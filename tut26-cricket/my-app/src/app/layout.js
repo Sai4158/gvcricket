@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 // Define your site's main information
 const siteName = "GV Cricket";
 const siteDescription =
-  "GV Cricket: Your ultimate digital scorebook for real-time cricket matches. Track scores, manage teams, analyze performance, and share live updates effortlessly. Perfect for amateur leagues, casual games, and passionate fans.";
+  "GV Cricket is the official scorekeeping app for our league. Use it to set up teams, score matches ball by ball, and share live results with the community.";
 const siteUrl = "https://gvcricket.com/"; // As requested
 const gvLogoPath = "/gvLogo.png"; // Path to your logo in the public directory, as per your file structure
 

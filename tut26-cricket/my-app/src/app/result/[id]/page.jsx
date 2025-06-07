@@ -633,14 +633,22 @@ export default function ResultPage() {
   return (
     <main className="min-h-screen bg-zinc-950 p-4 sm:p-8 text-zinc-300 font-sans">
       <div className="max-w-4xl mx-auto space-y-12 py-10">
-        <header className="flex justify-between items-center">
-          <h1 className="text-4xl font-bold text-white">Match Result</h1>
-          <button
-            onClick={() => router.push("/")}
-            className="inline-flex items-center gap-2 text-zinc-300 hover:text-white transition-colors"
-          >
-            <FaArrowLeft /> Back to Home
-          </button>
+        <header className="w-full max-w-4xl mx-auto grid grid-cols-3 items-center mt-7 mb-4 px-4">
+          {/* Back Button (Aligned to the left) */}
+          <div className="text-left">
+            <button
+              onClick={() => router.push("/session")}
+              className="inline-flex items-center gap-2 px-4 py-3 rounded-lg bg-zinc-800 text-zinc-200 hover:bg-zinc-700 transition-colors"
+            >
+              <FaArrowLeft />
+              <span>Back</span>
+            </button>
+          </div>
+
+          {/* New descriptive text added below the header */}
+          <h1 className="text-center text-4xl text-white mb-10">
+            Match Result
+          </h1>
         </header>
 
         <section className="space-y-8">
