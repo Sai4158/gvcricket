@@ -123,8 +123,8 @@ export default function HomePage() {
                 href="/session/new"
                 className=" text-center py-4 rounded-2xl bg-gradient-to-r from-yellow-400 via-amber-300 to-orange-400 text-black text-2xl font-bold shadow-lg shadow-amber-900/40 hover:scale-105 transition-transform"
               >
-                Launch Umpire <br />
-                Mode
+                Launch <br />
+                Umpire Mode
               </Link>
               <Link
                 href="/session"
@@ -134,7 +134,7 @@ export default function HomePage() {
               </Link>
               <Link
                 href="/rules"
-                className="text-center  py-4 rounded-2xl bg-zinc-700 text-white/80 text-2xl font-bold ring-1 ring-zinc-700 hover:bg-zinc-700 hover:text-white transition hover:scale-105 transition-transform"
+                className="text-center  py-4 rounded-2xl bg-zinc-500 text-white text-2xl font-bold ring-1 ring-zinc-700 hover:bg-zinc-700 hover:text-white transition hover:scale-105 transition-transform"
               >
                 View All Rules!
               </Link>
