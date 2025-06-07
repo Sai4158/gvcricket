@@ -149,7 +149,7 @@ export default function ViewSessionPage() {
       );
       return { session, match };
     },
-    { refreshInterval: 2000 }
+    { refreshInterval: 20000 }
   );
 
   const sessionData = data?.session;
@@ -190,6 +190,9 @@ export default function ViewSessionPage() {
             {sessionData.name}
           </h1>
           <p className="text-amber-400">Live Spectator View</p>
+          <p className="text-green-600 font-bold text-lg ">
+            <br /> Update every 20s
+          </p>
         </div>
         <button
           onClick={handleCopy}
