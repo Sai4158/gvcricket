@@ -432,6 +432,22 @@ const RulesModal = ({ onClose }) => (
             </li>
           </ul>
         </div>
+
+        <div>
+          <h3 className="font-bold text-red-400">Umpiring & Dismissals</h3>
+          <ul className="list-disc list-inside mt-2 pl-2">
+            <li>The umpire’s call is final and should be loud and clear.</li>
+            <li>
+              <strong>No LBWs</strong> (Leg Before Wicket).
+            </li>
+            <li>
+              <strong>No back runs</strong> or pitch boundary running allowed.
+            </li>
+            <li>
+              Waist-high full toss = <strong>No Ball</strong>
+            </li>
+          </ul>
+        </div>
         <div>
           <h3 className="font-bold text-teal-400">
             Fair Play & Team Selection
@@ -451,23 +467,6 @@ const RulesModal = ({ onClose }) => (
             <li>
               Fair rotation: The player who bats first bowls last, and vice
               versa.
-            </li>
-          </ul>
-        </div>
-        <div>
-          <h3 className="font-bold text-red-400">Umpiring & Dismissals</h3>
-          <ul className="list-disc list-inside mt-2 pl-2">
-            <li>The umpire’s call is final and should be loud and clear.</li>
-            <li>Stumping is allowed.</li>
-            <li>
-              <strong>No LBWs</strong> (Leg Before Wicket).
-            </li>
-            <li>
-              <strong>No back runs</strong> or pitch-boundary running allowed.
-            </li>
-            <li>
-              Waist-high full toss = <strong>No Ball</strong> → Free Hit next
-              ball.
             </li>
           </ul>
         </div>
