@@ -86,11 +86,11 @@ export default function RulesPage() {
           All players must bowl for a minimum of <strong>1 over</strong>.
         </RuleItem>
         <RuleItem>
-          To prevent disputes, teams must be <strong>randomized</strong> for
-          every match.
+          To prevent disputes, teams must try to be <strong>randomized</strong>{" "}
+          for every match.
         </RuleItem>
         <RuleItem>
-          The toss-winning captain chooses to bat or bowl. The opposing captain
+          The toss winning captain chooses to bat or bowl. The opposing captain
           gets the <strong>first pick</strong> when selecting teams.
         </RuleItem>
         <RuleItem>
