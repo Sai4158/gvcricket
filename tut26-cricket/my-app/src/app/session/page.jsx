@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------
-   src/app/session/page.jsx – (Final UI Polish)
+   src/app/session/page.jsx – (Final Version with all UX improvements)
 -------------------------------------------------------------------*/
 "use client";
 import { useEffect, useState } from "react";
@@ -14,9 +14,34 @@ import {
   FaLock,
   FaInfoCircle,
   FaTimes,
+  FaCheckCircle,
 } from "react-icons/fa";
 
-// --- PIN Entry Modal Component (No changes needed) ---
+// --- Helper function to calculate relative time ---
+function formatRelativeTime(dateString) {
+  if (!dateString) return "some time ago";
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "some time ago";
+
+  const now = new Date();
+  const seconds = Math.round((now - date) / 1000);
+
+  const minutes = Math.round(seconds / 60);
+  const hours = Math.round(minutes / 60);
+  const days = Math.round(hours / 24);
+
+  if (seconds < 60) return "just now";
+  if (minutes < 60) return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
+  if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+  if (days < 7) return `${days} day${days > 1 ? "s" : ""} ago`;
+
+  return `on ${date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  })}`;
+}
+
+// --- PIN Entry Modal Component (Updated for numeric keyboard) ---
 const PinModal = ({ onPinSubmit, onExit }) => {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
@@ -52,6 +77,8 @@ const PinModal = ({ onPinSubmit, onExit }) => {
         </p>
         <input
           type="password"
+          inputMode="numeric"
+          pattern="[0-9]*"
           value={pin}
           onChange={(e) => setPin(e.target.value)}
           onKeyPress={handleKeyPress}
@@ -72,90 +99,98 @@ const PinModal = ({ onPinSubmit, onExit }) => {
   );
 };
 
-// --- ✨ NEW: Updated Information Modal ---
-const InfoModal = ({ onExit }) => {
-  return (
+// --- Information Modal Component ---
+const InfoModal = ({ onExit }) => (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+    onClick={onExit}
+  >
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
-      onClick={onExit}
+      initial={{ scale: 0.9, y: 20 }}
+      animate={{ scale: 1, y: 0 }}
+      exit={{ scale: 0.9, y: 20 }}
+      className="relative w-full max-w-lg bg-zinc-900 p-8 rounded-2xl ring-1 ring-white/10 shadow-2xl"
+      onClick={(e) => e.stopPropagation()}
     >
-      <motion.div
-        initial={{ scale: 0.9, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.9, y: 20 }}
-        className="relative w-full max-w-lg bg-zinc-900 p-8 rounded-2xl ring-1 ring-white/10 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-white">Legend & Controls</h2>
-          <button
-            onClick={onExit}
-            className="text-zinc-500 hover:text-white transition-colors"
-          >
-            <FaTimes size={20} />
-          </button>
-        </div>
-        <div className="space-y-6 text-left">
-          {/* Status Legend */}
-          <div>
-            <h3 className="font-bold text-lg text-white mb-2">
-              Status Indicators
-            </h3>
-            <div className="flex items-start gap-4 mb-3">
-              <div className="w-3 h-3 rounded-full bg-green-500 mt-1.5 flex-shrink-0"></div>
-              <div>
-                <h4 className="font-semibold text-zinc-100">Live</h4>
-                <p className="text-zinc-400 text-sm">
-                  This match is currently in progress.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-4">
-              <div className="w-3 h-3 rounded-full bg-red-500 mt-1.5 flex-shrink-0"></div>
-              <div>
-                <h4 className="font-semibold text-zinc-100">Ended</h4>
-                <p className="text-zinc-400 text-sm">This match is finished.</p>
-              </div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-white">Legend & Controls</h2>
+        <button
+          onClick={onExit}
+          className="text-zinc-500 hover:text-white transition-colors"
+        >
+          <FaTimes size={20} />
+        </button>
+      </div>
+      <div className="space-y-6 text-left">
+        <div>
+          <h3 className="font-bold text-lg text-white mb-2">
+            Status Indicators
+          </h3>
+          <div className="flex items-start gap-4 mb-3">
+            <div className="w-3 h-3 rounded-full bg-green-500 mt-1.5 flex-shrink-0"></div>
+            <div>
+              <h4 className="font-semibold text-zinc-100">LIVE NOW</h4>
+              <p className="text-zinc-400 text-sm">
+                This match is currently in progress.
+              </p>
             </div>
           </div>
-          {/* Button Explanations */}
-          <div>
-            <h3 className="font-bold text-lg text-white mb-3">Buttons</h3>
-            <div className="flex items-start gap-4 mb-3">
-              <div className="text-blue-500 mt-0.5 flex-shrink-0">
-                <FaLock size={20} />
-              </div>
-              <div>
-                <h4 className="font-semibold text-zinc-100">Umpire Mode</h4>
-                <p className="text-zinc-400 text-sm">
-                  Continue scoring a live match. Requires a PIN to access the
-                  controls.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-4">
-              <div className="text-green-500 mt-0.5 flex-shrink-0">
-                <FaEye size={20} />
-              </div>
-              <div>
-                <h4 className="font-semibold text-zinc-100">See Score</h4>
-                <p className="text-zinc-400 text-sm">
-                  Open the spectator view. Anyone can see the live score or
-                  review a finished game.
-                </p>
-              </div>
+          <div className="flex items-start gap-4">
+            <div className="w-3 h-3 rounded-full bg-red-500 mt-1.5 flex-shrink-0"></div>
+            <div>
+              <h4 className="font-semibold text-zinc-100">Ended [Time] Ago</h4>
+              <p className="text-zinc-400 text-sm">
+                This match is finished. The time shows how long ago it ended.
+              </p>
             </div>
           </div>
         </div>
-      </motion.div>
+        <div>
+          <h3 className="font-bold text-lg text-white mb-3">Buttons</h3>
+          <div className="flex items-start gap-4 mb-3">
+            <div className="text-blue-500 mt-0.5 flex-shrink-0">
+              <FaLock size={20} />
+            </div>
+            <div>
+              <h4 className="font-semibold text-zinc-100">Umpire Mode</h4>
+              <p className="text-zinc-400 text-sm">
+                Continue scoring a live match. Requires a PIN to access the
+                controls.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="text-yellow-400 mt-0.5 flex-shrink-0">
+              <FaEye size={20} />
+            </div>
+            <div>
+              <h4 className="font-semibold text-zinc-100">View Live Score</h4>
+              <p className="text-zinc-400 text-sm">
+                Open the spectator view for a match that is currently live.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="text-green-500 mt-0.5 flex-shrink-0">
+              <FaEye size={20} />
+            </div>
+            <div>
+              <h4 className="font-semibold text-zinc-100">See Final Score</h4>
+              <p className="text-zinc-400 text-sm">
+                Review the final scorecard for a completed match.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </motion.div>
-  );
-};
+  </motion.div>
+);
 
-// --- Session Card Component (Updated with new button logic) ---
+// --- Session Card Component (Final Version) ---
 const SessionCard = ({ session, onUmpireClick }) => {
   const isLive = session.isLive;
 
@@ -177,21 +212,26 @@ const SessionCard = ({ session, onUmpireClick }) => {
               }`}
             ></div>
             <span
-              className={`text-xs font-bold ${
+              className={`text-xs font-bold capitalize ${
                 isLive ? "text-green-300" : "text-red-300"
               }`}
             >
-              {isLive ? "Live" : "Ended"}
+              {/* ✅ FIX: Use relative time for ended matches, and "LIVE NOW" for live ones */}
+              {isLive
+                ? "LIVE NOW"
+                : `Ended ${formatRelativeTime(
+                    session.updatedAt || session.createdAt
+                  )}`}
             </span>
           </div>
         </div>
+        {/* ✅ FIX: The full date remains here for clarity */}
         <p className="text-xs text-zinc-400 mb-6">
           {new Date(session.createdAt).toLocaleString()}
         </p>
       </div>
 
       <div className="flex gap-3 flex-wrap mt-auto">
-        {/* ✅ Umpire Mode button only shows if the match is live */}
         {isLive && session.match && (
           <button
             onClick={() => onUmpireClick(session)}
@@ -202,14 +242,17 @@ const SessionCard = ({ session, onUmpireClick }) => {
           </button>
         )}
 
-        {/* ✅ "See Score" button is always visible (if there's a match) and is now green */}
         {session.match && (
           <Link
             href={`/session/${session._id}/view`}
-            className="flex-1 px-4 py-2.5 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-600 text-center transition flex items-center justify-center gap-2"
+            className={`flex-1 px-4 py-2.5 rounded-lg font-semibold text-center transition flex items-center justify-center gap-2 ${
+              isLive
+                ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-black hover:brightness-110"
+                : "bg-green-700 text-white hover:bg-green-600"
+            }`}
           >
             <FaEye />
-            <span>See Score</span>
+            <span>{isLive ? "View Live Score" : "See Final Score"}</span>
           </Link>
         )}
       </div>
@@ -225,9 +268,7 @@ export default function SessionsPage() {
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const router = useRouter();
 
-  const handleUmpireClick = (session) => {
-    setSelectedSession(session);
-  };
+  const handleUmpireClick = (session) => setSelectedSession(session);
 
   useEffect(() => {
     fetch("/api/sessions")
@@ -249,7 +290,6 @@ export default function SessionsPage() {
         Loading...
       </main>
     );
-
   if (!sessions.length)
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-6 bg-zinc-950 text-zinc-100">
@@ -280,7 +320,6 @@ export default function SessionsPage() {
             <FaPlus /> New
           </Link>
         </div>
-
         <div className="flex justify-center items-center gap-3 mb-8">
           <h1 className="text-4xl text-center font-extrabold text-white">
             All Sessions
@@ -293,7 +332,6 @@ export default function SessionsPage() {
             <FaInfoCircle size={24} />
           </button>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sessions.map((s) => (
             <SessionCard
@@ -304,7 +342,6 @@ export default function SessionsPage() {
           ))}
         </div>
       </div>
-
       <AnimatePresence>
         {selectedSession && (
           <PinModal
