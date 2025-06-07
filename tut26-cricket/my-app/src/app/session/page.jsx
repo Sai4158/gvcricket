@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------
-   src/app/session/page.jsx – (Modernized Dark UI Version)
+   src/app/session/page.jsx – (Final UI Polish)
 -------------------------------------------------------------------*/
 "use client";
 import { useEffect, useState } from "react";
@@ -12,32 +12,24 @@ import {
   FaShieldAlt,
   FaEye,
   FaLock,
-  FaCheckCircle,
-  FaTimesCircle,
+  FaInfoCircle,
+  FaTimes,
 } from "react-icons/fa";
 
-// --- PIN Entry Modal Component ---
+// --- PIN Entry Modal Component (No changes needed) ---
 const PinModal = ({ onPinSubmit, onExit }) => {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
-
   const handleSubmit = () => {
-    // The PIN is hardcoded here as "0000".
-    if (pin === "0000") {
-      onPinSubmit();
-    } else {
+    if (pin === "0000") onPinSubmit();
+    else {
       setError("Incorrect PIN. Please try again.");
       setPin("");
     }
   };
-
-  // Allows submitting with the Enter key
   const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
-      handleSubmit();
-    }
+    if (e.key === "Enter") handleSubmit();
   };
-
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -80,14 +72,97 @@ const PinModal = ({ onPinSubmit, onExit }) => {
   );
 };
 
-// --- Session Card Component ---
+// --- ✨ NEW: Updated Information Modal ---
+const InfoModal = ({ onExit }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+      onClick={onExit}
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+        className="relative w-full max-w-lg bg-zinc-900 p-8 rounded-2xl ring-1 ring-white/10 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-white">Legend & Controls</h2>
+          <button
+            onClick={onExit}
+            className="text-zinc-500 hover:text-white transition-colors"
+          >
+            <FaTimes size={20} />
+          </button>
+        </div>
+        <div className="space-y-6 text-left">
+          {/* Status Legend */}
+          <div>
+            <h3 className="font-bold text-lg text-white mb-2">
+              Status Indicators
+            </h3>
+            <div className="flex items-start gap-4 mb-3">
+              <div className="w-3 h-3 rounded-full bg-green-500 mt-1.5 flex-shrink-0"></div>
+              <div>
+                <h4 className="font-semibold text-zinc-100">Live</h4>
+                <p className="text-zinc-400 text-sm">
+                  This match is currently in progress.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4">
+              <div className="w-3 h-3 rounded-full bg-red-500 mt-1.5 flex-shrink-0"></div>
+              <div>
+                <h4 className="font-semibold text-zinc-100">Ended</h4>
+                <p className="text-zinc-400 text-sm">This match is finished.</p>
+              </div>
+            </div>
+          </div>
+          {/* Button Explanations */}
+          <div>
+            <h3 className="font-bold text-lg text-white mb-3">Buttons</h3>
+            <div className="flex items-start gap-4 mb-3">
+              <div className="text-blue-500 mt-0.5 flex-shrink-0">
+                <FaLock size={20} />
+              </div>
+              <div>
+                <h4 className="font-semibold text-zinc-100">Umpire Mode</h4>
+                <p className="text-zinc-400 text-sm">
+                  Continue scoring a live match. Requires a PIN to access the
+                  controls.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4">
+              <div className="text-green-500 mt-0.5 flex-shrink-0">
+                <FaEye size={20} />
+              </div>
+              <div>
+                <h4 className="font-semibold text-zinc-100">See Score</h4>
+                <p className="text-zinc-400 text-sm">
+                  Open the spectator view. Anyone can see the live score or
+                  review a finished game.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+// --- Session Card Component (Updated with new button logic) ---
 const SessionCard = ({ session, onUmpireClick }) => {
-  const isLive = session.result === "";
+  const isLive = session.isLive;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
       className="bg-zinc-900/50 ring-1 ring-white/10 rounded-2xl p-6 flex flex-col justify-between shadow-lg hover:ring-white/20 transition-all"
     >
       <div>
@@ -98,15 +173,15 @@ const SessionCard = ({ session, onUmpireClick }) => {
           <div className="flex items-center gap-2">
             <div
               className={`w-2.5 h-2.5 rounded-full ${
-                isLive ? "bg-red-500 animate-pulse" : "bg-green-500"
+                isLive ? "bg-green-500 animate-pulse" : "bg-red-500"
               }`}
             ></div>
             <span
               className={`text-xs font-bold ${
-                isLive ? "text-red-300" : "text-green-300"
+                isLive ? "text-green-300" : "text-red-300"
               }`}
             >
-              {isLive ? "Live" : "Done"}
+              {isLive ? "Live" : "Ended"}
             </span>
           </div>
         </div>
@@ -116,22 +191,27 @@ const SessionCard = ({ session, onUmpireClick }) => {
       </div>
 
       <div className="flex gap-3 flex-wrap mt-auto">
-        {session.match && (
+        {/* ✅ Umpire Mode button only shows if the match is live */}
+        {isLive && session.match && (
           <button
-            onClick={() => onUmpireClick(session, isLive)} // Pass isLive along with session
-            className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold shadow hover:bg-blue-500 transition flex items-center justify-center gap-2"
+            onClick={() => onUmpireClick(session)}
+            className="flex-1 px-4 py-2.5 rounded-lg bg-blue-600 text-white font-semibold shadow hover:bg-blue-500 transition flex items-center justify-center gap-2"
           >
             <FaLock />
-            <span>{isLive ? "Umpire Mode (Live)" : "Umpire Mode (Saved)"}</span>
+            <span>Umpire Mode</span>
           </button>
         )}
-        <Link
-          href={`/session/${session._id}/view`}
-          className="flex-1 px-4 py-2 rounded-lg bg-green-700 ring-1 ring-black text-white font-semibold hover:bg-zinc-700 text-center transition flex items-center justify-center gap-2"
-        >
-          <FaEye />
-          <span>View</span>
-        </Link>
+
+        {/* ✅ "See Score" button is always visible (if there's a match) and is now green */}
+        {session.match && (
+          <Link
+            href={`/session/${session._id}/view`}
+            className="flex-1 px-4 py-2.5 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-600 text-center transition flex items-center justify-center gap-2"
+          >
+            <FaEye />
+            <span>See Score</span>
+          </Link>
+        )}
       </div>
     </motion.div>
   );
@@ -141,35 +221,26 @@ const SessionCard = ({ session, onUmpireClick }) => {
 export default function SessionsPage() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSession, setSelectedSession] = useState(null); // For PIN modal
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const router = useRouter();
 
-  // Accept sessionIsLive argument from SessionCard
-  const handleUmpireClick = (session, sessionIsLive) => {
-    setSelectedSession({ ...session, sessionIsLive }); // Store it in selectedSession
+  const handleUmpireClick = (session) => {
+    setSelectedSession(session);
   };
 
   useEffect(() => {
     fetch("/api/sessions")
       .then((res) => res.json())
       .then((data) => setSessions(data ?? []))
-      .catch((e) => {
-        console.error(e);
-        // Handle error with a state update instead of alert
-      })
+      .catch((e) => console.error(e))
       .finally(() => setLoading(false));
   }, []);
 
   const handlePinSubmit = () => {
-    if (!selectedSession) return;
-
-    // Use the sessionIsLive property stored in selectedSession
-    const path = selectedSession.sessionIsLive
-      ? `/match/${selectedSession.match}`
-      : `/result/${selectedSession.match}`;
-
-    router.push(path);
-    setSelectedSession(null); // Close modal
+    if (!selectedSession || !selectedSession.isLive) return;
+    router.push(`/match/${selectedSession.match}`);
+    setSelectedSession(null);
   };
 
   if (loading)
@@ -210,19 +281,25 @@ export default function SessionsPage() {
           </Link>
         </div>
 
-        <h1 className="text-4xl text-center font-extrabold text-white mt-10 mb-5">
-          All Sessions
-        </h1>
+        <div className="flex justify-center items-center gap-3 mb-8">
+          <h1 className="text-4xl text-center font-extrabold text-white">
+            All Sessions
+          </h1>
+          <button
+            onClick={() => setIsInfoModalOpen(true)}
+            className="text-zinc-500 hover:text-blue-400 transition-colors"
+            aria-label="Information about statuses and controls"
+          >
+            <FaInfoCircle size={24} />
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sessions.map((s) => (
             <SessionCard
               key={s._id}
               session={s}
-              // FIX: Correctly pass the session and its isLive status to handleUmpireClick
-              onUmpireClick={(clickedSession, clickedIsLive) =>
-                handleUmpireClick(clickedSession, clickedIsLive)
-              }
+              onUmpireClick={handleUmpireClick}
             />
           ))}
         </div>
@@ -234,6 +311,9 @@ export default function SessionsPage() {
             onPinSubmit={handlePinSubmit}
             onExit={() => setSelectedSession(null)}
           />
+        )}
+        {isInfoModalOpen && (
+          <InfoModal onExit={() => setIsInfoModalOpen(false)} />
         )}
       </AnimatePresence>
     </main>
