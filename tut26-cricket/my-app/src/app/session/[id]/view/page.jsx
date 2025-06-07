@@ -190,8 +190,8 @@ export default function ViewSessionPage() {
             {sessionData.name}
           </h1>
           <p className="text-amber-400">Live Spectator View</p>
-          <p className="text-green-600 font-bold text-lg ">
-            <br /> Update every 20s
+          <p className="text-green-500 font-bold text-xl ">
+            <br /> Updates Every 20s
           </p>
         </div>
         <button
