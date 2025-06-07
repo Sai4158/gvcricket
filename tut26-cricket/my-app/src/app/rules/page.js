@@ -127,7 +127,6 @@ export default function RulesPage() {
         <RuleItem>
           The umpire's decision is final and must be called loudly.
         </RuleItem>
-        <RuleItem>Stumping is allowed.</RuleItem>
         <RuleItem>
           There are <strong>no LBWs</strong> (Leg Before Wicket).
         </RuleItem>
