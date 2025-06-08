@@ -708,7 +708,7 @@ export default function MatchPage() {
       match.innings === "first" ? match.innings1.team : match.innings2.team;
     const currentTeamArray =
       match.teamA[0] === battingTeamName ? match.teamA : match.teamB;
-    const maxWickets = currentTeamArray?.length - 1 || 10; // A team is all out when (players - 1) are out.
+    const maxWickets = currentTeamArray?.length || 10; // A team is all out when (players - 1) are out.
 
     const isFirstInnings = match.innings === "first";
     const activeInningsKey = isFirstInnings ? "innings1" : "innings2";
