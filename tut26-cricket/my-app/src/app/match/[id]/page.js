@@ -718,11 +718,32 @@ export default function MatchPage() {
     setShowInningsEnd(endCondition);
   }, [match]);
 
+  // const handleCopyShareLink = () => {
+  //   const link = `${window.location.origin}/session/${match.sessionId}/view`;
+  //   navigator.clipboard
+  //     .writeText(link)
+  //     .then(() => alert("Spectator link copied!"));
+  // };
+
   const handleCopyShareLink = () => {
     const link = `${window.location.origin}/session/${match.sessionId}/view`;
-    navigator.clipboard
-      .writeText(link)
-      .then(() => alert("Spectator link copied!"));
+
+    if (navigator.share) {
+      navigator
+        .share({
+          title: "Spectator Link",
+          text: "Join the match as a spectator!",
+          url: link,
+        })
+        .catch((err) => {
+          // Fallback if user cancels or error occurs
+          alert("Spectator link ready to share!");
+        });
+    } else {
+      navigator.clipboard
+        .writeText(link)
+        .then(() => alert("Spectator link copied!"));
+    }
   };
 
   if (isLoading) return <Splash>Loading Match...</Splash>;
@@ -748,8 +769,8 @@ export default function MatchPage() {
           <Scoreboard match={match} history={oversHistory} />
           <BallTracker history={oversHistory} />
           <Controls onScore={handleScoreEvent} disabled={controlsDisabled} />
-          <div className="mt-8 pt-6 border-t border-white/10 space-y-4">
-            <div className="flex items-center justify-around">
+          <div className="mt-8 pt-6 border-t border-white/10 space-y-4 ">
+            <div className="flex items-center justify-around ">
               <ActionButton
                 onClick={() => setShowEditTeams(true)}
                 icon={<FaUserEdit size={40} />}
