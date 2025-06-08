@@ -152,19 +152,20 @@ export default function TossPage() {
   const startMatch = async (decision) => {
     if (isSubmitting || !tossResult.winnerName || !decision || !matchDetails)
       return;
+
     setIsSubmitting(true);
     const { teamA, teamB } = matchDetails;
     const teamAName = teamA[0];
     const teamBName = teamB[0];
     const { winnerName } = tossResult;
+
     const teamBattingFirst =
-      winnerName === teamAName
-        ? decision === "bat"
-          ? teamAName
-          : teamBName
-        : decision === "bat"
+      decision === "bat"
+        ? winnerName
+        : winnerName === teamAName
         ? teamBName
         : teamAName;
+
     const teamBowlingFirst =
       teamBattingFirst === teamAName ? teamBName : teamAName;
 

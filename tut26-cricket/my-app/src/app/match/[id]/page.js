@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------
-    src/app/match/[id]/page.jsx – (Final UI and Grammar Fix)
+    src/app/match/[id]/page.jsx – (Corrected Logic)
 -------------------------------------------------------------------*/
 "use client";
 
@@ -152,25 +152,14 @@ const useMatch = (matchId) => {
 
 // ✅ FIX: Header grammar corrected and team name is now color-coded.
 const Header = ({ match }) => {
-  const { innings, tossWinner, tossDecision, teamA, teamB } = match;
+  // FIX: This logic is now robust. It directly uses the team names stored
+  // in the innings data, which is the reliable source of truth.
+  const { innings, teamA, teamB, innings1, innings2 } = match;
 
   const teamAName = teamA[0];
-  const teamBName = teamB[0];
-
-  let firstBattingTeamName;
-  if (tossWinner === teamAName) {
-    firstBattingTeamName = tossDecision === "bat" ? teamAName : teamBName;
-  } else {
-    firstBattingTeamName = tossDecision === "bat" ? teamBName : teamAName;
-  }
-
   const currentBattingTeam =
-    innings === "first"
-      ? firstBattingTeamName
-      : firstBattingTeamName === teamAName
-      ? teamBName
-      : teamAName;
-  const target = innings === "first" ? null : (match.innings1.score ?? 0) + 1;
+    innings === "first" ? innings1.team : innings2.team;
+  const target = innings === "first" ? null : (innings1.score ?? 0) + 1;
 
   // Determine color based on which team is batting
   const teamColorClass =
@@ -202,8 +191,14 @@ const Scoreboard = ({ match, history }) => {
     .flatMap((o) => o.balls)
     .filter((b) => b.extraType !== "wide" && b.extraType !== "noball").length;
   const oversDisplay = `${Math.floor(legalBalls / 6)}.${legalBalls % 6}`;
-  const battingTeamKey = match.innings === "first" ? "teamA" : "teamB";
-  const totalWickets = match[battingTeamKey]?.length || 11;
+
+  // FIX: Robustly find the current batting team's player list to get the correct team size.
+  const battingTeamName =
+    match.innings === "first" ? match.innings1.team : match.innings2.team;
+  const currentTeamArray =
+    match.teamA[0] === battingTeamName ? match.teamA : match.teamB;
+  const totalPlayers = currentTeamArray?.length || 11;
+
   return (
     <div className="grid grid-cols-2 gap-4 text-center mb-6 bg-zinc-900/50 p-4 rounded-2xl ring-1 ring-white/10">
       <div>
@@ -212,7 +207,7 @@ const Scoreboard = ({ match, history }) => {
           <span className="text-4xl text-rose-500">/{match.outs}</span>
         </div>
         <div className="text-zinc-100 text-sm uppercase tracking-wider">
-          Score / Wickets <strong>({totalWickets})</strong>
+          Score / Wickets <strong>({totalPlayers})</strong>
         </div>
       </div>
       <div>
@@ -342,6 +337,8 @@ const MidGameTeamRoster = ({ title, teamNames, setTeamNames, isBatting }) => {
 const EditTeamsModal = ({ match, onUpdate, onClose }) => {
   const [teamA, setTeamA] = useState([...match.teamA]);
   const [teamB, setTeamB] = useState([...match.teamB]);
+
+  // This logic for determining the batting team is correct and robust.
   const isTeamABatting =
     (match.innings === "first" && match.innings1.team === match.teamA[0]) ||
     (match.innings === "second" && match.innings2.team === match.teamA[0]);
@@ -379,6 +376,7 @@ const EditTeamsModal = ({ match, onUpdate, onClose }) => {
   );
 };
 
+// ... (The rest of the sub-components like BallTracker, Ball, Controls, etc., remain unchanged as they were correct)
 const BallTracker = ({ history }) => {
   const lastOverBalls = history.at(-1)?.balls ?? [];
   return (
@@ -681,7 +679,6 @@ const ModalBase = ({ children, title, onExit }) => {
     </motion.div>
   );
 };
-
 // --- Main Page Component ---
 export default function MatchPage() {
   const { id: matchId } = useParams();
@@ -704,6 +701,15 @@ export default function MatchPage() {
 
   useEffect(() => {
     if (!match) return;
+
+    // FIX: This logic now correctly identifies the batting team's data
+    // to determine if the team is all out.
+    const battingTeamName =
+      match.innings === "first" ? match.innings1.team : match.innings2.team;
+    const currentTeamArray =
+      match.teamA[0] === battingTeamName ? match.teamA : match.teamB;
+    const maxWickets = currentTeamArray?.length - 1 || 10; // A team is all out when (players - 1) are out.
+
     const isFirstInnings = match.innings === "first";
     const activeInningsKey = isFirstInnings ? "innings1" : "innings2";
     const oversHistory = match[activeInningsKey]?.history ?? [];
@@ -711,19 +717,11 @@ export default function MatchPage() {
       .flatMap((o) => o.balls)
       .filter((b) => b.extraType !== "wide" && b.extraType !== "noball").length;
     const oversDone = legalBallsInInnings >= match.overs * 6;
-    const battingTeamKey = match.innings === "first" ? "teamA" : "teamB";
-    const isAllOut = match.outs >= (match[battingTeamKey]?.length || 1);
+    const isAllOut = match.outs >= maxWickets;
     const endCondition =
       oversDone || isAllOut || !!match.result || !match.isOngoing;
     setShowInningsEnd(endCondition);
   }, [match]);
-
-  // const handleCopyShareLink = () => {
-  //   const link = `${window.location.origin}/session/${match.sessionId}/view`;
-  //   navigator.clipboard
-  //     .writeText(link)
-  //     .then(() => alert("Spectator link copied!"));
-  // };
 
   const handleCopyShareLink = () => {
     const link = `${window.location.origin}/session/${match.sessionId}/view`;
