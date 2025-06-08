@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import useSWR from "swr";
 import Link from "next/link";
-import { FaCopy, FaSync, FaArrowLeft, FaCheck } from "react-icons/fa";
+import { FaCopy, FaArrowLeft, FaCheck } from "react-icons/fa";
 
 // --- Fetcher ---
 const fetcher = (url) => fetch(url).then((res) => res.json());
@@ -66,33 +66,34 @@ const SplashMsg = ({ children }) => (
   </main>
 );
 
+// ✅ UPDATED: This component now only shows fallen wickets and total players.
 const LiveScoreCard = ({ match }) => {
   if (!match || !match.innings1 || !match.innings2) return null;
 
   const isFirstInnings = match.innings === "first";
   const battingInnings = isFirstInnings ? match.innings1 : match.innings2;
-  const battingTeam = battingInnings.team;
-  const runRate = calculateRunRate(match.score, battingInnings.history);
-  const legalBalls = battingInnings.history
-    .flatMap((o) => o.balls)
-    .filter((b) => b.extraType !== "wide" && b.extraType !== "noball").length;
-  const oversDisplay = `${Math.floor(legalBalls / 6)}.${legalBalls % 6}`;
+  const battingTeamName = battingInnings.team;
+
+  // Determine the correct team array to get the player count
+  const battingTeamData =
+    battingTeamName === match.teamA[0] ? match.teamA : match.teamB;
+  const playerCount = battingTeamData.length;
 
   return (
     <div className="w-full max-w-xl bg-black/30 backdrop-blur-sm ring-1 ring-white/10 rounded-3xl p-6 text-center space-y-2 shadow-2xl shadow-zinc-900">
-      <p className="text-xl font-bold text-amber-300 tracking-wide">
-        🏏 {battingTeam}'s Team
+      <p className="text-5xl font-bold text-amber-300 tracking-wide mb-5">
+        {battingTeamName}
       </p>
-      <p className="text-8xl font-extrabold text-white">
-        {match.score}/{match.outs}
+      <p className="text-6xl font-extrabold text-white">
+        <span className="text-green-600">{match.score}</span>/
+        <span className="text-red-600">{match.outs}</span>
       </p>
-      <div className="text-lg text-zinc-400 flex justify-center items-center gap-4">
+      <br />
+      <div className="text-2xl text-white flex justify-center items-center gap-4">
+        {/* This section now shows the total number of players */}
         <span>
-          Overs: <span className="font-bold text-zinc-200">{oversDisplay}</span>
-        </span>
-        <span className="text-zinc-600">|</span>
-        <span>
-          Run Rate: <span className="font-bold text-zinc-200">{runRate}</span>
+          Total Players:{" "}
+          <span className="font-bold text-white">{playerCount}</span>
         </span>
       </div>
     </div>
@@ -105,12 +106,12 @@ const TeamInningsDetail = ({ title, inningsData }) => {
   return (
     <div className="bg-zinc-900/50 p-6 rounded-2xl ring-1 ring-zinc-800">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold text-white">{title}'s Team</h2>
-        <span className="text-3xl font-mono font-bold text-amber-300">
-          {inningsData?.score ?? 0}
+        <h2 className="text-2xl font-bold text-white">{title}</h2>
+        <span className="text-2xl font-mono font-bold text-amber-300">
+          {inningsData?.score ?? 0} Runs
         </span>
       </div>
-      <div className="text-sm text-zinc-400 mb-4">Run Rate: {runRate}</div>
+      <div className="text-sm text-zinc-100 mb-4">Run Rate: {runRate}</div>
       <div className="space-y-4 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
         {inningsData?.history.length > 0 ? (
           [...inningsData.history].reverse().map((over) => (
@@ -126,7 +127,9 @@ const TeamInningsDetail = ({ title, inningsData }) => {
             </div>
           ))
         ) : (
-          <p className="text-sm text-zinc-500">No overs bowled yet.</p>
+          <p className="text-sm text-yellow-200 font-bold">
+            No overs bowled yet.
+          </p>
         )}
       </div>
     </div>
@@ -149,7 +152,7 @@ export default function ViewSessionPage() {
       );
       return { session, match };
     },
-    { refreshInterval: 20000 }
+    { refreshInterval: 15000 }
   );
 
   const sessionData = data?.session;
@@ -186,13 +189,12 @@ export default function ViewSessionPage() {
           <FaArrowLeft size={20} />
         </button>
         <div>
-          <h1 className="text-4xl font-extrabold text-white">
+          <h1 className="text-3xl font-extrabold text-white">
             {sessionData.name}
           </h1>
-          <p className="text-amber-400">Live Spectator View</p>
-          <p className="text-green-500 font-bold text-xl ">
-            <br /> Updates Every 20s
-          </p>
+          <br />
+          <p className="text-green-400 mb-2">Live Spectator View</p>
+          <p className="text-amber-500 font-bold text-xl ">Updates Every 15s</p>
         </div>
         <button
           onClick={handleCopy}
