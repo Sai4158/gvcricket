@@ -731,8 +731,6 @@ export default function MatchPage() {
     if (navigator.share) {
       navigator
         .share({
-          title: "Spectator Link",
-          text: "Join the match as a spectator!",
           url: link,
         })
         .catch((err) => {
