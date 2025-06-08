@@ -289,15 +289,15 @@ export default function TeamSelectionPage() {
               🏏Team Selection
             </h1>
           </div>
-          <p className="text-zinc-400 mt-2">
+          <p className="text-zinc-100 mt-2">
             Set player counts, team names, and match overs.
           </p>
           <br />
           <button
             onClick={() => setIsInfoModalOpen(true)}
-            className="text-zinc-500 hover:text-blue-400 transition-colors"
+            className="text-white hover:text-blue-400 transition-colors"
           >
-            <FaInfoCircle size={24} />
+            <FaInfoCircle size={40} />
           </button>
         </header>
 
