@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------
-   src/app/match/[id]/page.jsx – (Corrected Batting Team Display)
+    src/app/match/[id]/page.jsx – (Final UI and Grammar Fix)
 -------------------------------------------------------------------*/
 "use client";
 
@@ -13,6 +13,12 @@ import {
   FaSyncAlt,
   FaInfoCircle,
   FaTimes,
+  FaUserEdit,
+  FaTrash,
+  FaPen,
+  FaCheck,
+  FaPlus,
+  FaMinus,
 } from "react-icons/fa";
 import { LuUndo2 } from "react-icons/lu";
 
@@ -20,7 +26,6 @@ import { LuUndo2 } from "react-icons/lu";
 const useMatch = (matchId) => {
   const router = useRouter();
   const fetcher = (url) => fetch(url).then((res) => res.json());
-
   const {
     data: match,
     error,
@@ -29,7 +34,6 @@ const useMatch = (matchId) => {
   } = useSWR(matchId ? `/api/matches/${matchId}` : null, fetcher, {
     revalidateOnFocus: false,
   });
-
   const [isUpdating, setIsUpdating] = useState(false);
   const [historyStack, setHistoryStack] = useState([]);
 
@@ -40,20 +44,20 @@ const useMatch = (matchId) => {
       setHistoryStack((prev) => [...prev, match]);
     }
     const optimisticData = { ...match, ...payload };
-    await mutate(
-      fetch(`/api/matches/${matchId}`, {
+    try {
+      await mutate(optimisticData, false);
+      await fetch(`/api/matches/${matchId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      }).then((res) => res.json()),
-      {
-        optimisticData,
-        rollbackOnError: true,
-        populateCache: true,
-        revalidate: false,
-      }
-    );
-    setIsUpdating(false);
+      });
+      await mutate();
+    } catch (e) {
+      console.error("Failed to update match:", e);
+      await mutate(match, true);
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const addBallToHistory = (currentMatch, ball) => {
@@ -67,7 +71,6 @@ const useMatch = (matchId) => {
       lastOver?.balls.filter(
         (b) => b.extraType !== "wide" && b.extraType !== "noball"
       ).length ?? 0;
-
     if (!lastOver || (validBallsInLastOver >= 6 && isLegalBall)) {
       history.push({ overNumber: history.length + 1, balls: [ball] });
     } else {
@@ -80,14 +83,10 @@ const useMatch = (matchId) => {
     const payload = structuredClone(match);
     const activeInningsKey =
       payload.innings === "first" ? "innings1" : "innings2";
-    const runsToAdd = runs;
-
-    payload[activeInningsKey].score += runsToAdd;
+    payload[activeInningsKey].score += runs;
     payload.score = payload[activeInningsKey].score;
-    if (isOut) {
-      payload.outs++;
-    }
-    const newBall = { runs: runsToAdd, isOut, extraType };
+    if (isOut) payload.outs++;
+    const newBall = { runs, isOut, extraType };
     payload.balls.push(newBall);
     addBallToHistory(payload, newBall);
     if (
@@ -95,7 +94,6 @@ const useMatch = (matchId) => {
       payload.score > payload.innings1.score
     ) {
       payload.isOngoing = false;
-      // Calculate result here when match ends by chasing
       const wicketsLeft = (match.teamB?.length || 11) - 1 - payload.outs;
       payload.result = `${
         payload[activeInningsKey].team
@@ -108,7 +106,6 @@ const useMatch = (matchId) => {
     if (historyStack.length === 0) return;
     const lastState = historyStack.at(-1);
     setHistoryStack((prev) => prev.slice(0, -1));
-    await mutate(lastState, false);
     await patchAndUpdate(lastState, true);
   };
 
@@ -146,28 +143,27 @@ const useMatch = (matchId) => {
     handleScoreEvent,
     handleNextInningsOrEnd,
     handleUndo,
+    patchAndUpdate,
     mutate,
   };
 };
 
 // --- UI Sub-components ---
 
-// ✅ FIX: This component now has corrected and simplified logic
+// ✅ FIX: Header grammar corrected and team name is now color-coded.
 const Header = ({ match }) => {
   const { innings, tossWinner, tossDecision, teamA, teamB } = match;
 
-  // Determine which team bats first based on toss
-  let firstBattingTeamName;
   const teamAName = teamA[0];
   const teamBName = teamB[0];
 
+  let firstBattingTeamName;
   if (tossWinner === teamAName) {
     firstBattingTeamName = tossDecision === "bat" ? teamAName : teamBName;
   } else {
     firstBattingTeamName = tossDecision === "bat" ? teamBName : teamAName;
   }
 
-  // Determine the team currently batting
   const currentBattingTeam =
     innings === "first"
       ? firstBattingTeamName
@@ -176,6 +172,10 @@ const Header = ({ match }) => {
       : teamAName;
   const target = innings === "first" ? null : (match.innings1.score ?? 0) + 1;
 
+  // Determine color based on which team is batting
+  const teamColorClass =
+    currentBattingTeam === teamAName ? "text-sky-400" : "text-red-400";
+
   return (
     <header className="text-center mb-6">
       <h1 className="text-5xl md:text-6xl font-bold text-white tracking-tight">
@@ -183,7 +183,10 @@ const Header = ({ match }) => {
       </h1>
       <br />
       <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">
-        {currentBattingTeam}'s Team Is Batting Now!
+        <span className={`font-bold ${teamColorClass}`}>
+          {currentBattingTeam}
+        </span>{" "}
+        is Batting Now!
       </h1>
       {target !== null && (
         <p className="text-zinc-400 text-lg mt-1">
@@ -199,6 +202,8 @@ const Scoreboard = ({ match, history }) => {
     .flatMap((o) => o.balls)
     .filter((b) => b.extraType !== "wide" && b.extraType !== "noball").length;
   const oversDisplay = `${Math.floor(legalBalls / 6)}.${legalBalls % 6}`;
+  const battingTeamKey = match.innings === "first" ? "teamA" : "teamB";
+  const totalWickets = match[battingTeamKey]?.length || 11;
   return (
     <div className="grid grid-cols-2 gap-4 text-center mb-6 bg-zinc-900/50 p-4 rounded-2xl ring-1 ring-white/10">
       <div>
@@ -206,17 +211,171 @@ const Scoreboard = ({ match, history }) => {
           {match.score}
           <span className="text-4xl text-rose-500">/{match.outs}</span>
         </div>
-        <div className="text-zinc-500 text-sm uppercase tracking-wider">
-          Score
+        <div className="text-zinc-100 text-sm uppercase tracking-wider">
+          Score / Wickets <strong>({totalWickets})</strong>
         </div>
       </div>
       <div>
         <div className="text-6xl font-bold text-white">{oversDisplay}</div>
-        <div className="text-zinc-500 text-sm uppercase tracking-wider">
-          Overs ({match.overs})
+        <div className="text-zinc-100 text-sm uppercase tracking-wider">
+          Overs <strong>({match.overs})</strong>
         </div>
       </div>
     </div>
+  );
+};
+
+// ✅ FIX: UI is now smaller and more compact.
+const MidGameTeamRoster = ({ title, teamNames, setTeamNames, isBatting }) => {
+  const [isEditing, setIsEditing] = useState(false);
+
+  const teamColorClass = isBatting ? "text-amber-300" : "text-sky-400";
+  const teamRingClass = isBatting
+    ? "focus:ring-amber-500"
+    : "focus:ring-sky-500";
+
+  const handleNameChange = (index, newName) =>
+    setTeamNames((current) =>
+      current.map((name, i) => (i === index ? newName : name))
+    );
+  const addPlayer = () => {
+    if (teamNames.length < 15)
+      setTeamNames((current) => [...current, `Player ${current.length + 1}`]);
+  };
+  const removeLastPlayer = () => {
+    if (teamNames.length > 1) setTeamNames((current) => current.slice(0, -1));
+  };
+  const removePlayerAtIndex = (indexToRemove) =>
+    setTeamNames((current) =>
+      current.filter((_, index) => index !== indexToRemove)
+    );
+
+  return (
+    <div className="bg-zinc-900/50 p-4 rounded-xl ring-1 ring-white/10 space-y-3 transition-all duration-300">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <h2 className={`text-xl font-bold ${teamColorClass}`}>
+            {teamNames[0] || title}
+          </h2>
+          {isBatting && (
+            <span className="text-xs font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full">
+              BATTING
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => setIsEditing(!isEditing)}
+          className="p-2 rounded-full hover:bg-white/10 transition-colors"
+        >
+          {isEditing ? (
+            <FaCheck className="text-green-400" size={18} />
+          ) : (
+            <FaPen size={18} />
+          )}
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between p-2 bg-zinc-800 rounded-lg">
+        <span className="font-semibold text-zinc-300 text-sm">Players</span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={removeLastPlayer}
+            className="w-7 h-7 rounded-md bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center transition-colors"
+          >
+            <FaMinus />
+          </button>
+          <span className="text-lg font-bold w-6 text-center">
+            {teamNames.length}
+          </span>
+          <button
+            onClick={addPlayer}
+            className="w-7 h-7 rounded-md bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center transition-colors"
+          >
+            <FaPlus />
+          </button>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {isEditing && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-2 pt-3 border-t border-white/10">
+              {teamNames.map((name, i) => (
+                <motion.div
+                  key={i}
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-2"
+                >
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => handleNameChange(i, e.target.value)}
+                    placeholder={i === 0 ? "Team Name" : `Player ${i + 1}`}
+                    className={`flex-1 px-3 py-2 text-sm rounded-lg bg-zinc-900 focus:ring-2 ${teamRingClass} outline-none transition`}
+                  />
+                  {i > 0 && (
+                    <button
+                      onClick={() => removePlayerAtIndex(i)}
+                      className="p-2 text-zinc-500 hover:text-red-500 transition-colors"
+                    >
+                      <FaTrash />
+                    </button>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const EditTeamsModal = ({ match, onUpdate, onClose }) => {
+  const [teamA, setTeamA] = useState([...match.teamA]);
+  const [teamB, setTeamB] = useState([...match.teamB]);
+  const isTeamABatting =
+    (match.innings === "first" && match.innings1.team === match.teamA[0]) ||
+    (match.innings === "second" && match.innings2.team === match.teamA[0]);
+
+  const handleSaveChanges = () => {
+    const finalTeamA = teamA.map((p) => p.trim()).filter(Boolean);
+    const finalTeamB = teamB.map((p) => p.trim()).filter(Boolean);
+    onUpdate({ teamA: finalTeamA, teamB: finalTeamB });
+    onClose();
+  };
+
+  return (
+    <ModalBase title="Edit Teams" onExit={onClose}>
+      <div className="space-y-4 text-left max-h-[70vh] overflow-y-auto p-1">
+        <MidGameTeamRoster
+          title="Team A"
+          teamNames={teamA}
+          setTeamNames={setTeamA}
+          isBatting={isTeamABatting}
+        />
+        <MidGameTeamRoster
+          title="Team B"
+          teamNames={teamB}
+          setTeamNames={setTeamB}
+          isBatting={!isTeamABatting}
+        />
+      </div>
+      <button
+        onClick={handleSaveChanges}
+        className="mt-6 w-full py-2.5 text-md bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-500 transition"
+      >
+        Save Changes
+      </button>
+    </ModalBase>
   );
 };
 
@@ -321,9 +480,10 @@ const ActionButton = ({ onClick, icon, label, disabled }) => (
     className="flex flex-col items-center gap-1.5 p-2 text-zinc-400 hover:text-white transition w-20 disabled:opacity-50 disabled:cursor-not-allowed"
   >
     {icon}
-    <span className="text-xs font-medium">{label}</span>
+    <span className="text-xs font-medium text-center">{label}</span>
   </button>
 );
+
 const Splash = ({ children }) => (
   <main className="h-screen w-full flex items-center justify-center bg-zinc-950 text-white text-xl">
     {children}
@@ -332,7 +492,6 @@ const Splash = ({ children }) => (
 
 const HistoryModal = ({ history, onClose }) => (
   <ModalBase title="Over History" onExit={onClose}>
-    {" "}
     <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-2 text-left">
       {history.length > 0 ? (
         [...history].reverse().map((over, i) => (
@@ -504,10 +663,10 @@ const ModalBase = ({ children, title, onExit }) => {
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.8, opacity: 0 }}
         transition={{ type: "spring", stiffness: 400, damping: 30 }}
-        className="relative bg-zinc-900 p-8 rounded-2xl max-w-md w-full ring-1 ring-white/10 shadow-2xl shadow-black"
+        className="relative bg-zinc-900 p-5 sm:p-6 rounded-2xl max-w-sm w-full ring-1 ring-white/10 shadow-2xl shadow-black"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-3xl font-bold mb-6 text-center text-white">
+        <h2 className="text-2xl font-bold mb-4 text-center text-white">
           {title}
         </h2>
         {children}
@@ -535,46 +694,50 @@ export default function MatchPage() {
     handleScoreEvent,
     handleNextInningsOrEnd,
     handleUndo,
+    patchAndUpdate,
     mutate,
   } = useMatch(matchId);
   const [showHistory, setShowHistory] = useState(false);
   const [showInningsEnd, setShowInningsEnd] = useState(false);
   const [showRules, setShowRules] = useState(false);
-
-  const isFirstInnings = match?.innings === "first";
-  const activeInningsKey = isFirstInnings ? "innings1" : "innings2";
-  const oversHistory = match?.[activeInningsKey]?.history ?? [];
+  const [showEditTeams, setShowEditTeams] = useState(false);
 
   useEffect(() => {
     if (!match) return;
+    const isFirstInnings = match.innings === "first";
+    const activeInningsKey = isFirstInnings ? "innings1" : "innings2";
+    const oversHistory = match[activeInningsKey]?.history ?? [];
     const legalBallsInInnings = oversHistory
       .flatMap((o) => o.balls)
       .filter((b) => b.extraType !== "wide" && b.extraType !== "noball").length;
     const oversDone = legalBallsInInnings >= match.overs * 6;
-    const isAllOut =
-      match.outs >= (match[isFirstInnings ? "teamA" : "teamB"]?.length || 10);
+    const battingTeamKey = match.innings === "first" ? "teamA" : "teamB";
+    const isAllOut = match.outs >= (match[battingTeamKey]?.length || 1);
     const endCondition =
       oversDone || isAllOut || !!match.result || !match.isOngoing;
     setShowInningsEnd(endCondition);
-  }, [match, oversHistory]);
+  }, [match]);
 
   const handleCopyShareLink = () => {
     const link = `${window.location.origin}/session/${match.sessionId}/view`;
-    navigator.clipboard.writeText(link).then(() => {
-      alert("Spectator link copied!");
-    });
+    navigator.clipboard
+      .writeText(link)
+      .then(() => alert("Spectator link copied!"));
   };
 
   if (isLoading) return <Splash>Loading Match...</Splash>;
-  if (error) return <Splash>Error: {error.message}</Splash>;
+  if (error) return <Splash>Error: Could not load match data.</Splash>;
   if (!match) return <Splash>Match not found.</Splash>;
 
+  const isFirstInnings = match.innings === "first";
+  const activeInningsKey = isFirstInnings ? "innings1" : "innings2";
+  const oversHistory = match[activeInningsKey]?.history ?? [];
   const controlsDisabled = isUpdating || showInningsEnd;
 
   return (
     <>
       <main className="min-h-screen font-sans bg-zinc-950 text-white p-4">
-        <div className="max-w-md mx-auto pt-8 pb-12">
+        <div className="max-w-md mx-auto pt-8 pb-24">
           {match.result && (
             <div className="bg-green-900/50 text-green-300 p-4 rounded-xl text-center mb-4 ring-1 ring-green-500">
               <h3 className="font-bold text-xl">Match Over</h3>
@@ -585,34 +748,44 @@ export default function MatchPage() {
           <Scoreboard match={match} history={oversHistory} />
           <BallTracker history={oversHistory} />
           <Controls onScore={handleScoreEvent} disabled={controlsDisabled} />
-          <div className="flex items-center justify-around gap-2 mt-8 border-t border-white pt-4">
-            <ActionButton
-              onClick={() => setShowRules(true)}
-              icon={<FaInfoCircle size={40} />}
-              label="Rules"
-            />
-            <ActionButton
-              onClick={() => mutate()}
-              icon={<FaSyncAlt size={40} />}
-              label="Sync"
-              disabled={isUpdating}
-            />
-            <ActionButton
-              onClick={handleCopyShareLink}
-              icon={<FaShareAlt size={40} />}
-              label="Share"
-            />
-            <ActionButton
-              onClick={() => setShowHistory(true)}
-              icon={<FaBookOpen size={50} />}
-              label="History"
-            />
-            <ActionButton
-              onClick={handleUndo}
-              icon={<LuUndo2 size={50} />}
-              label="Undo"
-              disabled={isUpdating || historyStack.length === 0}
-            />
+          <div className="mt-8 pt-6 border-t border-white/10 space-y-4">
+            <div className="flex items-center justify-around">
+              <ActionButton
+                onClick={() => setShowEditTeams(true)}
+                icon={<FaUserEdit size={40} />}
+                label="Edit Teams"
+                disabled={isUpdating}
+              />
+              <ActionButton
+                onClick={handleCopyShareLink}
+                icon={<FaShareAlt size={40} />}
+                label="Share"
+              />
+              <ActionButton
+                onClick={handleUndo}
+                icon={<LuUndo2 size={40} />}
+                label="Undo"
+                disabled={isUpdating || historyStack.length === 0}
+              />
+            </div>
+            <div className="flex items-center justify-around">
+              <ActionButton
+                onClick={() => setShowRules(true)}
+                icon={<FaInfoCircle size={40} />}
+                label="Rules"
+              />
+              <ActionButton
+                onClick={() => mutate()}
+                icon={<FaSyncAlt size={40} />}
+                label="Sync"
+                disabled={isUpdating}
+              />
+              <ActionButton
+                onClick={() => setShowHistory(true)}
+                icon={<FaBookOpen size={40} />}
+                label="History"
+              />
+            </div>
           </div>
         </div>
       </main>
@@ -627,6 +800,13 @@ export default function MatchPage() {
           />
         )}
         {showRules && <RulesModal onClose={() => setShowRules(false)} />}
+        {showEditTeams && (
+          <EditTeamsModal
+            match={match}
+            onUpdate={patchAndUpdate}
+            onClose={() => setShowEditTeams(false)}
+          />
+        )}
       </AnimatePresence>
     </>
   );

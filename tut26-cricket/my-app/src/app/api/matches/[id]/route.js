@@ -2,19 +2,28 @@
 
 // Corrected imports:
 import { connectDB } from "../../../lib/db";
-import Match from "../../../../models/Match"; // Go up four levels to src, then to models/Match.js
+import Match from "../../../../models/Match";
+import { NextResponse } from "next/server";
 
-// GET handler is correct, no changes needed.
-export async function GET(_req, { params }) {
-  await connectDB();
-  const match = await Match.findById(params.id);
-  if (!match) {
-    return Response.json({ message: "Match not found" }, { status: 404 });
+export async function GET(req, { params }) {
+  try {
+    await connectDB();
+    const match = await Match.findById(params.id);
+
+    if (!match) {
+      return NextResponse.json({ message: "Match not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(match, { status: 200 });
+  } catch (err) {
+    return NextResponse.json(
+      { message: "Error fetching match", error: err.message },
+      { status: 500 }
+    );
   }
-  return new Response(JSON.stringify(match), { status: 200 });
 }
 
-// PATCH /api/matches/:id → update any fields of the match
+// ✅ FIX: Correctly handling the 'params' object.
 export async function PATCH(req, { params }) {
   try {
     const data = await req.json();
@@ -22,7 +31,6 @@ export async function PATCH(req, { params }) {
 
     const updateQuery = { $set: {} };
 
-    // This whitelist determines what the client is allowed to change.
     const updatableFields = [
       "score",
       "outs",
@@ -34,9 +42,10 @@ export async function PATCH(req, { params }) {
       "balls",
       "tossWinner",
       "tossDecision",
+      "teamA",
+      "teamB",
     ];
 
-    // Build the $set operator from the received data
     for (const key in data) {
       if (updatableFields.includes(key)) {
         updateQuery.$set[key] = data[key];
@@ -44,7 +53,7 @@ export async function PATCH(req, { params }) {
     }
 
     if (Object.keys(updateQuery.$set).length === 0) {
-      return Response.json(
+      return NextResponse.json(
         { message: "No valid updatable fields provided" },
         { status: 400 }
       );
@@ -56,41 +65,41 @@ export async function PATCH(req, { params }) {
     });
 
     if (!updated) {
-      return Response.json(
+      return NextResponse.json(
         { message: "Match not found for update" },
         { status: 404 }
       );
     }
 
-    return new Response(JSON.stringify(updated), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return NextResponse.json(updated, { status: 200 });
   } catch (err) {
     if (err.name === "ValidationError") {
-      return Response.json(
+      return NextResponse.json(
         { message: "Validation Error", error: err.message },
         { status: 400 }
       );
     }
-    return Response.json(
+    return NextResponse.json(
       { message: "Error updating match", error: err.message },
       { status: 500 }
     );
   }
 }
 
-// DELETE handler is correct, no changes needed.
-export async function DELETE(_req, { params }) {
+// ✅ FIX: Correctly handling the 'params' object.
+export async function DELETE(req, { params }) {
   try {
     await connectDB();
     const deletedMatch = await Match.findByIdAndDelete(params.id);
+
     if (!deletedMatch) {
-      return Response.json({ message: "Match not found" }, { status: 404 });
+      return NextResponse.json({ message: "Match not found" }, { status: 404 });
     }
-    return new Response(null, { status: 204 }); // 204 No Content
+
+    // Return a 204 response with no body
+    return new Response(null, { status: 204 });
   } catch (err) {
-    return Response.json(
+    return NextResponse.json(
       { message: "Error deleting match", error: err.message },
       { status: 500 }
     );
