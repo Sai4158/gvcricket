@@ -371,7 +371,7 @@ const Controls = ({
         onClick={onWide}
         className={`${baseBtn} bg-green-600 hover:bg-green-500`}
       >
-        Wide
+        WIDE
       </ButtonWithInfo>
       <ButtonWithInfo
         info="A No Ball. Does not count as a legal ball."
@@ -379,7 +379,7 @@ const Controls = ({
         onClick={onNoBall}
         className={`${baseBtn} bg-orange-600 hover:bg-orange-500`}
       >
-        No Ball
+        NO BALL
       </ButtonWithInfo>
     </div>
   );
@@ -446,9 +446,9 @@ const RunInputModal = ({ title, onConfirm, onClose }) => {
       color: "bg-green-600 hover:bg-green-500",
     };
     secondaryOptions = [1];
-  } else if (title === "Dismissal") {
+  } else if (title === "OUT") {
     // ✅ CORRECTED PROMPT: More generic for all types of outs (caught, bowled, etc.)
-    prompt = "How many runs were completed on this dismissal?";
+    prompt = "How many runs were taken (run out)?";
     primaryOption = {
       label: "0",
       value: 0,
@@ -459,7 +459,7 @@ const RunInputModal = ({ title, onConfirm, onClose }) => {
     // No Ball
     prompt = (
       <>
-        Total runs to add for this No Ball?
+        How many runs to add for this No Ball?
         <span className={subTextStyle}>Ball does not count</span>
       </>
     );
@@ -766,7 +766,7 @@ export default function MatchPage() {
         )}
         {modal.type === "out" && (
           <RunInputModal
-            title="Dismissal"
+            title="OUT"
             onConfirm={handleOutConfirm}
             onClose={() => setModal({ type: null })}
           />

@@ -161,25 +161,76 @@ export default function RulesPage() {
         title="App Guide"
         headingColor="text-amber-400"
       >
+        {/* --- Access & Setup --- */}
+        <h3 className="text-xl font-bold text-white mb-2">Access & Setup</h3>
         <RuleItem>
-          <strong>New Session:</strong> Start here to create a new match with a
-          name and date.
+          <strong>New Session:</strong> Create new matches with custom names,
+          dates, overs, and teams.
         </RuleItem>
         <RuleItem>
-          <strong>All Sessions:</strong> View a list of all past and live
-          matches.
+          <strong>All Sessions:</strong> Browse and resume past or live matches.
         </RuleItem>
         <RuleItem>
-          <strong>Umpire Mode:</strong> PIN protected (<strong>0000</strong>)
-          access to score a live match or view completed results.
+          <strong>Umpire Mode:</strong> PIN-protected (**0000**) scoring
+          interface for live matches.
         </RuleItem>
         <RuleItem>
-          <strong>View:</strong> Public link for anyone to spectate a live
-          score.
+          <strong>View Mode:</strong> A public, read-only link for live score
+          spectating.
+        </RuleItem>
+
+        {/* --- Live Scoring & Management --- */}
+        <br />
+        <h3 className="text-xl font-bold text-white mb-2">
+          Live Scoring & Management
+        </h3>
+        <RuleItem>
+          <strong>Scoring (0-6):</strong> Instantly add runs and log a legal
+          delivery.
         </RuleItem>
         <RuleItem>
-          <strong>Undo Button:</strong> Use immediately on the match page to
-          correct a scoring mistake.
+          <strong>OUT:</strong> Records a wicket and counts as a legal ball. A
+          prompt handles any runs scored on the dismissal.
+        </RuleItem>
+        <RuleItem>
+          <strong>Extras (Wide/No Ball):</strong> Adds runs without consuming a
+          legal ball from the over.
+        </RuleItem>
+        <RuleItem>
+          <strong>Undo:</strong> Instantly reverses the last scoring action for
+          one-click corrections.
+        </RuleItem>
+        <RuleItem>
+          <strong>Edit Overs:</strong> Adjust total match overs mid-game. Logic
+          prevents setting overs below the current progress.
+        </RuleItem>
+        <RuleItem>
+          <strong>Edit Teams:</strong> Modify team rosters on-the-fly. The "all
+          out" wicket count updates automatically.
+        </RuleItem>
+        <RuleItem>
+          <strong>History & Rules:</strong> Review a ball-by-ball history or
+          view a summary of tournament rules at any time.
+        </RuleItem>
+
+        {/* --- Automatic Logic --- */}
+        <br />
+        <h3 className="text-xl font-bold text-white mb-2">
+          Automatic Game Logic
+        </h3>
+        <RuleItem>
+          <strong>Over Completion:</strong> An over automatically ends after **6
+          legal balls** are delivered. Extras do not count towards this total.
+        </RuleItem>
+        <RuleItem>
+          <strong>Innings End:</strong> An innings concludes when the **overs
+          are finished** or the **team is all out**. A modal then prompts for
+          the next action.
+        </RuleItem>
+        <RuleItem>
+          <strong>Match End:</strong> The match automatically finishes when the
+          second innings ends or the **target is successfully chased**, with the
+          final result displayed.
         </RuleItem>
       </Section>
 
