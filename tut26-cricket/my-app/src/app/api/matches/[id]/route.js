@@ -23,7 +23,6 @@ export async function GET(req, { params }) {
   }
 }
 
-// ✅ FIX: Correctly handling the 'params' object.
 export async function PATCH(req, { params }) {
   try {
     const data = await req.json();
@@ -31,6 +30,7 @@ export async function PATCH(req, { params }) {
 
     const updateQuery = { $set: {} };
 
+    // This is the array that needs to be modified
     const updatableFields = [
       "score",
       "outs",
@@ -44,6 +44,7 @@ export async function PATCH(req, { params }) {
       "tossDecision",
       "teamA",
       "teamB",
+      "overs", // ✅ ADD THIS LINE
     ];
 
     for (const key in data) {
@@ -86,7 +87,6 @@ export async function PATCH(req, { params }) {
   }
 }
 
-// ✅ FIX: Correctly handling the 'params' object.
 export async function DELETE(req, { params }) {
   try {
     await connectDB();
@@ -96,7 +96,6 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ message: "Match not found" }, { status: 404 });
     }
 
-    // Return a 204 response with no body
     return new Response(null, { status: 204 });
   } catch (err) {
     return NextResponse.json(

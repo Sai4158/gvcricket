@@ -101,7 +101,7 @@ export default function TossPage() {
 
   // State management
   const [status, setStatus] = useState("choosing"); // 'choosing', 'counting', 'flipping', 'finished'
-  const [countdown, setCountdown] = useState(6);
+  const [countdown, setCountdown] = useState(3);
   const [playerChoice, setPlayerChoice] = useState(null);
   const [tossResult, setTossResult] = useState({
     side: null,
@@ -193,7 +193,7 @@ export default function TossPage() {
   const redoToss = () => {
     setStatus("choosing");
     setPlayerChoice(null);
-    setCountdown(6);
+    setCountdown(3);
     setTossResult({ side: null, winnerName: null, call: null });
     setIsSubmitting(false);
   };
