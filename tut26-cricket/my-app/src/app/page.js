@@ -111,11 +111,24 @@ export default function HomePage() {
                   className="h-44 w-44 object-contain drop-shadow-[0_5px_35px_rgba(255,100,120,0.8)] rounded-full mb-6"
                 />
               </motion.div>
+              {/* ✅ UPDATED H1 with animated gradient and glow */}
               <motion.h1
                 initial={{ y: 50, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 100, delay: 0.3 }}
-                className="text-6xl md:text-8xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-yellow-200 via-rose-200 to-orange-300"
+                // We apply our animation and a drop-shadow for the glow
+                className="
+    animate-[animate-gradient_5s_linear_infinite] 
+    bg-clip-text text-transparent 
+    text-6xl md:text-8xl font-extrabold tracking-tight
+    drop-shadow-[0_0_1rem_rgba(249,115,22,0.4)]
+  "
+                // The gradient is now defined here with a larger background size
+                style={{
+                  backgroundSize: "200% auto",
+                  backgroundImage:
+                    "linear-gradient(to right, #fde047, #fbcfe8, #fb923c, #fbcfe8, #fde047)",
+                }}
               >
                 The Home of GV Cricket.
               </motion.h1>
@@ -140,21 +153,53 @@ export default function HomePage() {
               </p>
             </div>
             <div className="w-full max-w-md flex flex-col gap-5">
+              {/* ✅ Button 1: Animated Gradient Background */}
               <Link
                 href="/session/new"
-                className=" text-center py-4 rounded-2xl bg-gradient-to-r from-yellow-400 via-amber-300 to-orange-400 text-black text-2xl font-bold shadow-lg shadow-amber-900/40 hover:scale-105 transition-transform"
+                className="
+      text-center py-4 rounded-2xl text-black text-2xl font-bold
+      shadow-lg shadow-amber-900/40
+      hover:scale-105 transition-all duration-300
+      animate-[animate-gradient-slow_8s_ease-in-out_infinite]
+    "
+                style={{
+                  backgroundSize: "200% auto",
+                  // The gradient is repeated for a seamless loop
+                  backgroundImage:
+                    "linear-gradient(to right, #facc15, #f59e0b, #fb923c, #f59e0b, #facc15)",
+                }}
               >
-                Launch Umpire <br /> Mode
+                Launch Umpire <br /> View
               </Link>
+
+              {/* ✅ Button 2: Animated Gradient Background (Different Colors) */}
               <Link
                 href="/session"
-                className="text-center py-4 rounded-2xl bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-300 text-black text-2xl font-bold shadow-lg shadow-amber-900/40 hover:scale-105 transition-transform"
+                className="
+      text-center py-4 rounded-2xl text-black text-2xl font-bold
+      shadow-lg shadow-amber-900/40
+      hover:scale-105 transition-all duration-300
+      animate-[animate-gradient-slow_8s_ease-in-out_infinite]
+    "
+                style={{
+                  backgroundSize: "200% auto",
+                  backgroundImage:
+                    "linear-gradient(to right, #facc15, #d97706, #fde047, #d97706, #facc15)",
+                }}
               >
                 View Past/Live <br /> Sessions
               </Link>
+
+              {/* ✅ Button 3: Solid Color with Breathing Glow Animation */}
               <Link
                 href="/rules"
-                className="text-center  py-4 rounded-2xl bg-zinc-700 text-white/80 text-2xl font-bold ring-1 ring-zinc-700 hover:bg-zinc-700 hover:text-white transition hover:scale-105 transition-transform"
+                className="
+      text-center py-4 rounded-2xl bg-zinc-700 text-white/80 text-2xl font-bold
+      ring-1 ring-zinc-600
+      hover:scale-105 transition-all duration-300
+      hover:bg-zinc-600 hover:text-white
+      animate-[animate-glow_4s_ease-in-out_infinite]
+    "
               >
                 View All Rules!
               </Link>
