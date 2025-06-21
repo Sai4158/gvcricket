@@ -332,14 +332,37 @@ export default function TossPage() {
                     <button
                       onClick={() => startMatch("bat")}
                       disabled={isSubmitting}
-                      className="flex-1 py-3 bg-green-600 text-white rounded-lg hover:bg-green-500 font-bold disabled:opacity-50 transition-colors"
+                      className="
+    flex-1 py-3 text-black rounded-2xl font-bold
+    shadow-lg shadow-yellow-900/40
+    hover:scale-105 transition-all duration-300
+    disabled:opacity-50 disabled:animate-none disabled:hover:scale-100
+    animate-[animate-gradient-slow_6s_ease-in-out_infinite]
+  "
+                      style={{
+                        backgroundSize: "200% auto",
+                        backgroundImage:
+                          "linear-gradient(to right, #fde047, #f59e0b, #fbbf24, #f59e0b, #fde047)",
+                      }}
                     >
                       {isSubmitting ? "..." : "Bat First"}
                     </button>
+
                     <button
                       onClick={() => startMatch("bowl")}
                       disabled={isSubmitting}
-                      className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-500 font-bold disabled:opacity-50 transition-colors"
+                      className="
+    flex-1 py-3 text-white rounded-2xl font-bold
+    shadow-lg shadow-cyan-900/40
+    hover:scale-105 transition-all duration-300
+    disabled:opacity-50 disabled:animate-none disabled:hover:scale-100
+    animate-[animate-gradient-slow_6s_ease-in-out_infinite]
+  "
+                      style={{
+                        backgroundSize: "200% auto",
+                        backgroundImage:
+                          "linear-gradient(to right, #22d3ee, #0ea5e9, #38bdf8, #0ea5e9, #22d3ee)",
+                      }}
                     >
                       {isSubmitting ? "..." : "Bowl First"}
                     </button>
