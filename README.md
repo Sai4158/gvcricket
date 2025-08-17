@@ -1,4 +1,4 @@
-# 🏏 GV Cricket Scorekeeper
+# 🏏 GV Cricket
 
 **GV Cricket** is the official scorekeeping app for our league. Use it to set up teams, score matches ball-by-ball, and share live results with the community. Ditch the paper scorecard and manage everything in one place.
 
