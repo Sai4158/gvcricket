@@ -1,10 +1,15 @@
 /* src/app/page.js */
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, useScroll, useTransform } from "framer-motion";
+import {
+  motion,
+  useScroll,
+  useTransform,
+  AnimatePresence,
+} from "framer-motion";
 import {
   FaUsers,
   FaPlusCircle,
@@ -13,10 +18,145 @@ import {
   FaPenSquare,
   FaEye,
   FaCheckCircle,
+  FaBars,
+  FaTimes,
 } from "react-icons/fa";
 
+// --- Header Component with Mobile Navigation ---
+const Header = () => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const { scrollY } = useScroll();
+
+  useEffect(() => {
+    return scrollY.onChange((latest) => {
+      const previous = scrollY.getPrevious();
+      // Hide header when scrolling down past a threshold, but not if the menu is open
+      if (latest > previous && latest > 150 && !isMenuOpen) {
+        setHidden(true);
+      } else {
+        setHidden(false);
+      }
+    });
+  }, [scrollY, isMenuOpen]);
+
+  const handleScrollToCommunity = () => {
+    setIsMenuOpen(false);
+    const element = document.getElementById("community-highlights");
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  const navLinks = [
+    { href: "/session/new", text: "Start Match 🡢" },
+    { href: "/session", text: "View Past/Live Sessions" },
+    { type: "divider" },
+    { onClick: handleScrollToCommunity, text: "Community Highlights" },
+    { href: "/rules", text: "Community Rules" },
+  ];
+
+  const linkStyles =
+    "text-2xl font-light text-zinc-300 hover:text-white transition-colors duration-300";
+
+  return (
+    <motion.header
+      variants={{
+        visible: { y: 0, opacity: 1 },
+        hidden: { y: "-150%", opacity: 0 },
+      }}
+      animate={hidden ? "hidden" : "visible"}
+      transition={{ duration: 0.35, ease: "easeInOut" }}
+      className="fixed top-0 left-0 right-0 z-50 p-6 flex justify-end md:hidden font-sans"
+    >
+      <motion.button
+        whileTap={{ scale: 0.9 }}
+        onClick={() => setIsMenuOpen(true)}
+        className="p-3 text-white"
+        aria-label="Open navigation menu"
+      >
+        <FaBars className="h-8 w-8" />
+      </motion.button>
+
+      <AnimatePresence>
+        {isMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ ease: "easeInOut", duration: 0.4 }}
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
+            onClick={() => setIsMenuOpen(false)}
+          >
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", stiffness: 350, damping: 35 }}
+              className="fixed top-0 right-0 bottom-0 w-4/5 max-w-xs bg-zinc-900/60 backdrop-blur-xl p-6 flex flex-col shadow-2xl border-l border-zinc-700/80"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-start mb-8">
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setIsMenuOpen(false)}
+                  className="p-2"
+                  aria-label="Close navigation menu"
+                >
+                  <FaTimes className="text-white h-8 w-8" />
+                </motion.button>
+              </div>
+              <nav className="flex flex-col items-start justify-center flex-grow pl-4">
+                <ul className="space-y-6">
+                  {navLinks.map((link, index) => {
+                    if (link.type === "divider") {
+                      return (
+                        <li key={index} aria-hidden="true">
+                          <hr className="border-white/30" />
+                        </li>
+                      );
+                    }
+                    return (
+                      <motion.li
+                        key={index}
+                        whileTap={{ scale: 0.95 }}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{
+                          delay: 0.15 * (index + 1),
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 30,
+                        }}
+                      >
+                        {link.href ? (
+                          <Link
+                            href={link.href}
+                            onClick={() => setIsMenuOpen(false)}
+                            className={linkStyles}
+                          >
+                            {link.text}
+                          </Link>
+                        ) : (
+                          <button onClick={link.onClick} className={linkStyles}>
+                            {link.text}
+                          </button>
+                        )}
+                      </motion.li>
+                    );
+                  })}
+                </ul>
+              </nav>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.header>
+  );
+};
+
 // A section component that fades and slides in as it enters the viewport
-const AnimatedSection = ({ children, className }) => {
+const AnimatedSection = ({ children, className, id }) => {
   const ref = useRef(null);
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -29,6 +169,7 @@ const AnimatedSection = ({ children, className }) => {
 
   return (
     <motion.section
+      id={id}
       ref={ref}
       style={{ opacity, y }}
       className={`relative ${className}`}
@@ -77,6 +218,7 @@ export default function HomePage() {
 
   return (
     <>
+      <Header />
       <main className="bg-black text-zinc-200 font-sans">
         {/* --- Hero Section (This part remains unchanged) --- */}
         <section ref={heroRef} className="h-screen relative overflow-hidden">
@@ -144,11 +286,7 @@ export default function HomePage() {
                 Built for the Community, by the Community.
               </h2>
               <p className="text-lg text-zinc-300 leading-relaxed">
-                It all started in 2022 with a few friends who loved the game.
-                Today, we're a friendly league of over{" "}
-                <strong className="text-white">50+ members</strong> who meet for
-                fun, competitive cricket. This app is our custom built tool to
-                make scoring simple, fast, and accessible to everyone in{" "}
+                Make scoring simple, fast, and accessible to everyone in{" "}
                 <strong className="text-white">real time.</strong>
               </p>
             </div>
@@ -214,7 +352,7 @@ export default function HomePage() {
                 </h2>
                 <p className="mt-4 max-w-2xl mx-auto text-xl text-white">
                   Say goodbye to memorizing. <br /> <br /> This is a real time
-                  scoring tool designed for our games, perfect for practice
+                  scoring tool designed for these games, perfect for practice
                   matches, league play, or just having fun with friends.
                 </p>
               </div>
@@ -288,10 +426,19 @@ export default function HomePage() {
             </div>
           </AnimatedSection>
 
-          <AnimatedSection className="w-full max-w-6xl mx-auto flex flex-col items-center">
+          <AnimatedSection
+            id="community-highlights"
+            className="w-full max-w-6xl mx-auto flex flex-col items-center"
+          >
             <h2 className="text-5xl md:text-7xl font-bold tracking-tight mb-16 text-center text-white">
-              From Our Community
+              From the Community
             </h2>
+            <p className="text-lg text-zinc-300 leading-relaxed text-center max-w-3xl mx-auto -mt-8 mb-16">
+              It all started in 2022 with a few friends who loved the game.
+              Today, it's a friendly league of over{" "}
+              <strong className="text-white">50+ members</strong> who meet for
+              fun, competitive cricket.
+            </p>
             <div className="grid sm:grid-cols-2 lg:grid-cols-2 gap-8 w-full">
               {communityVideos.map((video) => (
                 <YouTubeVideoPlayer

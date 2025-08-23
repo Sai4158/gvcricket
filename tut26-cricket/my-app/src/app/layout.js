@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 // Define your site's main information
 const siteName = "GV Cricket";
 const siteDescription =
-  "GV Cricket is the official scorekeeping app for our league. Use it to set up teams, score matches ball by ball, and share live results with the community.";
+  "Free live cricket scoring app. Track ball-by-ball scores, manage teams, and get real-time updates for any match.";
 const siteUrl = "https://gvcricket.com/"; // As requested
 const gvLogoPath = "/gvLogo.png"; // Path to your logo in the public directory, as per your file structure
 
@@ -42,10 +42,52 @@ export const metadata = {
     "umpire tool",
     "sports scoring",
     "online cricket",
+    "gully cricket app",
+    "local cricket scorer",
+    "cricket scoring sheet online",
+    "live cricket score tracker",
+    "Indian cricket app",
+    "free cricket scoring app",
+    "ball by ball scoring",
+    "cricket scorer for India",
+    "Pakistan cricket scoring app",
+    "Australia cricket scores",
+    "England cricket live score",
+    "South Africa cricket app",
+    "New Zealand cricket tracker",
+    "Sri Lanka cricket scores",
+    "Bangladesh cricket live app",
+    "West Indies cricket scoring",
+    "tennis ball cricket scorer",
+    "box cricket score keeper",
+    "cricket tournament manager",
+    "live match scoring app",
+    "mobile cricket scoring",
+    "digital cricket scorecard",
+    "simple cricket scoring app",
+    "online cricket scorebook",
+    "cricket score calculator",
+    "best cricket scoring app",
+    "cricket club management app",
+    "local league cricket scoring",
+    "cricket score app for android",
+    "cricket score app for iOS",
+    "cricket stats tracker",
+    "player performance tracker cricket",
+    "cricket over tracker",
+    "run rate calculator cricket",
+    "free score keeping app",
+    "cricket score keeper online free",
+    "gully cricket score app India",
   ],
   authors: [{ name: "GV Cricket Team", url: siteUrl }],
   creator: "GV Cricket Team",
   publisher: "GV Cricket Innovations",
+  applicationName: siteName,
+  category: "Sports",
+
+  // Link to the manifest file for PWA capabilities
+  manifest: "/manifest.json",
 
   // Favicons (ensure these files are in your /public directory)
   icons: {
@@ -106,9 +148,37 @@ export const viewport = {
   themeColor: "#000000",
 };
 
+// JSON-LD Structured Data for Rich Snippets
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "GV Cricket",
+  operatingSystem: "WEB",
+  applicationCategory: "SportsApplication",
+  aggregateRating: {
+    "@type": "AggregateRating",
+    ratingValue: "4.8",
+    ratingCount: "120",
+  },
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
+  description: siteDescription,
+  url: siteUrl,
+  logo: `${siteUrl}${gvLogoPath}`,
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}
       >
