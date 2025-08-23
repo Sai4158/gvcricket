@@ -20,6 +20,7 @@ import {
   FaCheckCircle,
   FaBars,
   FaTimes,
+  FaArrowRight,
 } from "react-icons/fa";
 
 // --- Header Component with Mobile Navigation ---
@@ -49,7 +50,7 @@ const Header = () => {
   };
 
   const navLinks = [
-    { href: "/session/new", text: "Start Match 🡢" },
+    { href: "/session/new", text: "Start Match", icon: FaArrowRight },
     { href: "/session", text: "View Past/Live Sessions" },
     { type: "divider" },
     { onClick: handleScrollToCommunity, text: "Community Highlights" },
@@ -57,7 +58,7 @@ const Header = () => {
   ];
 
   const linkStyles =
-    "text-2xl font-light text-zinc-300 hover:text-white transition-colors duration-300";
+    "text-2xl font-light text-zinc-300 hover:text-white transition-colors duration-300 flex items-center gap-3";
 
   return (
     <motion.header
@@ -135,11 +136,13 @@ const Header = () => {
                             onClick={() => setIsMenuOpen(false)}
                             className={linkStyles}
                           >
-                            {link.text}
+                            <span>{link.text}</span>
+                            {link.icon && <link.icon className="h-5 w-5" />}
                           </Link>
                         ) : (
                           <button onClick={link.onClick} className={linkStyles}>
-                            {link.text}
+                            <span>{link.text}</span>
+                            {link.icon && <link.icon className="h-5 w-5" />}
                           </button>
                         )}
                       </motion.li>
