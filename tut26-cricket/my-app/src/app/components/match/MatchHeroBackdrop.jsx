@@ -16,7 +16,7 @@ export default function MatchHeroBackdrop({ match, children, className = "" }) {
           <img
             src={imageUrl}
             alt={match?.name || "Match backdrop"}
-            className="absolute inset-0 h-full w-full object-cover object-center opacity-30 scale-[1.85] blur-xl sm:scale-[1.65]"
+            className="absolute inset-0 h-full w-full object-cover object-center opacity-30 scale-[5.4] blur-xl sm:scale-[4.8]"
             loading="eager"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-zinc-950/70 to-zinc-950" />

@@ -11,7 +11,7 @@ const DEFAULTS = {
     accessibilityMode: false,
   },
   umpire: {
-    enabled: false,
+    enabled: true,
     muted: false,
     volume: 0.75,
     mode: "simple",

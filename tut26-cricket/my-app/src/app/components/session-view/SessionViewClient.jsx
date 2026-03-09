@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { FaArrowLeft, FaCheck, FaCopy, FaMicrophone } from "react-icons/fa";
 import AnnouncementControls from "../live/AnnouncementControls";
 import LiveMicModal from "../live/LiveMicModal";
+import WalkiePanel from "../live/WalkiePanel";
 import useLocalMicMonitor from "../live/useLocalMicMonitor";
 import useAnnouncementSettings from "../live/useAnnouncementSettings";
+import useWalkieTalkie from "../live/useWalkieTalkie";
 import MatchHeroBackdrop from "../match/MatchHeroBackdrop";
 import useEventSource from "../live/useEventSource";
 import useLiveRelativeTime from "../live/useLiveRelativeTime";
@@ -53,6 +55,12 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const sessionData = data?.session;
   const match = data?.match;
   const isLiveMatch = Boolean(match?.isOngoing && !match?.result);
+  const walkie = useWalkieTalkie({
+    matchId: match?._id || "",
+    enabled: Boolean(match?._id && isLiveMatch),
+    role: "spectator",
+    displayName: sessionData?.name ? `${sessionData.name} Spectator` : "Spectator",
+  });
 
   useEffect(() => {
     if (!match || !isLiveMatch || !settings.enabled || settings.mode === "silent") {
@@ -232,6 +240,25 @@ export default function SessionViewClient({ sessionId, initialData }) {
           </div>
         </section>
       </div>
+
+      {isLiveMatch && walkie.snapshot?.enabled ? (
+        <div className="w-full max-w-4xl mt-4">
+          <WalkiePanel
+            role="spectator"
+            snapshot={walkie.snapshot}
+            notice={walkie.notice}
+            error={walkie.error}
+            canEnable={false}
+            canTalk={walkie.canTalk}
+            isSelfTalking={walkie.isSelfTalking}
+            countdown={walkie.countdown}
+            onToggleEnabled={() => {}}
+            onStartTalking={walkie.startTalking}
+            onStopTalking={walkie.stopTalking}
+            onDismissNotice={walkie.dismissNotice}
+          />
+        </div>
+      ) : null}
 
       <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
         <TeamInningsDetail

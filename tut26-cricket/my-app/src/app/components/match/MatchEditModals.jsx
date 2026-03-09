@@ -14,8 +14,23 @@ function EditableRoster({
   setPlayers,
   canEditPlayers,
   lockedReason = "",
+  theme = "blue",
 }) {
   const [isEditingName, setIsEditingName] = useState(false);
+  const isBlue = theme === "blue";
+  const cardClass = isBlue
+    ? "border-sky-400/18 bg-[linear-gradient(180deg,rgba(28,36,56,0.92),rgba(24,24,30,0.9))]"
+    : "border-rose-300/18 bg-[linear-gradient(180deg,rgba(58,30,36,0.9),rgba(24,24,30,0.9))]";
+  const titleClass = isBlue ? "text-sky-200" : "text-rose-200";
+  const panelClass = isBlue
+    ? "border-sky-300/8 bg-sky-950/18"
+    : "border-rose-300/8 bg-rose-950/18";
+  const inputClass = isBlue
+    ? "border-sky-400/14 bg-zinc-900/90 focus:border-sky-300/40"
+    : "border-rose-300/14 bg-zinc-900/90 focus:border-rose-300/40";
+  const iconButtonClass = isBlue
+    ? "bg-sky-950/40 text-sky-100 hover:bg-sky-900/60"
+    : "bg-rose-950/35 text-rose-100 hover:bg-rose-900/55";
 
   const updatePlayer = (index, nextValue) => {
     setPlayers((current) =>
@@ -53,10 +68,10 @@ function EditableRoster({
   };
 
   return (
-    <div className="space-y-4 rounded-[22px] border border-zinc-700 bg-zinc-800/80 p-4">
+    <div className={`space-y-4 rounded-[22px] border p-4 shadow-[0_14px_40px_rgba(0,0,0,0.22)] ${cardClass}`}>
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-zinc-400">{title}</p>
+          <p className={`text-sm font-semibold ${titleClass}`}>{title}</p>
           {isEditingName ? (
             <input
               type="text"
@@ -70,7 +85,7 @@ function EditableRoster({
               }}
               autoFocus
               placeholder="Team name"
-              className="mt-1 w-full rounded-xl border border-zinc-600 bg-zinc-900 px-3 py-2 text-lg font-bold text-white outline-none transition"
+              className={`mt-1 w-full rounded-xl border px-3 py-2 text-lg font-bold text-white outline-none transition ${inputClass}`}
             />
           ) : (
             <div className="mt-1 flex items-center gap-2">
@@ -78,7 +93,7 @@ function EditableRoster({
               <button
                 type="button"
                 onClick={() => setIsEditingName(true)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-zinc-200 transition hover:bg-zinc-700"
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition ${iconButtonClass}`}
                 aria-label={`Edit ${title} name`}
               >
                 <FaPen size={12} />
@@ -88,7 +103,7 @@ function EditableRoster({
         </div>
       </div>
 
-      <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-zinc-900/70 px-3 py-3">
+      <div className={`flex items-center justify-between rounded-2xl border px-3 py-3 ${panelClass}`}>
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
             Players
@@ -129,13 +144,13 @@ function EditableRoster({
               value={player}
               onChange={(event) => updatePlayer(index, event.target.value)}
               placeholder={`Player ${index + 1}`}
-              className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none transition"
+              className={`w-full rounded-xl border px-3 py-2 text-sm text-white outline-none transition ${inputClass}`}
             />
             <button
               type="button"
               onClick={() => removePlayerAtIndex(index)}
               disabled={!canEditPlayers || players.length <= 1}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 transition hover:bg-zinc-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-xl transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40 ${iconButtonClass}`}
             >
               <FaTrash size={13} />
             </button>
@@ -183,6 +198,7 @@ export function EditTeamsModal({ match, onUpdate, onClose }) {
           setPlayers={setTeamAPlayers}
           canEditPlayers={canEditTeamAPlayers}
           lockedReason={!canEditTeamAPlayers ? lockedReason : ""}
+          theme="blue"
         />
         <EditableRoster
           title="Team B"
@@ -192,6 +208,7 @@ export function EditTeamsModal({ match, onUpdate, onClose }) {
           setPlayers={setTeamBPlayers}
           canEditPlayers={canEditTeamBPlayers}
           lockedReason={!canEditTeamBPlayers ? lockedReason : ""}
+          theme="red"
         />
       </div>
       <button

@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import useLocalMicMonitor from "../live/useLocalMicMonitor";
 import useAnnouncementSettings from "../live/useAnnouncementSettings";
+import { WalkieNotice } from "../live/WalkiePanel";
+import useWalkieTalkie from "../live/useWalkieTalkie";
 import MatchHeroBackdrop from "./MatchHeroBackdrop";
 import { countLegalBalls } from "../../lib/match-scoring";
 import {
@@ -62,6 +64,13 @@ export default function MatchPageClient({
   const liveUpdatedLabel = useLiveRelativeTime(lastUpdatedAt);
   const isLiveMatch = Boolean(match?.isOngoing && !match?.result);
   const tossPending = !match?.tossWinner || !match?.tossDecision;
+  const walkie = useWalkieTalkie({
+    matchId,
+    enabled: Boolean(authStatus === "granted" && isLiveMatch),
+    role: "umpire",
+    hasUmpireAccess: authStatus === "granted",
+    displayName: "Umpire",
+  });
 
   useEffect(() => {
     lastLocalActionRef.current = "";
@@ -132,6 +141,7 @@ export default function MatchPageClient({
       rate: 0.9,
       minGapMs: 2500,
       userGesture: true,
+      ignoreEnabled: true,
     });
   };
 
@@ -226,6 +236,12 @@ export default function MatchPageClient({
               {error.message || "Match update failed."}
             </div>
           ) : null}
+          <WalkieNotice
+            notice={
+              walkie.snapshot?.activeSpeakerRole === "spectator" ? walkie.notice : ""
+            }
+            onDismiss={walkie.dismissNotice}
+          />
           <BallTracker history={oversHistory} />
           <Controls
             onScore={handleAnnouncedScoreEvent}
@@ -244,9 +260,13 @@ export default function MatchPageClient({
             onHistory={() => setModal({ type: "history" })}
             onImage={() => setModal({ type: "image" })}
             onCommentary={() => setModal({ type: "commentary" })}
+            onWalkie={() => setModal({ type: "walkie" })}
             onMic={() => setModal({ type: "mic" })}
             onShare={handleCopyShareLink}
             onRules={() => setModal({ type: "rules" })}
+            isWalkieActive={Boolean(walkie.snapshot?.enabled)}
+            isCommentaryActive={micMonitor.isActive || micMonitor.isPaused}
+            isAnnounceActive={Boolean(umpireSettings.enabled)}
           />
         </div>
       </main>
@@ -259,7 +279,9 @@ export default function MatchPageClient({
           isLiveMatch
             ? {
                 title: "Umpire Commentary",
-                subtitle: "Start voice, close this popup, then reopen it any time to stop or replay the score.",
+                variant: "modal",
+                simpleMode: true,
+                onClose: () => setModal({ type: null }),
                 settings: umpireSettings,
                 updateSetting: updateUmpireSetting,
                 onToggleEnabled: (nextEnabled) => {
@@ -279,22 +301,36 @@ export default function MatchPageClient({
                 statusText: umpireSettings.enabled
                   ? status === "waiting_for_gesture"
                     ? voiceName
-                      ? `Voice ready: ${voiceName} - tap once to unlock audio on this browser`
-                      : "Tap a scoring button or Read live score once."
+                      ? voiceName
+                      : "Tap Read Score once."
                     : voiceName
-                    ? `Voice ready: ${voiceName}`
-                    : "Voice will use your browser's English voice."
+                    ? voiceName
+                    : ""
                   : "",
                 onAnnounceNow: handleManualScoreAnnouncement,
                 announceLabel:
                   announceCooldownLeft > 0
-                    ? `Read Live Score (${announceCooldownLeft}s)`
-                    : "Read Live Score",
-                announceDisabled:
-                  announceCooldownLeft > 0 || !umpireSettings.enabled,
-                announceHint: umpireSettings.enabled
-                  ? "Replay the score every 3 seconds."
-                  : "Start commentary to replay the score.",
+                    ? `Read Score (${announceCooldownLeft}s)`
+                    : "Read Score",
+                announceDisabled: announceCooldownLeft > 0,
+              }
+            : null
+        }
+        walkieProps={
+          isLiveMatch
+            ? {
+                role: "umpire",
+                snapshot: walkie.snapshot,
+                notice: walkie.notice,
+                error: walkie.error,
+                canEnable: walkie.canEnable,
+                canTalk: walkie.canTalk,
+                isSelfTalking: walkie.isSelfTalking,
+                countdown: walkie.countdown,
+                onToggleEnabled: walkie.toggleEnabled,
+                onStartTalking: walkie.startTalking,
+                onStopTalking: walkie.stopTalking,
+                onDismissNotice: walkie.dismissNotice,
               }
             : null
         }

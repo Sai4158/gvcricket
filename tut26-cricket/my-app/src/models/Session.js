@@ -32,6 +32,8 @@ const SessionSchema = new mongoose.Schema(
       enum: ["simple", "full", ""],
       default: "",
     },
+    walkieTalkieEnabled: { type: Boolean, default: false },
+    walkieTalkieUpdatedAt: { type: Date, default: null },
     lastEventType: { type: String, default: "", trim: true },
     lastEventText: { type: String, default: "", trim: true },
     adminAccessVersion: { type: Number, default: 1 },

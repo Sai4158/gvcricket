@@ -130,6 +130,54 @@ export const matchPatchObjectSchema = z
   })
   .strict();
 
+const walkieParticipantSchema = z
+  .string()
+  .min(8)
+  .max(80)
+  .regex(/^[a-zA-Z0-9._:-]+$/, "participantId is invalid.");
+
+const walkieRoleSchema = z.enum(["umpire", "spectator"]);
+
+export const walkieToggleSchema = z
+  .object({
+    enabled: z.boolean(),
+  })
+  .strict();
+
+export const walkieClaimSchema = z
+  .object({
+    participantId: walkieParticipantSchema,
+    role: walkieRoleSchema,
+    token: z.string().min(16).max(400),
+  })
+  .strict();
+
+export const walkieReleaseSchema = z
+  .object({
+    participantId: walkieParticipantSchema,
+    role: walkieRoleSchema,
+    token: z.string().min(16).max(400),
+  })
+  .strict();
+
+export const walkieSignalSchema = z
+  .object({
+    participantId: walkieParticipantSchema,
+    role: walkieRoleSchema,
+    token: z.string().min(16).max(400),
+    toId: walkieParticipantSchema,
+    payload: z
+      .object({
+        type: z.enum(["offer", "answer", "ice-candidate"]),
+        sdp: z.string().max(120000).optional(),
+        candidate: z.string().max(10000).optional(),
+        sdpMid: z.string().max(100).optional(),
+        sdpMLineIndex: z.number().int().min(0).max(32).optional(),
+      })
+      .strict(),
+  })
+  .strict();
+
 export const matchPatchSchema = matchPatchObjectSchema.refine(
   (value) => Object.keys(value).length > 0,
   {
@@ -222,6 +270,22 @@ export function validateMatchPatchPayload(body) {
 
 export function validateMatchActionPayload(body) {
   return validateWithSchema(matchActionSchema, body);
+}
+
+export function validateWalkieTogglePayload(body) {
+  return validateWithSchema(walkieToggleSchema, body);
+}
+
+export function validateWalkieClaimPayload(body) {
+  return validateWithSchema(walkieClaimSchema, body);
+}
+
+export function validateWalkieReleasePayload(body) {
+  return validateWithSchema(walkieReleaseSchema, body);
+}
+
+export function validateWalkieSignalPayload(body) {
+  return validateWithSchema(walkieSignalSchema, body);
 }
 
 export { inningsSchema, oversSchema, pinSchema };

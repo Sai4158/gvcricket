@@ -3,8 +3,9 @@
 import { useRef } from "react";
 import Image from "next/image";
 import { motion, useScroll, useTransform } from "framer-motion";
+import LiveNowBanner from "./LiveNowBanner";
 
-export default function HeroSection() {
+export default function HeroSection({ liveMatch = null }) {
   const heroRef = useRef(null);
   const { scrollYProgress } = useScroll({
     target: heroRef,
@@ -20,9 +21,13 @@ export default function HeroSection() {
         style={{ scale: heroScale, opacity: heroOpacity }}
         className="sticky top-0 h-screen flex flex-col items-center justify-center text-center"
       >
-        <div className="absolute inset-0 bg-black/70 z-10" />
+        <LiveNowBanner liveMatch={liveMatch} />
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/Thumb1.png')" }}
+        />
         <video
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 z-0 h-full w-full object-cover"
           autoPlay
           loop
           muted
@@ -32,7 +37,8 @@ export default function HeroSection() {
           <source src="/videos/Cricket1.mp4" type="video/mp4" />
           Your browser does not support the video tag.
         </video>
-        <div className="relative z-20 flex flex-col items-center px-4">
+        <div className="absolute inset-0 z-10 bg-[linear-gradient(180deg,rgba(0,0,0,0.42)_0%,rgba(0,0,0,0.56)_48%,rgba(0,0,0,0.72)_100%)]" />
+        <div className="relative z-20 flex flex-col items-center px-4 pt-28 md:pt-20">
           <motion.div
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -41,10 +47,10 @@ export default function HeroSection() {
             <Image
               src="/gvLogo.png"
               alt="GV Cricket logo"
-              width={140}
-              height={140}
+              width={500}
+              height={400}
               priority
-              className="h-44 w-44 object-contain drop-shadow-[0_5px_35px_rgba(255,100,120,0.8)] rounded-full mb-6"
+              className="mb-5 h-auto w-[340px] max-w-[88vw] object-contain drop-shadow-[0_10px_48px_rgba(255,100,120,0.8)] md:w-[520px]"
             />
           </motion.div>
           <motion.h1

@@ -22,6 +22,45 @@ function scoreLine(score, outs) {
   return `${score} for ${outs}`;
 }
 
+function safeNumber(value) {
+  return Number(value || 0);
+}
+
+function getBallsRemaining(match) {
+  return Math.max(
+    0,
+    safeNumber(match?.overs) * 6 - countLegalBalls(getActiveHistory(match))
+  );
+}
+
+function formatRemainingOvers(match) {
+  const ballsRemaining = getBallsRemaining(match);
+  const overs = Math.floor(ballsRemaining / 6);
+  const balls = ballsRemaining % 6;
+
+  if (overs <= 0) {
+    return `${balls} ball${balls === 1 ? "" : "s"} left`;
+  }
+
+  if (balls === 0) {
+    return `${overs} over${overs === 1 ? "" : "s"} left`;
+  }
+
+  return `${overs} over${overs === 1 ? "" : "s"} and ${balls} ball${
+    balls === 1 ? "" : "s"
+  } left`;
+}
+
+function shouldReadFullScore(ball) {
+  if (!ball) return true;
+  return (
+    ball.isOut ||
+    ball.extraType === "wide" ||
+    ball.extraType === "noball" ||
+    ball.runs >= 4
+  );
+}
+
 function describeBall(ball) {
   if (!ball) return "Score update";
 
@@ -54,24 +93,21 @@ function describeBall(ball) {
 function buildChaseEquation(match) {
   if (match?.innings !== "second") return "";
 
-  const target = Number(match?.innings1?.score || 0) + 1;
-  const runsNeeded = Math.max(0, target - Number(match?.score || 0));
-  const ballsRemaining = Math.max(
-    0,
-    Number(match?.overs || 0) * 6 - countLegalBalls(getActiveHistory(match))
-  );
+  const target = safeNumber(match?.innings1?.score) + 1;
+  const runsNeeded = Math.max(0, target - safeNumber(match?.score));
+  const ballsRemaining = getBallsRemaining(match);
   const wicketsLeft = Math.max(
     1,
-    getTotalDismissalsAllowed(match) - Number(match?.outs || 0)
+    getTotalDismissalsAllowed(match) - safeNumber(match?.outs)
   );
 
   if (runsNeeded <= 0) {
     return "Target chased.";
   }
 
-  return `Need ${runsNeeded} from ${ballsRemaining} with ${wicketsLeft} ${
+  return `Need ${runsNeeded}. ${formatRemainingOvers(match)}. ${wicketsLeft} ${
     wicketsLeft === 1 ? "wicket" : "wickets"
-  } in hand.`;
+  } left.`;
 }
 
 function buildOverLine(event) {
@@ -84,9 +120,9 @@ function buildOverLine(event) {
 
 function buildFullBallCommentary(event, match) {
   const base = describeBall(event.ball);
-  const currentScore = `The score is ${scoreLine(event.score, event.outs)} after ${
+  const currentScore = `Score ${scoreLine(event.score, event.outs)} after ${
     event.overs || getOversDisplay(getActiveHistory(match))
-  } overs.`;
+  }.`;
   const chaseLine = buildChaseEquation(match);
   const overLine = buildOverLine(event);
 
@@ -94,9 +130,41 @@ function buildFullBallCommentary(event, match) {
 }
 
 function buildSimpleBallCommentary(event) {
-  return [describeBall(event.ball), `Score now ${scoreLine(event.score, event.outs)}.`]
-    .filter(Boolean)
-    .join(" ");
+  const parts = [describeBall(event.ball)];
+
+  if (shouldReadFullScore(event.ball)) {
+    parts.push(`Score ${scoreLine(event.score, event.outs)}.`);
+  }
+
+  return parts.filter(Boolean).join(" ");
+}
+
+function buildSmartBallCommentary(event, match) {
+  const parts = [describeBall(event.ball)];
+
+  if (event.overCompleted) {
+    parts.push(`Over complete. ${scoreLine(event.score, event.outs)}.`);
+  } else if (shouldReadFullScore(event.ball)) {
+    parts.push(`Score ${scoreLine(event.score, event.outs)}.`);
+  }
+
+  if (match?.innings === "second") {
+    const chaseLine = buildChaseEquation(match);
+    if (event.targetChased) {
+      parts.push("Target chased.");
+    } else if (
+      event.ball?.isOut ||
+      event.ball?.runs >= 4 ||
+      event.ball?.extraType ||
+      getBallsRemaining(match) <= 12
+    ) {
+      parts.push(chaseLine);
+    }
+  } else if (event.overCompleted && getBallsRemaining(match) > 0) {
+    parts.push(formatRemainingOvers(match) + ".");
+  }
+
+  return parts.filter(Boolean).join(" ");
 }
 
 export function createScoreLiveEvent(matchBefore, matchAfter, ball) {
@@ -186,8 +254,7 @@ export function buildSpectatorAnnouncement(event, match, mode = "full") {
     return buildSimpleBallCommentary(event);
   }
 
-  const teamLine = event.battingTeam ? `${event.battingTeam} batting.` : "";
-  return [teamLine, buildFullBallCommentary(event, match)].filter(Boolean).join(" ");
+  return buildSmartBallCommentary(event, match) || buildFullBallCommentary(event, match);
 }
 
 export function buildCurrentScoreAnnouncement(match) {
@@ -197,10 +264,11 @@ export function buildCurrentScoreAnnouncement(match) {
   const activeInningsKey = match.innings === "first" ? "innings1" : "innings2";
   const overs = getOversDisplay(match[activeInningsKey]?.history ?? []);
   const chaseLine = buildChaseEquation(match);
+  const ballsLeftLine = formatRemainingOvers(match);
 
   return [
-    `${battingTeam.name} batting.`,
-    `The score is ${scoreLine(match.score, match.outs)} after ${overs} overs.`,
+    `${battingTeam.name}, ${scoreLine(match.score, match.outs)} after ${overs}.`,
+    ballsLeftLine ? `${ballsLeftLine}.` : "",
     chaseLine,
   ]
     .filter(Boolean)

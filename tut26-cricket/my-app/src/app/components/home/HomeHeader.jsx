@@ -48,12 +48,12 @@ export default function HomeHeader() {
       }}
       animate={hidden ? "hidden" : "visible"}
       transition={{ duration: 0.35, ease: "easeInOut" }}
-      className="fixed top-0 left-0 right-0 z-50 p-6 flex justify-end md:hidden font-sans"
+      className="pointer-events-none fixed top-0 left-0 right-0 z-50 p-6 flex justify-end md:hidden font-sans"
     >
       <motion.button
         whileTap={{ scale: 0.9 }}
         onClick={() => setIsMenuOpen(true)}
-        className="p-3 text-white"
+        className="pointer-events-auto p-3 text-white"
         aria-label="Open navigation menu"
       >
         <FaBars className="h-8 w-8" />

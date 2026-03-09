@@ -101,7 +101,7 @@ export async function loadPublicMatchData(matchId) {
 export async function loadTossPageData(matchId) {
   await connectDB();
   const match = await Match.findById(matchId)
-    .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
+    .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode walkieTalkieEnabled lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
     .lean();
 
   if (!match) {
@@ -125,7 +125,7 @@ export async function loadTossPageData(matchId) {
 export async function loadMatchAccessData(matchId) {
   await connectDB();
   const match = await Match.findById(matchId)
-    .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
+    .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode walkieTalkieEnabled lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
     .lean();
 
   if (!match) {
@@ -143,5 +143,60 @@ export async function loadMatchAccessData(matchId) {
   return {
     authStatus: authorized ? "granted" : "locked",
     match: authorized ? serializePublicMatch(match) : null,
+  };
+}
+
+export async function loadHomeLiveBannerData() {
+  await connectDB();
+
+  const fiveHoursAgo = new Date(Date.now() - 5 * 60 * 60 * 1000);
+
+  const sessions = await Session.find()
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(12)
+    .lean();
+
+  let session = null;
+  let match = null;
+
+  for (const candidate of sessions) {
+    const createdAt = new Date(candidate.createdAt || 0);
+    if (Number.isNaN(createdAt.getTime()) || createdAt < fiveHoursAgo) {
+      continue;
+    }
+
+    const resolvedMatch = await findMatchForSession(candidate);
+    if (resolvedMatch?.isOngoing && !resolvedMatch?.result) {
+      session = candidate;
+      match = resolvedMatch;
+      break;
+    }
+  }
+
+  if (!session || !match) {
+    return null;
+  }
+
+  const teamAName =
+    session.teamAName ||
+    match.teamAName ||
+    (Array.isArray(session.teamA) ? session.teamA[0] : "") ||
+    (Array.isArray(match.teamA) ? match.teamA[0] : "") ||
+    "Team A";
+  const teamBName =
+    session.teamBName ||
+    match.teamBName ||
+    (Array.isArray(session.teamB) ? session.teamB[0] : "") ||
+    (Array.isArray(match.teamB) ? match.teamB[0] : "") ||
+    "Team B";
+
+  return {
+    sessionId: String(session._id),
+    matchId: String(match._id),
+    teamAName,
+    teamBName,
+    score: Number(match.score || 0),
+    outs: Number(match.outs || 0),
+    updatedAt: new Date(match.updatedAt || session.updatedAt || session.createdAt).toISOString(),
   };
 }

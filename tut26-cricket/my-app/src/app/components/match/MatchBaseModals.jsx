@@ -5,7 +5,7 @@ import { FaTimes } from "react-icons/fa";
 import { Ball } from "./MatchBallHistory";
 import MatchImageUploader from "./MatchImageUploader";
 
-export function ModalBase({ children, title, onExit }) {
+export function ModalBase({ children, title, onExit, hideHeader = false }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -22,15 +22,19 @@ export function ModalBase({ children, title, onExit }) {
         className="relative bg-zinc-900 p-6 rounded-2xl max-w-sm w-full border border-zinc-700 shadow-2xl shadow-black"
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 className="text-2xl font-bold mb-4 text-center text-white">{title}</h2>
+        {!hideHeader ? (
+          <h2 className="mb-4 text-center text-2xl font-bold text-white">{title}</h2>
+        ) : null}
         {children}
-        <button
-          onClick={onExit}
-          className="absolute top-3 right-3 p-2 text-zinc-500 hover:text-white rounded-full transition-colors"
-          aria-label="Close modal"
-        >
-          <FaTimes size={20} />
-        </button>
+        {!hideHeader ? (
+          <button
+            onClick={onExit}
+            className="absolute top-3 right-3 rounded-full p-2 text-zinc-500 transition-colors hover:text-white"
+            aria-label="Close modal"
+          >
+            <FaTimes size={20} />
+          </button>
+        ) : null}
       </motion.div>
     </motion.div>
   );

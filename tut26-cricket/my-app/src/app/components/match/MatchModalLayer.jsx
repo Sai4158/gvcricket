@@ -3,6 +3,7 @@
 import { AnimatePresence } from "framer-motion";
 import AnnouncementControls from "../live/AnnouncementControls";
 import LiveMicModal from "../live/LiveMicModal";
+import WalkiePanel from "../live/WalkiePanel";
 import {
   HistoryModal,
   InningsEndModal,
@@ -19,6 +20,7 @@ export default function MatchModalLayer({
   modalType,
   micMonitor,
   commentaryProps,
+  walkieProps,
   oversHistory,
   currentOverNumber,
   firstInningsOversPlayed,
@@ -87,8 +89,13 @@ export default function MatchModalLayer({
         />
       )}
       {modalType === "commentary" && commentaryProps ? (
-        <ModalBase title="Umpire Commentary" onExit={onClose}>
+        <ModalBase title="" onExit={onClose} hideHeader>
           <AnnouncementControls {...commentaryProps} />
+        </ModalBase>
+      ) : null}
+      {modalType === "walkie" && walkieProps ? (
+        <ModalBase title="Walkie-Talkie" onExit={onClose}>
+          <WalkiePanel {...walkieProps} />
         </ModalBase>
       ) : null}
       {modalType === "mic" && (

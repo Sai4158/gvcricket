@@ -477,6 +477,8 @@ export function buildSessionMirrorUpdate(matchDocument) {
     matchImageUploadedBy: match?.matchImageUploadedBy || "",
     announcerEnabled: Boolean(match?.announcerEnabled),
     announcerMode: match?.announcerMode || "",
+    walkieTalkieEnabled: Boolean(match?.walkieTalkieEnabled),
+    walkieTalkieUpdatedAt: match?.walkieTalkieUpdatedAt || null,
     lastEventType: match?.lastEventType || "",
     lastEventText: match?.lastEventText || "",
     adminAccessVersion: Number(match?.adminAccessVersion || 1),

@@ -383,11 +383,48 @@ test("spectator commentary includes smart score and chase details", () => {
   });
 
   const fullLine = buildSpectatorAnnouncement(event, after, "full");
-  assert.match(fullLine, /Titans batting\./);
-  assert.match(fullLine, /The score is 8 for 1 after 0\.1 overs\./);
-  assert.match(fullLine, /Need 3 from 11 with 1 wicket in hand\./);
+  assert.match(fullLine, /Single/);
+  assert.doesNotMatch(fullLine, /Titans batting\./);
+  assert.doesNotMatch(fullLine, /The score is/);
 
   const currentScoreLine = buildCurrentScoreAnnouncement(after);
-  assert.match(currentScoreLine, /Titans batting\./);
-  assert.match(currentScoreLine, /The score is 8 for 1 after 0\.1 overs\./);
+  assert.match(currentScoreLine, /Titans, 8 for 1 after 0\.1\./);
+  assert.match(currentScoreLine, /1 over and 5 balls left\./);
+  assert.match(currentScoreLine, /Need 3\./);
+});
+
+test("spectator commentary adds richer context only on bigger moments", () => {
+  const before = {
+    ...buildBaseMatch(),
+    innings: "second",
+    score: 7,
+    outs: 1,
+    innings1: { team: "Falcons", score: 14, history: [] },
+    innings2: { team: "Titans", score: 7, history: [] },
+  };
+  const after = {
+    ...before,
+    score: 11,
+    innings2: {
+      team: "Titans",
+      score: 11,
+      history: [
+        {
+          overNumber: 1,
+          balls: [{ runs: 4, isOut: false, extraType: null }],
+        },
+      ],
+    },
+  };
+
+  const event = createScoreLiveEvent(before, after, {
+    runs: 4,
+    isOut: false,
+    extraType: null,
+  });
+
+  const fullLine = buildSpectatorAnnouncement(event, after, "full");
+  assert.match(fullLine, /Four runs/);
+  assert.match(fullLine, /Score 11 for 1\./);
+  assert.match(fullLine, /Need 4\./);
 });

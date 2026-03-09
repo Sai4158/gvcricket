@@ -32,7 +32,7 @@ export function middleware() {
     "Permissions-Policy",
     [
       "camera=()",
-      "microphone=()",
+      "microphone=(self)",
       "geolocation=()",
       "payment=()",
       "usb=()",
