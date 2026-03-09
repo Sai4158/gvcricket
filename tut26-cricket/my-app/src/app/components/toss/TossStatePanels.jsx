@@ -1,7 +1,27 @@
 "use client";
-
 import { AnimatePresence, motion } from "framer-motion";
+import { FaCircle } from "react-icons/fa";
 import { CoinHeads, CoinTails, SpinningCoin } from "./CoinArt";
+
+function ChoiceButton({ onClick, tone, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`group flex-1 rounded-[24px] px-5 py-4 text-left transition duration-300 hover:-translate-y-0.5 ${
+        tone === "heads"
+          ? "bg-[linear-gradient(135deg,#fde047,#f59e0b)] text-black shadow-[0_16px_36px_rgba(245,158,11,0.24)]"
+          : "bg-[linear-gradient(135deg,#e5e7eb,#94a3b8)] text-black shadow-[0_16px_36px_rgba(148,163,184,0.18)]"
+      }`}
+    >
+      <div className="text-[10px] font-semibold uppercase tracking-[0.28em] opacity-70">
+        Call
+      </div>
+      <div className="mt-2 text-2xl font-black transition-transform group-hover:translate-x-0.5">
+        {children}
+      </div>
+    </button>
+  );
+}
 
 export default function TossStatePanels({
   status,
@@ -15,115 +35,157 @@ export default function TossStatePanels({
   const { winnerName, call, side } = tossResult;
 
   return (
-    <div className="h-[480px] flex flex-col items-center justify-center gap-8">
+    <div className="min-h-[520px] rounded-[28px] border border-white/10 bg-white/[0.03] px-5 py-6">
       <AnimatePresence mode="wait">
-        {status === "choosing" && (
+        {status === "choosing" ? (
           <motion.div
             key="choosing"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="w-full flex flex-col items-center gap-6"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            className="flex min-h-[468px] flex-col justify-between"
           >
-            <p className="text-white text-2xl">
-              <span className="font-bold">{teamName}</span>, pick a side:
-            </p>
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={() => onChoice("heads")}
-                className="w-36 py-3 font-bold rounded-lg text-lg transition-all duration-300 ease-in-out hover:scale-105 bg-yellow-400 text-black focus:ring-2 focus:ring-white"
+            <div className="text-center">
+              <div className="mx-auto inline-flex h-20 w-20 items-center justify-center rounded-full border border-amber-300/10 bg-amber-400/10 shadow-[0_0_32px_rgba(245,158,11,0.12)]">
+                <div
+                  aria-hidden="true"
+                  className="h-10 w-10 bg-white/95 shadow-[0_0_10px_rgba(245,158,11,0.35)]"
+                  style={{
+                    WebkitMaskImage: "url('/gvLogo.png')",
+                    maskImage: "url('/gvLogo.png')",
+                    WebkitMaskRepeat: "no-repeat",
+                    maskRepeat: "no-repeat",
+                    WebkitMaskPosition: "center",
+                    maskPosition: "center",
+                    WebkitMaskSize: "contain",
+                    maskSize: "contain",
+                  }}
+                />
+              </div>
+              <h2 className="mt-5 text-3xl font-black text-white">{teamName}</h2>
+              <p className="mt-2 text-sm text-zinc-400">Call it.</p>
+            </div>
+
+            <div className="py-8 flex justify-center">
+              <motion.div
+                animate={{ rotateY: 720 }}
+                transition={{
+                  duration: 3.2,
+                  ease: "linear",
+                  repeat: Number.POSITIVE_INFINITY,
+                }}
               >
+                <SpinningCoin />
+              </motion.div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <ChoiceButton tone="heads" onClick={() => onChoice("heads")}>
                 Heads
-              </button>
-              <button
-                onClick={() => onChoice("tails")}
-                className="w-36 py-3 font-bold rounded-lg text-lg transition-all duration-300 ease-in-out hover:scale-105 bg-slate-300 text-black focus:ring-2 focus:ring-white"
-              >
+              </ChoiceButton>
+              <ChoiceButton tone="tails" onClick={() => onChoice("tails")}>
                 Tails
-              </button>
+              </ChoiceButton>
             </div>
           </motion.div>
-        )}
+        ) : null}
 
-        {status === "counting" && (
+        {status === "counting" ? (
           <motion.div
             key="counting"
-            initial={{ opacity: 0, scale: 0.8 }}
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="flex flex-col items-center gap-4"
+            exit={{ opacity: 0, scale: 1.05 }}
+            className="flex min-h-[468px] flex-col items-center justify-center text-center"
           >
-            <p className="text-xl text-zinc-400">Tossing in...</p>
-            <p className="text-9xl font-mono font-bold text-white">{countdown}</p>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-300">
+              <FaCircle className="text-[9px] text-amber-300" />
+              Tossing
+            </div>
+            <div className="my-8">
+              <SpinningCoin />
+            </div>
+            <p className="text-sm uppercase tracking-[0.35em] text-zinc-500">In</p>
+            <p className="mt-2 text-8xl font-black text-white">{countdown}</p>
           </motion.div>
-        )}
+        ) : null}
 
-        {status === "flipping" && (
+        {status === "flipping" ? (
           <motion.div
             key="flipping"
-            initial={{ scale: 0.5, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1, rotateY: 1080 }}
-            exit={{ scale: 0.5, opacity: 0 }}
-            transition={{ duration: 3, ease: "easeInOut" }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            className="flex min-h-[468px] flex-col items-center justify-center text-center"
           >
-            <SpinningCoin />
+            <motion.div
+              animate={{ rotateY: 1440 }}
+              transition={{ duration: 2.2, ease: "easeInOut" }}
+            >
+              <SpinningCoin />
+            </motion.div>
+            <p className="mt-8 text-lg font-semibold text-zinc-200">Flipping...</p>
           </motion.div>
-        )}
+        ) : null}
 
-        {status === "finished" && (
+        {status === "finished" ? (
           <motion.div
             key="finished"
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full flex flex-col items-center gap-6"
+            className="flex min-h-[468px] flex-col items-center justify-between text-center"
           >
-            {side === "heads" ? <CoinHeads /> : <CoinTails />}
-            <div className="text-xl font-semibold text-center leading-relaxed">
-              <p>
-                {teamName} called{" "}
-                <strong className="text-amber-300 capitalize">{call}</strong>.
+            <div>
+              <div className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-300">
+                Result
+              </div>
+              <div className="mt-6 flex justify-center">
+                {side === "heads" ? <CoinHeads /> : <CoinTails />}
+              </div>
+              <p className="mt-6 text-xs uppercase tracking-[0.38em] text-zinc-500">
+                {teamName} called {call}
               </p>
-              <br />
-              <p>
-                It is <strong className="text-amber-300 capitalize">{side}</strong>.
-              </p>
-              <br />
-              <p className="text-2xl font-bold text-white mt-2">
-                {winnerName} wins the toss!
+              <h2 className="mt-3 text-3xl font-black leading-tight text-white">
+                {winnerName} won the toss
+              </h2>
+              <p className="mt-2 text-sm text-zinc-400">
+                Landed on <span className="capitalize text-white">{side}</span>
               </p>
             </div>
-            <div className="w-full max-w-xs mt-2 space-y-4">
-              <p className="text-lg text-zinc-200">What will {winnerName} do?</p>
-              <div className="flex gap-4 justify-center">
+
+            <div className="w-full">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.34em] text-zinc-500">
+                Next move
+              </p>
+              <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={() => onDecision("bat")}
                   disabled={isSubmitting}
-                  className="flex-1 py-3 text-black rounded-2xl font-bold shadow-lg shadow-yellow-900/40 hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:animate-none disabled:hover:scale-100 animate-[animate-gradient-slow_6s_ease-in-out_infinite]"
-                  style={{
-                    backgroundSize: "200% auto",
-                    backgroundImage:
-                      "linear-gradient(to right, #fde047, #f59e0b, #fbbf24, #f59e0b, #fde047)",
-                  }}
+                  className="group rounded-[24px] border border-amber-200/40 bg-[linear-gradient(135deg,#fde047_0%,#f59e0b_100%)] px-4 py-4 text-base font-black text-black shadow-[0_18px_40px_rgba(245,158,11,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_44px_rgba(245,158,11,0.28)] disabled:opacity-50 disabled:hover:translate-y-0"
                 >
-                  {isSubmitting ? "..." : "Bat First"}
+                  <span className="block text-[10px] uppercase tracking-[0.28em] opacity-70">
+                    Attack
+                  </span>
+                  <span className="mt-1 block transition-transform group-hover:translate-x-0.5">
+                    {isSubmitting ? "Saving..." : "Bat First"}
+                  </span>
                 </button>
-
                 <button
                   onClick={() => onDecision("bowl")}
                   disabled={isSubmitting}
-                  className="flex-1 py-3 text-white rounded-2xl font-bold shadow-lg shadow-cyan-900/40 hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:animate-none disabled:hover:scale-100 animate-[animate-gradient-slow_6s_ease-in-out_infinite]"
-                  style={{
-                    backgroundSize: "200% auto",
-                    backgroundImage:
-                      "linear-gradient(to right, #22d3ee, #0ea5e9, #38bdf8, #0ea5e9, #22d3ee)",
-                  }}
+                  className="group rounded-[24px] border border-sky-200/20 bg-[linear-gradient(135deg,#38bdf8_0%,#2563eb_100%)] px-4 py-4 text-base font-black text-white shadow-[0_18px_40px_rgba(37,99,235,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_44px_rgba(37,99,235,0.3)] disabled:opacity-50 disabled:hover:translate-y-0"
                 >
-                  {isSubmitting ? "..." : "Bowl First"}
+                  <span className="block text-[10px] uppercase tracking-[0.28em] opacity-75">
+                    Control
+                  </span>
+                  <span className="mt-1 block transition-transform group-hover:translate-x-0.5">
+                    {isSubmitting ? "Saving..." : "Bowl First"}
+                  </span>
                 </button>
               </div>
             </div>
           </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
     </div>
   );

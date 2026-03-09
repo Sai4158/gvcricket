@@ -1,9 +1,11 @@
 "use client";
 
 import {
+  FaBroadcastTower,
   FaBookOpen,
   FaImage,
   FaInfoCircle,
+  FaMicrophone,
   FaRegClock,
   FaShareAlt,
   FaUserEdit,
@@ -19,6 +21,8 @@ export default function MatchActionGrid({
   onUndo,
   onHistory,
   onImage,
+  onCommentary,
+  onMic,
   onShare,
   onRules,
 }) {
@@ -57,6 +61,18 @@ export default function MatchActionGrid({
           icon={<FaImage />}
           label="Image"
           colorClass="text-pink-400"
+        />
+        <ActionButton
+          onClick={onCommentary}
+          icon={<FaBroadcastTower />}
+          label="Voice"
+          colorClass="text-emerald-300"
+        />
+        <ActionButton
+          onClick={onMic}
+          icon={<FaMicrophone />}
+          label="Mic"
+          colorClass="text-emerald-400"
         />
         <ActionButton
           onClick={onShare}

@@ -1,11 +1,26 @@
 import TossPageClient from "../../components/toss/TossPageClient";
-import { loadPublicMatchData } from "../../lib/server-data";
+import { loadTossPageData } from "../../lib/server-data";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function TossPage({ params }) {
   const { id } = await params;
-  const initialMatch = await loadPublicMatchData(id);
+  const { match: initialMatch, authStatus } = await loadTossPageData(id);
 
-  return <TossPageClient matchId={id} initialMatch={initialMatch} />;
+  if (
+    initialMatch &&
+    initialMatch.tossWinner &&
+    initialMatch.tossDecision
+  ) {
+    redirect(`/match/${id}`);
+  }
+
+  return (
+    <TossPageClient
+      matchId={id}
+      initialMatch={initialMatch}
+      initialAuthStatus={authStatus}
+    />
+  );
 }

@@ -1,4 +1,6 @@
 import { getTeamBundle } from "./team-utils";
+import { getPublicMatchImagePath } from "./match-image-secure";
+import { isSafeMatchImageUrl } from "./match-image";
 
 export function serializePublicMatch(matchDocument) {
   if (!matchDocument) return null;
@@ -28,7 +30,7 @@ export function serializePublicMatch(matchDocument) {
     innings1: match.innings1 || { team: "", score: 0, history: [] },
     innings2: match.innings2 || { team: "", score: 0, history: [] },
     balls: Array.isArray(match.balls) ? match.balls : [],
-    matchImageUrl: match.matchImageUrl || "",
+    matchImageUrl: getPublicMatchImagePath(match),
     announcerEnabled: Boolean(match.announcerEnabled),
     announcerMode: match.announcerMode || "",
     lastLiveEvent: match.lastLiveEvent || null,
@@ -63,7 +65,17 @@ export function serializePublicSession(sessionDocument) {
     teamBName: teamB.name,
     teamA: teamA.players,
     teamB: teamB.players,
-    matchImageUrl: session.matchImageUrl || "",
+    matchImageUrl: isSafeMatchImageUrl(session.matchImageUrl || "")
+      ? session.matchImageUrl || ""
+      : getPublicMatchImagePath({
+          _id: session.match?._id || session.match || "",
+          matchImageUrl: session.matchImageUrl || "",
+          matchImageStorageUrlEnc: session.matchImageStorageUrlEnc || "",
+          matchImageStorageUrlHash: session.matchImageStorageUrlHash || "",
+          matchImagePublicId: session.matchImagePublicId || "",
+          matchImageUploadedAt: session.matchImageUploadedAt || null,
+          updatedAt: session.updatedAt || null,
+        }),
     announcerEnabled: Boolean(session.announcerEnabled),
     announcerMode: session.announcerMode || "",
     lastEventType: session.lastEventType || "",

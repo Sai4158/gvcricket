@@ -1,9 +1,10 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import AnnouncementControls from "../live/AnnouncementControls";
+import useLocalMicMonitor from "../live/useLocalMicMonitor";
 import useAnnouncementSettings from "../live/useAnnouncementSettings";
-import MatchImageCard from "./MatchImageCard";
+import MatchHeroBackdrop from "./MatchHeroBackdrop";
 import { countLegalBalls } from "../../lib/match-scoring";
 import {
   buildCurrentScoreAnnouncement,
@@ -31,6 +32,7 @@ export default function MatchPageClient({
   initialAuthStatus,
   initialMatch,
 }) {
+  const router = useRouter();
   const [modal, setModal] = useState({ type: null });
   const [infoText, setInfoText] = useState(null);
   const [announceCooldownLeft, setAnnounceCooldownLeft] = useState(0);
@@ -41,7 +43,9 @@ export default function MatchPageClient({
   );
   const { settings: umpireSettings, updateSetting: updateUmpireSetting } =
     useAnnouncementSettings("umpire");
-  const { speak, prime, stop, status, voiceName } = useSpeechAnnouncer(umpireSettings);
+  const micMonitor = useLocalMicMonitor();
+  const { speak, prime, stop, status, voiceName } =
+    useSpeechAnnouncer(umpireSettings);
   const {
     match,
     error,
@@ -57,16 +61,35 @@ export default function MatchPageClient({
   } = useMatch(matchId, authStatus === "granted", initialMatch);
   const liveUpdatedLabel = useLiveRelativeTime(lastUpdatedAt);
   const isLiveMatch = Boolean(match?.isOngoing && !match?.result);
+  const tossPending = !match?.tossWinner || !match?.tossDecision;
 
   useEffect(() => {
     lastLocalActionRef.current = "";
   }, [match?.lastLiveEvent?.id]);
 
   useEffect(() => {
+    if (authStatus === "granted" && match && tossPending) {
+      router.replace(`/toss/${matchId}`);
+    }
+  }, [authStatus, match, matchId, router, tossPending]);
+
+  useEffect(() => {
     if (!isLiveMatch) {
       stop();
     }
   }, [isLiveMatch, stop]);
+
+  useEffect(() => {
+    if (announceCooldownLeft <= 0) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setAnnounceCooldownLeft((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [announceCooldownLeft]);
 
   const announceUmpireAction = (runs, isOut = false, extraType = null) => {
     const nextMatch = match
@@ -87,7 +110,7 @@ export default function MatchPageClient({
     lastLocalActionRef.current = text;
     speak(text, {
       key: `umpire-${text}`,
-      rate: 1.03,
+      rate: 0.92,
       minGapMs: 250,
       userGesture: true,
     });
@@ -98,7 +121,21 @@ export default function MatchPageClient({
     handleScoreEvent(runs, isOut, extraType);
   };
 
-  const handleCopyShareLink = () => {
+  const handleManualScoreAnnouncement = () => {
+    if (!match || announceCooldownLeft > 0) {
+      return;
+    }
+
+    setAnnounceCooldownLeft(3);
+    speak(buildCurrentScoreAnnouncement(match), {
+      key: `umpire-current-score-${match._id}`,
+      rate: 0.9,
+      minGapMs: 2500,
+      userGesture: true,
+    });
+  };
+
+  const handleCopyShareLink = async () => {
     if (!match) return;
 
     triggerMatchHapticFeedback();
@@ -107,15 +144,27 @@ export default function MatchPageClient({
     const shareText = `Follow the live score for ${shareTitle}. Current score: ${match.score}/${match.outs}.`;
 
     if (navigator.share) {
-      navigator
-        .share({ title: shareTitle, text: shareText, url: link })
-        .catch(console.error);
-      return;
+      try {
+        await navigator.share({ title: shareTitle, text: shareText, url: link });
+        return;
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          return;
+        }
+      }
     }
 
-    navigator.clipboard
-      .writeText(link)
-      .then(() => alert("Spectator link copied to clipboard."));
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(link);
+        alert("Spectator link copied to clipboard.");
+        return;
+      } catch {
+        // Fall through to the browser prompt if clipboard access is blocked.
+      }
+    }
+
+    window.prompt("Copy spectator link", link);
   };
 
   if (authStatus !== "granted") {
@@ -130,7 +179,7 @@ export default function MatchPageClient({
   }
 
   if (isLoading) return <Splash>Loading Match...</Splash>;
-  if (error) return <Splash>Error: Could not load match data.</Splash>;
+  if (error && !match) return <Splash>Error: Could not load match data.</Splash>;
   if (!match) return <Splash>Match not found.</Splash>;
 
   const activeInningsKey = match.innings === "first" ? "innings1" : "innings2";
@@ -146,60 +195,37 @@ export default function MatchPageClient({
   const isAllOut = maxWickets > 0 && match.outs >= maxWickets;
   const showInningsEnd =
     !match.isOngoing || Boolean(match.result) || oversDone || isAllOut;
-  const controlsDisabled = isUpdating || showInningsEnd || Boolean(match.result);
+  const controlsDisabled =
+    isUpdating || showInningsEnd || Boolean(match.result) || tossPending;
 
   return (
     <>
       <main className="min-h-screen font-sans bg-zinc-950 text-white p-4">
         <div className="max-w-md mx-auto pt-8 pb-24">
-          <div className="flex items-center justify-center gap-3 mb-4 text-sm text-zinc-300">
-            <span className="inline-flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse"></span>
-              Live
-            </span>
-            <span suppressHydrationWarning>{liveUpdatedLabel}</span>
-          </div>
-          {match.result && (
-            <div className="bg-green-900/50 text-green-300 p-4 rounded-xl text-center mb-4 ring-1 ring-green-500">
-              <h3 className="font-bold text-xl">Match Over</h3>
-              <p>{match.result}</p>
+          <MatchHeroBackdrop match={match} className="mb-5">
+            <div className="px-5 pt-6 pb-5">
+              <div className="flex items-center justify-center gap-3 mb-4 text-sm text-zinc-200">
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse"></span>
+                  Live
+                </span>
+                <span suppressHydrationWarning>{liveUpdatedLabel}</span>
+              </div>
+              {match.result && (
+                <div className="bg-green-900/50 text-green-300 p-4 rounded-xl text-center mb-4 ring-1 ring-green-500">
+                  <h3 className="font-bold text-xl">Match Over</h3>
+                  <p>{match.result}</p>
+                </div>
+              )}
+              <MatchHeader match={match} />
+              <Scoreboard match={match} history={oversHistory} />
             </div>
-          )}
-          <div className="mb-5">
-            <MatchImageCard match={match} compact title="Match Cover" />
-          </div>
-          {isLiveMatch ? <div className="mb-5">
-            <AnnouncementControls
-              title="Umpire Feedback"
-              subtitle="Short local voice confirmation for each scoring input."
-              settings={umpireSettings}
-              updateSetting={updateUmpireSetting}
-              showAccessibility
-              onToggleEnabled={(nextEnabled) => {
-                if (nextEnabled) {
-                  prime();
-                }
-              }}
-              statusText={
-                umpireSettings.enabled
-                  ? voiceName
-                    ? `Voice ready: ${voiceName}${status === "waiting_for_gesture" ? " · tap once if playback is blocked" : ""}`
-                    : status === "waiting_for_gesture"
-                    ? "Tap once to enable voice playback on this browser."
-                    : "Voice will use your browser's English voice."
-                  : ""
-              }
-              onAnnounceNow={() =>
-                speak(buildCurrentScoreAnnouncement(match), {
-                  key: "umpire-current-score",
-                  rate: 1,
-                  userGesture: true,
-                })
-              }
-            />
-          </div> : null}
-          <MatchHeader match={match} />
-          <Scoreboard match={match} history={oversHistory} />
+          </MatchHeroBackdrop>
+          {error ? (
+            <div className="mb-4 rounded-2xl border border-rose-500/30 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
+              {error.message || "Match update failed."}
+            </div>
+          ) : null}
           <BallTracker history={oversHistory} />
           <Controls
             onScore={handleAnnouncedScoreEvent}
@@ -217,6 +243,8 @@ export default function MatchPageClient({
             onUndo={handleUndo}
             onHistory={() => setModal({ type: "history" })}
             onImage={() => setModal({ type: "image" })}
+            onCommentary={() => setModal({ type: "commentary" })}
+            onMic={() => setModal({ type: "mic" })}
             onShare={handleCopyShareLink}
             onRules={() => setModal({ type: "rules" })}
           />
@@ -226,6 +254,50 @@ export default function MatchPageClient({
         showInningsEnd={showInningsEnd}
         match={match}
         modalType={modal.type}
+        micMonitor={micMonitor}
+        commentaryProps={
+          isLiveMatch
+            ? {
+                title: "Umpire Commentary",
+                subtitle: "Start voice, close this popup, then reopen it any time to stop or replay the score.",
+                settings: umpireSettings,
+                updateSetting: updateUmpireSetting,
+                onToggleEnabled: (nextEnabled) => {
+                  if (nextEnabled) {
+                    prime();
+                    speak("Umpire voice on.", {
+                      key: "umpire-voice-enabled",
+                      rate: 0.9,
+                      interrupt: false,
+                      userGesture: true,
+                      ignoreEnabled: true,
+                    });
+                  } else {
+                    stop();
+                  }
+                },
+                statusText: umpireSettings.enabled
+                  ? status === "waiting_for_gesture"
+                    ? voiceName
+                      ? `Voice ready: ${voiceName} - tap once to unlock audio on this browser`
+                      : "Tap a scoring button or Read live score once."
+                    : voiceName
+                    ? `Voice ready: ${voiceName}`
+                    : "Voice will use your browser's English voice."
+                  : "",
+                onAnnounceNow: handleManualScoreAnnouncement,
+                announceLabel:
+                  announceCooldownLeft > 0
+                    ? `Read Live Score (${announceCooldownLeft}s)`
+                    : "Read Live Score",
+                announceDisabled:
+                  announceCooldownLeft > 0 || !umpireSettings.enabled,
+                announceHint: umpireSettings.enabled
+                  ? "Replay the score every 3 seconds."
+                  : "Start commentary to replay the score.",
+              }
+            : null
+        }
         oversHistory={oversHistory}
         currentOverNumber={currentOverNumber}
         firstInningsOversPlayed={firstInningsOversPlayed}

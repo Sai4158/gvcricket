@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FaRedo } from "react-icons/fa";
+import { FaHandSparkles, FaRedo } from "react-icons/fa";
 import MatchImageUploader from "../match/MatchImageUploader";
+import { AccessGate, Splash } from "../match/MatchStatusShell";
+import useMatchAccess from "../match/useMatchAccess";
 import TossStatePanels from "./TossStatePanels";
 import { getTeamBundle } from "../../lib/team-utils";
 
@@ -15,8 +17,16 @@ function createActionId(prefix) {
   return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export default function TossPageClient({ matchId, initialMatch }) {
+export default function TossPageClient({
+  matchId,
+  initialMatch,
+  initialAuthStatus = "checking",
+}) {
   const router = useRouter();
+  const { authStatus, authError, authSubmitting, submitPin } = useMatchAccess(
+    matchId,
+    initialAuthStatus
+  );
   const [status, setStatus] = useState("choosing");
   const [countdown, setCountdown] = useState(3);
   const [playerChoice, setPlayerChoice] = useState(null);
@@ -31,11 +41,20 @@ export default function TossPageClient({ matchId, initialMatch }) {
   const [showImageStep, setShowImageStep] = useState(false);
 
   useEffect(() => {
-    if (status !== "counting") return undefined;
+    if (status !== "counting" || countdown <= 0) {
+      return undefined;
+    }
 
-    if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
+    const timer = window.setTimeout(() => {
+      setCountdown((current) => current - 1);
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [countdown, status]);
+
+  useEffect(() => {
+    if (status !== "counting" || countdown !== 0 || !matchDetails || !playerChoice) {
+      return undefined;
     }
 
     const teamA = getTeamBundle(matchDetails, "teamA");
@@ -44,17 +63,26 @@ export default function TossPageClient({ matchId, initialMatch }) {
     const winnerName = playerChoice === actualSide ? teamA.name : teamB.name;
 
     setStatus("flipping");
-    const timer = setTimeout(() => {
-      setTossResult({ side: actualSide, winnerName, call: playerChoice });
-      setStatus("finished");
-    }, 3000);
+    setTossResult({ side: actualSide, winnerName, call: playerChoice });
+  }, [countdown, matchDetails, playerChoice, status]);
 
-    return () => clearTimeout(timer);
-  }, [status, countdown, matchDetails, playerChoice]);
+  useEffect(() => {
+    if (status !== "flipping") {
+      return undefined;
+    }
+
+    const revealTimer = window.setTimeout(() => {
+      setStatus("finished");
+    }, 2400);
+
+    return () => window.clearTimeout(revealTimer);
+  }, [status]);
 
   const handleChoice = (choice) => {
+    setError("");
     setPlayerChoice(choice);
     setCountdown(3);
+    setTossResult({ side: null, winnerName: null, call: null });
     setStatus("counting");
   };
 
@@ -64,6 +92,7 @@ export default function TossPageClient({ matchId, initialMatch }) {
     }
 
     setIsSubmitting(true);
+    setError("");
 
     try {
       const res = await fetch(`/api/matches/${matchId}/actions`, {
@@ -77,17 +106,16 @@ export default function TossPageClient({ matchId, initialMatch }) {
         }),
       });
 
+      const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
-        throw new Error(payload.message || "Failed to update match.");
+        throw new Error(payload.message || "Failed to update toss.");
       }
 
-      const payload = await res.json();
       setMatchDetails(payload.match);
       setShowImageStep(true);
-      setIsSubmitting(false);
     } catch (caughtError) {
-      setError(caughtError.message);
+      setError(caughtError.message || "Failed to update toss.");
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -99,12 +127,21 @@ export default function TossPageClient({ matchId, initialMatch }) {
     setTossResult({ side: null, winnerName: null, call: null });
     setIsSubmitting(false);
     setShowImageStep(false);
+    setError("");
   };
 
   if (error) {
     return (
-      <main className="min-h-screen grid place-content-center bg-black">
-        <p className="text-red-400 text-xl p-8">{error}</p>
+      <main className="min-h-screen grid place-content-center bg-zinc-950 px-6">
+        <div className="max-w-sm rounded-[28px] border border-rose-500/30 bg-rose-950/30 px-6 py-5 text-center text-rose-200 shadow-2xl shadow-black/40">
+          <p className="text-lg font-semibold">{error}</p>
+          <button
+            onClick={redoToss}
+            className="mt-5 rounded-full bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
+          >
+            Try Toss Again
+          </button>
+        </div>
       </main>
     );
   }
@@ -112,61 +149,96 @@ export default function TossPageClient({ matchId, initialMatch }) {
   if (!matchDetails) {
     return (
       <main className="min-h-screen grid place-content-center bg-zinc-950">
-        <p className="text-white text-xl animate-pulse">LOADING...</p>
+        <p className="text-white text-xl animate-pulse">Loading toss...</p>
       </main>
     );
   }
 
   const teamA = getTeamBundle(matchDetails, "teamA");
+  const teamB = getTeamBundle(matchDetails, "teamB");
+  const titleText = showImageStep ? "Ready to Start" : "Match Toss";
+  const subtitleText = showImageStep
+    ? "Add a cover, or skip."
+    : `${teamA.name} vs ${teamB.name}`;
+  const stageLabel =
+    showImageStep ? "Step 3" : status === "finished" ? "Step 2" : "Step 1";
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-zinc-900 to-black p-6 text-white overflow-hidden">
-      <div className="relative w-full max-w-lg bg-black/50 backdrop-blur-xl ring-1 ring-yellow-400/30 rounded-3xl p-8 sm:px-12 sm:py-16 text-center shadow-2xl shadow-yellow-500/10">
-        <button
-          onClick={redoToss}
-          className="absolute top-4 right-4 p-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
-          aria-label="Redo Toss"
-        >
-          <FaRedo />
-        </button>
+    authStatus !== "granted" ? (
+      authStatus === "checking" ? (
+        <Splash>Checking toss access...</Splash>
+      ) : (
+        <AccessGate
+          onSubmit={submitPin}
+          isSubmitting={authSubmitting}
+          error={authError}
+        />
+      )
+    ) : (
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(245,158,11,0.12),transparent_35%),linear-gradient(180deg,#050505_0%,#0b0b11_55%,#050505_100%)] px-4 py-8 text-white">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md items-center justify-center">
+        <section className="relative w-full overflow-hidden rounded-[34px] border border-amber-400/25 bg-[linear-gradient(180deg,rgba(18,18,22,0.96),rgba(6,6,8,0.96))] px-6 py-7 shadow-[0_30px_100px_rgba(0,0,0,0.55)]">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.14),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.12),transparent_24%)]" />
 
-        <h1 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-yellow-300 to-orange-400 bg-clip-text text-transparent mb-8 sm:mb-12">
-          The Toss
-        </h1>
+          <div className="relative">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-300">
+                  <FaHandSparkles className="text-[10px]" />
+                  {stageLabel}
+                </div>
+                <h1 className="mt-4 text-4xl font-black tracking-tight text-amber-300">
+                  {titleText}
+                </h1>
+                <p className="mt-2 text-sm text-zinc-400">{subtitleText}</p>
+              </div>
 
-        {showImageStep ? (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold text-white">Add a Match Image</h2>
-              <p className="text-zinc-400 mt-2">
-                Upload a team photo, ground photo, poster, or skip and add it later after admin access.
-              </p>
+              <button
+                onClick={redoToss}
+                className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
+                aria-label="Redo Toss"
+              >
+                <FaRedo />
+              </button>
             </div>
-            <MatchImageUploader
-              matchId={String(matchDetails._id)}
-              existingImageUrl={matchDetails.matchImageUrl || ""}
-              onUploaded={() => {
-                router.push(`/match/${matchId}`);
-              }}
-              onSkip={() => router.push(`/match/${matchId}`)}
-              title="Optional pre-game image"
-              description="Keep the flow fast: upload now, or choose later once the umpire view is unlocked."
-              primaryLabel="Upload and Start Match"
-              secondaryLabel="Skip and Start Match"
-            />
+
+            {showImageStep ? (
+              <div className="space-y-6">
+                <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-4 py-4 text-center">
+                  <p className="text-base font-semibold text-white">
+                    Toss complete. {tossResult.winnerName} chose to {matchDetails.tossDecision}.
+                  </p>
+                  <p className="mt-2 text-sm text-zinc-400">Add an image or go live.</p>
+                </div>
+
+                <MatchImageUploader
+                  matchId={String(matchDetails._id)}
+                  existingImageUrl={matchDetails.matchImageUrl || ""}
+                  onUploaded={() => {
+                    router.push(`/match/${matchId}`);
+                  }}
+                  onSkip={() => router.push(`/match/${matchId}`)}
+                  title="Optional match image"
+                  description="Poster, ground photo, or team image. You can also add it later."
+                  primaryLabel="Start Match"
+                  secondaryLabel="Skip for now"
+                />
+              </div>
+            ) : (
+              <TossStatePanels
+                status={status}
+                countdown={countdown}
+                teamName={teamA.name}
+                tossResult={tossResult}
+                isSubmitting={isSubmitting}
+                onChoice={handleChoice}
+                onDecision={startMatch}
+              />
+            )}
           </div>
-        ) : (
-          <TossStatePanels
-            status={status}
-            countdown={countdown}
-            teamName={teamA.name}
-            tossResult={tossResult}
-            isSubmitting={isSubmitting}
-            onChoice={handleChoice}
-            onDecision={startMatch}
-          />
-        )}
+        </section>
       </div>
     </main>
+    )
   );
 }

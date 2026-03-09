@@ -11,8 +11,8 @@ export default function ScoringBreakdownCharts({
   team1Name,
   team2Name,
 }) {
-  const team1Chart = useChartWidth();
-  const team2Chart = useChartWidth();
+  const [team1ContainerRef, team1Width] = useChartWidth();
+  const [team2ContainerRef, team2Width] = useChartWidth();
   const colors = ["#38bdf8", "#8b5cf6", "#f87171"];
   const radian = Math.PI / 180;
 
@@ -47,12 +47,12 @@ export default function ScoringBreakdownCharts({
         <FaChartPie /> Run Source Breakdown
       </h2>
       <div className="grid md:grid-cols-2 gap-8 items-center">
-        <div ref={team1Chart.containerRef} className="w-full h-80 min-w-0">
+        <div ref={team1ContainerRef} className="w-full h-80 min-w-0">
           <h3 className="font-bold text-center text-blue-400 text-lg">
             {team1Name}
           </h3>
-          {team1Chart.width > 0 ? (
-            <PieChart width={team1Chart.width} height={320}>
+          {team1Width > 0 ? (
+            <PieChart width={team1Width} height={320}>
               <Pie
                 data={innings1Summary.scoringBreakdown}
                 dataKey="value"
@@ -74,12 +74,12 @@ export default function ScoringBreakdownCharts({
             <div className="h-full w-full rounded-xl bg-zinc-950/30" />
           )}
         </div>
-        <div ref={team2Chart.containerRef} className="w-full h-80 min-w-0">
+        <div ref={team2ContainerRef} className="w-full h-80 min-w-0">
           <h3 className="font-bold text-center text-red-400 text-lg">
             {team2Name}
           </h3>
-          {team2Chart.width > 0 ? (
-            <PieChart width={team2Chart.width} height={320}>
+          {team2Width > 0 ? (
+            <PieChart width={team2Width} height={320}>
               <Pie
                 data={innings2Summary.scoringBreakdown}
                 dataKey="value"

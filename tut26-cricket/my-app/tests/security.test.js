@@ -14,6 +14,7 @@ import {
   MatchEngineError,
 } from "../src/app/lib/match-engine.js";
 import { validateMatchImageBuffer } from "../src/app/lib/match-image.js";
+import { evaluateSensitiveImagePredictions } from "../src/app/lib/match-image-moderation.js";
 import {
   serializePublicMatch,
   serializePublicSession,
@@ -326,6 +327,24 @@ test("image validation rejects invalid binary payloads", () => {
   assert.equal(result.ok, false);
 });
 
+test("sensitive image moderation flags explicit predictions and allows neutral ones", () => {
+  const blocked = evaluateSensitiveImagePredictions([
+    { className: "Neutral", probability: 0.1 },
+    { className: "Porn", probability: 0.91 },
+    { className: "Sexy", probability: 0.02 },
+  ]);
+  assert.equal(blocked.ok, false);
+  assert.deepEqual(blocked.blockedLabels, ["Porn"]);
+
+  const safe = evaluateSensitiveImagePredictions([
+    { className: "Neutral", probability: 0.94 },
+    { className: "Sexy", probability: 0.18 },
+    { className: "Porn", probability: 0.01 },
+  ]);
+  assert.equal(safe.ok, true);
+  assert.deepEqual(safe.blockedLabels, []);
+});
+
 test("middleware adds core security headers", () => {
   const response = middleware();
   assert.equal(response.headers.get("x-frame-options"), "DENY");
@@ -365,10 +384,10 @@ test("spectator commentary includes smart score and chase details", () => {
 
   const fullLine = buildSpectatorAnnouncement(event, after, "full");
   assert.match(fullLine, /Titans batting\./);
-  assert.match(fullLine, /Current score, 8 for 1 after 0\.1 overs\./);
+  assert.match(fullLine, /The score is 8 for 1 after 0\.1 overs\./);
   assert.match(fullLine, /Need 3 from 11 with 1 wicket in hand\./);
 
   const currentScoreLine = buildCurrentScoreAnnouncement(after);
   assert.match(currentScoreLine, /Titans batting\./);
-  assert.match(currentScoreLine, /Current score, 8 for 1 after 0\.1 overs\./);
+  assert.match(currentScoreLine, /The score is 8 for 1 after 0\.1 overs\./);
 });

@@ -76,23 +76,23 @@ export default function TeamSelectionPage() {
   };
 
   return (
-    <main className="min-h-screen flex flex-col items-center bg-zinc-950 text-zinc-100 py-10 px-5">
+    <main className="min-h-screen bg-zinc-950 px-5 py-10 text-zinc-100">
       <div className="w-full max-w-4xl mx-auto">
-        <header className="text-center mb-5 mt-7">
-          <div className="flex justify-center items-center gap-3">
+        <header className="mb-8 mt-7 text-center">
+          <div className="flex items-center justify-center gap-3">
             <h1 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-yellow-300 via-rose-200 to-orange-400 bg-clip-text text-transparent">
               Team Selection
             </h1>
           </div>
-          <p className="text-zinc-100 mt-2">
-            Set player counts, team names, and match overs.
+          <p className="mx-auto mt-3 max-w-xl text-sm text-zinc-400 sm:text-base">
+            Set names, squad size, and overs before the toss.
           </p>
-          <br />
           <button
             onClick={() => setIsInfoModalOpen(true)}
-            className="text-white hover:text-blue-400 transition-colors"
+            className="mt-4 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-colors hover:bg-white/[0.08] hover:text-amber-300"
+            aria-label="Open team setup help"
           >
-            <FaInfoCircle size={40} />
+            <FaInfoCircle size={24} />
           </button>
         </header>
 
@@ -102,19 +102,24 @@ export default function TeamSelectionPage() {
         </section>
 
         <section className="w-full max-w-md mx-auto space-y-8">
-          <div className="flex items-center justify-between p-4 bg-zinc-900/50 rounded-2xl ring-1 ring-white/10">
-            <h2 className="text-xl font-bold">Overs</h2>
+          <div className="flex items-center justify-between rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,20,24,0.96),rgba(10,10,14,0.96))] p-5 shadow-[0_18px_45px_rgba(0,0,0,0.22)]">
+            <div>
+              <h2 className="text-xl font-black text-white">Overs</h2>
+              <p className="mt-1 text-sm text-zinc-500">Match length</p>
+            </div>
             <div className="flex items-center gap-4">
               <button
                 onClick={() => overs > 1 && setOvers(overs - 1)}
-                className="w-10 h-10 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center transition-colors"
+                className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-zinc-100 transition-colors hover:bg-white/15"
               >
                 <FaMinus />
               </button>
-              <span className="text-3xl font-bold w-12 text-center">{overs}</span>
+              <span className="w-12 text-center text-4xl font-black text-white">
+                {overs}
+              </span>
               <button
                 onClick={() => overs < 50 && setOvers(overs + 1)}
-                className="w-10 h-10 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center transition-colors"
+                className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-zinc-100 transition-colors hover:bg-white/15"
               >
                 <FaPlus />
               </button>
@@ -124,7 +129,7 @@ export default function TeamSelectionPage() {
           <button
             onClick={handleSubmit}
             disabled={isLoading}
-            className="w-full text-xl font-bold py-5 rounded-2xl transition-all flex items-center justify-center gap-3 bg-gradient-to-r from-yellow-400 via-orange-400 to-red-500 text-white shadow-lg shadow-orange-800/30 hover:scale-105 active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex w-full items-center justify-center gap-3 rounded-[28px] bg-gradient-to-r from-yellow-400 via-orange-400 to-red-500 py-5 text-xl font-black text-white shadow-lg shadow-orange-800/30 transition-all hover:scale-[1.02] active:scale-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading ? "Saving..." : "Proceed to Toss"}
             {!isLoading && <FaArrowRight />}

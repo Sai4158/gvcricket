@@ -13,9 +13,18 @@ export function createDefaultRoster(teamLabel) {
 
 export default function TeamRoster({ color, roster, setRoster }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
   const teamColorClass = color === "blue" ? "text-blue-400" : "text-red-400";
   const teamRingClass =
     color === "blue" ? "focus:ring-blue-500" : "focus:ring-red-500";
+  const teamGlowClass =
+    color === "blue"
+      ? "shadow-[0_18px_45px_rgba(59,130,246,0.08)]"
+      : "shadow-[0_18px_45px_rgba(248,113,113,0.08)]";
+  const badgeClass =
+    color === "blue"
+      ? "border-blue-400/20 bg-blue-500/10 text-blue-300"
+      : "border-rose-400/20 bg-rose-500/10 text-rose-300";
 
   const updatePlayer = (index, nextValue) => {
     setRoster((current) => ({
@@ -54,38 +63,83 @@ export default function TeamRoster({ color, roster, setRoster }) {
   };
 
   return (
-    <div className="bg-zinc-900/50 p-6 rounded-2xl ring-1 ring-white/10 space-y-4 transition-all duration-300">
-      <div className="flex justify-between items-center">
-        <h2 className={`text-2xl font-bold ${teamColorClass}`}>{roster.name}</h2>
+    <div
+      className={`rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,20,24,0.96),rgba(10,10,14,0.96))] p-6 ring-1 ring-white/5 transition-all duration-300 ${teamGlowClass}`}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-3">
+            {isEditingName ? (
+              <input
+                type="text"
+                value={roster.name}
+                onChange={(event) =>
+                  setRoster((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+                onBlur={() => setIsEditingName(false)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    setIsEditingName(false);
+                  }
+                }}
+                autoFocus
+                placeholder="Team Name"
+                className={`min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2 text-2xl font-black text-white outline-none transition focus:ring-2 ${teamRingClass}`}
+              />
+            ) : (
+              <>
+                <h2 className={`truncate text-2xl font-black ${teamColorClass}`}>
+                  {roster.name}
+                </h2>
+                <button
+                  onClick={() => setIsEditingName(true)}
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${badgeClass}`}
+                  aria-label={`Edit ${roster.name} name`}
+                >
+                  <FaPen size={13} />
+                </button>
+              </>
+            )}
+          </div>
+          <p className="mt-2 text-sm text-zinc-500">Set players and names.</p>
+        </div>
+
         <button
           onClick={() => setIsEditing((current) => !current)}
-          className="p-2 rounded-full hover:bg-white/10 transition-colors"
+          className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] transition-colors hover:bg-white/[0.08] ${
+            isEditing ? "text-emerald-400" : "text-zinc-300"
+          }`}
+          aria-label={isEditing ? "Finish editing roster" : "Edit roster"}
         >
-          {isEditing ? (
-            <FaCheck className="text-green-400" size={20} />
-          ) : (
-            <FaPen size={20} />
-          )}
+          {isEditing ? <FaCheck size={18} /> : <FaPen size={16} />}
         </button>
       </div>
 
-      <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg">
-        <span className="font-semibold text-zinc-300">Players</span>
+      <div className="mt-5 flex items-center justify-between rounded-2xl border border-white/5 bg-white/[0.04] px-4 py-4">
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-[0.28em] text-zinc-500">
+            Players
+          </span>
+          <div className="mt-1 text-sm text-zinc-300">Squad size</div>
+        </div>
         <div className="flex items-center gap-4">
           <button
             onClick={removeLastPlayer}
             disabled={roster.players.length <= 1}
-            className="w-8 h-8 rounded-md bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-zinc-200 transition-colors hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <FaMinus />
           </button>
-          <span className="text-xl font-bold w-8 text-center">
+          <span className="w-8 text-center text-3xl font-black text-white">
             {roster.players.length}
           </span>
           <button
             onClick={addPlayer}
             disabled={roster.players.length >= 15}
-            className="w-8 h-8 rounded-md bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-zinc-200 transition-colors hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <FaPlus />
           </button>
@@ -100,23 +154,10 @@ export default function TeamRoster({ color, roster, setRoster }) {
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="space-y-3 pt-4 border-t border-white/10">
-              <p className="text-sm text-zinc-400 px-1">
-                Editing team and player names...
+            <div className="mt-5 space-y-3 border-t border-white/10 pt-5">
+              <p className="px-1 text-xs font-semibold uppercase tracking-[0.28em] text-zinc-500">
+                Player names
               </p>
-
-              <input
-                type="text"
-                value={roster.name}
-                onChange={(event) =>
-                  setRoster((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
-                }
-                placeholder="Team Name"
-                className={`w-full px-4 py-3 rounded-xl bg-zinc-900 focus:ring-2 ${teamRingClass} outline-none transition`}
-              />
 
               {roster.players.map((player, index) => (
                 <motion.div
@@ -132,12 +173,12 @@ export default function TeamRoster({ color, roster, setRoster }) {
                     value={player}
                     onChange={(event) => updatePlayer(index, event.target.value)}
                     placeholder={`Player ${index + 1}`}
-                    className={`flex-1 px-4 py-3 rounded-xl bg-zinc-900 focus:ring-2 ${teamRingClass} outline-none transition`}
+                    className={`flex-1 rounded-2xl border border-white/5 bg-white/[0.04] px-4 py-3 text-white outline-none transition focus:ring-2 ${teamRingClass}`}
                   />
                   <button
                     onClick={() => removePlayerAtIndex(index)}
                     disabled={roster.players.length <= 1}
-                    className="p-3 text-zinc-500 hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-2xl text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <FaTrash />
                   </button>

@@ -1,6 +1,8 @@
 "use client";
 
 import { AnimatePresence } from "framer-motion";
+import AnnouncementControls from "../live/AnnouncementControls";
+import LiveMicModal from "../live/LiveMicModal";
 import {
   HistoryModal,
   InningsEndModal,
@@ -15,6 +17,8 @@ export default function MatchModalLayer({
   showInningsEnd,
   match,
   modalType,
+  micMonitor,
+  commentaryProps,
   oversHistory,
   currentOverNumber,
   firstInningsOversPlayed,
@@ -79,6 +83,18 @@ export default function MatchModalLayer({
         <MatchImageModal
           match={match}
           onUploaded={onImageUploaded}
+          onClose={onClose}
+        />
+      )}
+      {modalType === "commentary" && commentaryProps ? (
+        <ModalBase title="Umpire Commentary" onExit={onClose}>
+          <AnnouncementControls {...commentaryProps} />
+        </ModalBase>
+      ) : null}
+      {modalType === "mic" && (
+        <LiveMicModal
+          title="Live Commentary Mic"
+          monitor={micMonitor}
           onClose={onClose}
         />
       )}

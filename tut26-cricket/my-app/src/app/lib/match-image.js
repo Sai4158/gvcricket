@@ -1,5 +1,7 @@
 const SAFE_IMAGE_HOSTS = new Set(["i.ibb.co", "ibb.co"]);
 const MAX_MATCH_IMAGE_BYTES = 5 * 1024 * 1024;
+const INTERNAL_MATCH_IMAGE_PATH =
+  /^\/api\/matches\/[a-f0-9]{24}\/image\/file(?:\?[^#]*)?$/i;
 const ALLOWED_IMAGE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -70,7 +72,17 @@ export function validateMatchImageBuffer(buffer, mimeType) {
   return { ok: true };
 }
 
-export function isSafeMatchImageUrl(value) {
+export function buildPublicMatchImageUrl(matchId, version = "") {
+  const safeId = String(matchId || "").trim();
+  if (!/^[a-f0-9]{24}$/i.test(safeId)) {
+    return "";
+  }
+
+  const versionSuffix = version ? `?v=${encodeURIComponent(String(version))}` : "";
+  return `/api/matches/${safeId}/image/file${versionSuffix}`;
+}
+
+export function isSafeRemoteMatchImageUrl(value) {
   if (!value) return false;
 
   try {
@@ -79,6 +91,16 @@ export function isSafeMatchImageUrl(value) {
   } catch {
     return false;
   }
+}
+
+export function isSafeMatchImageUrl(value) {
+  if (!value) return false;
+
+  if (typeof value === "string" && INTERNAL_MATCH_IMAGE_PATH.test(value.trim())) {
+    return true;
+  }
+
+  return isSafeRemoteMatchImageUrl(value);
 }
 
 export function normalizeMatchImageMetadata(uploadData, uploadedBy = "admin") {

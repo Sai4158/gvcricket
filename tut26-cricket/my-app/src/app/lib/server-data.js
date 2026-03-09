@@ -98,6 +98,30 @@ export async function loadPublicMatchData(matchId) {
   return serializePublicMatch(match);
 }
 
+export async function loadTossPageData(matchId) {
+  await connectDB();
+  const match = await Match.findById(matchId)
+    .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
+    .lean();
+
+  if (!match) {
+    return { authStatus: "locked", match: null };
+  }
+
+  const cookieStore = await cookies();
+  const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
+  const authorized = hasValidMatchAccess(
+    matchId,
+    token,
+    Number(match.adminAccessVersion || 1)
+  );
+
+  return {
+    authStatus: authorized ? "granted" : "locked",
+    match: serializePublicMatch(match),
+  };
+}
+
 export async function loadMatchAccessData(matchId) {
   await connectDB();
   const match = await Match.findById(matchId)

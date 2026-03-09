@@ -23,15 +23,26 @@ export function AccessGate({ onSubmit, isSubmitting, error }) {
           Enter the server PIN to unlock match controls.
         </p>
         <input
-          type="password"
+          type="text"
           inputMode="numeric"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          name="umpire-access-pin"
+          data-form-type="other"
+          data-lpignore="true"
           value={pin}
-          onChange={(event) => setPin(event.target.value)}
+          onChange={(event) =>
+            setPin(event.target.value.replace(/[^\d]/g, "").slice(0, 6))
+          }
           onKeyDown={(event) => {
             if (event.key === "Enter") onSubmit(pin);
           }}
-          className="w-full p-4 text-center text-2xl tracking-[1rem] rounded-lg bg-zinc-800 ring-1 ring-zinc-700 focus:ring-blue-500 outline-none text-white"
-          placeholder="----"
+          maxLength={6}
+          className="w-full p-4 text-center text-2xl tracking-[0.65rem] rounded-lg bg-zinc-800 ring-1 ring-zinc-700 focus:ring-blue-500 outline-none text-white"
+          style={{ WebkitTextSecurity: "disc" }}
+          placeholder="------"
         />
         {error && <p className="text-red-400 text-sm mt-4 text-center">{error}</p>}
         <button

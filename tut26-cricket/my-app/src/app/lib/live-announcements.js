@@ -46,8 +46,8 @@ function describeBall(ball) {
   if (ball.runs === 1) return "Single";
   if (ball.runs === 2) return "Two runs";
   if (ball.runs === 3) return "Three runs";
-  if (ball.runs === 4) return "Four";
-  if (ball.runs === 6) return "Six";
+  if (ball.runs === 4) return "Four runs";
+  if (ball.runs === 6) return "Six runs";
   return pluralize(ball.runs, "run");
 }
 
@@ -84,7 +84,7 @@ function buildOverLine(event) {
 
 function buildFullBallCommentary(event, match) {
   const base = describeBall(event.ball);
-  const currentScore = `Current score, ${scoreLine(event.score, event.outs)} after ${
+  const currentScore = `The score is ${scoreLine(event.score, event.outs)} after ${
     event.overs || getOversDisplay(getActiveHistory(match))
   } overs.`;
   const chaseLine = buildChaseEquation(match);
@@ -94,7 +94,7 @@ function buildFullBallCommentary(event, match) {
 }
 
 function buildSimpleBallCommentary(event) {
-  return [describeBall(event.ball), `Score ${scoreLine(event.score, event.outs)}.`]
+  return [describeBall(event.ball), `Score now ${scoreLine(event.score, event.outs)}.`]
     .filter(Boolean)
     .join(" ");
 }
@@ -200,7 +200,7 @@ export function buildCurrentScoreAnnouncement(match) {
 
   return [
     `${battingTeam.name} batting.`,
-    `Current score, ${scoreLine(match.score, match.outs)} after ${overs} overs.`,
+    `The score is ${scoreLine(match.score, match.outs)} after ${overs} overs.`,
     chaseLine,
   ]
     .filter(Boolean)

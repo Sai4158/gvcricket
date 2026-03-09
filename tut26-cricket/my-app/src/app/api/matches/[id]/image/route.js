@@ -1,32 +1,29 @@
 import crypto from "node:crypto";
-import { cookies } from "next/headers";
 import { jsonError, jsonRateLimit } from "../../../../lib/api-response";
 import { writeAuditLog } from "../../../../lib/audit-log";
 import { connectDB } from "../../../../lib/db";
 import { buildSessionMirrorUpdate } from "../../../../lib/match-engine";
+import { isValidUmpirePin } from "../../../../lib/match-access";
 import {
-  getMatchAccessCookieName,
-  hasValidMatchAccess,
-} from "../../../../lib/match-access";
-import {
-  isSafeMatchImageUrl,
+  buildPublicMatchImageUrl,
+  isSafeRemoteMatchImageUrl,
   normalizeMatchImageMetadata,
   validateMatchImageBuffer,
 } from "../../../../lib/match-image";
+import {
+  encryptMatchImageSourceUrl,
+  hashMatchImageSourceUrl,
+} from "../../../../lib/match-image-secure";
+import { moderateMatchImageBuffer } from "../../../../lib/match-image-moderation";
 import { serializePublicMatch } from "../../../../lib/public-data";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { parseMultipartRequest } from "../../../../lib/request-security";
+import { pinSchema } from "../../../../lib/validators";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 
 export const runtime = "nodejs";
-
-async function hasMatchAccess(matchId, accessVersion) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
-  return hasValidMatchAccess(matchId, token, accessVersion);
-}
 
 function getSafeUploadName(file) {
   const extension = String(file?.name || "")
@@ -81,12 +78,19 @@ export async function POST(req, { params }) {
       return jsonError("Match not found.", 404);
     }
 
-    const hasAccess = await hasMatchAccess(
-      id,
-      Number(match.adminAccessVersion || 1)
-    );
-    if (!hasAccess) {
-      return jsonError("Umpire access required.", 403);
+    const pinValue = parsedRequest.value.get("pin");
+    const parsedPin = pinSchema.safeParse(pinValue);
+    if (!parsedPin.success || !isValidUmpirePin(parsedPin.data)) {
+      await writeAuditLog({
+        action: "match_media_upload_denied",
+        targetType: "match",
+        targetId: id,
+        status: "failure",
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+      });
+
+      return jsonError("Correct admin PIN required for image upload.", 401);
     }
 
     const file = parsedRequest.value.get("image");
@@ -99,6 +103,27 @@ export async function POST(req, { params }) {
     const validation = validateMatchImageBuffer(buffer, file.type);
     if (!validation.ok) {
       return jsonError(validation.message, 400);
+    }
+
+    const moderation = await moderateMatchImageBuffer(buffer);
+    if (!moderation.ok) {
+      await writeAuditLog({
+        action: "match_media_upload_blocked",
+        targetType: "match",
+        targetId: id,
+        status: "failure",
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        metadata: {
+          blockedLabels: moderation.blockedLabels,
+          predictions: moderation.predictions.map((prediction) => ({
+            className: prediction.className,
+            probability: Number(prediction.probability.toFixed(4)),
+          })),
+        },
+      });
+
+      return jsonError(moderation.message, 422);
     }
 
     const imgbbKey = process.env.IMGBB_API_KEY;
@@ -125,12 +150,21 @@ export async function POST(req, { params }) {
     }
 
     const imageMetadata = normalizeMatchImageMetadata(uploadJson.data);
-    if (!isSafeMatchImageUrl(imageMetadata.matchImageUrl)) {
+    if (!isSafeRemoteMatchImageUrl(imageMetadata.matchImageUrl)) {
       throw new Error("Remote image URL was rejected.");
     }
 
-    match.matchImageUrl = imageMetadata.matchImageUrl;
+    match.matchImageUrl = buildPublicMatchImageUrl(
+      id,
+      imageMetadata.matchImagePublicId || imageMetadata.matchImageUploadedAt?.getTime()
+    );
     match.matchImagePublicId = imageMetadata.matchImagePublicId;
+    match.matchImageStorageUrlEnc = encryptMatchImageSourceUrl(
+      imageMetadata.matchImageUrl
+    );
+    match.matchImageStorageUrlHash = hashMatchImageSourceUrl(
+      imageMetadata.matchImageUrl
+    );
     match.matchImageUploadedAt = imageMetadata.matchImageUploadedAt;
     match.matchImageUploadedBy = "admin";
     match.mediaUpdatedAt = new Date();
@@ -168,6 +202,8 @@ export async function POST(req, { params }) {
       },
     });
   } catch (error) {
+    const status = error?.message === "Image moderation unavailable." ? 503 : 500;
+
     await writeAuditLog({
       action: "match_media_upload",
       targetType: "match",
@@ -178,6 +214,9 @@ export async function POST(req, { params }) {
       metadata: { message: error.message },
     });
 
-    return jsonError("Failed to upload the match image.", 500);
+    return jsonError(
+      status === 503 ? "Image moderation is temporarily unavailable." : "Failed to upload the match image.",
+      status
+    );
   }
 }

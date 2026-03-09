@@ -4,17 +4,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 function pickAmericanVoice(voices) {
   const preferredNames = [
-    "Google US English",
-    "Microsoft Jenny Online",
-    "Microsoft Aria Online",
-    "Microsoft Guy Online",
-    "Microsoft Jenny",
-    "Microsoft Aria",
-    "Microsoft Guy",
     "Samantha",
+    "Ava",
+    "Allison",
+    "Nicky",
+    "Evan",
+    "Moira",
+    "Microsoft Aria Online",
+    "Microsoft Jenny Online",
+    "Microsoft Guy Online",
+    "Microsoft Aria",
+    "Microsoft Jenny",
+    "Microsoft Guy",
     "Zira",
-    "Jenny",
     "Aria",
+    "Jenny",
+    "Google US English",
   ];
 
   for (const name of preferredNames) {
@@ -23,10 +28,49 @@ function pickAmericanVoice(voices) {
   }
 
   return (
+    voices.find(
+      (voice) =>
+        voice.lang?.toLowerCase().startsWith("en-us") && voice.localService
+    ) ||
     voices.find((voice) => voice.lang?.toLowerCase().startsWith("en-us")) ||
+    voices.find(
+      (voice) => voice.lang?.toLowerCase().startsWith("en") && voice.localService
+    ) ||
     voices.find((voice) => voice.lang?.toLowerCase().startsWith("en")) ||
     null
   );
+}
+
+function normalizeSpeechText(text) {
+  return String(text || "")
+    .replace(/\s+/g, " ")
+    .replace(/\s*([,.!?;:])\s*/g, "$1 ")
+    .replace(/(\d+)\s*\/\s*(\d+)/g, "$1 for $2")
+    .trim();
+}
+
+function getSpeechProfile(voice, options) {
+  const voiceName = voice?.name?.toLowerCase() || "";
+  const isAppleNatural =
+    voiceName.includes("samantha") ||
+    voiceName.includes("ava") ||
+    voiceName.includes("allison") ||
+    voiceName.includes("nicky");
+  const isMicrosoftNatural =
+    voiceName.includes("aria") ||
+    voiceName.includes("jenny") ||
+    voiceName.includes("guy");
+
+  return {
+    rate:
+      options.rate ??
+      (isAppleNatural ? 0.9 : isMicrosoftNatural ? 0.92 : 0.94),
+    pitch: options.pitch ?? (isAppleNatural ? 0.96 : 0.98),
+  };
+}
+
+function canUseSpeechSynthesis() {
+  return typeof window !== "undefined" && Boolean(window.speechSynthesis);
 }
 
 export default function useSpeechAnnouncer(settings) {
@@ -40,29 +84,45 @@ export default function useSpeechAnnouncer(settings) {
   const pendingSpeakRef = useRef(null);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return undefined;
+    if (!canUseSpeechSynthesis()) return undefined;
+
+    let retryTimer = null;
+    let retries = 0;
 
     const assignVoice = () => {
       const voices = window.speechSynthesis.getVoices();
-      setVoice(pickAmericanVoice(voices));
-      setStatus((current) => (current === "unsupported" ? current : "ready"));
+      if (voices.length > 0) {
+        setVoice(pickAmericanVoice(voices));
+        setStatus((current) => (current === "unsupported" ? current : "ready"));
+        return true;
+      }
+
+      if (retries < 8) {
+        retries += 1;
+        retryTimer = window.setTimeout(assignVoice, 250);
+      }
+
+      return false;
     };
 
     assignVoice();
     window.speechSynthesis.addEventListener("voiceschanged", assignVoice);
-    return () =>
+    return () => {
+      if (retryTimer) {
+        window.clearTimeout(retryTimer);
+      }
       window.speechSynthesis.removeEventListener("voiceschanged", assignVoice);
+    };
   }, []);
 
   const performSpeak = useCallback(
     (text, options = {}) => {
       if (
         !text ||
-        !settings.enabled ||
+        (!settings.enabled && !options.ignoreEnabled) ||
         settings.muted ||
         settings.mode === "silent" ||
-        typeof window === "undefined" ||
-        !window.speechSynthesis
+        !canUseSpeechSynthesis()
       ) {
         return false;
       }
@@ -79,7 +139,10 @@ export default function useSpeechAnnouncer(settings) {
 
       lastSpokenRef.current = { key, at: now };
 
-      if (options.interrupt !== false) {
+      if (
+        options.interrupt !== false &&
+        (window.speechSynthesis.speaking || window.speechSynthesis.pending)
+      ) {
         window.speechSynthesis.cancel();
       }
 
@@ -89,11 +152,12 @@ export default function useSpeechAnnouncer(settings) {
         // Ignore resume failures and try to speak anyway.
       }
 
-      const utterance = new SpeechSynthesisUtterance(text);
+      const utterance = new SpeechSynthesisUtterance(normalizeSpeechText(text));
+      const profile = getSpeechProfile(voice, options);
       utterance.voice = voice;
       utterance.lang = voice?.lang || "en-US";
-      utterance.rate = options.rate ?? 1;
-      utterance.pitch = options.pitch ?? 1;
+      utterance.rate = profile.rate;
+      utterance.pitch = profile.pitch;
       utterance.volume = settings.volume;
       utterance.onstart = () => setStatus("speaking");
       utterance.onend = () => setStatus("ready");
@@ -101,7 +165,12 @@ export default function useSpeechAnnouncer(settings) {
         setStatus("blocked");
       };
 
-      window.speechSynthesis.speak(utterance);
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        setStatus("blocked");
+        return false;
+      }
 
       return true;
     },
@@ -115,7 +184,7 @@ export default function useSpeechAnnouncer(settings) {
   );
 
   const prime = useCallback(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) {
+    if (!canUseSpeechSynthesis()) {
       setStatus("unsupported");
       return false;
     }
@@ -123,13 +192,6 @@ export default function useSpeechAnnouncer(settings) {
     try {
       window.speechSynthesis.getVoices();
       window.speechSynthesis.resume?.();
-
-      const unlockUtterance = new SpeechSynthesisUtterance(" ");
-      unlockUtterance.volume = 0;
-      unlockUtterance.rate = 1;
-      unlockUtterance.pitch = 1;
-      window.speechSynthesis.speak(unlockUtterance);
-      window.speechSynthesis.cancel();
 
       isPrimedRef.current = true;
       setStatus("ready");
@@ -148,7 +210,7 @@ export default function useSpeechAnnouncer(settings) {
   }, [performSpeak]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return undefined;
+    if (!canUseSpeechSynthesis()) return undefined;
 
     const primeFromGesture = () => {
       if (!isPrimedRef.current) {
@@ -189,10 +251,18 @@ export default function useSpeechAnnouncer(settings) {
   const speak = useCallback(
     (text, options = {}) => {
       if (options.userGesture) {
-        prime();
+        isPrimedRef.current = true;
+        setStatus((current) => (current === "unsupported" ? current : "ready"));
+        try {
+          window.speechSynthesis?.resume?.();
+        } catch {
+          // Ignore resume failures and continue with direct user-gesture speech.
+        }
+        pendingSpeakRef.current = null;
+        return performSpeak(text, options);
       }
 
-      if (!isPrimedRef.current && !options.userGesture) {
+      if (!isPrimedRef.current) {
         pendingSpeakRef.current = { text, options };
         setStatus("waiting_for_gesture");
         return false;
@@ -200,7 +270,7 @@ export default function useSpeechAnnouncer(settings) {
 
       return performSpeak(text, options);
     },
-    [performSpeak, prime]
+    [performSpeak]
   );
 
   const stop = useCallback(() => {

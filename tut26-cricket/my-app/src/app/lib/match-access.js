@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
 const COOKIE_PREFIX = "gv_match_access_";
-const ACCESS_TOKEN_TTL_SECONDS = 60 * 30;
+const ACCESS_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
 const ADMIN_ROLE = "admin";
 
 function getConfiguredPinValue() {

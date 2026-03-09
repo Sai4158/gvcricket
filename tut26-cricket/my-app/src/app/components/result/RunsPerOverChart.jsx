@@ -18,7 +18,7 @@ export default function RunsPerOverChart({
   team1Name,
   team2Name,
 }) {
-  const { containerRef, width } = useChartWidth();
+  const [containerRef, width] = useChartWidth();
   const maxOvers = Math.max(
     innings1Summary.runsPerOver.length,
     innings2Summary.runsPerOver.length

@@ -118,13 +118,22 @@ export async function POST(req, { params }) {
     }
 
     const nextState = applyMatchAction(match, parsedRequest.value);
+    const updatePayload = {};
     for (const key of MUTABLE_ACTION_KEYS) {
-      match[key] = nextState[key];
+      updatePayload[key] = nextState[key];
     }
-    await match.save();
 
-    await Session.findByIdAndUpdate(match.sessionId, {
-      $set: buildSessionMirrorUpdate(match),
+    const updatedMatch = await Match.findByIdAndUpdate(
+      id,
+      { $set: updatePayload },
+      { new: true, runValidators: true }
+    );
+    if (!updatedMatch) {
+      return jsonError("Match not found.", 404);
+    }
+
+    await Session.findByIdAndUpdate(updatedMatch.sessionId, {
+      $set: buildSessionMirrorUpdate(updatedMatch),
     });
 
     await writeAuditLog({
@@ -139,7 +148,7 @@ export async function POST(req, { params }) {
 
     return Response.json(
       {
-        match: serializePublicMatch(match),
+        match: serializePublicMatch(updatedMatch),
       },
       {
         headers: {

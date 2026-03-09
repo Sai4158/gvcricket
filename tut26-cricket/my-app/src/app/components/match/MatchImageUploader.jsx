@@ -16,6 +16,7 @@ export default function MatchImageUploader({
 }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [pin, setPin] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState("");
 
@@ -53,6 +54,10 @@ export default function MatchImageUploader({
 
   const handleUpload = async () => {
     if (!selectedFile || isUploading) return;
+    if (!pin.trim()) {
+      setError("Enter the admin PIN to upload an image.");
+      return;
+    }
 
     setIsUploading(true);
     setError("");
@@ -61,6 +66,7 @@ export default function MatchImageUploader({
       const compressedFile = await compressMatchImage(selectedFile);
       const formData = new FormData();
       formData.append("image", compressedFile);
+      formData.append("pin", pin.trim());
 
       const response = await fetch(`/api/matches/${matchId}/image`, {
         method: "POST",
@@ -74,9 +80,11 @@ export default function MatchImageUploader({
 
       setSelectedFile(null);
       setPreviewUrl("");
+      setPin("");
       onUploaded?.(payload);
     } catch (caughtError) {
       setError(caughtError.message);
+      setPin("");
     } finally {
       setIsUploading(false);
     }
@@ -112,8 +120,35 @@ export default function MatchImageUploader({
           onChange={handleSelectFile}
           className="block w-full text-sm text-zinc-300 file:mr-4 file:rounded-full file:border-0 file:bg-zinc-800 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-zinc-700"
         />
+        <label className="block space-y-2">
+          <span className="text-xs uppercase tracking-wider text-zinc-400">
+            Admin PIN
+          </span>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            name="match-image-pin"
+            data-form-type="other"
+            data-lpignore="true"
+            value={pin}
+            onChange={(event) => {
+              setPin(event.target.value.replace(/[^\d]/g, "").slice(0, 6));
+              if (error) {
+                setError("");
+              }
+            }}
+            maxLength={6}
+            placeholder="Enter PIN for this upload"
+            className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-3 text-sm text-white outline-none"
+            style={{ WebkitTextSecurity: "disc" }}
+          />
+        </label>
         <p className="text-xs text-zinc-500">
-          Images are compressed before upload, limited to safe raster formats, and protected by admin access.
+          Images are compressed before upload, limited to safe raster formats, and require the admin PIN every time.
         </p>
         {error && <p className="text-sm text-red-400">{error}</p>}
       </div>
@@ -121,7 +156,7 @@ export default function MatchImageUploader({
       <div className="mt-6 flex flex-wrap gap-3">
         <button
           onClick={handleUpload}
-          disabled={!selectedFile || isUploading}
+          disabled={!selectedFile || !pin.trim() || isUploading}
           className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-5 py-3 font-semibold text-black transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <FaUpload />

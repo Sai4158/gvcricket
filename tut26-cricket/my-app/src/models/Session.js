@@ -22,6 +22,8 @@ const SessionSchema = new mongoose.Schema(
     mediaUpdatedAt: { type: Date, default: null },
     matchImageUrl: { type: String, default: "", trim: true },
     matchImagePublicId: { type: String, default: "", trim: true },
+    matchImageStorageUrlEnc: { type: String, default: "", trim: true },
+    matchImageStorageUrlHash: { type: String, default: "", trim: true },
     matchImageUploadedAt: { type: Date, default: null },
     matchImageUploadedBy: { type: String, default: "", trim: true },
     announcerEnabled: { type: Boolean, default: false },

@@ -30,5 +30,5 @@ export default function useChartWidth() {
     };
   }, []);
 
-  return { containerRef, width };
+  return [containerRef, width];
 }

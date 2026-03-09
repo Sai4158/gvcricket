@@ -130,6 +130,21 @@ function hasScoreActivity(match) {
   );
 }
 
+function getRosterEditPermissions(match) {
+  if (match?.innings !== "second") {
+    return { teamA: true, teamB: true };
+  }
+
+  const secondInningsTeam = match?.innings2?.team || "";
+  const teamAName = match?.teamAName || "Team A";
+  const teamBName = match?.teamBName || "Team B";
+
+  return {
+    teamA: secondInningsTeam === teamAName,
+    teamB: secondInningsTeam === teamBName,
+  };
+}
+
 function isTargetChased(match) {
   return (
     match?.innings === "second" &&
@@ -372,6 +387,7 @@ export function applyMatchAction(matchDocument, action) {
 export function applySafeMatchPatch(matchDocument, patch) {
   const currentMatch = toPlainMatch(matchDocument);
   const nextMatch = toPlainMatch(matchDocument);
+  const rosterPermissions = getRosterEditPermissions(currentMatch);
   const previousNames = {
     teamAName: currentMatch.teamAName || "Team A",
     teamBName: currentMatch.teamBName || "Team B",
@@ -405,8 +421,26 @@ export function applySafeMatchPatch(matchDocument, patch) {
 
   if (patch.teamAName !== undefined) nextMatch.teamAName = nextNames.teamAName;
   if (patch.teamBName !== undefined) nextMatch.teamBName = nextNames.teamBName;
-  if (patch.teamA !== undefined) nextMatch.teamA = [...patch.teamA];
-  if (patch.teamB !== undefined) nextMatch.teamB = [...patch.teamB];
+  if (patch.teamA !== undefined) {
+    if (!rosterPermissions.teamA) {
+      throw new MatchEngineError(
+        `Only ${currentMatch.innings2?.team || "the second innings batting team"} can change players after the first innings.`,
+        409
+      );
+    }
+
+    nextMatch.teamA = [...patch.teamA];
+  }
+  if (patch.teamB !== undefined) {
+    if (!rosterPermissions.teamB) {
+      throw new MatchEngineError(
+        `Only ${currentMatch.innings2?.team || "the second innings batting team"} can change players after the first innings.`,
+        409
+      );
+    }
+
+    nextMatch.teamB = [...patch.teamB];
+  }
   if (patch.announcerEnabled !== undefined) {
     nextMatch.announcerEnabled = patch.announcerEnabled;
   }

@@ -37,27 +37,45 @@ export function ModalBase({ children, title, onExit }) {
 }
 
 export function RunInputModal({ title, onConfirm, onClose }) {
-  const options =
-    title === "Wide"
-      ? [1, 2, 3, 4, 5]
-      : title === "OUT"
-      ? [0, 1, 2, 3]
-      : [1, 2, 3, 4, 5, 7];
+  const config =
+    title === "OUT"
+      ? {
+          options: [0, 1, 2, 3],
+          prompt: "How many runs were taken (run out)?",
+          helper: "",
+          activeClass: "bg-rose-600 hover:bg-rose-500",
+        }
+      : title === "Wide"
+      ? {
+          options: [0, 1],
+          prompt: "How many runs to add for this wide ball?",
+          helper: "Ball does not count",
+          activeClass: "bg-emerald-600 hover:bg-emerald-500",
+        }
+      : {
+          options: [0, 1, 2, 3, 4, 6],
+          prompt: "How many runs to add for this No Ball?",
+          helper: "Ball does not count",
+          activeClass: "bg-orange-600 hover:bg-orange-500",
+        };
 
   return (
     <ModalBase title={title} onExit={onClose}>
-      <p className="text-zinc-300 text-center mb-6 font-semibold">
-        {title === "OUT"
-          ? "How many runs were completed on the wicket?"
-          : `How many total runs should be added for this ${title.toLowerCase()}?`}
-      </p>
+      <div className="mb-6 text-center">
+        <p className="font-semibold text-zinc-300">{config.prompt}</p>
+        {config.helper ? (
+          <p className="mt-2 text-sm text-zinc-400">{config.helper}</p>
+        ) : null}
+      </div>
       <div className="flex flex-col items-center gap-3">
-        {options.map((runs) => (
+        {config.options.map((runs, index) => (
           <motion.button
             whileTap={{ scale: 0.95 }}
             key={runs}
             onClick={() => onConfirm(runs)}
-            className="w-full py-4 rounded-full text-2xl font-bold transition-transform text-white bg-zinc-800 hover:bg-zinc-700"
+            className={`w-full rounded-full py-4 text-2xl font-bold text-white transition-transform ${
+              index === 0 ? config.activeClass : "bg-zinc-800 hover:bg-zinc-700"
+            }`}
           >
             {runs}
           </motion.button>

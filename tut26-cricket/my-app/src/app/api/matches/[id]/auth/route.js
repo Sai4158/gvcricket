@@ -36,9 +36,11 @@ export async function GET(_req, { params }) {
     return jsonError("Match not found.", 404);
   }
 
-  return NextResponse.json(
+  const authorized = await hasAuthorizedCookie(id, match.adminAccessVersion || 1);
+
+  const response = NextResponse.json(
     {
-      authorized: await hasAuthorizedCookie(id, match.adminAccessVersion || 1),
+      authorized,
     },
     {
       headers: {
@@ -46,6 +48,16 @@ export async function GET(_req, { params }) {
       },
     }
   );
+
+  if (authorized) {
+    const matchCookie = getMatchAccessCookie(
+      id,
+      Number(match.adminAccessVersion || 1)
+    );
+    response.cookies.set(matchCookie.name, matchCookie.value, matchCookie.options);
+  }
+
+  return response;
 }
 
 export async function POST(req, { params }) {
