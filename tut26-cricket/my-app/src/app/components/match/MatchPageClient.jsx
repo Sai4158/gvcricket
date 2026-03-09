@@ -286,7 +286,9 @@ export default function MatchPageClient({
             }
             onMicHoldEnd={() => micMonitor.stop({ resumeMedia: true })}
             isWalkieActive={Boolean(walkie.snapshot?.enabled)}
+            isWalkieTalking={Boolean(walkie.isSelfTalking)}
             isCommentaryActive={micMonitor.isActive || micMonitor.isPaused}
+            isCommentaryTalking={Boolean(micMonitor.isActive)}
             isAnnounceActive={Boolean(umpireSettings.enabled)}
           />
         </div>

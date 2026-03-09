@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { playUiTone } from "../../lib/page-audio";
 
 function getMicErrorMessage(error) {
   const name = String(error?.name || "");
@@ -61,6 +62,8 @@ export default function useLocalMicMonitor() {
   };
 
   const stop = useCallback(async ({ resumeMedia = false } = {}) => {
+    const wasLive = Boolean(streamRef.current || isActive || isPaused);
+
     try {
       sourceRef.current?.disconnect();
       gainNodeRef.current?.disconnect();
@@ -93,7 +96,11 @@ export default function useLocalMicMonitor() {
     if (resumeMedia) {
       resumePausedMedia();
     }
-  }, []);
+
+    if (wasLive) {
+      playUiTone({ frequency: 640, durationMs: 140, type: "triangle", volume: 0.035 });
+    }
+  }, [isActive, isPaused]);
 
   const start = async ({ pauseMedia = false } = {}) => {
     if (
@@ -149,6 +156,7 @@ export default function useLocalMicMonitor() {
       audioContextRef.current = audioContext;
       setIsActive(true);
       setIsPaused(false);
+      playUiTone({ frequency: 880, durationMs: 140, type: "sine", volume: 0.04 });
       return true;
     } catch (nextError) {
       await stop({ resumeMedia: pauseMedia });

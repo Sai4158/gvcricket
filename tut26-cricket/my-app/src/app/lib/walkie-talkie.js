@@ -144,10 +144,6 @@ function disableForNoSpectators(matchId) {
   notifyMatch(matchId, {
     type: "state",
     snapshot: buildSnapshot(matchId),
-    notification: {
-      type: "walkie_disabled",
-      message: "Walkie-talkie turned off. No spectators connected.",
-    },
   });
 }
 

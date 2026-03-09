@@ -97,12 +97,14 @@ function ActionIconButton({
   colorClass,
   disabled = false,
   active = false,
+  talking = false,
   badge,
   badgeClass = "",
   compact = false,
 }) {
   const holdTimerRef = useRef(null);
   const holdStartedRef = useRef(false);
+  const suppressClickRef = useRef(false);
 
   const clearHoldTimer = () => {
     if (holdTimerRef.current) {
@@ -129,14 +131,18 @@ function ActionIconButton({
       return;
     }
     holdStartedRef.current = false;
+    suppressClickRef.current = true;
     void onHoldEnd?.();
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 180);
   };
 
   return (
     <motion.button
       whileTap={{ scale: 0.95 }}
       onClick={() => {
-        if (holdStartedRef.current) {
+        if (holdStartedRef.current || suppressClickRef.current) {
           holdStartedRef.current = false;
           return;
         }
@@ -159,8 +165,11 @@ function ActionIconButton({
       <div
         className={`relative ${compact ? "text-4xl" : "text-[2.35rem]"} ${colorClass} ${
           active ? "drop-shadow-[0_0_16px_currentColor]" : ""
-        }`}
+        } ${talking ? "animate-pulse drop-shadow-[0_0_22px_currentColor]" : ""}`}
       >
+        {talking ? (
+          <span className="absolute -inset-3 rounded-full border border-current/30" aria-hidden="true" />
+        ) : null}
         {icon}
       </div>
       <span
@@ -191,7 +200,9 @@ export default function MatchActionGrid({
   onMicHoldStart,
   onMicHoldEnd,
   isWalkieActive = false,
+  isWalkieTalking = false,
   isCommentaryActive = false,
+  isCommentaryTalking = false,
   isAnnounceActive = false,
 }) {
   return (
@@ -206,9 +217,12 @@ export default function MatchActionGrid({
             label="Walkietalkie"
             colorClass="text-emerald-300"
             active={isWalkieActive}
-            badge={isWalkieActive ? "On" : "Off"}
+            talking={isWalkieTalking}
+            badge={isWalkieTalking ? "Live" : isWalkieActive ? "On" : "Off"}
             badgeClass={
-              isWalkieActive
+              isWalkieTalking
+                ? "border-cyan-400/30 bg-cyan-500/15 text-cyan-100"
+                : isWalkieActive
                 ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
                 : "border-rose-400/20 bg-rose-500/10 text-rose-200"
             }
@@ -221,9 +235,12 @@ export default function MatchActionGrid({
             label="Speaker mic"
             colorClass="text-amber-300"
             active={isCommentaryActive}
-            badge={isCommentaryActive ? "On" : "Off"}
+            talking={isCommentaryTalking}
+            badge={isCommentaryTalking ? "Live" : isCommentaryActive ? "On" : "Off"}
             badgeClass={
-              isCommentaryActive
+              isCommentaryTalking
+                ? "border-cyan-400/30 bg-cyan-500/15 text-cyan-100"
+                : isCommentaryActive
                 ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
                 : "border-rose-400/20 bg-rose-500/10 text-rose-200"
             }

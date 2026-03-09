@@ -8,7 +8,7 @@ import {
   FaCheck,
   FaCopy,
   FaMicrophone,
-  FaBroadcastTower,
+  FaMicrophoneSlash,
   FaVolumeUp,
 } from "react-icons/fa";
 import AnnouncementControls from "../live/AnnouncementControls";
@@ -27,10 +27,69 @@ import TeamInningsDetail from "./TeamInningsDetail";
 import {
   buildCurrentScoreAnnouncement,
   buildSpectatorAnnouncement,
+  buildSpectatorOverCompleteAnnouncement,
+  buildSpectatorScoreAnnouncement,
 } from "../../lib/live-announcements";
 import { getTeamBundle } from "../../lib/team-utils";
 import { duckPageMedia, restorePageMedia } from "../../lib/page-audio";
 import { ModalBase } from "../match/MatchBaseModals";
+
+function DualWalkieIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" aria-hidden="true">
+      <path
+        d="M5.5 7.5h4a1 1 0 0 1 1 1v7a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-7a1 1 0 0 1 1-1Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M7.5 7V5.75L9 5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="7.5" cy="14" r="0.9" fill="currentColor" />
+      <path
+        d="M14.5 9h4a1 1 0 0 1 1 1v5.5a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2V10a1 1 0 0 1 1-1Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M16.5 8.5V7.25L18 6.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="16.5" cy="14" r="0.9" fill="currentColor" />
+    </svg>
+  );
+}
+
+function LoudspeakerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" aria-hidden="true">
+      <path
+        d="M4.5 14H7l4.75 3.5V6.5L7 10H4.5A1.5 1.5 0 0 0 3 11.5v1A1.5 1.5 0 0 0 4.5 14Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M15.5 9.5a4 4 0 0 1 0 5m2.5-7.5a7 7 0 0 1 0 10"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
 export default function SessionViewClient({ sessionId, initialData }) {
   const [copied, setCopied] = useState(false);
@@ -39,13 +98,17 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const [localWalkieNotice, setLocalWalkieNotice] = useState("");
   const [streamError, setStreamError] = useState("");
   const [quickWalkieTalking, setQuickWalkieTalking] = useState(false);
+  const [quickSpeakerTalking, setQuickSpeakerTalking] = useState(false);
   const lastAnnouncedEventRef = useRef("");
   const overDoneTimerRef = useRef(null);
+  const scoreFollowUpTimerRef = useRef(null);
   const announcementDuckRef = useRef([]);
   const announcementRestoreTimerRef = useRef(null);
   const walkieHoldTimerRef = useRef(null);
   const walkieHeldRef = useRef(false);
   const suppressWalkieClickRef = useRef(false);
+  const speakerHoldTimerRef = useRef(null);
+  const speakerHeldRef = useRef(false);
   const previousEnabledRef = useRef(false);
   const previousWalkieEnabledRef = useRef(false);
   const router = useRouter();
@@ -129,8 +192,24 @@ export default function SessionViewClient({ sessionId, initialData }) {
     speakWithDuck(line, {
       key: event.id,
       rate: 0.9,
-      minGapMs: event.overCompleted ? 2000 : 700,
-    }, event.overCompleted ? 1700 : 2200);
+      minGapMs: event.overCompleted ? 2200 : 900,
+    }, 1400);
+
+    if (scoreFollowUpTimerRef.current) {
+      window.clearTimeout(scoreFollowUpTimerRef.current);
+      scoreFollowUpTimerRef.current = null;
+    }
+
+    const scoreLine = buildSpectatorScoreAnnouncement(event, match);
+    if (scoreLine) {
+      scoreFollowUpTimerRef.current = window.setTimeout(() => {
+        speakWithDuck(scoreLine, {
+          key: `${event.id}-score`,
+          rate: 0.88,
+          minGapMs: 1200,
+        }, 1700);
+      }, 1200);
+    }
 
     if (overDoneTimerRef.current) {
       window.clearTimeout(overDoneTimerRef.current);
@@ -139,11 +218,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
     if (event.overCompleted) {
       overDoneTimerRef.current = window.setTimeout(() => {
-        speakWithDuck("Over done.", {
-          key: `${event.id}-over-done`,
+        speakWithDuck(buildSpectatorOverCompleteAnnouncement(match), {
+          key: `${event.id}-over-summary`,
           rate: 0.9,
           minGapMs: 2000,
-        }, 1500);
+        }, 2300);
       }, 2000);
     }
   }, [isLiveMatch, match, settings.enabled, settings.mode, speakWithDuck]);
@@ -158,6 +237,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
     return () => {
       if (overDoneTimerRef.current) {
         window.clearTimeout(overDoneTimerRef.current);
+      }
+      if (scoreFollowUpTimerRef.current) {
+        window.clearTimeout(scoreFollowUpTimerRef.current);
       }
       if (announcementRestoreTimerRef.current) {
         window.clearTimeout(announcementRestoreTimerRef.current);
@@ -222,6 +304,24 @@ export default function SessionViewClient({ sessionId, initialData }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleQuickAnnounce = () => {
+    if (!match) {
+      return;
+    }
+
+    prime();
+    speakWithDuck(
+      buildCurrentScoreAnnouncement(match),
+      {
+        key: `spectator-quick-score-${match._id}`,
+        rate: 0.88,
+        minGapMs: 1500,
+        ignoreEnabled: true,
+      },
+      2400
+    );
+  };
+
   if (!sessionId) return <SplashMsg>No Session ID provided.</SplashMsg>;
   if (streamError) return <SplashMsg>Could not load session data.</SplashMsg>;
   if (!sessionData) return <SplashMsg>Loading Session...</SplashMsg>;
@@ -234,6 +334,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const showWalkieLauncher = Boolean(match?._id && isLiveMatch);
   const speakerMicOn = Boolean(micMonitor.isActive || micMonitor.isPaused);
   const walkieCardTalking = quickWalkieTalking || walkie.isSelfTalking;
+  const speakerCardTalking = quickSpeakerTalking || micMonitor.isActive;
   const launcherCardClass =
     "flex min-h-[92px] w-full items-center gap-3 rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-4 text-left shadow-[0_18px_50px_rgba(0,0,0,0.32)] backdrop-blur-sm transition-transform hover:-translate-y-0.5";
   const launcherBadgeClass =
@@ -243,6 +344,13 @@ export default function SessionViewClient({ sessionId, initialData }) {
     if (walkieHoldTimerRef.current) {
       window.clearTimeout(walkieHoldTimerRef.current);
       walkieHoldTimerRef.current = null;
+    }
+  };
+
+  const clearSpeakerHoldTimer = () => {
+    if (speakerHoldTimerRef.current) {
+      window.clearTimeout(speakerHoldTimerRef.current);
+      speakerHoldTimerRef.current = null;
     }
   };
 
@@ -277,6 +385,34 @@ export default function SessionViewClient({ sessionId, initialData }) {
     window.setTimeout(() => {
       suppressWalkieClickRef.current = false;
     }, 80);
+  };
+
+  const handleSpeakerLauncherPressStart = () => {
+    if (!speakerMicOn) {
+      return;
+    }
+
+    clearSpeakerHoldTimer();
+    speakerHoldTimerRef.current = window.setTimeout(async () => {
+      speakerHeldRef.current = true;
+      setQuickSpeakerTalking(true);
+      const started = await micMonitor.start({ pauseMedia: true });
+      if (!started) {
+        speakerHeldRef.current = false;
+        setQuickSpeakerTalking(false);
+      }
+    }, 170);
+  };
+
+  const handleSpeakerLauncherPressEnd = async () => {
+    clearSpeakerHoldTimer();
+    if (!speakerHeldRef.current) {
+      return;
+    }
+
+    speakerHeldRef.current = false;
+    setQuickSpeakerTalking(false);
+    await micMonitor.stop({ resumeMedia: true });
   };
 
   return (
@@ -338,14 +474,21 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
       <div className="w-full max-w-4xl mt-4">
         {showWalkieLauncher ? (
-          <button
-            type="button"
+          <div
+            role="button"
+            tabIndex={0}
             onClick={() => {
               if (suppressWalkieClickRef.current) {
                 suppressWalkieClickRef.current = false;
                 return;
               }
               setActivePanel("walkie");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setActivePanel("walkie");
+              }
             }}
             onPointerDown={handleWalkieLauncherPressStart}
             onPointerUp={() => {
@@ -365,33 +508,78 @@ export default function SessionViewClient({ sessionId, initialData }) {
                 ? "bg-emerald-500 text-black"
                 : "bg-emerald-500/14 text-emerald-300"
             }`}>
-              {walkieCardTalking ? <FaMicrophone /> : <FaBroadcastTower />}
+              {walkieCardTalking ? <FaMicrophone /> : <DualWalkieIcon />}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-base font-semibold text-white">
                 Walkietalkie
               </span>
               <span className="mt-1 block text-xs text-zinc-400">
-                {walkieCardTalking ? "Release to stop." : "Hold to talk. Tap to open."}
+                {walkieCardTalking
+                  ? "You are speaking."
+                  : walkie.snapshot?.enabled
+                  ? "Hold mic to talk."
+                  : "Tap to open."}
               </span>
             </span>
-            <span
-              className={`${launcherBadgeClass} ${
-                walkieCardTalking
-                  ? "bg-emerald-500 text-black"
-                  : walkie.snapshot?.enabled
-                  ? "bg-emerald-500/15 text-emerald-200"
-                  : "bg-rose-500/12 text-rose-200"
-              }`}
-            >
-              {walkieCardTalking ? "Live" : walkie.snapshot?.enabled ? "On" : "Off"}
-            </span>
-          </button>
+            {walkie.snapshot?.enabled ? (
+              <span className="flex flex-col items-end gap-2">
+                <span
+                  className={`${launcherBadgeClass} ${
+                    walkieCardTalking
+                      ? "bg-emerald-500 text-black"
+                      : "bg-emerald-500/15 text-emerald-200"
+                  }`}
+                >
+                  {walkieCardTalking ? "Live" : "On"}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Hold walkietalkie mic"
+                  onClick={(event) => event.stopPropagation()}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                    handleWalkieLauncherPressStart();
+                  }}
+                  onPointerUp={(event) => {
+                    event.stopPropagation();
+                    void handleWalkieLauncherPressEnd();
+                  }}
+                  onPointerCancel={(event) => {
+                    event.stopPropagation();
+                    void handleWalkieLauncherPressEnd();
+                  }}
+                  onPointerLeave={(event) => {
+                    event.stopPropagation();
+                    void handleWalkieLauncherPressEnd();
+                  }}
+                  className={`inline-flex h-12 w-12 items-center justify-center rounded-full border transition ${
+                    walkieCardTalking
+                      ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_24px_rgba(16,185,129,0.35)]"
+                      : "border-white/12 bg-white/[0.05] text-white"
+                  }`}
+                >
+                  {walkieCardTalking ? <FaMicrophone /> : <FaMicrophoneSlash />}
+                </button>
+              </span>
+            ) : (
+              <span className={`${launcherBadgeClass} bg-rose-500/12 text-rose-200`}>
+                Off
+              </span>
+            )}
+          </div>
         ) : null}
 
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => setActivePanel("mic")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setActivePanel("mic");
+            }
+          }}
           className={launcherCardClass}
           aria-label="Open speaker mic"
         >
@@ -399,7 +587,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
             className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-xl text-black shadow-[0_12px_26px_rgba(16,185,129,0.28)]"
             aria-hidden="true"
           >
-            <FaMicrophone />
+            <LoudspeakerIcon />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-base font-semibold text-white">
@@ -412,29 +600,88 @@ export default function SessionViewClient({ sessionId, initialData }) {
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/[0.04]">
                 <FaVolumeUp />
               </span>
-              <span>Use phone as a mic.</span>
+              <span>
+                {speakerCardTalking
+                  ? "You are speaking."
+                  : speakerMicOn
+                  ? "Hold mic to talk."
+                  : "Use phone as a mic."}
+              </span>
             </span>
           </span>
-          <span
-            className={`${launcherBadgeClass} ${
-              speakerMicOn
-                ? "bg-emerald-500/15 text-emerald-200"
-                : "bg-rose-500/12 text-rose-200"
-            }`}
-          >
-            {speakerMicOn ? "On" : "Off"}
-          </span>
-        </button>
+          {speakerMicOn ? (
+            <span className="flex flex-col items-end gap-2">
+              <span
+                className={`${launcherBadgeClass} ${
+                  speakerCardTalking
+                    ? "bg-emerald-500 text-black"
+                    : "bg-emerald-500/15 text-emerald-200"
+                }`}
+              >
+                {speakerCardTalking ? "Live" : "On"}
+              </span>
+              <button
+                type="button"
+                aria-label="Hold speaker mic"
+                onClick={(event) => event.stopPropagation()}
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  handleSpeakerLauncherPressStart();
+                }}
+                onPointerUp={(event) => {
+                  event.stopPropagation();
+                  void handleSpeakerLauncherPressEnd();
+                }}
+                onPointerCancel={(event) => {
+                  event.stopPropagation();
+                  void handleSpeakerLauncherPressEnd();
+                }}
+                onPointerLeave={(event) => {
+                  event.stopPropagation();
+                  void handleSpeakerLauncherPressEnd();
+                }}
+                className={`inline-flex h-12 w-12 items-center justify-center rounded-full border transition ${
+                  speakerCardTalking
+                    ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_24px_rgba(16,185,129,0.35)]"
+                    : "border-white/12 bg-white/[0.05] text-white"
+                }`}
+              >
+                {speakerCardTalking ? <FaMicrophone /> : <FaMicrophoneSlash />}
+              </button>
+            </span>
+          ) : (
+            <span
+              className={`${launcherBadgeClass} bg-rose-500/12 text-rose-200`}
+            >
+              Off
+            </span>
+          )}
+        </div>
 
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => setActivePanel("announce")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setActivePanel("announce");
+            }
+          }}
           className={`${launcherCardClass} mt-4`}
           aria-label="Open announce score"
         >
-          <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-amber-400/14 text-lg text-amber-200">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              handleQuickAnnounce();
+            }}
+            aria-label="Announce current score"
+            className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-amber-400/14 text-lg text-amber-200 transition hover:bg-amber-400/20"
+          >
             <FaVolumeUp />
-          </span>
+          </button>
           <span className="min-w-0 flex-1">
             <span className="block text-base font-semibold text-white">
               Announce score
@@ -452,7 +699,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
           >
             {settings.enabled ? "On" : "Off"}
           </span>
-        </button>
+        </div>
       </div>
 
       <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">

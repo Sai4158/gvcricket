@@ -79,22 +79,19 @@ function describeBall(ball) {
   if (!ball) return "Score update";
 
   if (ball.isOut) {
-    if (ball.runs > 0) {
-      return `Scored ${pluralize(ball.runs, "run")} and 1 out this ball.`;
-    }
     return "1 out this ball.";
   }
 
   if (ball.extraType === "wide") {
     const extraRuns = Math.max(Number(ball.runs || 0) - 1, 0);
     if (extraRuns === 0) return "Wide ball this ball.";
-    return `Wide ball plus ${pluralize(extraRuns, "run")} this ball.`;
+    return `Wide ball and ${pluralize(extraRuns, "extra run")} this ball.`;
   }
 
   if (ball.extraType === "noball") {
     const extraRuns = Math.max(Number(ball.runs || 0) - 1, 0);
     if (extraRuns === 0) return "No ball this ball.";
-    return `No ball plus ${pluralize(extraRuns, "run")} this ball.`;
+    return `No ball and ${pluralize(extraRuns, "extra run")} this ball.`;
   }
 
   if (ball.runs === 0) return "Dot ball.";
@@ -138,10 +135,14 @@ function buildScoreSentence(event) {
   return `The total score is ${event.score} run${event.score === 1 ? "" : "s"}.`;
 }
 
-function buildSmartBallCommentary(event, match) {
-  return [describeBall(event.ball), buildScoreSentence(event), buildBallsLeftLine(match)]
-    .filter(Boolean)
-    .join(" ");
+export function buildSpectatorBallAnnouncement(event) {
+  if (!event?.ball) return "";
+  return describeBall(event.ball);
+}
+
+export function buildSpectatorScoreAnnouncement(event, match) {
+  if (!event) return "";
+  return [buildScoreSentence(event), buildBallsLeftLine(match)].filter(Boolean).join(" ");
 }
 
 export function buildSpectatorOverCompleteAnnouncement(match) {
@@ -152,11 +153,17 @@ export function buildSpectatorOverCompleteAnnouncement(match) {
     `The total score is ${safeNumber(match.score)} run${
       safeNumber(match.score) === 1 ? "" : "s"
     }.`,
-    `${oversCompleted} over${oversCompleted === 1 ? "" : "s"} have been completed.`,
+    oversCompleted === 1
+      ? "1 over has been completed."
+      : `${oversCompleted} overs have been completed.`,
   ];
 
   if (safeNumber(match.outs) > 0) {
-    parts.push(`${safeNumber(match.outs)} batter${safeNumber(match.outs) === 1 ? "" : "s"} out.`);
+    parts.push(
+      safeNumber(match.outs) === 1
+        ? "1 batter was out."
+        : `${safeNumber(match.outs)} batters were out.`
+    );
   }
 
   const ballsRemaining = getBallsRemaining(match);
@@ -231,7 +238,9 @@ export function buildSpectatorAnnouncement(event, match, mode = "full") {
   }
 
   if (event.type === "target_chased" && event.result) {
-    return `${buildSmartBallCommentary(event, match)} ${event.result}`;
+    return [buildSpectatorBallAnnouncement(event), buildSpectatorScoreAnnouncement(event, match), event.result]
+      .filter(Boolean)
+      .join(" ");
   }
 
   if (event.type === "toss_set") {
@@ -251,26 +260,32 @@ export function buildSpectatorAnnouncement(event, match, mode = "full") {
   }
 
   if (mode === "simple") {
-    return buildSmartBallCommentary(event, match);
+    return buildSpectatorBallAnnouncement(event);
   }
 
-  return buildSmartBallCommentary(event, match);
+  return buildSpectatorBallAnnouncement(event);
 }
 
 export function buildCurrentScoreAnnouncement(match) {
   if (!match) return "";
 
   const battingTeam = getBattingTeamBundle(match);
-  const chaseLine = formatRemainingOvers(match);
-
-  return [
-    `Current score for ${battingTeam.name} is ${match.score} run${
-      match.score === 1 ? "" : "s"
+  const parts = [
+    `The current score for ${battingTeam.name} is ${safeNumber(match.score)} run${
+      safeNumber(match.score) === 1 ? "" : "s"
     }.`,
-    chaseLine ? `${chaseLine}.` : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  ];
+
+  if (safeNumber(match.outs) > 0) {
+    parts.push(`${safeNumber(match.outs)} out${safeNumber(match.outs) === 1 ? "" : "s"}.`);
+  }
+
+  const chaseLine = formatRemainingOvers(match);
+  if (chaseLine) {
+    parts.push(`${chaseLine}.`);
+  }
+
+  return parts.join(" ");
 }
 
 export function buildUmpireAnnouncement(event, mode = "simple") {

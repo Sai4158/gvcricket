@@ -25,6 +25,8 @@ import { countLegalBalls, buildWinByWicketsText } from "../src/app/lib/match-sco
 import {
   buildCurrentScoreAnnouncement,
   buildSpectatorAnnouncement,
+  buildSpectatorOverCompleteAnnouncement,
+  buildSpectatorScoreAnnouncement,
   createScoreLiveEvent,
 } from "../src/app/lib/live-announcements.js";
 
@@ -353,7 +355,7 @@ test("middleware adds core security headers", () => {
   assert.match(response.headers.get("permissions-policy"), /camera=\(\)/);
 });
 
-test("spectator commentary includes smart score and chase details", () => {
+test("spectator commentary uses simple ball-first wording and separate score line", () => {
   const before = {
     ...buildBaseMatch(),
     innings: "second",
@@ -383,54 +385,102 @@ test("spectator commentary includes smart score and chase details", () => {
   });
 
   const fullLine = buildSpectatorAnnouncement(event, after, "full");
-  assert.match(fullLine, /Single run/);
-  assert.match(fullLine, /Score 8 runs and 1 out\./);
-  assert.doesNotMatch(fullLine, /after 0\.1\./);
-  assert.doesNotMatch(fullLine, /balls left in the over\./);
-  assert.doesNotMatch(fullLine, /Need 3\./);
-  assert.doesNotMatch(fullLine, /\d+\s*\/\s*\d+/);
+  assert.match(fullLine, /Scored 1 run this ball\./);
+  assert.doesNotMatch(fullLine, /The total score is/);
+  assert.doesNotMatch(fullLine, /out/);
+
+  const scoreLine = buildSpectatorScoreAnnouncement(event, after);
+  assert.match(scoreLine, /The total score is 8 runs\./);
+  assert.match(scoreLine, /5 balls left in the over\./);
 
   const currentScoreLine = buildCurrentScoreAnnouncement(after);
-  assert.match(currentScoreLine, /Titans, 8 runs and 1 out after 0\.1\./);
-  assert.match(currentScoreLine, /5 balls left in the over\./);
+  assert.match(currentScoreLine, /The current score for Titans is 8 runs\./);
+  assert.match(currentScoreLine, /1 out\./);
   assert.match(currentScoreLine, /1 over and 5 balls left\./);
-  assert.match(currentScoreLine, /Need 3\./);
 });
 
-test("spectator commentary adds richer context only on bigger moments", () => {
+test("spectator commentary handles last-ball warnings and over summaries", () => {
   const before = {
     ...buildBaseMatch(),
-    innings: "second",
-    score: 7,
-    outs: 1,
-    innings1: { team: "Falcons", score: 14, history: [] },
-    innings2: { team: "Titans", score: 7, history: [] },
-  };
-  const after = {
-    ...before,
-    score: 11,
-    innings2: {
-      team: "Titans",
-      score: 11,
+    innings: "first",
+    score: 4,
+    outs: 2,
+    innings1: {
+      team: "Falcons",
+      score: 4,
       history: [
         {
           overNumber: 1,
-          balls: [{ runs: 4, isOut: false, extraType: null }],
+          balls: [
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 0, isOut: true, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+          ],
+        },
+      ],
+    },
+  };
+  const after = {
+    ...before,
+    score: 5,
+    innings2: {
+      ...before.innings2,
+    },
+    innings1: {
+      team: "Falcons",
+      score: 5,
+      history: [
+        {
+          overNumber: 1,
+          balls: [
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 0, isOut: true, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+          ],
         },
       ],
     },
   };
 
   const event = createScoreLiveEvent(before, after, {
-    runs: 4,
+    runs: 1,
     isOut: false,
     extraType: null,
   });
 
   const fullLine = buildSpectatorAnnouncement(event, after, "full");
-  assert.match(fullLine, /Four runs/);
-  assert.match(fullLine, /Score 11 runs and 1 out\./);
-  assert.doesNotMatch(fullLine, /after 0\.1\./);
-  assert.doesNotMatch(fullLine, /balls left in the over\./);
-  assert.doesNotMatch(fullLine, /Need 4\./);
+  assert.match(fullLine, /Scored 1 run this ball\./);
+
+  const scoreLine = buildSpectatorScoreAnnouncement(event, after);
+  assert.match(scoreLine, /The total score is 5 runs\./);
+  assert.match(scoreLine, /This is the last ball for this over\./);
+
+  const overLine = buildSpectatorOverCompleteAnnouncement({
+    ...after,
+    score: 6,
+    outs: 2,
+    innings1: {
+      team: "Falcons",
+      score: 6,
+      history: [
+        {
+          overNumber: 1,
+          balls: [
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 0, isOut: true, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 2, isOut: false, extraType: null },
+          ],
+        },
+      ],
+    },
+  });
+  assert.match(overLine, /The total score is 6 runs\./);
+  assert.match(overLine, /1 over has been completed\./);
+  assert.match(overLine, /2 batters were out\./);
 });
