@@ -1,28 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import useSWR from "swr";
-import Link from "next/link";
-import { FaCopy, FaArrowLeft, FaCheck } from "react-icons/fa";
+import { FaArrowLeft, FaCheck, FaCopy } from "react-icons/fa";
+import { countLegalBalls } from "../../../lib/match-scoring";
+import { getBattingTeamBundle, getTeamBundle } from "../../../lib/team-utils";
 
-// --- Fetcher ---
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
-// --- Helper function ---
 const calculateRunRate = (score, history) => {
-  if (!history || !score) return "0.00";
-  const legalBalls = history
-    .flatMap((o) => o.balls)
-    .filter((b) => b.extraType !== "wide" && b.extraType !== "noball").length;
-  if (legalBalls === 0) return "0.00";
-  const overs = legalBalls / 6;
-  return (score / overs).toFixed(2);
+  const legalBalls = countLegalBalls(history);
+  if (!legalBalls || !score) return "0.00";
+  return (score / (legalBalls / 6)).toFixed(2);
 };
 
-// --- UI Components ---
 const Ball = ({ runs, isOut, extraType }) => {
-  let style, label;
+  let style;
+  let label;
+
   if (isOut) {
     style = "bg-rose-600 text-white";
     label = "W";
@@ -34,7 +31,7 @@ const Ball = ({ runs, isOut, extraType }) => {
     label = `${runs}${extraType.substring(0, 2)}`;
   } else if (runs === 0) {
     style = "bg-zinc-700 text-zinc-300";
-    label = "•";
+    label = ".";
   } else if (runs === 6) {
     style = "bg-purple-500 text-white";
     label = "6";
@@ -45,6 +42,7 @@ const Ball = ({ runs, isOut, extraType }) => {
     style = "bg-green-600 text-white";
     label = runs;
   }
+
   return (
     <div
       className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shadow-md ${style}`}
@@ -61,28 +59,20 @@ const SplashMsg = ({ children }) => (
       href="/"
       className="mt-6 underline text-lg text-blue-400 hover:text-blue-300 transition"
     >
-      ← Back to Home
+      Back to Home
     </Link>
   </main>
 );
 
-// ✅ UPDATED: This component now only shows fallen wickets and total players.
 const LiveScoreCard = ({ match }) => {
-  if (!match || !match.innings1 || !match.innings2) return null;
+  if (!match) return null;
 
-  const isFirstInnings = match.innings === "first";
-  const battingInnings = isFirstInnings ? match.innings1 : match.innings2;
-  const battingTeamName = battingInnings.team;
-
-  // Determine the correct team array to get the player count
-  const battingTeamData =
-    battingTeamName === match.teamA[0] ? match.teamA : match.teamB;
-  const playerCount = battingTeamData.length;
+  const battingTeam = getBattingTeamBundle(match);
 
   return (
     <div className="w-full max-w-xl bg-black/30 backdrop-blur-sm ring-1 ring-white/10 rounded-3xl p-6 text-center space-y-2 shadow-2xl shadow-zinc-900">
       <p className="text-5xl font-bold text-amber-300 tracking-wide mb-5">
-        {battingTeamName}
+        {battingTeam.name}
       </p>
       <p className="text-6xl font-extrabold text-white">
         <span className="text-green-600">{match.score}</span>/
@@ -90,10 +80,9 @@ const LiveScoreCard = ({ match }) => {
       </p>
       <br />
       <div className="text-2xl text-white flex justify-center items-center gap-4">
-        {/* This section now shows the total number of players */}
         <span>
           Total Players:{" "}
-          <span className="font-bold text-white">{playerCount}</span>
+          <span className="font-bold text-white">{battingTeam.players.length}</span>
         </span>
       </div>
     </div>
@@ -102,7 +91,9 @@ const LiveScoreCard = ({ match }) => {
 
 const TeamInningsDetail = ({ title, inningsData }) => {
   if (!inningsData) return null;
+
   const runRate = calculateRunRate(inningsData.score, inningsData.history);
+
   return (
     <div className="bg-zinc-900/50 p-6 rounded-2xl ring-1 ring-zinc-800">
       <div className="flex justify-between items-center mb-4">
@@ -120,23 +111,20 @@ const TeamInningsDetail = ({ title, inningsData }) => {
                 Over {over.overNumber}
               </p>
               <div className="flex gap-2 flex-wrap">
-                {over.balls.map((ball, i) => (
-                  <Ball key={i} {...ball} />
+                {over.balls.map((ball, index) => (
+                  <Ball key={index} {...ball} />
                 ))}
               </div>
             </div>
           ))
         ) : (
-          <p className="text-sm text-yellow-200 font-bold">
-            No overs bowled yet.
-          </p>
+          <p className="text-sm text-yellow-200 font-bold">No overs bowled yet.</p>
         )}
       </div>
     </div>
   );
 };
 
-// --- Main Page Component ---
 export default function ViewSessionPage() {
   const { id: sessionId } = useParams();
   const [copied, setCopied] = useState(false);
@@ -159,7 +147,7 @@ export default function ViewSessionPage() {
   const match = data?.match;
 
   useEffect(() => {
-    if (match && match.result) {
+    if (match?.result) {
       router.push(`/result/${match._id}`);
     }
   }, [match, router]);
@@ -173,10 +161,12 @@ export default function ViewSessionPage() {
   if (!sessionId) return <SplashMsg>No Session ID provided.</SplashMsg>;
   if (error) return <SplashMsg>Could not load session data.</SplashMsg>;
   if (!sessionData) return <SplashMsg>Loading Session...</SplashMsg>;
-  if (!match)
-    return (
-      <SplashMsg>The match for this session hasn't started yet.</SplashMsg>
-    );
+  if (!match) {
+    return <SplashMsg>The match for this session has not started yet.</SplashMsg>;
+  }
+
+  const teamA = getTeamBundle(match, "teamA");
+  const teamB = getTeamBundle(match, "teamB");
 
   return (
     <main className="min-h-screen bg-zinc-950 text-white font-sans p-4 pb-10 flex flex-col items-center">
@@ -194,7 +184,7 @@ export default function ViewSessionPage() {
           </h1>
           <br />
           <p className="text-green-400 mb-2">Live Spectator View</p>
-          <p className="text-amber-500 font-bold text-xl ">Updates Every 15s</p>
+          <p className="text-amber-500 font-bold text-xl">Updates Every 15s</p>
         </div>
         <button
           onClick={handleCopy}
@@ -212,14 +202,8 @@ export default function ViewSessionPage() {
       <LiveScoreCard match={match} />
 
       <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
-        <TeamInningsDetail
-          title={match.innings1?.team || "Team A"}
-          inningsData={match.innings1}
-        />
-        <TeamInningsDetail
-          title={match.innings2?.team || "Team B"}
-          inningsData={match.innings2}
-        />
+        <TeamInningsDetail title={match.innings1?.team || teamA.name} inningsData={match.innings1} />
+        <TeamInningsDetail title={match.innings2?.team || teamB.name} inningsData={match.innings2} />
       </div>
 
       <style jsx global>{`

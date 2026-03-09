@@ -1,11 +1,21 @@
-// src/app/api/matches/[id]/route.js
-
-// Corrected imports:
-import { connectDB } from "../../../lib/db";
-import Match from "../../../../models/Match";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { connectDB } from "../../../lib/db";
+import {
+  getMatchAccessCookieName,
+  hasValidMatchAccess,
+} from "../../../lib/match-access";
+import Match from "../../../../models/Match";
+import Session from "../../../../models/Session";
 
-export async function GET(req, { params }) {
+async function requireMatchAccess(matchId) {
+  const cookieStore = await cookies();
+  const accessCookie = cookieStore.get(getMatchAccessCookieName(matchId));
+
+  return hasValidMatchAccess(matchId, accessCookie?.value);
+}
+
+export async function GET(_req, { params }) {
   try {
     await connectDB();
     const match = await Match.findById(params.id);
@@ -15,9 +25,9 @@ export async function GET(req, { params }) {
     }
 
     return NextResponse.json(match, { status: 200 });
-  } catch (err) {
+  } catch (error) {
     return NextResponse.json(
-      { message: "Error fetching match", error: err.message },
+      { message: "Error fetching match", error: error.message },
       { status: 500 }
     );
   }
@@ -25,12 +35,19 @@ export async function GET(req, { params }) {
 
 export async function PATCH(req, { params }) {
   try {
+    const hasAccess = await requireMatchAccess(params.id);
+
+    if (!hasAccess) {
+      return NextResponse.json(
+        { message: "Umpire access required" },
+        { status: 403 }
+      );
+    }
+
     const data = await req.json();
     await connectDB();
 
     const updateQuery = { $set: {} };
-
-    // This is the array that needs to be modified
     const updatableFields = [
       "score",
       "outs",
@@ -44,7 +61,9 @@ export async function PATCH(req, { params }) {
       "tossDecision",
       "teamA",
       "teamB",
-      "overs", // ✅ ADD THIS LINE
+      "teamAName",
+      "teamBName",
+      "overs",
     ];
 
     for (const key in data) {
@@ -72,23 +91,53 @@ export async function PATCH(req, { params }) {
       );
     }
 
+    const sessionUpdate = {};
+
+    if ("teamA" in updateQuery.$set) sessionUpdate.teamA = updated.teamA;
+    if ("teamB" in updateQuery.$set) sessionUpdate.teamB = updated.teamB;
+    if ("teamAName" in updateQuery.$set) sessionUpdate.teamAName = updated.teamAName;
+    if ("teamBName" in updateQuery.$set) sessionUpdate.teamBName = updated.teamBName;
+    if ("overs" in updateQuery.$set) sessionUpdate.overs = updated.overs;
+    if ("tossWinner" in updateQuery.$set) {
+      sessionUpdate.tossWinner = updated.tossWinner;
+    }
+    if ("isOngoing" in updateQuery.$set) {
+      sessionUpdate.isLive = updated.isOngoing;
+    }
+
+    if (Object.keys(sessionUpdate).length > 0) {
+      await Session.findByIdAndUpdate(updated.sessionId, {
+        $set: sessionUpdate,
+      });
+    }
+
     return NextResponse.json(updated, { status: 200 });
-  } catch (err) {
-    if (err.name === "ValidationError") {
+  } catch (error) {
+    if (error.name === "ValidationError") {
       return NextResponse.json(
-        { message: "Validation Error", error: err.message },
+        { message: "Validation Error", error: error.message },
         { status: 400 }
       );
     }
+
     return NextResponse.json(
-      { message: "Error updating match", error: err.message },
+      { message: "Error updating match", error: error.message },
       { status: 500 }
     );
   }
 }
 
-export async function DELETE(req, { params }) {
+export async function DELETE(_req, { params }) {
   try {
+    const hasAccess = await requireMatchAccess(params.id);
+
+    if (!hasAccess) {
+      return NextResponse.json(
+        { message: "Umpire access required" },
+        { status: 403 }
+      );
+    }
+
     await connectDB();
     const deletedMatch = await Match.findByIdAndDelete(params.id);
 
@@ -97,9 +146,9 @@ export async function DELETE(req, { params }) {
     }
 
     return new Response(null, { status: 204 });
-  } catch (err) {
+  } catch (error) {
     return NextResponse.json(
-      { message: "Error deleting match", error: err.message },
+      { message: "Error deleting match", error: error.message },
       { status: 500 }
     );
   }

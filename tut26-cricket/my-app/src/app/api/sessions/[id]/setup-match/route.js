@@ -1,67 +1,98 @@
-// src/app/api/sessions/[id]/setup-match/route.js
-
 import { connectDB } from "../../../../lib/db";
+import { NextResponse } from "next/server";
+import { getMatchAccessCookie } from "../../../../lib/match-access";
+import { buildTeamUpdate } from "../../../../lib/team-utils";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 
-// POST /api/sessions/:id/setup-match
 export async function POST(req, { params }) {
   const { id: sessionId } = params;
+  let transactionSession;
 
   try {
     await connectDB();
-    const { teamA, teamB, overs } = await req.json();
+    const { teamAName, teamAPlayers, teamBName, teamBPlayers, overs } =
+      await req.json();
+    const normalizedTeamA = buildTeamUpdate(teamAName, teamAPlayers);
+    const normalizedTeamB = buildTeamUpdate(teamBName, teamBPlayers);
 
-    // Validate incoming data
-    if (!teamA || !teamB || !overs || !sessionId) {
+    if (
+      !normalizedTeamA.name ||
+      !normalizedTeamB.name ||
+      !normalizedTeamA.players.length ||
+      !normalizedTeamB.players.length ||
+      !overs ||
+      !sessionId
+    ) {
       return Response.json(
         { message: "Missing required fields." },
         { status: 400 }
       );
     }
 
-    // 1. Create the new Match document
-    const newMatch = new Match({
-      teamA,
-      teamB,
-      overs,
-      sessionId, // Link back to the session
-      isOngoing: true,
-      innings1: { score: 0, history: [] },
-      innings2: { score: 0, history: [] },
-    });
-    await newMatch.save();
+    let createdMatch = null;
+    transactionSession = await Match.startSession();
 
-    // 2. Atomically update the corresponding Session to link the new match
-    const updatedSession = await Session.findByIdAndUpdate(
-      sessionId,
-      {
-        $set: {
-          match: newMatch._id,
-          teamA: teamA,
-          teamB: teamB,
-          overs: overs,
-          isLive: true,
+    await transactionSession.withTransaction(async () => {
+      const existingSession = await Session.findById(sessionId).session(
+        transactionSession
+      );
+
+      if (!existingSession) {
+        throw new Error("SESSION_NOT_FOUND");
+      }
+
+      [createdMatch] = await Match.create(
+        [
+          {
+            teamA: normalizedTeamA.players,
+            teamB: normalizedTeamB.players,
+            teamAName: normalizedTeamA.name,
+            teamBName: normalizedTeamB.name,
+            overs,
+            sessionId,
+            isOngoing: true,
+            innings1: { score: 0, history: [] },
+            innings2: { score: 0, history: [] },
+          },
+        ],
+        { session: transactionSession }
+      );
+
+      await Session.findByIdAndUpdate(
+        sessionId,
+        {
+          $set: {
+            match: createdMatch._id,
+            teamA: normalizedTeamA.players,
+            teamB: normalizedTeamB.players,
+            teamAName: normalizedTeamA.name,
+            teamBName: normalizedTeamB.name,
+            overs,
+            isLive: true,
+          },
         },
-      },
-      { new: true } // Return the updated document
-    );
+        { new: true, session: transactionSession }
+      );
+    });
 
-    if (!updatedSession) {
-      // This would happen if the sessionId was invalid
+    const response = NextResponse.json(createdMatch, { status: 201 });
+    const matchCookie = getMatchAccessCookie(createdMatch._id);
+    response.cookies.set(matchCookie.name, matchCookie.value, matchCookie.options);
+    return response;
+  } catch (error) {
+    if (error.message === "SESSION_NOT_FOUND") {
       return Response.json({ message: "Session not found" }, { status: 404 });
     }
 
-    // 3. Return the newly created match object
-    return new Response(JSON.stringify(newMatch), {
-      status: 201, // 201 Created
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (err) {
-    console.error("Error setting up match:", err);
+    console.error("Error setting up match:", error);
     return Response.json(
-      { message: "Error setting up match", error: err.message },
+      { message: "Error setting up match", error: error.message },
       { status: 500 }
     );
+  } finally {
+    if (transactionSession) {
+      await transactionSession.endSession();
+    }
   }
 }

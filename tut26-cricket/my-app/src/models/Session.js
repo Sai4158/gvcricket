@@ -2,20 +2,18 @@ import mongoose from "mongoose";
 
 const SessionSchema = new mongoose.Schema(
   {
-    /* basic meta */
     name: { type: String, required: true, trim: true },
-    overs: { type: Number, default: null }, // ✅ not required
+    date: { type: String, default: "", trim: true },
+    overs: { type: Number, default: null },
     isLive: { type: Boolean, default: false },
-
-    /* links & results */
     match: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Match",
       default: null,
     },
-    tossWinner: { type: String, enum: ["Team A", "Team B", ""], default: "" },
-
-    /* rosters */
+    tossWinner: { type: String, default: "" },
+    teamAName: { type: String, default: "", trim: true },
+    teamBName: { type: String, default: "", trim: true },
     teamA: { type: [String], default: [] },
     teamB: { type: [String], default: [] },
   },

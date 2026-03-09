@@ -1,12 +1,10 @@
-/* ---------------------------------------------------------------
-   src/app/session/new/page.jsx – (Modern, Dark UI Version)
----------------------------------------------------------------- */
 "use client";
+
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { FaPen, FaCalendarAlt, FaArrowRight } from "react-icons/fa";
+import { FaArrowRight, FaCalendarAlt, FaPen } from "react-icons/fa";
 
-// Get today's date in MM/DD/YYYY format
 const today = new Date().toLocaleDateString("en-US");
 
 export default function NewSessionPage() {
@@ -17,15 +15,18 @@ export default function NewSessionPage() {
   const router = useRouter();
 
   const createSession = async () => {
-    setError(""); // Clear previous errors
+    setError("");
+
     if (!name.trim()) {
       setError("Please enter a session name.");
       return;
     }
+
     if (!date.trim()) {
       setError("Please enter a valid date.");
       return;
     }
+
     setSaving(true);
 
     try {
@@ -43,16 +44,15 @@ export default function NewSessionPage() {
       }
 
       const session = await res.json();
-      router.push(`/teams/${session._id}`); // Jump to the team-selection step
-    } catch (e) {
-      setError(e.message);
+      router.push(`/teams/${session._id}`);
+    } catch (caughtError) {
+      setError(caughtError.message);
       setSaving(false);
     }
   };
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center bg-zinc-950 text-zinc-200 p-4">
-      {/* Main container with modern styling */}
       <div className="w-full max-w-md bg-zinc-900/50 p-8 rounded-2xl shadow-2xl ring-1 ring-white/10">
         <h1 className="text-4xl font-bold text-center text-white mb-2">
           Create New Session
@@ -62,7 +62,6 @@ export default function NewSessionPage() {
         </p>
 
         <div className="space-y-4">
-          {/* Styled input for Session Name */}
           <div>
             <label
               htmlFor="session-name"
@@ -75,14 +74,13 @@ export default function NewSessionPage() {
               <input
                 id="session-name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(event) => setName(event.target.value)}
                 placeholder="Game 1, 2, etc."
                 className="w-full p-3 pl-10 rounded-lg bg-zinc-800/50 ring-1 ring-zinc-700 focus:ring-blue-500 outline-none text-white placeholder:text-zinc-500 transition"
               />
             </div>
           </div>
 
-          {/* Styled input for Date */}
           <div>
             <label
               htmlFor="session-date"
@@ -95,42 +93,33 @@ export default function NewSessionPage() {
               <input
                 id="session-date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
-                placeholder="e.g., 6/6/2025"
+                onChange={(event) => setDate(event.target.value)}
+                placeholder="e.g. 6/6/2025"
                 className="w-full p-3 pl-10 rounded-lg bg-zinc-800/50 ring-1 ring-zinc-700 focus:ring-blue-500 outline-none text-white placeholder:text-zinc-500 transition"
               />
             </div>
           </div>
         </div>
 
-        {/* New error display component */}
         {error && (
           <div className="mt-6 text-center bg-red-900/30 text-red-300 p-3 rounded-lg text-sm">
             {error}
           </div>
         )}
 
-        {/* Redesigned primary button */}
         <button
           onClick={createSession}
           disabled={saving}
-          className={`w-full mt-8 py-3 px-6 rounded-lg font-semibold transition-all flex items-center justify-center gap-2
-                         bg-gradient-to-r from-yellow-400 via-amber-300 to-orange-400 text-black text-xl
-                         shadow-lg shadow-blue-600/20
-                         hover:scale-105
-                         disabled:opacity-60 disabled:shadow-none disabled:bg-zinc-700`}
+          className="w-full mt-8 py-3 px-6 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-400 via-amber-300 to-orange-400 text-black text-xl shadow-lg shadow-blue-600/20 hover:scale-105 disabled:opacity-60 disabled:shadow-none disabled:bg-zinc-700"
         >
           {saving ? "Creating..." : "Next: Select Teams"}
           {!saving && <FaArrowRight />}
         </button>
 
         <div className="text-center mt-6">
-          <a
-            href="/"
-            className="text-sm text-white hover:text-zinc-300 transition"
-          >
-            ← Back to Home
-          </a>
+          <Link href="/" className="text-sm text-white hover:text-zinc-300 transition">
+            Back to Home
+          </Link>
         </div>
       </div>
     </main>

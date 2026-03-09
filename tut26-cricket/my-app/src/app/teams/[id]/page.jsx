@@ -1,42 +1,40 @@
-/* ------------------------------------------------------------------
-   src/app/teams/[id]/page.jsx - (Final Version with Counter UI)
--------------------------------------------------------------------*/
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  FaPlus,
-  FaMinus,
-  FaTrash,
-  FaPen,
-  FaCheck,
   FaArrowRight,
+  FaCheck,
   FaInfoCircle,
+  FaMinus,
+  FaPen,
+  FaPlus,
   FaTimes,
+  FaTrash,
 } from "react-icons/fa";
 
-// A custom hook to persist state in sessionStorage (hydration-safe)
 function useSessionStorageState(key, defaultValue) {
   const [state, setState] = useState(defaultValue);
+
   useEffect(() => {
     const storedValue = window.sessionStorage.getItem(key);
-    if (storedValue) {
-      try {
-        setState(JSON.parse(storedValue));
-      } catch (e) {
-        console.error("Error parsing session storage value", e);
-      }
+    if (!storedValue) return;
+
+    try {
+      setState(JSON.parse(storedValue));
+    } catch (error) {
+      console.error("Error parsing session storage value", error);
     }
   }, [key]);
+
   useEffect(() => {
     window.sessionStorage.setItem(key, JSON.stringify(state));
   }, [key, state]);
+
   return [state, setState];
 }
 
-// --- Information Modal Component ---
 const InfoModal = ({ onExit }) => (
   <motion.div
     initial={{ opacity: 0 }}
@@ -50,7 +48,7 @@ const InfoModal = ({ onExit }) => (
       animate={{ scale: 1, y: 0 }}
       exit={{ scale: 0.9, y: 20 }}
       className="relative w-full max-w-lg bg-zinc-900 p-8 rounded-2xl ring-1 ring-white/10 shadow-2xl"
-      onClick={(e) => e.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
     >
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-white">How to Set Up Teams</h2>
@@ -68,8 +66,8 @@ const InfoModal = ({ onExit }) => (
           </h3>
           <p className="text-zinc-300">
             Use the <strong className="text-white">+/-</strong> buttons to
-            quickly change the number of players. The list below will update
-            automatically.
+            change the number of players. Team names are kept separate from the
+            player count.
           </p>
         </div>
         <div>
@@ -77,11 +75,8 @@ const InfoModal = ({ onExit }) => (
             2. Edit Names
           </h3>
           <p className="text-zinc-300">
-            Click the <strong className="text-white">Edit</strong> (
-            <FaPen className="inline" />) icon to show text fields. You can then
-            rename the teams and players. Click{" "}
-            <strong className="text-white">Done</strong> (
-            <FaCheck className="inline" />) to save.
+            Click the edit icon to update the team name and the player list.
+            Click done to save the local draft.
           </p>
         </div>
         <div>
@@ -89,10 +84,8 @@ const InfoModal = ({ onExit }) => (
             3. Delete a Player
           </h3>
           <p className="text-zinc-300">
-            While in <strong className="text-white">Edit Mode</strong>, a{" "}
-            <strong className="text-white">Trash</strong> (
-            <FaTrash className="inline" />) icon will appear, allowing you to
-            remove a specific player from the roster.
+            While editing, use the trash icon next to a player to remove that
+            player from the roster.
           </p>
         </div>
       </div>
@@ -100,51 +93,61 @@ const InfoModal = ({ onExit }) => (
   </motion.div>
 );
 
-// --- ✨ NEW: Final Roster Component with Counter ---
-const TeamRoster = ({ title, color, teamNames, setTeamNames }) => {
+function createDefaultRoster(teamLabel) {
+  return {
+    name: teamLabel,
+    players: Array.from({ length: 3 }, (_, index) => `Player ${index + 1}`),
+  };
+}
+
+const TeamRoster = ({ color, roster, setRoster }) => {
   const [isEditing, setIsEditing] = useState(false);
   const teamColorClass = color === "blue" ? "text-blue-400" : "text-red-400";
   const teamRingClass =
     color === "blue" ? "focus:ring-blue-500" : "focus:ring-red-500";
 
-  const handleNameChange = (index, newName) => {
-    setTeamNames((currentNames) =>
-      currentNames.map((name, i) => (i === index ? newName : name))
-    );
+  const updatePlayer = (index, nextValue) => {
+    setRoster((current) => ({
+      ...current,
+      players: current.players.map((player, playerIndex) =>
+        playerIndex === index ? nextValue : player
+      ),
+    }));
   };
 
   const addPlayer = () => {
-    if (teamNames.length < 15) {
-      // Max player limit
-      setTeamNames((currentNames) => [
-        ...currentNames,
-        `Player ${currentNames.length + 1}`,
-      ]);
-    }
+    setRoster((current) => {
+      if (current.players.length >= 15) return current;
+      return {
+        ...current,
+        players: [...current.players, `Player ${current.players.length + 1}`],
+      };
+    });
   };
 
   const removeLastPlayer = () => {
-    if (teamNames.length > 1) {
-      // Min player limit
-      setTeamNames((currentNames) => currentNames.slice(0, -1));
-    }
+    setRoster((current) => {
+      if (current.players.length <= 1) return current;
+      return {
+        ...current,
+        players: current.players.slice(0, -1),
+      };
+    });
   };
 
   const removePlayerAtIndex = (indexToRemove) => {
-    setTeamNames((currentNames) =>
-      currentNames.filter((_, index) => index !== indexToRemove)
-    );
+    setRoster((current) => ({
+      ...current,
+      players: current.players.filter((_, index) => index !== indexToRemove),
+    }));
   };
 
   return (
     <div className="bg-zinc-900/50 p-6 rounded-2xl ring-1 ring-white/10 space-y-4 transition-all duration-300">
-      {/* Header with Title and Edit Toggle */}
       <div className="flex justify-between items-center">
-        <h2 className={`text-2xl font-bold ${teamColorClass}`}>
-          {teamNames[0] || title}
-        </h2>
+        <h2 className={`text-2xl font-bold ${teamColorClass}`}>{roster.name}</h2>
         <button
-          onClick={() => setIsEditing(!isEditing)}
+          onClick={() => setIsEditing((current) => !current)}
           className="p-2 rounded-full hover:bg-white/10 transition-colors"
         >
           {isEditing ? (
@@ -155,29 +158,29 @@ const TeamRoster = ({ title, color, teamNames, setTeamNames }) => {
         </button>
       </div>
 
-      {/* Player Counter */}
       <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg">
         <span className="font-semibold text-zinc-300">Players</span>
         <div className="flex items-center gap-4">
           <button
             onClick={removeLastPlayer}
-            className="w-8 h-8 rounded-md bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center transition-colors"
+            disabled={roster.players.length <= 1}
+            className="w-8 h-8 rounded-md bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <FaMinus />
           </button>
           <span className="text-xl font-bold w-8 text-center">
-            {teamNames.length}
+            {roster.players.length}
           </span>
           <button
             onClick={addPlayer}
-            className="w-8 h-8 rounded-md bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center transition-colors"
+            disabled={roster.players.length >= 15}
+            className="w-8 h-8 rounded-md bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <FaPlus />
           </button>
         </div>
       </div>
 
-      {/* Editable Player List */}
       <AnimatePresence>
         {isEditing && (
           <motion.div
@@ -188,11 +191,25 @@ const TeamRoster = ({ title, color, teamNames, setTeamNames }) => {
           >
             <div className="space-y-3 pt-4 border-t border-white/10">
               <p className="text-sm text-zinc-400 px-1">
-                Editing team & player names...
+                Editing team and player names...
               </p>
-              {teamNames.map((name, i) => (
+
+              <input
+                type="text"
+                value={roster.name}
+                onChange={(event) =>
+                  setRoster((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+                placeholder="Team Name"
+                className={`w-full px-4 py-3 rounded-xl bg-zinc-900 focus:ring-2 ${teamRingClass} outline-none transition`}
+              />
+
+              {roster.players.map((player, index) => (
                 <motion.div
-                  key={i}
+                  key={`${player}-${index}`}
                   layout
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -201,19 +218,18 @@ const TeamRoster = ({ title, color, teamNames, setTeamNames }) => {
                 >
                   <input
                     type="text"
-                    value={name}
-                    onChange={(e) => handleNameChange(i, e.target.value)}
-                    placeholder={i === 0 ? "Team Name" : `Player ${i + 1}`}
+                    value={player}
+                    onChange={(event) => updatePlayer(index, event.target.value)}
+                    placeholder={`Player ${index + 1}`}
                     className={`flex-1 px-4 py-3 rounded-xl bg-zinc-900 focus:ring-2 ${teamRingClass} outline-none transition`}
                   />
-                  {i > 0 && (
-                    <button
-                      onClick={() => removePlayerAtIndex(i)}
-                      className="p-3 text-zinc-500 hover:text-red-500 transition-colors"
-                    >
-                      <FaTrash />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => removePlayerAtIndex(index)}
+                    disabled={roster.players.length <= 1}
+                    className="p-3 text-zinc-500 hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FaTrash />
+                  </button>
                 </motion.div>
               ))}
             </div>
@@ -227,22 +243,16 @@ const TeamRoster = ({ title, color, teamNames, setTeamNames }) => {
 export default function TeamSelectionPage() {
   const { id: sessionId } = useParams();
   const router = useRouter();
-
-  const [teamANames, setTeamANames] = useSessionStorageState(
-    `session_${sessionId}_teamA`,
-    Array.from({ length: 4 }, (_, i) =>
-      i === 0 ? "Team A" : `Player ${i + 1}`
-    )
+  const [teamA, setTeamA] = useSessionStorageState(
+    `session_${sessionId}_teamA_v2`,
+    createDefaultRoster("Team A")
   );
-  const [teamBNames, setTeamBNames] = useSessionStorageState(
-    `session_${sessionId}_teamB`,
-    Array.from({ length: 4 }, (_, i) =>
-      i === 0 ? "Team B" : `Player ${i + 1}`
-    )
+  const [teamB, setTeamB] = useSessionStorageState(
+    `session_${sessionId}_teamB_v2`,
+    createDefaultRoster("Team B")
   );
-
   const [overs, setOvers] = useSessionStorageState(
-    `session_${sessionId}_overs`,
+    `session_${sessionId}_overs_v2`,
     6
   );
   const [isLoading, setIsLoading] = useState(false);
@@ -250,32 +260,47 @@ export default function TeamSelectionPage() {
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
 
   const handleSubmit = async () => {
-    const finalTeamA = teamANames.map((p) => p.trim()).filter((p) => p);
-    const finalTeamB = teamBNames.map((p) => p.trim()).filter((p) => p);
-    if (!finalTeamA[0] || !finalTeamB[0]) {
+    const finalTeamAName = teamA.name.trim();
+    const finalTeamBName = teamB.name.trim();
+    const finalTeamAPlayers = teamA.players.map((player) => player.trim()).filter(Boolean);
+    const finalTeamBPlayers = teamB.players.map((player) => player.trim()).filter(Boolean);
+
+    if (!finalTeamAName || !finalTeamBName) {
       setError("Each team must have a name.");
       return;
     }
-    if (finalTeamA.length < 2 || finalTeamB.length < 2) {
+
+    if (!finalTeamAPlayers.length || !finalTeamBPlayers.length) {
       setError("Each team must have at least one player.");
       return;
     }
+
     setIsLoading(true);
     setError("");
+
     try {
       const response = await fetch(`/api/sessions/${sessionId}/setup-match`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamA: finalTeamA, teamB: finalTeamB, overs }),
+        body: JSON.stringify({
+          teamAName: finalTeamAName,
+          teamAPlayers: finalTeamAPlayers,
+          teamBName: finalTeamBName,
+          teamBPlayers: finalTeamBPlayers,
+          overs,
+        }),
       });
-      if (!response.ok)
+
+      if (!response.ok) {
         throw new Error(
           (await response.json()).message || "Failed to set up the match."
         );
+      }
+
       const match = await response.json();
       router.push(`/toss/${match._id}`);
-    } catch (e) {
-      setError(e.message);
+    } catch (caughtError) {
+      setError(caughtError.message);
       setIsLoading(false);
     }
   };
@@ -286,7 +311,7 @@ export default function TeamSelectionPage() {
         <header className="text-center mb-5 mt-7">
           <div className="flex justify-center items-center gap-3">
             <h1 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-yellow-300 via-rose-200 to-orange-400 bg-clip-text text-transparent">
-              🏏Team Selection
+              Team Selection
             </h1>
           </div>
           <p className="text-zinc-100 mt-2">
@@ -302,18 +327,8 @@ export default function TeamSelectionPage() {
         </header>
 
         <section className="grid md:grid-cols-2 gap-8 mb-10">
-          <TeamRoster
-            title="Team A"
-            color="blue"
-            teamNames={teamANames}
-            setTeamNames={setTeamANames}
-          />
-          <TeamRoster
-            title="Team B"
-            color="red"
-            teamNames={teamBNames}
-            setTeamNames={setTeamBNames}
-          />
+          <TeamRoster color="blue" roster={teamA} setRoster={setTeamA} />
+          <TeamRoster color="red" roster={teamB} setRoster={setTeamB} />
         </section>
 
         <section className="w-full max-w-md mx-auto space-y-8">
@@ -326,9 +341,7 @@ export default function TeamSelectionPage() {
               >
                 <FaMinus />
               </button>
-              <span className="text-3xl font-bold w-12 text-center">
-                {overs}
-              </span>
+              <span className="text-3xl font-bold w-12 text-center">{overs}</span>
               <button
                 onClick={() => overs < 50 && setOvers(overs + 1)}
                 className="w-10 h-10 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center transition-colors"

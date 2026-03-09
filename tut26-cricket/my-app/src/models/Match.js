@@ -1,8 +1,5 @@
-// /models/Match.js
-
 import mongoose from "mongoose";
 
-// Define a schema for a single ball delivery
 const BallSchema = new mongoose.Schema(
   {
     runs: { type: Number, required: true },
@@ -13,11 +10,11 @@ const BallSchema = new mongoose.Schema(
       default: null,
     },
     isOut: { type: Boolean, default: false },
+    batsmanOnStrike: { type: String, default: "" },
   },
   { _id: false }
 );
 
-// Define a schema for a single over
 const OverSchema = new mongoose.Schema(
   {
     overNumber: { type: Number, required: true },
@@ -31,28 +28,28 @@ const MatchSchema = new mongoose.Schema(
   {
     teamA: { type: [String], required: true },
     teamB: { type: [String], required: true },
+    teamAName: { type: String, default: "", trim: true },
+    teamBName: { type: String, default: "", trim: true },
     overs: { type: Number, required: true },
     sessionId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Session",
       required: true,
-    }, // State tracking
-
+    },
     tossWinner: { type: String, default: "" },
-    tossDecision: { type: String, enum: ["bat", "bowl", ""], default: "" }, // Added "" to enum
+    tossDecision: { type: String, enum: ["bat", "bowl", ""], default: "" },
     score: { type: Number, default: 0 },
     outs: { type: Number, default: 0 },
     isOngoing: { type: Boolean, default: true },
     innings: { type: String, enum: ["first", "second"], default: "first" },
-    result: { type: String, default: "" }, // Inning-specific data
-
+    result: { type: String, default: "" },
     innings1: {
-      team: { type: String, default: "" }, // ✅ Set default to empty string
+      team: { type: String, default: "" },
       score: { type: Number, default: 0 },
       history: [OverSchema],
     },
     innings2: {
-      team: { type: String, default: "" }, // ✅ Set default to empty string
+      team: { type: String, default: "" },
       score: { type: Number, default: 0 },
       history: [OverSchema],
     },

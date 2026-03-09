@@ -1,18 +1,27 @@
-// src/app/api/matches/route.js
+import { connectDB } from "../../lib/db";
+import { buildTeamUpdate } from "../../lib/team-utils";
+import Match from "../../../models/Match";
 
-// Corrected imports:
-import { connectDB } from "../../lib/db"; // Correct module path
-import Match from "../../../models/Match"; // Go up three levels to src, then to models/Match.js
-
-// POST /api/matches → create a new match
 export async function POST(req) {
   try {
-    const { teamA, teamB, overs, sessionId } = await req.json();
-    await connectDB();
-
-    const newMatch = new Match({
+    const {
       teamA,
       teamB,
+      teamAName,
+      teamBName,
+      overs,
+      sessionId,
+    } = await req.json();
+    await connectDB();
+
+    const normalizedTeamA = buildTeamUpdate(teamAName, teamA || []);
+    const normalizedTeamB = buildTeamUpdate(teamBName, teamB || []);
+
+    const newMatch = new Match({
+      teamA: normalizedTeamA.players,
+      teamB: normalizedTeamB.players,
+      teamAName: normalizedTeamA.name,
+      teamBName: normalizedTeamB.name,
       overs,
       sessionId,
       isOngoing: true,
@@ -32,16 +41,15 @@ export async function POST(req) {
       status: 201,
       headers: { "Content-Type": "application/json" },
     });
-  } catch (err) {
-    console.error("Error creating match:", err);
+  } catch (error) {
+    console.error("Error creating match:", error);
     return Response.json(
-      { message: "Error saving match", error: err.message },
+      { message: "Error saving match", error: error.message },
       { status: 500 }
     );
   }
 }
 
-// GET /api/matches → list recent matches (optional helper)
 export async function GET() {
   try {
     await connectDB();
@@ -50,9 +58,9 @@ export async function GET() {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-  } catch (err) {
+  } catch (error) {
     return Response.json(
-      { message: "Error fetching matches", error: err.message },
+      { message: "Error fetching matches", error: error.message },
       { status: 500 }
     );
   }
