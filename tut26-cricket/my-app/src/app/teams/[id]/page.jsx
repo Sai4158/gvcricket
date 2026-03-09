@@ -15,18 +15,19 @@ import {
 } from "react-icons/fa";
 
 function useSessionStorageState(key, defaultValue) {
-  const [state, setState] = useState(defaultValue);
+  const [state, setState] = useState(() => {
+    if (typeof window === "undefined") return defaultValue;
 
-  useEffect(() => {
     const storedValue = window.sessionStorage.getItem(key);
-    if (!storedValue) return;
+    if (!storedValue) return defaultValue;
 
     try {
-      setState(JSON.parse(storedValue));
+      return JSON.parse(storedValue);
     } catch (error) {
       console.error("Error parsing session storage value", error);
+      return defaultValue;
     }
-  }, [key]);
+  });
 
   useEffect(() => {
     window.sessionStorage.setItem(key, JSON.stringify(state));

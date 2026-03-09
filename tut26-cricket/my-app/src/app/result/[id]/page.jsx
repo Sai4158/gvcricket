@@ -70,6 +70,37 @@ const CongratulationsCard = ({ result }) => {
   );
 };
 
+const InningsColumn = ({ innings, summary, players, teamColor }) => {
+  const wickets = (innings.history || [])
+    .flatMap((over) => over.balls || [])
+    .filter((ball) => ball.isOut).length;
+
+  return (
+    <div
+      className={`bg-zinc-800/50 p-6 rounded-xl ring-1 ring-white/10 border-l-4 ${teamColor}`}
+    >
+      <h3 className="text-2xl font-bold text-white mb-4">{innings.team}</h3>
+      <p className="text-5xl font-extrabold text-white mb-4">
+        <span className="text-green-400">{innings.score}</span>/
+        <span className="text-red-400">{wickets}</span>
+      </p>
+      <div className="space-y-2 text-zinc-300">
+        <div className="flex justify-between">
+          <span>Overs:</span> <span className="font-bold">{summary.overs}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Total Players:</span>{" "}
+          <span className="font-bold">{players.length}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Run Rate:</span>{" "}
+          <span className="font-bold">{summary.runRate}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const EnhancedScorecard = ({ match, innings1Summary, innings2Summary }) => {
   const teamA = getTeamBundle(match, "teamA");
   const teamB = getTeamBundle(match, "teamB");
@@ -77,37 +108,6 @@ const EnhancedScorecard = ({ match, innings1Summary, innings2Summary }) => {
     match.innings1.team === teamB.name ? teamB.players : teamA.players;
   const innings2Team =
     match.innings2.team === teamA.name ? teamA.players : teamB.players;
-
-  const InningsColumn = ({ innings, summary, players, teamColor }) => {
-    const wickets = innings.history
-      .flatMap((over) => over.balls)
-      .filter((ball) => ball.isOut).length;
-
-    return (
-      <div
-        className={`bg-zinc-800/50 p-6 rounded-xl ring-1 ring-white/10 border-l-4 ${teamColor}`}
-      >
-        <h3 className="text-2xl font-bold text-white mb-4">{innings.team}</h3>
-        <p className="text-5xl font-extrabold text-white mb-4">
-          <span className="text-green-400">{innings.score}</span>/
-          <span className="text-red-400">{wickets}</span>
-        </p>
-        <div className="space-y-2 text-zinc-300">
-          <div className="flex justify-between">
-            <span>Overs:</span> <span className="font-bold">{summary.overs}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Total Players:</span>{" "}
-            <span className="font-bold">{players.length}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Run Rate:</span>{" "}
-            <span className="font-bold">{summary.runRate}</span>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="bg-zinc-900/50 rounded-2xl shadow-lg p-6 space-y-6 ring-1 ring-white/10">

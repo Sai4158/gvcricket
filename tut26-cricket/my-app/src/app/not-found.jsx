@@ -50,7 +50,7 @@ export default function NotFound() {
           className="text-4xl md:text-5xl font-bold text-zinc-100 mb-4 tracking-tight"
           variants={itemVariants}
         >
-          That's A Wicket!
+          That&apos;s A Wicket!
         </motion.h2>
 
         {/* 404 Title with gradient and shadow (Adjusted font size back to normal for 404 per original request) */}
@@ -66,9 +66,9 @@ export default function NotFound() {
           className="text-lg md:text-xl text-zinc-100 leading-relaxed max-w-prose mb-10"
           variants={itemVariants}
         >
-          It seems you've wandered off the pitch into an unmapped boundary. This
+          It seems you&apos;ve wandered off the pitch into an unmapped boundary. This
           area is strictly reserved for the strategists and statisticians, not
-          for public play. Trying to sneak in? That's a definite **no-ball!**
+          for public play. Trying to sneak in? That&apos;s a definite **no-ball!**
         </motion.p>
 
         {/* Go Back Home Button */}

@@ -322,30 +322,24 @@ const Controls = ({
   const baseBtn =
     "py-6 text-xl font-bold rounded-2xl transition-transform active:scale-95 shadow-lg w-full disabled:opacity-50 disabled:cursor-not-allowed";
 
-  const Button = ({ onClick, className, children }) => (
-    <motion.button
-      whileTap={{ scale: 0.95 }}
-      onClick={onClick}
-      disabled={disabled}
-      className={className}
-    >
-      {children}
-    </motion.button>
-  );
-
   return (
     <div className="grid grid-cols-4 gap-3">
-      <Button onClick={() => onScore(0)} className={`${baseBtn} bg-zinc-800 hover:bg-zinc-700`}>
+      <ScoreButton
+        onClick={() => onScore(0)}
+        disabled={disabled}
+        className={`${baseBtn} bg-zinc-800 hover:bg-zinc-700`}
+      >
         Dot
-      </Button>
+      </ScoreButton>
       {[1, 2, 3, 4, 6].map((runs) => (
-        <Button
+        <ScoreButton
           key={runs}
           onClick={() => onScore(runs)}
+          disabled={disabled}
           className={`${baseBtn} bg-zinc-800 hover:bg-zinc-700`}
         >
           {runs}
-        </Button>
+        </ScoreButton>
       ))}
       <ButtonWithInfo
         info="A dismissal. Specify runs completed in the next step."
@@ -377,6 +371,17 @@ const Controls = ({
     </div>
   );
 };
+
+const ScoreButton = ({ onClick, disabled, className, children }) => (
+  <motion.button
+    whileTap={{ scale: 0.95 }}
+    onClick={onClick}
+    disabled={disabled}
+    className={className}
+  >
+    {children}
+  </motion.button>
+);
 
 const ButtonWithInfo = ({
   children,

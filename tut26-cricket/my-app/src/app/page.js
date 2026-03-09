@@ -377,7 +377,7 @@ export default function HomePage() {
                     Live Umpire Scoring
                   </h3>
                   <p className="text-gray">
-                    The umpire's cockpit. Score every ball with simple, color
+                    The umpire&apos;s cockpit. Score every ball with simple, color
                     coded buttons for runs, wides, dots, and outs.
                   </p>
                 </div>
@@ -438,7 +438,7 @@ export default function HomePage() {
             </h2>
             <p className="text-lg text-zinc-300 leading-relaxed text-center max-w-3xl mx-auto -mt-8 mb-16">
               It all started in 2022 with a few friends who loved the game.
-              Today, it's a friendly league of over{" "}
+              Today, it&apos;s a friendly league of over{" "}
               <strong className="text-white">50+ members</strong> who meet for
               fun, competitive cricket.
             </p>

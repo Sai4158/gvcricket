@@ -125,7 +125,7 @@ export default function RulesPage() {
         headingColor="text-red-400"
       >
         <RuleItem>
-          The umpire's decision is final and must be called loudly.
+          The umpire&apos;s decision is final and must be called loudly.
         </RuleItem>
         <RuleItem>
           There are <strong>no LBWs</strong> (Leg Before Wicket).
@@ -205,8 +205,8 @@ export default function RulesPage() {
           prevents setting overs below the current progress.
         </RuleItem>
         <RuleItem>
-          <strong>Edit Teams:</strong> Modify team rosters on-the-fly. The "all
-          out" wicket count updates automatically.
+          <strong>Edit Teams:</strong> Modify team rosters on-the-fly. The
+          &quot;all out&quot; wicket count updates automatically.
         </RuleItem>
         <RuleItem>
           <strong>History & Rules:</strong> Review a ball-by-ball history or
