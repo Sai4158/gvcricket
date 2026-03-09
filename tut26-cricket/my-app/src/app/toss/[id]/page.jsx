@@ -2,55 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
 import { FaRedo } from "react-icons/fa";
+import TossStatePanels from "../../components/toss/TossStatePanels";
 import { getTeamBundle } from "../../lib/team-utils";
-
-const CoinHeads = () => (
-  <svg width="160" height="160" viewBox="0 0 100 100" fill="none">
-    <circle cx="50" cy="50" r="48" fill="#ffc700" stroke="#b38b00" strokeWidth="4" />
-    <text
-      x="50"
-      y="58"
-      fontFamily="Arial, sans-serif"
-      fontSize="22"
-      fill="#664d00"
-      textAnchor="middle"
-      fontWeight="bold"
-    >
-      HEADS
-    </text>
-  </svg>
-);
-
-const CoinTails = () => (
-  <svg width="160" height="160" viewBox="0 0 100 100" fill="none">
-    <circle cx="50" cy="50" r="48" fill="#cccccc" stroke="#8e8e8e" strokeWidth="4" />
-    <text
-      x="50"
-      y="58"
-      fontFamily="Arial, sans-serif"
-      fontSize="22"
-      fill="#4f4f4f"
-      textAnchor="middle"
-      fontWeight="bold"
-    >
-      TAILS
-    </text>
-  </svg>
-);
-
-const SpinningCoin = () => (
-  <svg width="160" height="160" viewBox="0 0 100 100" fill="none">
-    <circle cx="50" cy="50" r="48" fill="url(#grad)" stroke="#b38b00" strokeWidth="4" />
-    <defs>
-      <radialGradient id="grad">
-        <stop offset="0%" stopColor="#ffc700" />
-        <stop offset="100%" stopColor="#b38b00" />
-      </radialGradient>
-    </defs>
-  </svg>
-);
 
 export default function TossPage() {
   const { id: matchId } = useParams();
@@ -177,7 +131,6 @@ export default function TossPage() {
   }
 
   const teamA = getTeamBundle(matchDetails, "teamA");
-  const { winnerName, call, side } = tossResult;
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-zinc-900 to-black p-6 text-white overflow-hidden">
@@ -194,122 +147,15 @@ export default function TossPage() {
           The Toss
         </h1>
 
-        <div className="h-[480px] flex flex-col items-center justify-center gap-8">
-          <AnimatePresence mode="wait">
-            {status === "choosing" && (
-              <motion.div
-                key="choosing"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="w-full flex flex-col items-center gap-6"
-              >
-                <p className="text-white text-2xl">
-                  <span className="font-bold">{teamA.name}</span>, pick a side:
-                </p>
-                <div className="flex justify-center gap-4">
-                  <button
-                    onClick={() => handleChoice("heads")}
-                    className="w-36 py-3 font-bold rounded-lg text-lg transition-all duration-300 ease-in-out hover:scale-105 bg-yellow-400 text-black focus:ring-2 focus:ring-white"
-                  >
-                    Heads
-                  </button>
-                  <button
-                    onClick={() => handleChoice("tails")}
-                    className="w-36 py-3 font-bold rounded-lg text-lg transition-all duration-300 ease-in-out hover:scale-105 bg-slate-300 text-black focus:ring-2 focus:ring-white"
-                  >
-                    Tails
-                  </button>
-                </div>
-              </motion.div>
-            )}
-
-            {status === "counting" && (
-              <motion.div
-                key="counting"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                className="flex flex-col items-center gap-4"
-              >
-                <p className="text-xl text-zinc-400">Tossing in...</p>
-                <p className="text-9xl font-mono font-bold text-white">
-                  {countdown}
-                </p>
-              </motion.div>
-            )}
-
-            {status === "flipping" && (
-              <motion.div
-                key="flipping"
-                initial={{ scale: 0.5, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1, rotateY: 1080 }}
-                exit={{ scale: 0.5, opacity: 0 }}
-                transition={{ duration: 3, ease: "easeInOut" }}
-              >
-                <SpinningCoin />
-              </motion.div>
-            )}
-
-            {status === "finished" && (
-              <motion.div
-                key="finished"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="w-full flex flex-col items-center gap-6"
-              >
-                {side === "heads" ? <CoinHeads /> : <CoinTails />}
-                <div className="text-xl font-semibold text-center leading-relaxed">
-                  <p>
-                    {teamA.name} called{" "}
-                    <strong className="text-amber-300 capitalize">{call}</strong>.
-                  </p>
-                  <br />
-                  <p>
-                    It is{" "}
-                    <strong className="text-amber-300 capitalize">{side}</strong>.
-                  </p>
-                  <br />
-                  <p className="text-2xl font-bold text-white mt-2">
-                    {winnerName} wins the toss!
-                  </p>
-                </div>
-                <div className="w-full max-w-xs mt-2 space-y-4">
-                  <p className="text-lg text-zinc-200">
-                    What will {winnerName} do?
-                  </p>
-                  <div className="flex gap-4 justify-center">
-                    <button
-                      onClick={() => startMatch("bat")}
-                      disabled={isSubmitting}
-                      className="flex-1 py-3 text-black rounded-2xl font-bold shadow-lg shadow-yellow-900/40 hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:animate-none disabled:hover:scale-100 animate-[animate-gradient-slow_6s_ease-in-out_infinite]"
-                      style={{
-                        backgroundSize: "200% auto",
-                        backgroundImage:
-                          "linear-gradient(to right, #fde047, #f59e0b, #fbbf24, #f59e0b, #fde047)",
-                      }}
-                    >
-                      {isSubmitting ? "..." : "Bat First"}
-                    </button>
-
-                    <button
-                      onClick={() => startMatch("bowl")}
-                      disabled={isSubmitting}
-                      className="flex-1 py-3 text-white rounded-2xl font-bold shadow-lg shadow-cyan-900/40 hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:animate-none disabled:hover:scale-100 animate-[animate-gradient-slow_6s_ease-in-out_infinite]"
-                      style={{
-                        backgroundSize: "200% auto",
-                        backgroundImage:
-                          "linear-gradient(to right, #22d3ee, #0ea5e9, #38bdf8, #0ea5e9, #22d3ee)",
-                      }}
-                    >
-                      {isSubmitting ? "..." : "Bowl First"}
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        <TossStatePanels
+          status={status}
+          countdown={countdown}
+          teamName={teamA.name}
+          tossResult={tossResult}
+          isSubmitting={isSubmitting}
+          onChoice={handleChoice}
+          onDecision={startMatch}
+        />
       </div>
     </main>
   );
