@@ -26,6 +26,7 @@ export async function GET(request, { params }) {
       let cleanupSession = () => {};
       let cleanupMatch = () => {};
       let heartbeat = null;
+      let currentMatchId = "";
 
       const send = (event, data) => {
         controller.enqueue(encoder.encode(encodeEvent(event, data)));
@@ -38,6 +39,19 @@ export async function GET(request, { params }) {
         const pushSessionPayload = async () => {
           const session = await Session.findById(params.id).lean();
           const match = session?.match ? await Match.findById(session.match).lean() : null;
+          const nextMatchId = match?._id ? String(match._id) : "";
+
+          if (nextMatchId !== currentMatchId) {
+            cleanupMatch();
+            currentMatchId = nextMatchId;
+
+            if (currentMatchId) {
+              cleanupMatch = subscribeToMatch(currentMatchId, async () => {
+                await pushSessionPayload();
+              });
+            }
+          }
+
           send("session", {
             session,
             match,
@@ -46,16 +60,10 @@ export async function GET(request, { params }) {
           return { session, match };
         };
 
-        const initial = await pushSessionPayload();
+        await pushSessionPayload();
         cleanupSession = subscribeToSession(params.id, async () => {
           await pushSessionPayload();
         });
-
-        if (initial.match?._id) {
-          cleanupMatch = subscribeToMatch(String(initial.match._id), async () => {
-            await pushSessionPayload();
-          });
-        }
 
         heartbeat = setInterval(() => {
           send("ping", { ok: true, ts: Date.now() });

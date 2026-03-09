@@ -1,8 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import AnnouncementControls from "../../components/live/AnnouncementControls";
+import useAnnouncementSettings from "../../components/live/useAnnouncementSettings";
 import { countLegalBalls } from "../../lib/match-scoring";
+import {
+  buildCurrentScoreAnnouncement,
+  buildUmpireAnnouncement,
+  createScoreLiveEvent,
+} from "../../lib/live-announcements";
 import { getBattingTeamBundle } from "../../lib/team-utils";
 import { MatchHeader, Scoreboard, Splash, AccessGate } from "../../components/match/MatchStatusShell";
 import { Controls } from "../../components/match/MatchControls";
@@ -10,6 +17,7 @@ import { BallTracker } from "../../components/match/MatchBallHistory";
 import MatchActionGrid from "../../components/match/MatchActionGrid";
 import MatchModalLayer from "../../components/match/MatchModalLayer";
 import useLiveRelativeTime from "../../components/live/useLiveRelativeTime";
+import useSpeechAnnouncer from "../../components/live/useSpeechAnnouncer";
 import useMatch, {
   triggerMatchHapticFeedback,
 } from "../../components/match/useMatch";
@@ -19,8 +27,12 @@ export default function MatchPage() {
   const { id: matchId } = useParams();
   const [modal, setModal] = useState({ type: null });
   const [infoText, setInfoText] = useState(null);
+  const lastLocalActionRef = useRef("");
   const { authStatus, authError, authSubmitting, submitPin } =
     useMatchAccess(matchId);
+  const { settings: umpireSettings, updateSetting: updateUmpireSetting } =
+    useAnnouncementSettings("umpire");
+  const { speak } = useSpeechAnnouncer(umpireSettings);
   const {
     match,
     error,
@@ -34,6 +46,39 @@ export default function MatchPage() {
     patchAndUpdate,
   } = useMatch(matchId, authStatus === "granted");
   const liveUpdatedLabel = useLiveRelativeTime(lastUpdatedAt);
+
+  useEffect(() => {
+    lastLocalActionRef.current = "";
+  }, [match?.lastLiveEvent?.id]);
+
+  const announceUmpireAction = (runs, isOut = false, extraType = null) => {
+    const nextMatch = match
+      ? {
+          ...match,
+          score: match.score + runs,
+          outs: isOut ? match.outs + 1 : match.outs,
+        }
+      : null;
+    const event = createScoreLiveEvent(match, nextMatch || match, {
+      runs,
+      isOut,
+      extraType,
+    });
+    const text = buildUmpireAnnouncement(event, umpireSettings.mode);
+
+    if (!text || lastLocalActionRef.current === text) return;
+    lastLocalActionRef.current = text;
+    speak(text, {
+      key: `umpire-${text}`,
+      rate: 1.03,
+      minGapMs: 250,
+    });
+  };
+
+  const handleAnnouncedScoreEvent = (runs, isOut = false, extraType = null) => {
+    announceUmpireAction(runs, isOut, extraType);
+    handleScoreEvent(runs, isOut, extraType);
+  };
 
   const handleCopyShareLink = () => {
     if (!match) return;
@@ -101,11 +146,26 @@ export default function MatchPage() {
               <p>{match.result}</p>
             </div>
           )}
+          <div className="mb-5">
+            <AnnouncementControls
+              title="Umpire Feedback"
+              subtitle="Short local voice confirmation for each scoring input."
+              settings={umpireSettings}
+              updateSetting={updateUmpireSetting}
+              showAccessibility
+              onAnnounceNow={() =>
+                speak(buildCurrentScoreAnnouncement(match), {
+                  key: "umpire-current-score",
+                  rate: 1,
+                })
+              }
+            />
+          </div>
           <MatchHeader match={match} />
           <Scoreboard match={match} history={oversHistory} />
           <BallTracker history={oversHistory} />
           <Controls
-            onScore={handleScoreEvent}
+            onScore={handleAnnouncedScoreEvent}
             onOut={() => setModal({ type: "out" })}
             onNoBall={() => setModal({ type: "noball" })}
             onWide={() => setModal({ type: "wide" })}
@@ -134,7 +194,7 @@ export default function MatchPage() {
         infoText={infoText}
         onNext={handleNextInningsOrEnd}
         onUpdate={patchAndUpdate}
-        onScoreEvent={handleScoreEvent}
+        onScoreEvent={handleAnnouncedScoreEvent}
         onClose={() => setModal({ type: null })}
         onInfoClose={() => setInfoText(null)}
       />

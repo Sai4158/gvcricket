@@ -1,8 +1,9 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import useSWR from "swr";
+import { useState } from "react";
 import { FaArrowLeft } from "react-icons/fa";
+import useEventSource from "../../components/live/useEventSource";
 import {
   calculateInningsSummary,
 } from "../../lib/match-stats";
@@ -13,25 +14,36 @@ import PlayerStatsSection from "../../components/result/PlayerStatsSection";
 import RunsPerOverChart from "../../components/result/RunsPerOverChart";
 import ScoringBreakdownCharts from "../../components/result/ScoringBreakdownCharts";
 
-const fetcher = (url) => fetch(url).then((res) => res.json());
-
 export default function ResultPage() {
   const { id: matchId } = useParams();
   const router = useRouter();
-  const { data: match, error, isLoading } = useSWR(
-    matchId ? `/api/matches/${matchId}` : null,
-    fetcher
-  );
+  const [match, setMatch] = useState(null);
+  const [streamError, setStreamError] = useState("");
 
-  if (error) {
+  useEventSource({
+    url: matchId ? `/api/live/matches/${matchId}` : null,
+    event: "match",
+    enabled: Boolean(matchId),
+    onMessage: (payload) => {
+      setMatch(payload.match || null);
+      setStreamError("");
+    },
+    onError: () => {
+      if (!match) {
+        setStreamError("Failed to load match results.");
+      }
+    },
+  });
+
+  if (streamError) {
     return (
       <main className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="text-center text-red-400">Failed to load match results.</div>
+        <div className="text-center text-red-400">{streamError}</div>
       </main>
     );
   }
 
-  if (isLoading || !match) {
+  if (!match) {
     return (
       <main className="min-h-screen bg-zinc-950 flex items-center justify-center">
         <div className="text-lg font-medium">Loading Match Results...</div>

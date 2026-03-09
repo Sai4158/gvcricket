@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { addBallToHistory, buildWinByWicketsText } from "../../lib/match-scoring";
+import {
+  createMatchEndLiveEvent,
+  createScoreLiveEvent,
+  createUndoLiveEvent,
+} from "../../lib/live-announcements";
 import useEventSource from "../live/useEventSource";
 
 function triggerHapticFeedback() {
@@ -44,6 +49,12 @@ export default function useMatch(matchId, hasAccess) {
       setLastUpdatedAt(payload.updatedAt || "");
       setError(null);
       setIsLoading(false);
+    },
+    onError: () => {
+      if (!match) {
+        setError(new Error("Could not open live match stream."));
+        setIsLoading(false);
+      }
     },
   });
 
@@ -103,6 +114,8 @@ export default function useMatch(matchId, hasAccess) {
       payload.result = buildWinByWicketsText(payload, payload.outs);
     }
 
+    payload.lastLiveEvent = createScoreLiveEvent(match, payload, newBall);
+
     patchAndUpdate(payload);
   };
 
@@ -112,7 +125,13 @@ export default function useMatch(matchId, hasAccess) {
 
     const previousState = historyStack.at(-1);
     setHistoryStack((prev) => prev.slice(0, -1));
-    await patchAndUpdate(previousState, true);
+    await patchAndUpdate(
+      {
+        ...previousState,
+        lastLiveEvent: createUndoLiveEvent(previousState),
+      },
+      true
+    );
   };
 
   const handleNextInningsOrEnd = () => {
@@ -141,7 +160,11 @@ export default function useMatch(matchId, hasAccess) {
       }.`;
     }
 
-    patchAndUpdate({ isOngoing: false, result: resultText });
+    patchAndUpdate({
+      isOngoing: false,
+      result: resultText,
+      lastLiveEvent: createMatchEndLiveEvent(match, resultText),
+    });
     router.push(`/result/${matchId}`);
   };
 

@@ -60,6 +60,19 @@ const MatchSchema = new mongoose.Schema(
     uiMeta: { type: mongoose.Schema.Types.Mixed, default: {} },
     mediaUpdatedAt: { type: Date, default: null },
     lastLiveEvent: { type: mongoose.Schema.Types.Mixed, default: null },
+    matchImageUrl: { type: String, default: "", trim: true },
+    matchImagePublicId: { type: String, default: "", trim: true },
+    matchImageUploadedAt: { type: Date, default: null },
+    matchImageUploadedBy: { type: String, default: "", trim: true },
+    announcerEnabled: { type: Boolean, default: false },
+    announcerMode: {
+      type: String,
+      enum: ["simple", "full", ""],
+      default: "",
+    },
+    lastEventType: { type: String, default: "", trim: true },
+    lastEventText: { type: String, default: "", trim: true },
+    adminAccessVersion: { type: Number, default: 1 },
   },
   { timestamps: true }
 );

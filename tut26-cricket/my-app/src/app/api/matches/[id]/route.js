@@ -117,6 +117,34 @@ export async function PATCH(req, { params }) {
       updateQuery.$set[key] = validation.value[key];
     }
 
+    const scoringFields = ["score", "outs", "balls", "innings1", "innings2", "innings"];
+    const includesScoringChange = changedFields.some((field) =>
+      scoringFields.includes(field)
+    );
+
+    if (includesScoringChange) {
+      const nextScore =
+        typeof updateQuery.$set.score === "number" ? updateQuery.$set.score : null;
+      const nextOuts =
+        typeof updateQuery.$set.outs === "number" ? updateQuery.$set.outs : null;
+
+      if (!("lastLiveEvent" in updateQuery.$set)) {
+        updateQuery.$set.lastLiveEvent = {
+          type: "score_update",
+          createdAt: new Date(),
+          score: nextScore,
+          outs: nextOuts,
+        };
+      }
+    }
+
+    if (updateQuery.$set.lastLiveEvent) {
+      updateQuery.$set.lastEventType =
+        updateQuery.$set.lastLiveEvent.type || "";
+      updateQuery.$set.lastEventText =
+        updateQuery.$set.lastLiveEvent.summaryText || "";
+    }
+
     const updated = await Match.findByIdAndUpdate(params.id, updateQuery, {
       new: true,
       runValidators: true,

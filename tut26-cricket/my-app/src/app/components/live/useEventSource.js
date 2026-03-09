@@ -10,10 +10,15 @@ export default function useEventSource({
   enabled = true,
 }) {
   const onMessageRef = useRef(onMessage);
+  const onErrorRef = useRef(onError);
 
   useEffect(() => {
     onMessageRef.current = onMessage;
   }, [onMessage]);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
 
   useEffect(() => {
     if (!enabled || !url) return undefined;
@@ -31,7 +36,7 @@ export default function useEventSource({
     source.addEventListener(event, handler);
     const errorHandler = (error) => {
       console.error("Live stream error:", error);
-      onError?.(error);
+      onErrorRef.current?.(error);
     };
 
     source.addEventListener("error", errorHandler);
@@ -41,5 +46,5 @@ export default function useEventSource({
       source.removeEventListener("error", errorHandler);
       source.close();
     };
-  }, [enabled, event, onError, url]);
+  }, [enabled, event, url]);
 }

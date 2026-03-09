@@ -1,13 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { FaArrowLeft, FaCheck, FaCopy } from "react-icons/fa";
+import AnnouncementControls from "../../../components/live/AnnouncementControls";
+import useAnnouncementSettings from "../../../components/live/useAnnouncementSettings";
 import useEventSource from "../../../components/live/useEventSource";
 import useLiveRelativeTime from "../../../components/live/useLiveRelativeTime";
+import useSpeechAnnouncer from "../../../components/live/useSpeechAnnouncer";
 import LiveScoreCard from "../../../components/session-view/LiveScoreCard";
 import SplashMsg from "../../../components/session-view/SplashMsg";
 import TeamInningsDetail from "../../../components/session-view/TeamInningsDetail";
+import {
+  buildCurrentScoreAnnouncement,
+  buildSpectatorAnnouncement,
+} from "../../../lib/live-announcements";
 import { getTeamBundle } from "../../../lib/team-utils";
 
 export default function ViewSessionPage() {
@@ -15,8 +22,12 @@ export default function ViewSessionPage() {
   const [copied, setCopied] = useState(false);
   const [data, setData] = useState(null);
   const [streamError, setStreamError] = useState("");
+  const lastAnnouncedEventRef = useRef("");
+  const previousEnabledRef = useRef(false);
   const router = useRouter();
   const liveUpdatedLabel = useLiveRelativeTime(data?.updatedAt);
+  const { settings, updateSetting } = useAnnouncementSettings("spectator");
+  const { speak } = useSpeechAnnouncer(settings);
 
   useEventSource({
     url: sessionId ? `/api/live/sessions/${sessionId}` : null,
@@ -35,6 +46,38 @@ export default function ViewSessionPage() {
 
   const sessionData = data?.session;
   const match = data?.match;
+
+  useEffect(() => {
+    if (!match || !settings.enabled || settings.mode === "silent") {
+      previousEnabledRef.current = settings.enabled;
+      return;
+    }
+
+    if (!previousEnabledRef.current && settings.enabled) {
+      speak(buildCurrentScoreAnnouncement(match), {
+        key: "spectator-current-score",
+        rate: 0.98,
+      });
+    }
+
+    previousEnabledRef.current = settings.enabled;
+  }, [match, settings.enabled, settings.mode, speak]);
+
+  useEffect(() => {
+    const event = match?.lastLiveEvent;
+    if (!event || !settings.enabled || settings.mode === "silent") return;
+    if (lastAnnouncedEventRef.current === event.id) return;
+
+    lastAnnouncedEventRef.current = event.id;
+    const line = buildSpectatorAnnouncement(event, match, settings.mode);
+    if (!line) return;
+
+    speak(line, {
+      key: event.id,
+      rate: 0.97,
+      minGapMs: 700,
+    });
+  }, [match, settings.enabled, settings.mode, speak]);
 
   useEffect(() => {
     if (match?.result) {
@@ -96,6 +139,21 @@ export default function ViewSessionPage() {
       </header>
 
       <LiveScoreCard match={match} />
+
+      <div className="w-full max-w-4xl mt-6">
+        <AnnouncementControls
+          title="Announce Score"
+          subtitle="Optional live voice updates for spectators."
+          settings={settings}
+          updateSetting={updateSetting}
+          onAnnounceNow={() =>
+            speak(buildCurrentScoreAnnouncement(match), {
+              key: "spectator-manual-score",
+              rate: 0.98,
+            })
+          }
+        />
+      </div>
 
       <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
         <TeamInningsDetail
