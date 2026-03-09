@@ -34,7 +34,7 @@ const SessionSchema = new mongoose.Schema(
     lastEventText: { type: String, default: "", trim: true },
     adminAccessVersion: { type: Number, default: 1 },
   },
-  { timestamps: true }
+  { timestamps: true, strict: true, strictQuery: true }
 );
 
 export default mongoose.models.Session ||

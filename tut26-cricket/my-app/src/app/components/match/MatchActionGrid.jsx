@@ -2,6 +2,7 @@
 
 import {
   FaBookOpen,
+  FaImage,
   FaInfoCircle,
   FaRegClock,
   FaShareAlt,
@@ -17,6 +18,7 @@ export default function MatchActionGrid({
   onEditOvers,
   onUndo,
   onHistory,
+  onImage,
   onShare,
   onRules,
 }) {
@@ -49,6 +51,12 @@ export default function MatchActionGrid({
           icon={<FaBookOpen />}
           label="History"
           colorClass="text-violet-400"
+        />
+        <ActionButton
+          onClick={onImage}
+          icon={<FaImage />}
+          label="Image"
+          colorClass="text-pink-400"
         />
         <ActionButton
           onClick={onShare}

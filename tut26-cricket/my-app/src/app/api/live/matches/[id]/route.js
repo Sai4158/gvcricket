@@ -1,5 +1,6 @@
 import { connectDB } from "../../../../lib/db";
 import { ensureLiveUpdates, subscribeToMatch } from "../../../../lib/live-updates";
+import { serializePublicMatch } from "../../../../lib/public-data";
 import Match from "../../../../../models/Match";
 
 export const runtime = "nodejs";
@@ -18,6 +19,7 @@ function encodeEvent(event, data) {
 }
 
 export async function GET(request, { params }) {
+  const { id } = await params;
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -34,16 +36,16 @@ export async function GET(request, { params }) {
         await ensureLiveUpdates();
 
         const pushMatch = async () => {
-          const match = await Match.findById(params.id).lean();
+          const match = await Match.findById(id).lean();
           send("match", {
-            match,
+            match: serializePublicMatch(match),
             updatedAt: new Date().toISOString(),
           });
         };
 
         await pushMatch();
 
-        cleanup = subscribeToMatch(params.id, async () => {
+        cleanup = subscribeToMatch(id, async () => {
           await pushMatch();
         });
 
@@ -57,7 +59,7 @@ export async function GET(request, { params }) {
           controller.close();
         });
       } catch (error) {
-        send("error", { message: error.message });
+        send("error", { message: "Live updates are temporarily unavailable." });
         if (heartbeat) clearInterval(heartbeat);
         cleanup();
         controller.close();

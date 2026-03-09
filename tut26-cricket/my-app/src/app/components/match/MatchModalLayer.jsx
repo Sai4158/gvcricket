@@ -4,6 +4,7 @@ import { AnimatePresence } from "framer-motion";
 import {
   HistoryModal,
   InningsEndModal,
+  MatchImageModal,
   ModalBase,
   RulesModal,
   RunInputModal,
@@ -20,6 +21,7 @@ export default function MatchModalLayer({
   infoText,
   onNext,
   onUpdate,
+  onImageUploaded,
   onScoreEvent,
   onClose,
   onInfoClose,
@@ -70,6 +72,13 @@ export default function MatchModalLayer({
           innings={match.innings}
           firstInningsOversPlayed={firstInningsOversPlayed}
           onUpdate={onUpdate}
+          onClose={onClose}
+        />
+      )}
+      {modalType === "image" && (
+        <MatchImageModal
+          match={match}
+          onUploaded={onImageUploaded}
           onClose={onClose}
         />
       )}

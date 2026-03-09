@@ -1,31 +1,58 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { jsonError, jsonRateLimit } from "../../../../lib/api-response";
+import { writeAuditLog } from "../../../../lib/audit-log";
+import { connectDB } from "../../../../lib/db";
 import {
+  getClearedMatchAccessCookie,
   getMatchAccessCookie,
   getMatchAccessCookieName,
   hasValidMatchAccess,
   isValidUmpirePin,
 } from "../../../../lib/match-access";
-import { writeAuditLog } from "../../../../lib/audit-log";
+import { pinPayloadSchema } from "../../../../lib/validators";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
-import { validatePinPayload } from "../../../../lib/validators";
+import { ensureSameOrigin, parseJsonRequest } from "../../../../lib/request-security";
+import Match from "../../../../../models/Match";
+
+async function loadMatchAccessState(matchId) {
+  await connectDB();
+  return Match.findById(matchId).select("_id adminAccessVersion");
+}
+
+async function hasAuthorizedCookie(matchId, accessVersion) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
+
+  return hasValidMatchAccess(matchId, token, accessVersion);
+}
 
 export async function GET(_req, { params }) {
-  const cookieStore = await cookies();
-  const cookieName = getMatchAccessCookieName(params.id);
-  const token = cookieStore.get(cookieName)?.value;
+  const { id } = await params;
+  const match = await loadMatchAccessState(id);
 
-  return NextResponse.json({
-    authorized: hasValidMatchAccess(params.id, token),
-  });
+  if (!match) {
+    return jsonError("Match not found.", 404);
+  }
+
+  return NextResponse.json(
+    {
+      authorized: await hasAuthorizedCookie(id, match.adminAccessVersion || 1),
+    },
+    {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    }
+  );
 }
 
 export async function POST(req, { params }) {
+  const { id } = await params;
   const meta = getRequestMeta(req);
   const pinAttemptLimit = enforceRateLimit({
-    key: `pin-attempt:${params.id}:${meta.ip}`,
+    key: `pin-attempt:${id}:${meta.ip}`,
     limit: 5,
     windowMs: 5 * 60 * 1000,
     blockMs: 2 * 60 * 1000,
@@ -35,7 +62,7 @@ export async function POST(req, { params }) {
     await writeAuditLog({
       action: "umpire_auth_rate_limited",
       targetType: "match",
-      targetId: params.id,
+      targetId: id,
       status: "failure",
       ip: meta.ip,
       userAgent: meta.userAgent,
@@ -48,27 +75,33 @@ export async function POST(req, { params }) {
     );
   }
 
-  const body = await req.json().catch(() => null);
-  const validation = validatePinPayload(body);
+  const parsedRequest = await parseJsonRequest(req, pinPayloadSchema, {
+    maxBytes: 2048,
+  });
 
-  if (!validation.ok) {
+  if (!parsedRequest.ok) {
     await writeAuditLog({
       action: "umpire_auth_invalid_payload",
       targetType: "match",
-      targetId: params.id,
+      targetId: id,
       status: "failure",
       ip: meta.ip,
       userAgent: meta.userAgent,
     });
 
-    return jsonError(validation.message, 400);
+    return jsonError(parsedRequest.message, parsedRequest.status);
   }
 
-  if (!isValidUmpirePin(validation.value.pin)) {
+  const match = await loadMatchAccessState(id);
+  if (!match) {
+    return jsonError("Match not found.", 404);
+  }
+
+  if (!isValidUmpirePin(parsedRequest.value.pin)) {
     await writeAuditLog({
       action: "umpire_auth_failed",
       targetType: "match",
-      targetId: params.id,
+      targetId: id,
       status: "failure",
       ip: meta.ip,
       userAgent: meta.userAgent,
@@ -77,14 +110,59 @@ export async function POST(req, { params }) {
     return jsonError("Incorrect PIN.", 401);
   }
 
-  const response = NextResponse.json({ authorized: true });
-  const matchCookie = getMatchAccessCookie(params.id);
+  const response = NextResponse.json(
+    { authorized: true },
+    {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    }
+  );
+  const matchCookie = getMatchAccessCookie(
+    id,
+    Number(match.adminAccessVersion || 1)
+  );
   response.cookies.set(matchCookie.name, matchCookie.value, matchCookie.options);
 
   await writeAuditLog({
     action: "umpire_auth_granted",
     targetType: "match",
-    targetId: params.id,
+    targetId: id,
+    status: "success",
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+  });
+
+  return response;
+}
+
+export async function DELETE(req, { params }) {
+  const { id } = await params;
+  const originCheck = ensureSameOrigin(req);
+  if (!originCheck.ok) {
+    return jsonError(originCheck.message, originCheck.status);
+  }
+
+  const response = NextResponse.json(
+    { authorized: false },
+    {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    }
+  );
+  const clearedCookie = getClearedMatchAccessCookie(id);
+  response.cookies.set(
+    clearedCookie.name,
+    clearedCookie.value,
+    clearedCookie.options
+  );
+
+  const meta = getRequestMeta(req);
+  await writeAuditLog({
+    action: "umpire_auth_logout",
+    targetType: "match",
+    targetId: id,
     status: "success",
     ip: meta.ip,
     userAgent: meta.userAgent,

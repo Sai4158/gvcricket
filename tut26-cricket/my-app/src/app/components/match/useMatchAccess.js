@@ -2,19 +2,19 @@
 
 import { useEffect, useState } from "react";
 
-export default function useMatchAccess(matchId) {
-  const [authStatus, setAuthStatus] = useState("checking");
+export default function useMatchAccess(matchId, initialAuthStatus = "checking") {
+  const [authStatus, setAuthStatus] = useState(initialAuthStatus);
   const [authError, setAuthError] = useState("");
   const [authSubmitting, setAuthSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!matchId) return;
+    if (!matchId || initialAuthStatus !== "checking") return;
 
     fetch(`/api/matches/${matchId}/auth`)
       .then((res) => res.json())
       .then((data) => setAuthStatus(data.authorized ? "granted" : "locked"))
       .catch(() => setAuthStatus("locked"));
-  }, [matchId]);
+  }, [initialAuthStatus, matchId]);
 
   const submitPin = async (pin) => {
     setAuthSubmitting(true);

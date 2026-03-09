@@ -1,381 +1,227 @@
-function isNonEmptyString(value) {
-  return typeof value === "string" && value.trim().length > 0;
+import sanitizeHtml from "sanitize-html";
+import { z } from "zod";
+import { isSafeMatchImageUrl } from "./match-image";
+import { formatZodError } from "./request-security";
+
+function sanitizePlainText(value) {
+  return sanitizeHtml(String(value || ""), {
+    allowedTags: [],
+    allowedAttributes: {},
+  })
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-function normalizePlayers(players) {
-  if (!Array.isArray(players)) return [];
-  return players
-    .map((player) => (typeof player === "string" ? player.trim() : ""))
-    .filter(Boolean);
-}
+function buildStringSchema({ min = 0, max = 120, allowEmpty = false } = {}) {
+  const schema = z
+    .string()
+    .max(max)
+    .transform((value) => sanitizePlainText(value));
 
-function isPlainObject(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function normalizeStringArray(values) {
-  if (!Array.isArray(values)) return null;
-  const normalized = values
-    .map((value) => (typeof value === "string" ? value.trim() : ""))
-    .filter(Boolean);
-  return normalized;
-}
-
-function validateHistory(history) {
-  if (!Array.isArray(history)) return false;
-
-  return history.every((over, overIndex) => {
-    if (
-      typeof over !== "object" ||
-      over === null ||
-      typeof over.overNumber !== "number" ||
-      over.overNumber < 1 ||
-      !Array.isArray(over.balls)
-    ) {
-      return false;
-    }
-
-    return over.balls.every((ball) => {
-      if (typeof ball !== "object" || ball === null) return false;
-      if (typeof ball.runs !== "number" || ball.runs < 0 || ball.runs > 7) {
-        return false;
-      }
-      if (typeof ball.isOut !== "boolean") return false;
-      if (
-        ball.extraType !== null &&
-        ball.extraType !== undefined &&
-        !["wide", "noball", "byes", "legbyes", ""].includes(ball.extraType)
-      ) {
-        return false;
-      }
-      if (
-        ball.batsmanOnStrike !== undefined &&
-        typeof ball.batsmanOnStrike !== "string"
-      ) {
-        return false;
-      }
-      return true;
+  if (allowEmpty) {
+    return schema.refine((value) => value.length <= max, {
+      message: "Value is too long.",
     });
+  }
+
+  return schema.refine((value) => value.length >= min, {
+    message: "Value is required.",
   });
 }
 
-function validateInnings(innings) {
-  if (typeof innings !== "object" || innings === null) return false;
-  if (innings.team !== undefined && typeof innings.team !== "string") return false;
-  if (typeof innings.score !== "number" || innings.score < 0) return false;
-  if (!validateHistory(innings.history || [])) return false;
-  return true;
-}
+const optionalStringSchema = buildStringSchema({ max: 240, allowEmpty: true });
+const requiredNameSchema = buildStringSchema({ min: 1, max: 80 });
+const playerNameSchema = buildStringSchema({ min: 1, max: 48 });
+const playerArraySchema = z.array(playerNameSchema).min(1).max(15);
+const oversSchema = z.number().int().min(1).max(50);
+const pinSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4,64}$/, "PIN is invalid.");
+const ballSchema = z
+  .object({
+    runs: z.number().int().min(0).max(7),
+    isOut: z.boolean().default(false),
+    extraType: z.enum(["wide", "noball", "byes", "legbyes"]).nullable().optional(),
+    batsmanOnStrike: optionalStringSchema.optional(),
+  })
+  .strict();
+const overSchema = z
+  .object({
+    overNumber: z.number().int().min(1),
+    balls: z.array(ballSchema).max(12),
+    bowler: optionalStringSchema.optional(),
+  })
+  .strict();
+const inningsSchema = z
+  .object({
+    team: optionalStringSchema.default(""),
+    score: z.number().int().min(0),
+    history: z.array(overSchema),
+  })
+  .strict();
 
-export function validateSessionCreatePayload(body) {
-  if (typeof body !== "object" || body === null) {
-    return { ok: false, message: "Invalid request body." };
-  }
+export const sessionCreateSchema = z
+  .object({
+    name: requiredNameSchema,
+    date: optionalStringSchema.default(""),
+  })
+  .strict();
 
-  if (!isNonEmptyString(body.name)) {
-    return { ok: false, message: "Session name is required." };
-  }
+export const setupMatchSchema = z
+  .object({
+    teamAName: requiredNameSchema,
+    teamBName: requiredNameSchema,
+    teamAPlayers: playerArraySchema,
+    teamBPlayers: playerArraySchema,
+    overs: z.coerce.number().int().min(1).max(50),
+  })
+  .strict();
 
-  if (body.date !== undefined && typeof body.date !== "string") {
-    return { ok: false, message: "Date must be a string." };
+export const pinPayloadSchema = z
+  .object({
+    pin: pinSchema,
+  })
+  .strict();
+
+export const sessionPatchObjectSchema = z
+  .object({
+    name: requiredNameSchema.optional(),
+    date: optionalStringSchema.optional(),
+    isLive: z.boolean().optional(),
+    overs: oversSchema.nullable().optional(),
+    teamAName: requiredNameSchema.optional(),
+    teamBName: requiredNameSchema.optional(),
+    teamA: playerArraySchema.optional(),
+    teamB: playerArraySchema.optional(),
+    tossWinner: optionalStringSchema.optional(),
+    announcerEnabled: z.boolean().optional(),
+    announcerMode: z.enum(["simple", "full", ""]).optional(),
+    matchImageUrl: optionalStringSchema
+      .refine((value) => !value || isSafeMatchImageUrl(value), {
+        message: "matchImageUrl is invalid.",
+      })
+      .optional(),
+    matchImagePublicId: optionalStringSchema.optional(),
+    matchImageUploadedAt: z.coerce.date().optional(),
+    matchImageUploadedBy: optionalStringSchema.optional(),
+    lastEventType: optionalStringSchema.optional(),
+    lastEventText: optionalStringSchema.optional(),
+    adminAccessVersion: z.number().int().min(0).optional(),
+  })
+  .strict();
+
+export const sessionPatchSchema = sessionPatchObjectSchema.refine(
+  (value) => Object.keys(value).length > 0,
+  {
+    message: "No valid session fields provided.",
+  });
+
+export const matchPatchObjectSchema = z
+  .object({
+    teamAName: requiredNameSchema.optional(),
+    teamBName: requiredNameSchema.optional(),
+    teamA: playerArraySchema.optional(),
+    teamB: playerArraySchema.optional(),
+    overs: oversSchema.optional(),
+    announcerEnabled: z.boolean().optional(),
+    announcerMode: z.enum(["simple", "full", ""]).optional(),
+  })
+  .strict();
+
+export const matchPatchSchema = matchPatchObjectSchema.refine(
+  (value) => Object.keys(value).length > 0,
+  {
+    message: "No valid match fields provided.",
+  });
+
+const actionBaseSchema = z.object({
+  actionId: z
+    .string()
+    .min(8)
+    .max(80)
+    .regex(/^[a-zA-Z0-9._:-]+$/, "actionId is invalid."),
+});
+
+export const matchActionSchema = z.discriminatedUnion("type", [
+  actionBaseSchema
+    .extend({
+      type: z.literal("score_ball"),
+      runs: z.number().int().min(0).max(7),
+      isOut: z.boolean().default(false),
+      extraType: z.enum(["wide", "noball"]).nullable().default(null),
+    })
+    .refine(
+      (value) => {
+        if (value.extraType === "wide" || value.extraType === "noball") {
+          return value.runs >= 1;
+        }
+
+        return value.runs <= 6;
+      },
+      {
+        message: "runs is invalid.",
+        path: ["runs"],
+      }
+    )
+    .strict(),
+  actionBaseSchema
+    .extend({
+      type: z.literal("undo_last"),
+    })
+    .strict(),
+  actionBaseSchema
+    .extend({
+      type: z.literal("complete_innings"),
+    })
+    .strict(),
+  actionBaseSchema
+    .extend({
+      type: z.literal("set_toss"),
+      tossWinner: requiredNameSchema,
+      tossDecision: z.enum(["bat", "bowl"]),
+    })
+    .strict(),
+]);
+
+function validateWithSchema(schema, body) {
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: formatZodError(parsed.error),
+    };
   }
 
   return {
     ok: true,
-    value: {
-      name: body.name.trim(),
-      date: typeof body.date === "string" ? body.date.trim() : "",
-    },
+    value: parsed.data,
   };
+}
+
+export function validateSessionCreatePayload(body) {
+  return validateWithSchema(sessionCreateSchema, body);
 }
 
 export function validateSetupMatchPayload(body) {
-  if (typeof body !== "object" || body === null) {
-    return { ok: false, message: "Invalid request body." };
-  }
-
-  const normalized = {
-    teamAName: typeof body.teamAName === "string" ? body.teamAName.trim() : "",
-    teamBName: typeof body.teamBName === "string" ? body.teamBName.trim() : "",
-    teamAPlayers: normalizePlayers(body.teamAPlayers),
-    teamBPlayers: normalizePlayers(body.teamBPlayers),
-    overs: Number(body.overs),
-  };
-
-  if (!normalized.teamAName || !normalized.teamBName) {
-    return { ok: false, message: "Each team must have a name." };
-  }
-
-  if (!normalized.teamAPlayers.length || !normalized.teamBPlayers.length) {
-    return { ok: false, message: "Each team must have at least one player." };
-  }
-
-  if (!Number.isInteger(normalized.overs) || normalized.overs < 1 || normalized.overs > 50) {
-    return { ok: false, message: "Overs must be a whole number between 1 and 50." };
-  }
-
-  return { ok: true, value: normalized };
+  return validateWithSchema(setupMatchSchema, body);
 }
 
 export function validatePinPayload(body) {
-  if (typeof body !== "object" || body === null) {
-    return { ok: false, message: "Invalid request body." };
-  }
-
-  const pin = typeof body.pin === "string" ? body.pin.trim() : "";
-
-  if (!pin) {
-    return { ok: false, message: "PIN is required." };
-  }
-
-  if (pin.length > 64) {
-    return { ok: false, message: "PIN is invalid." };
-  }
-
-  return { ok: true, value: { pin } };
+  return validateWithSchema(pinPayloadSchema, body);
 }
 
 export function validateSessionPatchPayload(body) {
-  if (typeof body !== "object" || body === null) {
-    return { ok: false, message: "Invalid request body." };
-  }
-
-  const allowed = {};
-
-  if ("name" in body) {
-    if (!isNonEmptyString(body.name)) {
-      return { ok: false, message: "Session name must be a non-empty string." };
-    }
-    allowed.name = body.name.trim();
-  }
-
-  if ("date" in body) {
-    if (typeof body.date !== "string") {
-      return { ok: false, message: "Session date must be a string." };
-    }
-    allowed.date = body.date.trim();
-  }
-
-  if ("isLive" in body) {
-    if (typeof body.isLive !== "boolean") {
-      return { ok: false, message: "Session live state must be boolean." };
-    }
-    allowed.isLive = body.isLive;
-  }
-
-  if ("overs" in body) {
-    if (
-      body.overs !== null &&
-      (!Number.isInteger(body.overs) || body.overs < 1 || body.overs > 50)
-    ) {
-      return { ok: false, message: "Session overs must be 1 to 50." };
-    }
-    allowed.overs = body.overs;
-  }
-
-  if ("teamAName" in body) {
-    if (typeof body.teamAName !== "string") {
-      return { ok: false, message: "Team A name must be a string." };
-    }
-    allowed.teamAName = body.teamAName.trim();
-  }
-
-  if ("teamBName" in body) {
-    if (typeof body.teamBName !== "string") {
-      return { ok: false, message: "Team B name must be a string." };
-    }
-    allowed.teamBName = body.teamBName.trim();
-  }
-
-  if ("teamA" in body) {
-    const players = normalizePlayers(body.teamA);
-    if (!players.length) {
-      return { ok: false, message: "Team A must include at least one player." };
-    }
-    allowed.teamA = players;
-  }
-
-  if ("teamB" in body) {
-    const players = normalizePlayers(body.teamB);
-    if (!players.length) {
-      return { ok: false, message: "Team B must include at least one player." };
-    }
-    allowed.teamB = players;
-  }
-
-  if ("tossWinner" in body) {
-    if (typeof body.tossWinner !== "string") {
-      return { ok: false, message: "Toss winner must be a string." };
-    }
-    allowed.tossWinner = body.tossWinner.trim();
-  }
-
-  if ("images" in body) {
-    const images = normalizeStringArray(body.images);
-    if (!images) {
-      return { ok: false, message: "images must be an array of strings." };
-    }
-    allowed.images = images;
-    allowed.mediaUpdatedAt = new Date();
-  }
-
-  if ("announcer" in body) {
-    if (!isPlainObject(body.announcer)) {
-      return { ok: false, message: "announcer must be an object." };
-    }
-    allowed.announcer = body.announcer;
-  }
-
-  if ("uiMeta" in body) {
-    if (!isPlainObject(body.uiMeta)) {
-      return { ok: false, message: "uiMeta must be an object." };
-    }
-    allowed.uiMeta = body.uiMeta;
-  }
-
-  if ("lastLiveEvent" in body) {
-    if (body.lastLiveEvent !== null && !isPlainObject(body.lastLiveEvent)) {
-      return { ok: false, message: "lastLiveEvent must be an object or null." };
-    }
-    allowed.lastLiveEvent = body.lastLiveEvent;
-  }
-
-  if (Object.keys(allowed).length === 0) {
-    return { ok: false, message: "No valid session fields provided." };
-  }
-
-  return { ok: true, value: allowed };
+  return validateWithSchema(sessionPatchSchema, body);
 }
 
 export function validateMatchPatchPayload(body) {
-  if (typeof body !== "object" || body === null) {
-    return { ok: false, message: "Invalid request body." };
-  }
-
-  const allowed = {};
-
-  const numericFields = ["score", "outs", "overs"];
-  for (const field of numericFields) {
-    if (field in body) {
-      if (!Number.isInteger(body[field]) || body[field] < 0) {
-        return { ok: false, message: `${field} must be a non-negative integer.` };
-      }
-      allowed[field] = body[field];
-    }
-  }
-
-  if ("result" in body) {
-    if (typeof body.result !== "string") {
-      return { ok: false, message: "result must be a string." };
-    }
-    allowed.result = body.result;
-  }
-
-  if ("isOngoing" in body) {
-    if (typeof body.isOngoing !== "boolean") {
-      return { ok: false, message: "isOngoing must be boolean." };
-    }
-    allowed.isOngoing = body.isOngoing;
-  }
-
-  if ("innings" in body) {
-    if (!["first", "second"].includes(body.innings)) {
-      return { ok: false, message: "innings must be first or second." };
-    }
-    allowed.innings = body.innings;
-  }
-
-  if ("tossWinner" in body) {
-    if (typeof body.tossWinner !== "string") {
-      return { ok: false, message: "tossWinner must be a string." };
-    }
-    allowed.tossWinner = body.tossWinner.trim();
-  }
-
-  if ("tossDecision" in body) {
-    if (!["bat", "bowl", ""].includes(body.tossDecision)) {
-      return { ok: false, message: "tossDecision must be bat or bowl." };
-    }
-    allowed.tossDecision = body.tossDecision;
-  }
-
-  if ("teamAName" in body) {
-    if (typeof body.teamAName !== "string") {
-      return { ok: false, message: "teamAName must be a string." };
-    }
-    allowed.teamAName = body.teamAName.trim();
-  }
-
-  if ("teamBName" in body) {
-    if (typeof body.teamBName !== "string") {
-      return { ok: false, message: "teamBName must be a string." };
-    }
-    allowed.teamBName = body.teamBName.trim();
-  }
-
-  if ("teamA" in body) {
-    const players = normalizePlayers(body.teamA);
-    if (!players.length) {
-      return { ok: false, message: "teamA must include at least one player." };
-    }
-    allowed.teamA = players;
-  }
-
-  if ("teamB" in body) {
-    const players = normalizePlayers(body.teamB);
-    if (!players.length) {
-      return { ok: false, message: "teamB must include at least one player." };
-    }
-    allowed.teamB = players;
-  }
-
-  if ("balls" in body) {
-    if (!Array.isArray(body.balls)) {
-      return { ok: false, message: "balls must be an array." };
-    }
-    allowed.balls = body.balls;
-  }
-
-  if ("images" in body) {
-    const images = normalizeStringArray(body.images);
-    if (!images) {
-      return { ok: false, message: "images must be an array of strings." };
-    }
-    allowed.images = images;
-    allowed.mediaUpdatedAt = new Date();
-  }
-
-  if ("announcer" in body) {
-    if (!isPlainObject(body.announcer)) {
-      return { ok: false, message: "announcer must be an object." };
-    }
-    allowed.announcer = body.announcer;
-  }
-
-  if ("uiMeta" in body) {
-    if (!isPlainObject(body.uiMeta)) {
-      return { ok: false, message: "uiMeta must be an object." };
-    }
-    allowed.uiMeta = body.uiMeta;
-  }
-
-  if ("innings1" in body) {
-    if (!validateInnings(body.innings1)) {
-      return { ok: false, message: "innings1 is invalid." };
-    }
-    allowed.innings1 = body.innings1;
-  }
-
-  if ("innings2" in body) {
-    if (!validateInnings(body.innings2)) {
-      return { ok: false, message: "innings2 is invalid." };
-    }
-    allowed.innings2 = body.innings2;
-  }
-
-  if (Object.keys(allowed).length === 0) {
-    return { ok: false, message: "No valid updatable fields provided." };
-  }
-
-  return { ok: true, value: allowed };
+  return validateWithSchema(matchPatchSchema, body);
 }
+
+export function validateMatchActionPayload(body) {
+  return validateWithSchema(matchActionSchema, body);
+}
+
+export { inningsSchema, oversSchema, pinSchema };

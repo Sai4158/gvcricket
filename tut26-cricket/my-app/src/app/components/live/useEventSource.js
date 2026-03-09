@@ -24,6 +24,7 @@ export default function useEventSource({
     if (!enabled || !url) return undefined;
 
     const source = new EventSource(url);
+    let closed = false;
     const handler = (message) => {
       try {
         const data = JSON.parse(message.data);
@@ -35,13 +36,16 @@ export default function useEventSource({
 
     source.addEventListener(event, handler);
     const errorHandler = (error) => {
-      console.error("Live stream error:", error);
+      if (closed || source.readyState === EventSource.CLOSED) {
+        return;
+      }
       onErrorRef.current?.(error);
     };
 
     source.addEventListener("error", errorHandler);
 
     return () => {
+      closed = true;
       source.removeEventListener(event, handler);
       source.removeEventListener("error", errorHandler);
       source.close();

@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { FaTimes } from "react-icons/fa";
 import { Ball } from "./MatchBallHistory";
+import MatchImageUploader from "./MatchImageUploader";
 
 export function ModalBase({ children, title, onExit }) {
   return (
@@ -38,17 +39,17 @@ export function ModalBase({ children, title, onExit }) {
 export function RunInputModal({ title, onConfirm, onClose }) {
   const options =
     title === "Wide"
-      ? [0, 1]
+      ? [1, 2, 3, 4, 5]
       : title === "OUT"
       ? [0, 1, 2, 3]
-      : [0, 1, 2, 3, 4, 6];
+      : [1, 2, 3, 4, 5, 7];
 
   return (
     <ModalBase title={title} onExit={onClose}>
       <p className="text-zinc-300 text-center mb-6 font-semibold">
         {title === "OUT"
           ? "How many runs were completed on the wicket?"
-          : `How many runs should be added for this ${title.toLowerCase()}?`}
+          : `How many total runs should be added for this ${title.toLowerCase()}?`}
       </p>
       <div className="flex flex-col items-center gap-3">
         {options.map((runs) => (
@@ -126,6 +127,27 @@ export function InningsEndModal({ match, onNext }) {
           ? "Start Second Innings"
           : "View Final Results"}
       </button>
+    </ModalBase>
+  );
+}
+
+export function MatchImageModal({ match, onUploaded, onClose }) {
+  return (
+    <ModalBase
+      title={match?.matchImageUrl ? "Replace Match Image" : "Add Match Image"}
+      onExit={onClose}
+    >
+      <MatchImageUploader
+        matchId={String(match._id)}
+        existingImageUrl={match?.matchImageUrl || ""}
+        onUploaded={(updatedMatch) => {
+          onUploaded(updatedMatch);
+          onClose();
+        }}
+        title={match?.matchImageUrl ? "Replace the current image" : "Upload a match image"}
+        description="Upload a team photo, ground photo, poster, or winning team picture. Safe raster images only."
+        primaryLabel={match?.matchImageUrl ? "Replace Image" : "Upload Image"}
+      />
     </ModalBase>
   );
 }

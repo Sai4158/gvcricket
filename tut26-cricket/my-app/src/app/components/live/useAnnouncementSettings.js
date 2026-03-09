@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 
 const DEFAULTS = {
   spectator: {
@@ -19,42 +19,90 @@ const DEFAULTS = {
   },
 };
 
-export default function useAnnouncementSettings(role) {
-  const storageKey = `gv-announcer-${role}`;
-  const [settings, setSettings] = useState(() => {
-    if (typeof window === "undefined") {
-      return DEFAULTS[role];
-    }
+function getStorageKey(role) {
+  return `gv-announcer-${role}`;
+}
 
-    try {
-      const stored = window.localStorage.getItem(storageKey);
-      if (!stored) {
-        return DEFAULTS[role];
+function readRawValue(role) {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return window.localStorage.getItem(getStorageKey(role)) || "";
+}
+
+export default function useAnnouncementSettings(role) {
+  const subscribe = useMemo(
+    () => (onStoreChange) => {
+      if (typeof window === "undefined") {
+        return () => {};
       }
 
-      return {
-        ...DEFAULTS[role],
-        ...JSON.parse(stored),
+      const handleStorage = (event) => {
+        if (!event.key || event.key === getStorageKey(role)) {
+          onStoreChange();
+        }
       };
+
+      const handleCustom = (event) => {
+        if (event.detail?.role === role) {
+          onStoreChange();
+        }
+      };
+
+      window.addEventListener("storage", handleStorage);
+      window.addEventListener("gv-announcer-change", handleCustom);
+
+      return () => {
+        window.removeEventListener("storage", handleStorage);
+        window.removeEventListener("gv-announcer-change", handleCustom);
+      };
+    },
+    [role]
+  );
+
+  const rawValue = useSyncExternalStore(
+    subscribe,
+    () => readRawValue(role),
+    () => ""
+  );
+
+  const settings = useMemo(() => {
+    try {
+      return rawValue
+        ? {
+            ...DEFAULTS[role],
+            ...JSON.parse(rawValue),
+          }
+        : DEFAULTS[role];
     } catch (error) {
       console.error("Failed to load announcer settings:", error);
       return DEFAULTS[role];
     }
-  });
+  }, [rawValue, role]);
 
-  useEffect(() => {
+  const updateSetting = (key, value) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
     try {
-      window.localStorage.setItem(storageKey, JSON.stringify(settings));
+      const nextSettings = {
+        ...settings,
+        [key]: value,
+      };
+      window.localStorage.setItem(
+        getStorageKey(role),
+        JSON.stringify(nextSettings)
+      );
+      window.dispatchEvent(
+        new CustomEvent("gv-announcer-change", {
+          detail: { role },
+        })
+      );
     } catch (error) {
       console.error("Failed to save announcer settings:", error);
     }
-  }, [settings, storageKey]);
-
-  const updateSetting = (key, value) => {
-    setSettings((current) => ({
-      ...current,
-      [key]: value,
-    }));
   };
 
   return {

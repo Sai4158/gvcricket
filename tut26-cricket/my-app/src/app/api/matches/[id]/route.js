@@ -4,241 +4,211 @@ import { jsonError, jsonRateLimit } from "../../../lib/api-response";
 import { writeAuditLog } from "../../../lib/audit-log";
 import { connectDB } from "../../../lib/db";
 import {
+  applySafeMatchPatch,
+  buildSessionMirrorUpdate,
+  MatchEngineError,
+} from "../../../lib/match-engine";
+import {
+  getClearedMatchAccessCookie,
   getMatchAccessCookieName,
   hasValidMatchAccess,
 } from "../../../lib/match-access";
+import { serializePublicMatch } from "../../../lib/public-data";
 import { getRequestMeta } from "../../../lib/request-meta";
 import { enforceRateLimit } from "../../../lib/rate-limit";
-import { validateMatchPatchPayload } from "../../../lib/validators";
+import {
+  ensureSameOrigin,
+  parseJsonRequest,
+} from "../../../lib/request-security";
+import { matchPatchSchema } from "../../../lib/validators";
 import Match from "../../../../models/Match";
 import Session from "../../../../models/Session";
 
-async function requireMatchAccess(matchId) {
+async function hasMatchAccess(matchId, accessVersion) {
   const cookieStore = await cookies();
-  const accessCookie = cookieStore.get(getMatchAccessCookieName(matchId));
-
-  return hasValidMatchAccess(matchId, accessCookie?.value);
+  const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
+  return hasValidMatchAccess(matchId, token, accessVersion);
 }
 
 export async function GET(_req, { params }) {
   try {
+    const { id } = await params;
     await connectDB();
-    const match = await Match.findById(params.id);
+    const match = await Match.findById(id);
 
     if (!match) {
-      return NextResponse.json({ message: "Match not found" }, { status: 404 });
+      return jsonError("Match not found.", 404);
     }
 
-    return NextResponse.json(match, { status: 200 });
-  } catch (error) {
-    return NextResponse.json(
-      { message: "Error fetching match", error: error.message },
-      { status: 500 }
-    );
+    return Response.json(serializePublicMatch(match), {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch {
+    return jsonError("Could not load match.", 500);
   }
 }
 
 export async function PATCH(req, { params }) {
-  try {
-    const meta = getRequestMeta(req);
-    const hasAccess = await requireMatchAccess(params.id);
+  const { id } = await params;
+  const meta = getRequestMeta(req);
+  const updateLimit = enforceRateLimit({
+    key: `match-admin-patch:${id}:${meta.ip}`,
+    limit: 8,
+    windowMs: 60 * 1000,
+    blockMs: 60 * 1000,
+  });
 
+  if (!updateLimit.allowed) {
+    await writeAuditLog({
+        action: "match_patch_rate_limited",
+        targetType: "match",
+        targetId: id,
+      status: "failure",
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      metadata: { retryAfterMs: updateLimit.retryAfterMs },
+    });
+
+    return jsonRateLimit(
+      "Too many admin updates. Try again shortly.",
+      updateLimit.retryAfterMs
+    );
+  }
+
+  try {
+    const parsedRequest = await parseJsonRequest(req, matchPatchSchema, {
+      maxBytes: 16 * 1024,
+    });
+    if (!parsedRequest.ok) {
+      return jsonError(parsedRequest.message, parsedRequest.status);
+    }
+
+    await connectDB();
+    const match = await Match.findById(id);
+    if (!match) {
+      return jsonError("Match not found.", 404);
+    }
+
+    const hasAccess = await hasMatchAccess(
+      id,
+      Number(match.adminAccessVersion || 1)
+    );
     if (!hasAccess) {
       await writeAuditLog({
         action: "match_patch_denied",
         targetType: "match",
-        targetId: params.id,
+        targetId: id,
         status: "failure",
         ip: meta.ip,
         userAgent: meta.userAgent,
       });
 
-      return jsonError("Umpire access required", 403);
+      return jsonError("Umpire access required.", 403);
     }
 
-    const updateLimit = enforceRateLimit({
-      key: `match-patch:${params.id}:${meta.ip}`,
-      limit: 12,
-      windowMs: 1000,
-      blockMs: 3000,
+    const nextState = applySafeMatchPatch(match, parsedRequest.value);
+    match.teamA = nextState.teamA;
+    match.teamB = nextState.teamB;
+    match.teamAName = nextState.teamAName;
+    match.teamBName = nextState.teamBName;
+    match.overs = nextState.overs;
+    match.tossWinner = nextState.tossWinner;
+    match.innings1 = nextState.innings1;
+    match.innings2 = nextState.innings2;
+    match.announcerEnabled = nextState.announcerEnabled;
+    match.announcerMode = nextState.announcerMode;
+    await match.save();
+
+    await Session.findByIdAndUpdate(match.sessionId, {
+      $set: buildSessionMirrorUpdate(match),
     });
-
-    if (!updateLimit.allowed) {
-      await writeAuditLog({
-        action: "match_patch_rate_limited",
-        targetType: "match",
-        targetId: params.id,
-        status: "failure",
-        ip: meta.ip,
-        userAgent: meta.userAgent,
-        metadata: { retryAfterMs: updateLimit.retryAfterMs },
-      });
-
-      return jsonRateLimit(
-        "Too many scoring updates. Slow down briefly.",
-        updateLimit.retryAfterMs
-      );
-    }
-
-    const data = await req.json().catch(() => null);
-    const validation = validateMatchPatchPayload(data);
-
-    if (!validation.ok) {
-      return jsonError(validation.message, 400);
-    }
-
-    const changedFields = Object.keys(validation.value);
-    const isMediaUpdate = changedFields.some(
-      (field) =>
-        field.toLowerCase().includes("image") ||
-        field.toLowerCase().includes("media")
-    );
-
-    if (isMediaUpdate) {
-      const mediaLimit = enforceRateLimit({
-        key: `match-media:${params.id}:${meta.ip}`,
-        limit: 5,
-        windowMs: 60 * 1000,
-        blockMs: 60 * 1000,
-      });
-
-      if (!mediaLimit.allowed) {
-        return jsonRateLimit(
-          "Too many media update attempts. Try again shortly.",
-          mediaLimit.retryAfterMs
-        );
-      }
-    }
-
-    await connectDB();
-
-    const updateQuery = { $set: {} };
-    for (const key in validation.value) {
-      updateQuery.$set[key] = validation.value[key];
-    }
-
-    const scoringFields = ["score", "outs", "balls", "innings1", "innings2", "innings"];
-    const includesScoringChange = changedFields.some((field) =>
-      scoringFields.includes(field)
-    );
-
-    if (includesScoringChange) {
-      const nextScore =
-        typeof updateQuery.$set.score === "number" ? updateQuery.$set.score : null;
-      const nextOuts =
-        typeof updateQuery.$set.outs === "number" ? updateQuery.$set.outs : null;
-
-      if (!("lastLiveEvent" in updateQuery.$set)) {
-        updateQuery.$set.lastLiveEvent = {
-          type: "score_update",
-          createdAt: new Date(),
-          score: nextScore,
-          outs: nextOuts,
-        };
-      }
-    }
-
-    if (updateQuery.$set.lastLiveEvent) {
-      updateQuery.$set.lastEventType =
-        updateQuery.$set.lastLiveEvent.type || "";
-      updateQuery.$set.lastEventText =
-        updateQuery.$set.lastLiveEvent.summaryText || "";
-    }
-
-    const updated = await Match.findByIdAndUpdate(params.id, updateQuery, {
-      new: true,
-      runValidators: true,
-    });
-
-    if (!updated) {
-      return jsonError("Match not found for update", 404);
-    }
-
-    const sessionUpdate = {};
-
-    if ("teamA" in updateQuery.$set) sessionUpdate.teamA = updated.teamA;
-    if ("teamB" in updateQuery.$set) sessionUpdate.teamB = updated.teamB;
-    if ("teamAName" in updateQuery.$set) sessionUpdate.teamAName = updated.teamAName;
-    if ("teamBName" in updateQuery.$set) sessionUpdate.teamBName = updated.teamBName;
-    if ("overs" in updateQuery.$set) sessionUpdate.overs = updated.overs;
-    if ("tossWinner" in updateQuery.$set) {
-      sessionUpdate.tossWinner = updated.tossWinner;
-    }
-    if ("isOngoing" in updateQuery.$set) {
-      sessionUpdate.isLive = updated.isOngoing;
-    }
-
-    if (Object.keys(sessionUpdate).length > 0) {
-      await Session.findByIdAndUpdate(updated.sessionId, {
-        $set: sessionUpdate,
-      });
-    }
 
     await writeAuditLog({
-      action: isMediaUpdate ? "match_media_edit" : "match_patch",
+      action: "match_patch",
       targetType: "match",
-      targetId: params.id,
+      targetId: id,
       status: "success",
       ip: meta.ip,
       userAgent: meta.userAgent,
-      metadata: { fields: changedFields },
+      metadata: { fields: Object.keys(parsedRequest.value) },
     });
 
-    return NextResponse.json(updated, { status: 200 });
+    return Response.json(serializePublicMatch(match), {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
   } catch (error) {
-    if (error.name === "ValidationError") {
-      return NextResponse.json(
-        { message: "Validation Error", error: error.message },
-        { status: 400 }
-      );
+    if (error instanceof MatchEngineError) {
+      return jsonError(error.message, error.status);
     }
 
-    return NextResponse.json(
-      { message: "Error updating match", error: error.message },
-      { status: 500 }
-    );
+    return jsonError("Could not update match.", 500);
   }
 }
 
-export async function DELETE(_req, { params }) {
-  try {
-    const meta = getRequestMeta(_req);
-    const hasAccess = await requireMatchAccess(params.id);
+export async function DELETE(req, { params }) {
+  const { id } = await params;
+  const originCheck = ensureSameOrigin(req);
+  if (!originCheck.ok) {
+    return jsonError(originCheck.message, originCheck.status);
+  }
 
+  const meta = getRequestMeta(req);
+
+  try {
+    await connectDB();
+    const match = await Match.findById(id);
+    if (!match) {
+      return jsonError("Match not found.", 404);
+    }
+
+    const hasAccess = await hasMatchAccess(
+      id,
+      Number(match.adminAccessVersion || 1)
+    );
     if (!hasAccess) {
       await writeAuditLog({
         action: "match_delete_denied",
         targetType: "match",
-        targetId: params.id,
+        targetId: id,
         status: "failure",
         ip: meta.ip,
         userAgent: meta.userAgent,
       });
 
-      return jsonError("Umpire access required", 403);
+      return jsonError("Umpire access required.", 403);
     }
 
-    await connectDB();
-    const deletedMatch = await Match.findByIdAndDelete(params.id);
-
-    if (!deletedMatch) {
-      return jsonError("Match not found", 404);
-    }
+    await Session.findByIdAndUpdate(match.sessionId, {
+      $set: {
+        match: null,
+        isLive: false,
+      },
+    });
+    await Match.findByIdAndDelete(id);
 
     await writeAuditLog({
       action: "match_delete",
       targetType: "match",
-      targetId: params.id,
+      targetId: id,
       status: "success",
       ip: meta.ip,
       userAgent: meta.userAgent,
     });
 
-    return new Response(null, { status: 204 });
-  } catch (error) {
-    return NextResponse.json(
-      { message: "Error deleting match", error: error.message },
-      { status: 500 }
+    const response = new NextResponse(null, { status: 204 });
+    const clearedCookie = getClearedMatchAccessCookie(id);
+    response.headers.set("Cache-Control", "no-store");
+    response.cookies.set(
+      clearedCookie.name,
+      clearedCookie.value,
+      clearedCookie.options
     );
+    return response;
+  } catch {
+    return jsonError("Could not delete match.", 500);
   }
 }

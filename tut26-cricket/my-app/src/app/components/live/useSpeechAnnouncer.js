@@ -5,6 +5,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 function pickAmericanVoice(voices) {
   const preferredNames = [
     "Google US English",
+    "Microsoft Jenny Online",
+    "Microsoft Aria Online",
+    "Microsoft Guy Online",
     "Microsoft Jenny",
     "Microsoft Aria",
     "Microsoft Guy",
@@ -26,28 +29,15 @@ function pickAmericanVoice(voices) {
   );
 }
 
-function playAccessibilityChime(volume) {
-  if (typeof window === "undefined") return;
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) return;
-
-  const ctx = new AudioContextClass();
-  const oscillator = ctx.createOscillator();
-  const gain = ctx.createGain();
-  oscillator.type = "sine";
-  oscillator.frequency.setValueAtTime(880, ctx.currentTime);
-  oscillator.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.15);
-  gain.gain.setValueAtTime(Math.max(0.02, volume * 0.08), ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.2);
-  oscillator.connect(gain);
-  gain.connect(ctx.destination);
-  oscillator.start();
-  oscillator.stop(ctx.currentTime + 0.2);
-}
-
 export default function useSpeechAnnouncer(settings) {
   const [voice, setVoice] = useState(null);
+  const [status, setStatus] = useState(() => {
+    if (typeof window === "undefined") return "idle";
+    return window.speechSynthesis ? "idle" : "unsupported";
+  });
   const lastSpokenRef = useRef({ key: "", at: 0 });
+  const isPrimedRef = useRef(false);
+  const pendingSpeakRef = useRef(null);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.speechSynthesis) return undefined;
@@ -55,6 +45,7 @@ export default function useSpeechAnnouncer(settings) {
     const assignVoice = () => {
       const voices = window.speechSynthesis.getVoices();
       setVoice(pickAmericanVoice(voices));
+      setStatus((current) => (current === "unsupported" ? current : "ready"));
     };
 
     assignVoice();
@@ -63,49 +54,171 @@ export default function useSpeechAnnouncer(settings) {
       window.speechSynthesis.removeEventListener("voiceschanged", assignVoice);
   }, []);
 
-  const speak = useCallback((text, options = {}) => {
-    if (
-      !text ||
-      !settings.enabled ||
-      settings.muted ||
-      settings.mode === "silent" ||
-      typeof window === "undefined" ||
-      !window.speechSynthesis
-    ) {
-      return;
-    }
-
-    const key = options.key || text;
-    const now = Date.now();
-    const minGap = options.minGapMs ?? 450;
-    if (
-      lastSpokenRef.current.key === key &&
-      now - lastSpokenRef.current.at < minGap
-    ) {
-      return;
-    }
-
-    lastSpokenRef.current = { key, at: now };
-
-    if (options.interrupt !== false) {
-      window.speechSynthesis.cancel();
-    }
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.voice = voice;
-    utterance.lang = voice?.lang || "en-US";
-    utterance.rate = options.rate ?? 1;
-    utterance.pitch = options.pitch ?? 1;
-    utterance.volume = settings.volume;
-    window.speechSynthesis.speak(utterance);
-
-    if (settings.accessibilityMode) {
-      if (navigator.vibrate) {
-        navigator.vibrate([50, 30, 70]);
+  const performSpeak = useCallback(
+    (text, options = {}) => {
+      if (
+        !text ||
+        !settings.enabled ||
+        settings.muted ||
+        settings.mode === "silent" ||
+        typeof window === "undefined" ||
+        !window.speechSynthesis
+      ) {
+        return false;
       }
-      playAccessibilityChime(settings.volume);
-    }
-  }, [settings.accessibilityMode, settings.enabled, settings.mode, settings.muted, settings.volume, voice]);
 
-  return { speak };
+      const key = options.key || text;
+      const now = Date.now();
+      const minGap = options.minGapMs ?? 450;
+      if (
+        lastSpokenRef.current.key === key &&
+        now - lastSpokenRef.current.at < minGap
+      ) {
+        return false;
+      }
+
+      lastSpokenRef.current = { key, at: now };
+
+      if (options.interrupt !== false) {
+        window.speechSynthesis.cancel();
+      }
+
+      try {
+        window.speechSynthesis.resume?.();
+      } catch {
+        // Ignore resume failures and try to speak anyway.
+      }
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.voice = voice;
+      utterance.lang = voice?.lang || "en-US";
+      utterance.rate = options.rate ?? 1;
+      utterance.pitch = options.pitch ?? 1;
+      utterance.volume = settings.volume;
+      utterance.onstart = () => setStatus("speaking");
+      utterance.onend = () => setStatus("ready");
+      utterance.onerror = () => {
+        setStatus("blocked");
+      };
+
+      window.speechSynthesis.speak(utterance);
+
+      return true;
+    },
+    [
+      settings.enabled,
+      settings.mode,
+      settings.muted,
+      settings.volume,
+      voice,
+    ]
+  );
+
+  const prime = useCallback(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+      setStatus("unsupported");
+      return false;
+    }
+
+    try {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.resume?.();
+
+      const unlockUtterance = new SpeechSynthesisUtterance(" ");
+      unlockUtterance.volume = 0;
+      unlockUtterance.rate = 1;
+      unlockUtterance.pitch = 1;
+      window.speechSynthesis.speak(unlockUtterance);
+      window.speechSynthesis.cancel();
+
+      isPrimedRef.current = true;
+      setStatus("ready");
+
+      if (pendingSpeakRef.current) {
+        const nextPending = pendingSpeakRef.current;
+        pendingSpeakRef.current = null;
+        performSpeak(nextPending.text, nextPending.options);
+      }
+
+      return true;
+    } catch {
+      setStatus("blocked");
+      return false;
+    }
+  }, [performSpeak]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return undefined;
+
+    const primeFromGesture = () => {
+      if (!isPrimedRef.current) {
+        prime();
+      }
+    };
+
+    window.addEventListener("pointerdown", primeFromGesture, { passive: true });
+    window.addEventListener("keydown", primeFromGesture);
+    window.addEventListener("touchstart", primeFromGesture, { passive: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", primeFromGesture);
+      window.removeEventListener("keydown", primeFromGesture);
+      window.removeEventListener("touchstart", primeFromGesture);
+    };
+  }, [prime]);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || typeof window === "undefined") {
+      return undefined;
+    }
+
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        try {
+          window.speechSynthesis?.resume?.();
+        } catch {
+          // Ignore resume failures after tab restore.
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
+
+  const speak = useCallback(
+    (text, options = {}) => {
+      if (options.userGesture) {
+        prime();
+      }
+
+      if (!isPrimedRef.current && !options.userGesture) {
+        pendingSpeakRef.current = { text, options };
+        setStatus("waiting_for_gesture");
+        return false;
+      }
+
+      return performSpeak(text, options);
+    },
+    [performSpeak, prime]
+  );
+
+  const stop = useCallback(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+      return;
+    }
+
+    pendingSpeakRef.current = null;
+    window.speechSynthesis.cancel();
+    setStatus((current) => (current === "unsupported" ? current : "ready"));
+  }, []);
+
+  return {
+    speak,
+    prime,
+    stop,
+    isSupported: status !== "unsupported",
+    status,
+    voiceName: voice?.name || "",
+  };
 }

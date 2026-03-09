@@ -1,8 +1,9 @@
+import crypto from "node:crypto";
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
 import { jsonError, jsonRateLimit } from "../../../../lib/api-response";
 import { writeAuditLog } from "../../../../lib/audit-log";
 import { connectDB } from "../../../../lib/db";
+import { buildSessionMirrorUpdate } from "../../../../lib/match-engine";
 import {
   getMatchAccessCookieName,
   hasValidMatchAccess,
@@ -12,45 +13,83 @@ import {
   normalizeMatchImageMetadata,
   validateMatchImageBuffer,
 } from "../../../../lib/match-image";
+import { serializePublicMatch } from "../../../../lib/public-data";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
+import { parseMultipartRequest } from "../../../../lib/request-security";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 
 export const runtime = "nodejs";
 
-async function requireMatchAccess(matchId) {
+async function hasMatchAccess(matchId, accessVersion) {
   const cookieStore = await cookies();
-  const accessCookie = cookieStore.get(getMatchAccessCookieName(matchId));
-  return hasValidMatchAccess(matchId, accessCookie?.value);
+  const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
+  return hasValidMatchAccess(matchId, token, accessVersion);
+}
+
+function getSafeUploadName(file) {
+  const extension = String(file?.name || "")
+    .split(".")
+    .pop()
+    ?.toLowerCase();
+  const safeExtension = ["jpg", "jpeg", "png", "webp"].includes(extension)
+    ? extension
+    : "jpg";
+
+  return `match-${crypto.randomBytes(8).toString("hex")}.${safeExtension}`;
 }
 
 export async function POST(req, { params }) {
+  const { id } = await params;
   const meta = getRequestMeta(req);
+  const uploadLimit = enforceRateLimit({
+    key: `match-image:${id}:${meta.ip}`,
+    limit: 4,
+    windowMs: 60 * 1000,
+    blockMs: 60 * 1000,
+  });
 
-  try {
-    const hasAccess = await requireMatchAccess(params.id);
-    if (!hasAccess) {
-      return jsonError("Umpire access required", 403);
-    }
-
-    const uploadLimit = enforceRateLimit({
-      key: `match-image:${params.id}:${meta.ip}`,
-      limit: 4,
-      windowMs: 60 * 1000,
-      blockMs: 60 * 1000,
+  if (!uploadLimit.allowed) {
+    await writeAuditLog({
+      action: "match_media_rate_limited",
+      targetType: "match",
+      targetId: id,
+      status: "failure",
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      metadata: { retryAfterMs: uploadLimit.retryAfterMs },
     });
 
-    if (!uploadLimit.allowed) {
-      return jsonRateLimit(
-        "Too many image uploads. Try again shortly.",
-        uploadLimit.retryAfterMs
-      );
+    return jsonRateLimit(
+      "Too many image uploads. Try again shortly.",
+      uploadLimit.retryAfterMs
+    );
+  }
+
+  try {
+    const parsedRequest = await parseMultipartRequest(req, {
+      maxBytes: 6 * 1024 * 1024,
+    });
+    if (!parsedRequest.ok) {
+      return jsonError(parsedRequest.message, parsedRequest.status);
     }
 
-    const formData = await req.formData();
-    const file = formData.get("image");
+    await connectDB();
+    const match = await Match.findById(id);
+    if (!match) {
+      return jsonError("Match not found.", 404);
+    }
 
+    const hasAccess = await hasMatchAccess(
+      id,
+      Number(match.adminAccessVersion || 1)
+    );
+    if (!hasAccess) {
+      return jsonError("Umpire access required.", 403);
+    }
+
+    const file = parsedRequest.value.get("image");
     if (!(file instanceof File)) {
       return jsonError("An image file is required.", 400);
     }
@@ -58,103 +97,87 @@ export async function POST(req, { params }) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const validation = validateMatchImageBuffer(buffer, file.type);
-
     if (!validation.ok) {
       return jsonError(validation.message, 400);
     }
 
     const imgbbKey = process.env.IMGBB_API_KEY;
     if (!imgbbKey) {
-      return jsonError("Image storage is not configured.", 500);
+      return jsonError("Image uploads are not configured.", 500);
     }
 
+    const safeName = getSafeUploadName(file);
     const uploadForm = new FormData();
-    uploadForm.append("image", new Blob([buffer], { type: file.type }), file.name);
-    uploadForm.append("name", file.name.replace(/\.[^.]+$/, ""));
+    uploadForm.append("image", new Blob([buffer], { type: file.type }), safeName);
+    uploadForm.append("name", safeName.replace(/\.[^.]+$/, ""));
 
     const uploadResponse = await fetch(
-      `https://api.imgbb.com/1/upload?key=${imgbbKey}`,
+      `https://api.imgbb.com/1/upload?key=${encodeURIComponent(imgbbKey)}`,
       {
         method: "POST",
         body: uploadForm,
       }
     );
+    const uploadJson = await uploadResponse.json().catch(() => null);
 
-    const uploadJson = await uploadResponse.json();
     if (!uploadResponse.ok || !uploadJson?.success) {
-      throw new Error(uploadJson?.error?.message || "Image upload failed.");
+      throw new Error("Remote image upload failed.");
     }
 
     const imageMetadata = normalizeMatchImageMetadata(uploadJson.data);
     if (!isSafeMatchImageUrl(imageMetadata.matchImageUrl)) {
-      throw new Error("Upload provider returned an unsafe image URL.");
+      throw new Error("Remote image URL was rejected.");
     }
 
-    await connectDB();
-    const updatedMatch = await Match.findByIdAndUpdate(
-      params.id,
-      {
-        $set: {
-          ...imageMetadata,
-          matchImageUploadedBy: "admin",
-          mediaUpdatedAt: new Date(),
-          lastEventType: "image_update",
-          lastEventText: "Match image updated.",
-          lastLiveEvent: {
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            type: "image_update",
-            summaryText: "Match image updated.",
-            createdAt: new Date().toISOString(),
-          },
-        },
-      },
-      { new: true, runValidators: true }
-    );
+    match.matchImageUrl = imageMetadata.matchImageUrl;
+    match.matchImagePublicId = imageMetadata.matchImagePublicId;
+    match.matchImageUploadedAt = imageMetadata.matchImageUploadedAt;
+    match.matchImageUploadedBy = "admin";
+    match.mediaUpdatedAt = new Date();
+    match.lastEventType = "image_update";
+    match.lastEventText = "Match image updated.";
+    match.lastLiveEvent = {
+      id: `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`,
+      type: "image_update",
+      summaryText: "Match image updated.",
+      createdAt: new Date().toISOString(),
+    };
+    await match.save();
 
-    if (!updatedMatch) {
-      return jsonError("Match not found", 404);
-    }
-
-    await Session.findByIdAndUpdate(updatedMatch.sessionId, {
-      $set: {
-        matchImageUrl: updatedMatch.matchImageUrl,
-        matchImagePublicId: updatedMatch.matchImagePublicId,
-        matchImageUploadedAt: updatedMatch.matchImageUploadedAt,
-        matchImageUploadedBy: updatedMatch.matchImageUploadedBy,
-        mediaUpdatedAt: updatedMatch.mediaUpdatedAt,
-        lastEventType: "image_update",
-        lastEventText: "Match image updated.",
-      },
+    await Session.findByIdAndUpdate(match.sessionId, {
+      $set: buildSessionMirrorUpdate(match),
     });
 
     await writeAuditLog({
       action: "match_media_upload",
       targetType: "match",
-      targetId: params.id,
+      targetId: id,
       status: "success",
       ip: meta.ip,
       userAgent: meta.userAgent,
       metadata: {
         size: buffer.length,
         mimeType: file.type,
-        imagePublicId: updatedMatch.matchImagePublicId,
+        imagePublicId: match.matchImagePublicId,
       },
     });
 
-    return NextResponse.json(updatedMatch, { status: 200 });
+    return Response.json(serializePublicMatch(match), {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
   } catch (error) {
     await writeAuditLog({
       action: "match_media_upload",
       targetType: "match",
-      targetId: params.id,
+      targetId: id,
       status: "failure",
       ip: meta.ip,
       userAgent: meta.userAgent,
-      metadata: { error: error.message },
+      metadata: { message: error.message },
     });
 
-    return jsonError("Failed to upload match image", 500, {
-      error: error.message,
-    });
+    return jsonError("Failed to upload the match image.", 500);
   }
 }

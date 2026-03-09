@@ -19,7 +19,8 @@ const siteName = "GV Cricket";
 const siteDescription =
   "Free live cricket scoring app. Track ball-by-ball scores, manage teams, and get real-time updates for any match.";
 const siteUrl = "https://gvcricket.com/"; // As requested
-const gvLogoPath = "/gvLogo.png"; // Path to your logo in the public directory, as per your file structure
+const gvLogoPath = "/gvLogo.png";
+const gvIconPath = "/gv.png";
 
 export const metadata = {
   metadataBase: new URL(siteUrl),
@@ -89,11 +90,10 @@ export const metadata = {
   // Link to the manifest file for PWA capabilities
   manifest: "/manifest.json",
 
-  // Favicons (ensure these files are in your /public directory)
   icons: {
-    icon: "/gvLogo.png", // Standard favicon
-    shortcut: "/gvLogo.png", // Optional: 16x16 for shortcuts
-    apple: "/gvLogo.png", // Optional: Apple touch icon for iOS devices
+    icon: gvIconPath,
+    shortcut: gvIconPath,
+    apple: gvIconPath,
   },
 
   // Open Graph (for social media sharing previews like Facebook, LinkedIn, WhatsApp)
@@ -117,11 +117,11 @@ export const metadata = {
 
   // Twitter Card (for Twitter sharing previews)
   twitter: {
-    card: "/gvLogo.png", // Displays a large image at the top of the tweet
+    card: "summary_large_image",
     title: siteName,
     description: siteDescription,
-    creator: "@GVCricketApp", // Placeholder: Replace with your actual Twitter handle if you have one
-    images: [gvLogoPath], // Using gvLogo.png for Twitter card image
+    creator: "@GVCricketApp",
+    images: [gvLogoPath],
   },
 
   // Robots meta tag for search engine crawling behavior
@@ -171,6 +171,9 @@ const jsonLd = {
 };
 
 export default function RootLayout({ children }) {
+  const shouldRenderAnalytics =
+    process.env.NODE_ENV === "production" && process.env.VERCEL === "1";
+
   return (
     <html lang="en">
       <head>
@@ -183,7 +186,7 @@ export default function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}
       >
         <SmoothScroll>{children}</SmoothScroll>
-        <Analytics />
+        {shouldRenderAnalytics ? <Analytics /> : null}
       </body>
     </html>
   );

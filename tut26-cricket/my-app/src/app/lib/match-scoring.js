@@ -1,4 +1,4 @@
-import { getBattingTeamBundle } from "./team-utils";
+import { getBattingTeamBundle, getTotalDismissalsAllowed } from "./team-utils";
 
 export function countLegalBalls(history = []) {
   return history
@@ -32,7 +32,7 @@ export function addBallToHistory(match, ball) {
 
 export function buildWinByWicketsText(match, outs) {
   const battingTeam = getBattingTeamBundle(match);
-  const wicketsLeft = Math.max(battingTeam.players.length - outs, 1);
+  const wicketsLeft = Math.max(getTotalDismissalsAllowed(match) - outs, 1);
 
   return `${battingTeam.name} won by ${wicketsLeft} ${
     wicketsLeft === 1 ? "wicket" : "wickets"

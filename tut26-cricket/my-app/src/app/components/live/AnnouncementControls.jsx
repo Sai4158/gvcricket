@@ -13,8 +13,12 @@ export default function AnnouncementControls({
   subtitle,
   settings,
   updateSetting,
-  showAccessibility = false,
   onAnnounceNow,
+  onToggleEnabled,
+  statusText = "",
+  announceLabel = "Read current score",
+  announceDisabled = false,
+  announceHint = "",
 }) {
   return (
     <section className="bg-zinc-900/60 ring-1 ring-white/10 rounded-2xl p-4 sm:p-5 shadow-lg backdrop-blur-sm">
@@ -24,7 +28,11 @@ export default function AnnouncementControls({
           {subtitle && <p className="text-sm text-zinc-400 mt-1">{subtitle}</p>}
         </div>
         <button
-          onClick={() => updateSetting("enabled", !settings.enabled)}
+          onClick={() => {
+            const nextEnabled = !settings.enabled;
+            onToggleEnabled?.(nextEnabled);
+            updateSetting("enabled", nextEnabled);
+          }}
           className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
             settings.enabled
               ? "bg-emerald-500 text-black"
@@ -34,6 +42,10 @@ export default function AnnouncementControls({
           {settings.enabled ? "ON" : "OFF"}
         </button>
       </div>
+
+      {statusText && (
+        <p className="mb-4 text-xs text-zinc-500">{statusText}</p>
+      )}
 
       <div className="grid sm:grid-cols-2 gap-4">
         <label className="space-y-2">
@@ -79,27 +91,25 @@ export default function AnnouncementControls({
           </div>
         </div>
 
-        {showAccessibility && (
-          <label className="flex items-center justify-between rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-3 sm:col-span-2">
-            <span className="text-sm text-zinc-200">Accessibility feedback</span>
-            <input
-              type="checkbox"
-              checked={settings.accessibilityMode}
-              onChange={(event) =>
-                updateSetting("accessibilityMode", event.target.checked)
-              }
-            />
-          </label>
-        )}
       </div>
 
       {onAnnounceNow && (
-        <button
-          onClick={onAnnounceNow}
-          className="mt-4 text-sm font-medium text-amber-300 hover:text-amber-200"
-        >
-          Read current score
-        </button>
+        <div className="mt-4 space-y-2">
+          <button
+            onClick={onAnnounceNow}
+            disabled={announceDisabled}
+            className={`rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${
+              announceDisabled
+                ? "bg-zinc-900 text-zinc-500 cursor-not-allowed"
+                : "bg-amber-400 text-black hover:bg-amber-300"
+            }`}
+          >
+            {announceLabel}
+          </button>
+          {announceHint ? (
+            <p className="text-xs text-zinc-500">{announceHint}</p>
+          ) : null}
+        </div>
       )}
     </section>
   );

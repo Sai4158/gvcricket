@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
+import { z } from "zod";
 import Session from "../../../../models/Session";
+import Match from "../../../../models/Match";
 import { jsonError, jsonRateLimit } from "../../../lib/api-response";
 import { writeAuditLog } from "../../../lib/audit-log";
 import { connectDB } from "../../../lib/db";
@@ -8,125 +10,146 @@ import {
   hasValidMatchAccess,
   isValidUmpirePin,
 } from "../../../lib/match-access";
+import { serializePublicSession } from "../../../lib/public-data";
 import { getRequestMeta } from "../../../lib/request-meta";
 import { enforceRateLimit } from "../../../lib/rate-limit";
-import {
-  validatePinPayload,
-  validateSessionPatchPayload,
-} from "../../../lib/validators";
+import { parseJsonRequest } from "../../../lib/request-security";
+import { pinSchema, sessionPatchObjectSchema } from "../../../lib/validators";
 
-async function requireAdminAccess(request, sessionId) {
+const sessionAdminPatchSchema = z
+  .object({
+    pin: pinSchema.optional(),
+  })
+  .extend(sessionPatchObjectSchema.shape)
+  .strict()
+  .refine((value) => Object.keys(value).some((key) => key !== "pin"), {
+    message: "No valid session fields provided.",
+  });
+
+async function hasSessionAdminAccess(session) {
+  const matchId = session?.match ? String(session.match) : "";
+  if (!matchId) return false;
+
   const cookieStore = await cookies();
-  const body = await request.json().catch(() => null);
-  const cookieName = getMatchAccessCookieName(sessionId);
-  const token = cookieStore.get(cookieName)?.value;
+  const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
 
-  if (hasValidMatchAccess(sessionId, token)) {
-    return { allowed: true, body };
-  }
-
-  const validation = validatePinPayload(body);
-  if (!validation.ok) {
-    return { allowed: false, body, reason: validation.message, status: 400 };
-  }
-
-  if (!isValidUmpirePin(validation.value.pin)) {
-    return { allowed: false, body, reason: "Incorrect PIN.", status: 401 };
-  }
-
-  return { allowed: true, body };
+  return hasValidMatchAccess(
+    matchId,
+    token,
+    Number(session.adminAccessVersion || 1)
+  );
 }
 
 export async function GET(_req, { params }) {
+  const { id } = await params;
   await connectDB();
-  const doc = await Session.findById(params.id);
-  if (!doc) return jsonError("Session not found", 404);
-  return Response.json(doc);
+  const session = await Session.findById(id);
+  if (!session) {
+    return jsonError("Session not found.", 404);
+  }
+
+  return Response.json(serializePublicSession(session), {
+    headers: {
+      "Cache-Control": "no-store",
+    },
+  });
 }
 
 export async function PATCH(req, { params }) {
-  try {
-    const meta = getRequestMeta(req);
-    const patchLimit = enforceRateLimit({
-      key: `session-patch:${params.id}:${meta.ip}`,
-      limit: 6,
-      windowMs: 60 * 1000,
-      blockMs: 60 * 1000,
-    });
+  const { id } = await params;
+  const meta = getRequestMeta(req);
+  const patchLimit = enforceRateLimit({
+    key: `session-patch:${id}:${meta.ip}`,
+    limit: 6,
+    windowMs: 60 * 1000,
+    blockMs: 60 * 1000,
+  });
 
-    if (!patchLimit.allowed) {
-      return jsonRateLimit(
-        "Too many admin update attempts. Try again shortly.",
-        patchLimit.retryAfterMs
-      );
+  if (!patchLimit.allowed) {
+    return jsonRateLimit(
+      "Too many admin update attempts. Try again shortly.",
+      patchLimit.retryAfterMs
+    );
+  }
+
+  try {
+    const parsedRequest = await parseJsonRequest(req, sessionAdminPatchSchema, {
+      maxBytes: 16 * 1024,
+    });
+    if (!parsedRequest.ok) {
+      return jsonError(parsedRequest.message, parsedRequest.status);
     }
 
-    const access = await requireAdminAccess(req, params.id);
-    if (!access.allowed) {
+    await connectDB();
+    const session = await Session.findById(id);
+    if (!session) {
+      return jsonError("Session not found.", 404);
+    }
+
+    const hasCookieAccess = await hasSessionAdminAccess(session);
+    const hasPinAccess = parsedRequest.value.pin
+      ? isValidUmpirePin(parsedRequest.value.pin)
+      : false;
+
+    if (!hasCookieAccess && !hasPinAccess) {
       await writeAuditLog({
         action: "session_patch_denied",
         targetType: "session",
-        targetId: params.id,
+        targetId: id,
         status: "failure",
         ip: meta.ip,
         userAgent: meta.userAgent,
       });
 
-      return jsonError(access.reason || "Admin access required.", access.status || 403);
+      return jsonError("Admin access required.", 403);
     }
 
-    const validation = validateSessionPatchPayload(access.body);
-    if (!validation.ok) {
-      return jsonError(validation.message, 400);
-    }
+    const {
+      pin: _pin,
+      ...safePatch
+    } = parsedRequest.value;
 
-    const changedFields = Object.keys(validation.value);
-    const isMediaUpdate = changedFields.some(
-      (field) =>
-        field.toLowerCase().includes("image") ||
-        field.toLowerCase().includes("media")
-    );
+    Object.assign(session, safePatch);
+    await session.save();
 
-    if (isMediaUpdate) {
-      const mediaLimit = enforceRateLimit({
-        key: `session-media:${params.id}:${meta.ip}`,
-        limit: 5,
-        windowMs: 60 * 1000,
-        blockMs: 60 * 1000,
+    if (session.match) {
+      await Match.findByIdAndUpdate(session.match, {
+        $set: {
+          teamA: session.teamA,
+          teamB: session.teamB,
+          teamAName: session.teamAName,
+          teamBName: session.teamBName,
+          overs: session.overs,
+          tossWinner: session.tossWinner,
+          matchImageUrl: session.matchImageUrl,
+          matchImagePublicId: session.matchImagePublicId,
+          matchImageUploadedAt: session.matchImageUploadedAt,
+          matchImageUploadedBy: session.matchImageUploadedBy,
+          announcerEnabled: session.announcerEnabled,
+          announcerMode: session.announcerMode,
+          lastEventType: session.lastEventType,
+          lastEventText: session.lastEventText,
+          adminAccessVersion: session.adminAccessVersion,
+        },
       });
-
-      if (!mediaLimit.allowed) {
-        return jsonRateLimit(
-          "Too many media update attempts. Try again shortly.",
-          mediaLimit.retryAfterMs
-        );
-      }
     }
-
-    await connectDB();
-    const updated = await Session.findByIdAndUpdate(params.id, validation.value, {
-      new: true,
-      runValidators: true,
-    });
-
-    if (!updated) {
-      return jsonError("Session not found", 404);
-    }
-
-    const action = isMediaUpdate ? "session_media_edit" : "session_patch";
 
     await writeAuditLog({
-      action,
+      action: "session_patch",
       targetType: "session",
-      targetId: params.id,
+      targetId: id,
       status: "success",
       ip: meta.ip,
       userAgent: meta.userAgent,
-      metadata: { fields: changedFields },
+      metadata: { fields: Object.keys(safePatch) },
     });
 
-    return Response.json(updated);
-  } catch (error) {
-    return jsonError("Patch failed", 500, { error: error.message });
+    return Response.json(serializePublicSession(session), {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch {
+    return jsonError("Could not update the session.", 500);
   }
 }

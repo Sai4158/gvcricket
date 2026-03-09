@@ -10,7 +10,7 @@ const AuditLogSchema = new mongoose.Schema(
     userAgent: { type: String, default: "", trim: true },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
-  { timestamps: true }
+  { timestamps: true, strict: true, strictQuery: true }
 );
 
 export default mongoose.models.AuditLog ||

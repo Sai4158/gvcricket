@@ -5,12 +5,12 @@ import {
   Legend,
   Line,
   LineChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import CustomTooltip from "./CustomTooltip";
+import useChartWidth from "./useChartWidth";
 
 export default function RunsPerOverChart({
   innings1Summary,
@@ -18,6 +18,7 @@ export default function RunsPerOverChart({
   team1Name,
   team2Name,
 }) {
+  const { containerRef, width } = useChartWidth();
   const maxOvers = Math.max(
     innings1Summary.runsPerOver.length,
     innings2Summary.runsPerOver.length
@@ -33,9 +34,11 @@ export default function RunsPerOverChart({
       <h2 className="text-2xl font-bold text-white text-center flex items-center justify-center gap-2 mb-6">
         Runs Per Over
       </h2>
-      <div className="w-full h-80">
-        <ResponsiveContainer width="100%" height="100%">
+      <div ref={containerRef} className="w-full h-80 min-w-0">
+        {width > 0 ? (
           <LineChart
+            width={width}
+            height={320}
             data={chartData}
             margin={{ top: 5, right: 20, left: 0, bottom: 20 }}
           >
@@ -69,7 +72,9 @@ export default function RunsPerOverChart({
               activeDot={{ r: 8 }}
             />
           </LineChart>
-        </ResponsiveContainer>
+        ) : (
+          <div className="h-full w-full rounded-xl bg-zinc-950/30" />
+        )}
       </div>
     </div>
   );

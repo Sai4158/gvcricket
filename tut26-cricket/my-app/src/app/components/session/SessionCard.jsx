@@ -7,6 +7,12 @@ import { formatRelativeTime } from "./formatRelativeTime";
 
 export default function SessionCard({ session, onUmpireClick }) {
   const isLive = session.isLive;
+  const scoreHref =
+    session.match && !isLive
+      ? `/result/${session.match}`
+      : session.match
+      ? `/session/${session._id}/view`
+      : "";
 
   return (
     <motion.div
@@ -59,7 +65,8 @@ export default function SessionCard({ session, onUmpireClick }) {
 
         {session.match && (
           <Link
-            href={`/session/${session._id}/view`}
+            href={scoreHref}
+            prefetch={false}
             className={`flex-1 px-4 py-2.5 rounded-lg font-semibold text-center transition flex items-center justify-center gap-2 ${
               isLive
                 ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-black hover:brightness-110"
@@ -69,6 +76,12 @@ export default function SessionCard({ session, onUmpireClick }) {
             <FaEye />
             <span>{isLive ? "View Live Score" : "See Final Score"}</span>
           </Link>
+        )}
+
+        {!session.match && !isLive && (
+          <div className="flex-1 px-4 py-2.5 rounded-lg bg-zinc-800 text-zinc-400 font-semibold text-center">
+            No saved score
+          </div>
         )}
       </div>
     </motion.div>

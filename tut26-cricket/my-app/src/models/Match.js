@@ -73,8 +73,10 @@ const MatchSchema = new mongoose.Schema(
     lastEventType: { type: String, default: "", trim: true },
     lastEventText: { type: String, default: "", trim: true },
     adminAccessVersion: { type: Number, default: 1 },
+    processedActionIds: { type: [String], default: [] },
+    actionHistory: { type: [mongoose.Schema.Types.Mixed], default: [] },
   },
-  { timestamps: true }
+  { timestamps: true, strict: true, strictQuery: true }
 );
 
 export default mongoose.models.Match || mongoose.model("Match", MatchSchema);

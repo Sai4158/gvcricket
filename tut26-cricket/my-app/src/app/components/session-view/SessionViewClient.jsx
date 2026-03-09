@@ -1,0 +1,216 @@
+"use client";
+
+import { startTransition, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { FaArrowLeft, FaCheck, FaCopy } from "react-icons/fa";
+import AnnouncementControls from "../live/AnnouncementControls";
+import useAnnouncementSettings from "../live/useAnnouncementSettings";
+import MatchImageCard from "../match/MatchImageCard";
+import useEventSource from "../live/useEventSource";
+import useLiveRelativeTime from "../live/useLiveRelativeTime";
+import useSpeechAnnouncer from "../live/useSpeechAnnouncer";
+import LiveScoreCard from "./LiveScoreCard";
+import SplashMsg from "./SplashMsg";
+import TeamInningsDetail from "./TeamInningsDetail";
+import {
+  buildCurrentScoreAnnouncement,
+  buildSpectatorAnnouncement,
+} from "../../lib/live-announcements";
+import { getTeamBundle } from "../../lib/team-utils";
+
+export default function SessionViewClient({ sessionId, initialData }) {
+  const [copied, setCopied] = useState(false);
+  const [data, setData] = useState(initialData || null);
+  const [streamError, setStreamError] = useState("");
+  const lastAnnouncedEventRef = useRef("");
+  const previousEnabledRef = useRef(false);
+  const router = useRouter();
+  const liveUpdatedLabel = useLiveRelativeTime(data?.updatedAt);
+  const { settings, updateSetting } = useAnnouncementSettings("spectator");
+  const { speak, prime, stop, status, voiceName } = useSpeechAnnouncer(settings);
+
+  useEventSource({
+    url: sessionId ? `/api/live/sessions/${sessionId}` : null,
+    event: "session",
+    enabled: Boolean(sessionId),
+    onMessage: (payload) => {
+      startTransition(() => {
+        setData(payload);
+        setStreamError("");
+      });
+    },
+    onError: () => {
+      if (!data) {
+        setStreamError("Could not load session data.");
+      }
+    },
+  });
+
+  const sessionData = data?.session;
+  const match = data?.match;
+  const isLiveMatch = Boolean(match?.isOngoing && !match?.result);
+
+  useEffect(() => {
+    if (!match || !isLiveMatch || !settings.enabled || settings.mode === "silent") {
+      previousEnabledRef.current = settings.enabled;
+      return;
+    }
+
+    if (!previousEnabledRef.current && settings.enabled) {
+      speak(buildCurrentScoreAnnouncement(match), {
+        key: "spectator-current-score",
+        rate: 0.98,
+      });
+    }
+
+    previousEnabledRef.current = settings.enabled;
+  }, [isLiveMatch, match, settings.enabled, settings.mode, speak]);
+
+  useEffect(() => {
+    const event = match?.lastLiveEvent;
+    if (!event || !isLiveMatch || !settings.enabled || settings.mode === "silent") return;
+    if (lastAnnouncedEventRef.current === event.id) return;
+
+    lastAnnouncedEventRef.current = event.id;
+    const line = buildSpectatorAnnouncement(event, match, settings.mode);
+    if (!line) return;
+
+    speak(line, {
+      key: event.id,
+      rate: 0.97,
+      minGapMs: 700,
+    });
+  }, [isLiveMatch, match, settings.enabled, settings.mode, speak]);
+
+  useEffect(() => {
+    if (!isLiveMatch) {
+      stop();
+    }
+  }, [isLiveMatch, stop]);
+
+  useEffect(() => {
+    if (match?.result) {
+      router.push(`/result/${match._id}`);
+    }
+  }, [match, router]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (!sessionId) return <SplashMsg>No Session ID provided.</SplashMsg>;
+  if (streamError) return <SplashMsg>Could not load session data.</SplashMsg>;
+  if (!sessionData) return <SplashMsg>Loading Session...</SplashMsg>;
+  if (!match) {
+    return <SplashMsg>The match for this session has not started yet.</SplashMsg>;
+  }
+
+  const teamA = getTeamBundle(match, "teamA");
+  const teamB = getTeamBundle(match, "teamB");
+
+  return (
+    <main className="min-h-screen bg-zinc-950 text-white font-sans p-4 pb-10 flex flex-col items-center">
+      <header className="w-full max-w-4xl text-center my-8 relative">
+        <button
+          onClick={() => router.push("/session")}
+          className="absolute top-1/2 -translate-y-1/2 left-2 p-2 text-zinc-400 hover:text-white transition-colors"
+          aria-label="Back to Sessions"
+        >
+          <FaArrowLeft size={20} />
+        </button>
+        <div>
+          <h1 className="text-3xl font-extrabold text-white">
+            {sessionData.name}
+          </h1>
+          <br />
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <p className="text-green-400">Live Spectator View</p>
+            <span className="inline-flex items-center gap-2 text-sm text-zinc-300">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse"></span>
+              Live
+            </span>
+          </div>
+          <p className="text-amber-500 font-bold text-xl" suppressHydrationWarning>
+            {liveUpdatedLabel}
+          </p>
+        </div>
+        <button
+          onClick={handleCopy}
+          className="absolute top-1/2 -translate-y-1/2 right-2 p-2 text-zinc-400 hover:text-white transition-colors"
+          aria-label="Copy Link"
+        >
+          {copied ? (
+            <FaCheck className="text-green-500" size={20} />
+          ) : (
+            <FaCopy size={20} />
+          )}
+        </button>
+      </header>
+
+      <LiveScoreCard match={match} />
+
+      {isLiveMatch ? <div className="w-full max-w-4xl mt-6">
+        <MatchImageCard match={match} title="Match Photo" />
+      </div> : null}
+
+      <div className="w-full max-w-4xl mt-6">
+        <AnnouncementControls
+          title="Announce Score"
+          subtitle="Optional live voice updates for spectators."
+          settings={settings}
+          updateSetting={updateSetting}
+          onToggleEnabled={(nextEnabled) => {
+            if (nextEnabled) {
+              prime();
+            }
+          }}
+          statusText={
+            settings.enabled
+              ? voiceName
+                ? `Voice ready: ${voiceName}${status === "waiting_for_gesture" ? " · tap once if your browser blocks audio" : ""}`
+                : status === "waiting_for_gesture"
+                ? "Tap once to enable voice playback on this browser."
+                : "Voice will use your browser's English voice."
+              : ""
+          }
+          onAnnounceNow={() =>
+            speak(buildCurrentScoreAnnouncement(match), {
+              key: "spectator-manual-score",
+              rate: 0.98,
+              userGesture: true,
+            })
+          }
+        />
+      </div>
+
+      <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
+        <TeamInningsDetail
+          title={match.innings1?.team || teamA.name}
+          inningsData={match.innings1}
+        />
+        <TeamInningsDetail
+          title={match.innings2?.team || teamB.name}
+          inningsData={match.innings2}
+        />
+      </div>
+
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #4b5563;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #6b7280;
+        }
+      `}</style>
+    </main>
+  );
+}

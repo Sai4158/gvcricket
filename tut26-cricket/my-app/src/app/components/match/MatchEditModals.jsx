@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { syncTeamNamesAcrossMatch } from "../../lib/match-scoring";
 import { getTeamBundle } from "../../lib/team-utils";
 import { ModalBase } from "./MatchBaseModals";
 
@@ -48,26 +47,11 @@ export function EditTeamsModal({ match, onUpdate, onClose }) {
   const [teamBPlayers, setTeamBPlayers] = useState([...initialTeamB.players]);
 
   const handleSaveChanges = () => {
-    const nextNames = {
+    onUpdate({
       teamAName: teamAName.trim(),
       teamBName: teamBName.trim(),
-    };
-
-    const previousNames = {
-      teamAName: initialTeamA.name,
-      teamBName: initialTeamB.name,
-    };
-
-    const updatedMatch = syncTeamNamesAcrossMatch(match, previousNames, nextNames);
-
-    onUpdate({
-      teamAName: nextNames.teamAName,
-      teamBName: nextNames.teamBName,
       teamA: teamAPlayers.map((player) => player.trim()).filter(Boolean),
       teamB: teamBPlayers.map((player) => player.trim()).filter(Boolean),
-      innings1: updatedMatch.innings1,
-      innings2: updatedMatch.innings2,
-      tossWinner: updatedMatch.tossWinner,
     });
     onClose();
   };

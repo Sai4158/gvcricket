@@ -8,12 +8,12 @@
   "theme_color": "#000000",
   "icons": [
     {
-      "src": "/gvLogo.png",
+      "src": "/gv.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/gvLogo.png",
+      "src": "/gv.png",
       "sizes": "512x512",
       "type": "image/png"
     }

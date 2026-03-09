@@ -1,29 +1,68 @@
+import { z } from "zod";
+import { jsonError, jsonRateLimit } from "../../lib/api-response";
+import { writeAuditLog } from "../../lib/audit-log";
 import { connectDB } from "../../lib/db";
+import { serializePublicMatch } from "../../lib/public-data";
+import { getRequestMeta } from "../../lib/request-meta";
+import { enforceRateLimit } from "../../lib/rate-limit";
+import { parseJsonRequest } from "../../lib/request-security";
 import { buildTeamUpdate } from "../../lib/team-utils";
+import { oversSchema } from "../../lib/validators";
 import Match from "../../../models/Match";
 
+const createMatchSchema = z
+  .object({
+    sessionId: z.string().regex(/^[a-f0-9]{24}$/i, "sessionId is invalid."),
+    teamAName: z.string().min(1).max(80),
+    teamBName: z.string().min(1).max(80),
+    teamA: z.array(z.string().min(1).max(48)).min(1).max(15),
+    teamB: z.array(z.string().min(1).max(48)).min(1).max(15),
+    overs: oversSchema,
+  })
+  .strict();
+
 export async function POST(req) {
+  const meta = getRequestMeta(req);
+  const createLimit = enforceRateLimit({
+    key: `match-create:${meta.ip}`,
+    limit: 3,
+    windowMs: 60 * 1000,
+    blockMs: 60 * 1000,
+  });
+
+  if (!createLimit.allowed) {
+    return jsonRateLimit(
+      "Too many match creation attempts. Try again shortly.",
+      createLimit.retryAfterMs
+    );
+  }
+
   try {
-    const {
-      teamA,
-      teamB,
-      teamAName,
-      teamBName,
-      overs,
-      sessionId,
-    } = await req.json();
+    const parsedRequest = await parseJsonRequest(req, createMatchSchema, {
+      maxBytes: 24 * 1024,
+    });
+    if (!parsedRequest.ok) {
+      return jsonError(parsedRequest.message, parsedRequest.status);
+    }
+
     await connectDB();
 
-    const normalizedTeamA = buildTeamUpdate(teamAName, teamA || []);
-    const normalizedTeamB = buildTeamUpdate(teamBName, teamB || []);
+    const normalizedTeamA = buildTeamUpdate(
+      parsedRequest.value.teamAName,
+      parsedRequest.value.teamA
+    );
+    const normalizedTeamB = buildTeamUpdate(
+      parsedRequest.value.teamBName,
+      parsedRequest.value.teamB
+    );
 
-    const newMatch = new Match({
+    const newMatch = await Match.create({
       teamA: normalizedTeamA.players,
       teamB: normalizedTeamB.players,
       teamAName: normalizedTeamA.name,
       teamBName: normalizedTeamB.name,
-      overs,
-      sessionId,
+      overs: parsedRequest.value.overs,
+      sessionId: parsedRequest.value.sessionId,
       isOngoing: true,
       innings1: {
         score: 0,
@@ -35,18 +74,23 @@ export async function POST(req) {
       },
     });
 
-    await newMatch.save();
-
-    return new Response(JSON.stringify(newMatch), {
-      status: 201,
-      headers: { "Content-Type": "application/json" },
+    await writeAuditLog({
+      action: "match_create_direct",
+      targetType: "match",
+      targetId: String(newMatch._id),
+      status: "success",
+      ip: meta.ip,
+      userAgent: meta.userAgent,
     });
-  } catch (error) {
-    console.error("Error creating match:", error);
-    return Response.json(
-      { message: "Error saving match", error: error.message },
-      { status: 500 }
-    );
+
+    return Response.json(serializePublicMatch(newMatch), {
+      status: 201,
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch {
+    return jsonError("Could not create the match.", 500);
   }
 }
 
@@ -54,14 +98,13 @@ export async function GET() {
   try {
     await connectDB();
     const matches = await Match.find().sort({ createdAt: -1 });
-    return new Response(JSON.stringify(matches), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
+
+    return Response.json(matches.map((match) => serializePublicMatch(match)), {
+      headers: {
+        "Cache-Control": "no-store",
+      },
     });
-  } catch (error) {
-    return Response.json(
-      { message: "Error fetching matches", error: error.message },
-      { status: 500 }
-    );
+  } catch {
+    return jsonError("Could not load matches.", 500);
   }
 }

@@ -1,13 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { addBallToHistory, buildWinByWicketsText } from "../../lib/match-scoring";
-import {
-  createMatchEndLiveEvent,
-  createScoreLiveEvent,
-  createUndoLiveEvent,
-} from "../../lib/live-announcements";
 import useEventSource from "../live/useEventSource";
 
 function triggerHapticFeedback() {
@@ -16,39 +10,52 @@ function triggerHapticFeedback() {
   }
 }
 
+function createActionId(prefix) {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return `${prefix}:${crypto.randomUUID()}`;
+  }
+
+  return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function triggerMatchHapticFeedback() {
   triggerHapticFeedback();
 }
 
-export default function useMatch(matchId, hasAccess) {
+export default function useMatch(matchId, hasAccess, initialMatch = null) {
   const router = useRouter();
-  const [match, setMatch] = useState(null);
+  const [match, setMatch] = useState(initialMatch);
   const [error, setError] = useState(null);
-  const [isLoading, setIsLoading] = useState(Boolean(matchId && hasAccess));
+  const [isLoading, setIsLoading] = useState(
+    Boolean(matchId && hasAccess && !initialMatch)
+  );
   const [isUpdating, setIsUpdating] = useState(false);
-  const [historyStack, setHistoryStack] = useState([]);
   const [lastUpdatedAt, setLastUpdatedAt] = useState("");
 
   useEffect(() => {
     if (!matchId || !hasAccess) {
-      setMatch(null);
+      setMatch(initialMatch);
       setError(null);
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
-  }, [hasAccess, matchId]);
+    if (!initialMatch) {
+      setIsLoading(true);
+    }
+  }, [hasAccess, initialMatch, matchId]);
 
   useEventSource({
     url: matchId && hasAccess ? `/api/live/matches/${matchId}` : null,
     event: "match",
     enabled: Boolean(matchId && hasAccess),
     onMessage: (payload) => {
-      setMatch(payload.match || null);
-      setLastUpdatedAt(payload.updatedAt || "");
-      setError(null);
-      setIsLoading(false);
+      startTransition(() => {
+        setMatch(payload.match || null);
+        setLastUpdatedAt(payload.updatedAt || "");
+        setError(null);
+        setIsLoading(false);
+      });
     },
     onError: () => {
       if (!match) {
@@ -58,17 +65,54 @@ export default function useMatch(matchId, hasAccess) {
     },
   });
 
-  const patchAndUpdate = async (payload, isUndo = false) => {
-    if (!matchId || !hasAccess || isUpdating || !match) return;
+  const historyStack = useMemo(
+    () => new Array(Number(match?.undoCount || 0)).fill(null),
+    [match?.undoCount]
+  );
+
+  const sendAction = async (action) => {
+    if (!matchId || !hasAccess || isUpdating) return null;
 
     setIsUpdating(true);
-    if (!isUndo) {
-      setHistoryStack((prev) => [...prev, match]);
-    }
 
-    const optimisticData = { ...match, ...payload };
-    setMatch(optimisticData);
-    setLastUpdatedAt(new Date().toISOString());
+    try {
+      const response = await fetch(`/api/matches/${matchId}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action),
+      });
+
+      const body = await response
+        .json()
+        .catch(() => ({ message: "Failed to update match." }));
+
+      if (!response.ok) {
+        throw new Error(body.message || "Failed to update match.");
+      }
+
+      if (body.match) {
+        startTransition(() => {
+          setMatch(body.match);
+          setLastUpdatedAt(new Date().toISOString());
+        });
+      }
+
+      setError(null);
+
+      return body.match || null;
+    } catch (caughtError) {
+      console.error("Failed to update match:", caughtError);
+      setError(caughtError);
+      return null;
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const patchAndUpdate = async (payload) => {
+    if (!matchId || !hasAccess || isUpdating) return null;
+
+    setIsUpdating(true);
 
     try {
       const response = await fetch(`/api/matches/${matchId}`, {
@@ -77,16 +121,24 @@ export default function useMatch(matchId, hasAccess) {
         body: JSON.stringify(payload),
       });
 
+      const body = await response
+        .json()
+        .catch(() => ({ message: "Failed to update match." }));
+
       if (!response.ok) {
-        const body = await response
-          .json()
-          .catch(() => ({ message: "Failed to update match." }));
         throw new Error(body.message || "Failed to update match.");
       }
+
+      startTransition(() => {
+        setMatch(body);
+        setLastUpdatedAt(new Date().toISOString());
+      });
+      setError(null);
+      return body;
     } catch (caughtError) {
       console.error("Failed to update match:", caughtError);
-      setMatch(match);
       setError(caughtError);
+      return null;
     } finally {
       setIsUpdating(false);
     }
@@ -96,76 +148,41 @@ export default function useMatch(matchId, hasAccess) {
     if (!match || match.result || !hasAccess) return;
 
     triggerHapticFeedback();
-    const payload = structuredClone(match);
-    const activeInningsKey =
-      payload.innings === "first" ? "innings1" : "innings2";
-
-    payload[activeInningsKey].score += runs;
-    payload.score = payload[activeInningsKey].score;
-    if (isOut) payload.outs += 1;
-
-    const newBall = { runs, isOut, extraType };
-    if (!payload.balls) payload.balls = [];
-    payload.balls.push(newBall);
-    addBallToHistory(payload, newBall);
-
-    if (payload.innings === "second" && payload.score > payload.innings1.score) {
-      payload.isOngoing = false;
-      payload.result = buildWinByWicketsText(payload, payload.outs);
-    }
-
-    payload.lastLiveEvent = createScoreLiveEvent(match, payload, newBall);
-
-    patchAndUpdate(payload);
+    sendAction({
+      actionId: createActionId("score"),
+      type: "score_ball",
+      runs,
+      isOut,
+      extraType,
+    });
   };
 
   const handleUndo = async () => {
     triggerHapticFeedback();
-    if (historyStack.length === 0) return;
+    if (!match?.undoCount) return;
 
-    const previousState = historyStack.at(-1);
-    setHistoryStack((prev) => prev.slice(0, -1));
-    await patchAndUpdate(
-      {
-        ...previousState,
-        lastLiveEvent: createUndoLiveEvent(previousState),
-      },
-      true
-    );
+    await sendAction({
+      actionId: createActionId("undo"),
+      type: "undo_last",
+    });
   };
 
-  const handleNextInningsOrEnd = () => {
+  const handleNextInningsOrEnd = async () => {
     if (!match || !hasAccess) return;
 
-    if (match.innings === "first") {
-      patchAndUpdate({
-        score: 0,
-        outs: 0,
-        balls: [],
-        innings: "second",
-      });
+    if (match.result && !match.isOngoing) {
+      router.push(`/result/${matchId}`);
       return;
     }
 
-    const firstInningsScore = match.innings1.score;
-    const secondInningsScore = match.score;
-    let resultText = "Match Tied";
-
-    if (secondInningsScore > firstInningsScore) {
-      resultText = buildWinByWicketsText(match, match.outs);
-    } else if (firstInningsScore > secondInningsScore) {
-      const runsMargin = firstInningsScore - secondInningsScore;
-      resultText = `${match.innings1.team} won by ${runsMargin} ${
-        runsMargin === 1 ? "run" : "runs"
-      }.`;
-    }
-
-    patchAndUpdate({
-      isOngoing: false,
-      result: resultText,
-      lastLiveEvent: createMatchEndLiveEvent(match, resultText),
+    const updatedMatch = await sendAction({
+      actionId: createActionId("advance"),
+      type: "complete_innings",
     });
-    router.push(`/result/${matchId}`);
+
+    if (updatedMatch?.result && !updatedMatch?.isOngoing) {
+      router.push(`/result/${matchId}`);
+    }
   };
 
   return {
@@ -175,6 +192,12 @@ export default function useMatch(matchId, hasAccess) {
     isUpdating,
     lastUpdatedAt,
     historyStack,
+    replaceMatch: (nextMatch) => {
+      startTransition(() => {
+        setMatch(nextMatch);
+        setLastUpdatedAt(new Date().toISOString());
+      });
+    },
     handleScoreEvent,
     handleUndo,
     handleNextInningsOrEnd,

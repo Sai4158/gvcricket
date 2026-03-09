@@ -1,5 +1,6 @@
 import { connectDB } from "../../../../lib/db";
 import { ensureLiveUpdates, subscribeToMatch, subscribeToSession } from "../../../../lib/live-updates";
+import { serializePublicMatch, serializePublicSession } from "../../../../lib/public-data";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 
@@ -19,6 +20,7 @@ function encodeEvent(event, data) {
 }
 
 export async function GET(request, { params }) {
+  const { id } = await params;
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -37,7 +39,7 @@ export async function GET(request, { params }) {
         await ensureLiveUpdates();
 
         const pushSessionPayload = async () => {
-          const session = await Session.findById(params.id).lean();
+          const session = await Session.findById(id).lean();
           const match = session?.match ? await Match.findById(session.match).lean() : null;
           const nextMatchId = match?._id ? String(match._id) : "";
 
@@ -53,15 +55,15 @@ export async function GET(request, { params }) {
           }
 
           send("session", {
-            session,
-            match,
+            session: serializePublicSession(session),
+            match: serializePublicMatch(match),
             updatedAt: new Date().toISOString(),
           });
           return { session, match };
         };
 
         await pushSessionPayload();
-        cleanupSession = subscribeToSession(params.id, async () => {
+        cleanupSession = subscribeToSession(id, async () => {
           await pushSessionPayload();
         });
 
@@ -76,7 +78,7 @@ export async function GET(request, { params }) {
           controller.close();
         });
       } catch (error) {
-        send("error", { message: error.message });
+        send("error", { message: "Live updates are temporarily unavailable." });
         if (heartbeat) clearInterval(heartbeat);
         cleanupSession();
         cleanupMatch();

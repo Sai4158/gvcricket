@@ -1,8 +1,9 @@
 "use client";
 
 import { FaChartPie } from "react-icons/fa";
-import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { Cell, Legend, Pie, PieChart, Tooltip } from "recharts";
 import CustomTooltip from "./CustomTooltip";
+import useChartWidth from "./useChartWidth";
 
 export default function ScoringBreakdownCharts({
   innings1Summary,
@@ -10,6 +11,8 @@ export default function ScoringBreakdownCharts({
   team1Name,
   team2Name,
 }) {
+  const team1Chart = useChartWidth();
+  const team2Chart = useChartWidth();
   const colors = ["#38bdf8", "#8b5cf6", "#f87171"];
   const radian = Math.PI / 180;
 
@@ -44,12 +47,12 @@ export default function ScoringBreakdownCharts({
         <FaChartPie /> Run Source Breakdown
       </h2>
       <div className="grid md:grid-cols-2 gap-8 items-center">
-        <div className="w-full h-80">
+        <div ref={team1Chart.containerRef} className="w-full h-80 min-w-0">
           <h3 className="font-bold text-center text-blue-400 text-lg">
             {team1Name}
           </h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
+          {team1Chart.width > 0 ? (
+            <PieChart width={team1Chart.width} height={320}>
               <Pie
                 data={innings1Summary.scoringBreakdown}
                 dataKey="value"
@@ -67,14 +70,16 @@ export default function ScoringBreakdownCharts({
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: "16px" }} />
             </PieChart>
-          </ResponsiveContainer>
+          ) : (
+            <div className="h-full w-full rounded-xl bg-zinc-950/30" />
+          )}
         </div>
-        <div className="w-full h-80">
+        <div ref={team2Chart.containerRef} className="w-full h-80 min-w-0">
           <h3 className="font-bold text-center text-red-400 text-lg">
             {team2Name}
           </h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
+          {team2Chart.width > 0 ? (
+            <PieChart width={team2Chart.width} height={320}>
               <Pie
                 data={innings2Summary.scoringBreakdown}
                 dataKey="value"
@@ -92,7 +97,9 @@ export default function ScoringBreakdownCharts({
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: "16px" }} />
             </PieChart>
-          </ResponsiveContainer>
+          ) : (
+            <div className="h-full w-full rounded-xl bg-zinc-950/30" />
+          )}
         </div>
       </div>
     </div>
