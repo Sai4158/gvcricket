@@ -2,6 +2,8 @@ import { EventEmitter } from "node:events";
 
 const SPEAKER_MAX_MS = 30_000;
 const CLEANUP_GRACE_MS = 3_000;
+const REQUEST_COOLDOWN_MS = 30_000;
+const DISCONNECT_GRACE_MS = 5_000;
 
 const emitter = globalThis.__gvWalkieEmitter || new EventEmitter();
 globalThis.__gvWalkieEmitter = emitter;
@@ -26,6 +28,8 @@ function getMatchState(matchId) {
       transmissionId: "",
       timeoutId: null,
       lastNotification: "",
+      requestCooldowns: new Map(),
+      disconnectTimers: new Map(),
     });
   }
 
@@ -172,6 +176,12 @@ export function registerWalkieParticipant(matchId, participant) {
     connectedAt: new Date().toISOString(),
   };
 
+  const existingDisconnectTimer = matchState.disconnectTimers.get(nextParticipant.id);
+  if (existingDisconnectTimer) {
+    clearTimeout(existingDisconnectTimer);
+    matchState.disconnectTimers.delete(nextParticipant.id);
+  }
+
   matchState.participants.set(nextParticipant.id, nextParticipant);
   notifyMatch(matchId, {
     type: "state",
@@ -182,20 +192,31 @@ export function registerWalkieParticipant(matchId, participant) {
     snapshot: buildSnapshot(matchId),
     cleanup: () => {
       const latestState = getMatchState(matchId);
-      latestState.participants.delete(nextParticipant.id);
-
-      if (latestState.activeSpeakerId === nextParticipant.id) {
-        clearActiveLock(matchId, "disconnect");
+      const existingTimer = latestState.disconnectTimers.get(nextParticipant.id);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
       }
 
-      notifyMatch(matchId, {
-        type: "state",
-        snapshot: buildSnapshot(matchId),
-      });
+      const timer = setTimeout(() => {
+        const settledState = getMatchState(matchId);
+        settledState.disconnectTimers.delete(nextParticipant.id);
+        settledState.participants.delete(nextParticipant.id);
 
-      if (listParticipants(latestState, "spectator").length === 0) {
-        disableForNoSpectators(matchId);
-      }
+        if (settledState.activeSpeakerId === nextParticipant.id) {
+          clearActiveLock(matchId, "disconnect");
+        }
+
+        notifyMatch(matchId, {
+          type: "state",
+          snapshot: buildSnapshot(matchId),
+        });
+
+        if (listParticipants(settledState, "spectator").length === 0) {
+          disableForNoSpectators(matchId);
+        }
+      }, DISCONNECT_GRACE_MS);
+
+      latestState.disconnectTimers.set(nextParticipant.id, timer);
     },
   };
 }
@@ -228,6 +249,50 @@ export function setWalkieEnabled(matchId, enabled) {
   });
 
   return snapshot;
+}
+
+export function requestWalkieEnable(matchId, { participantId }) {
+  const matchState = getMatchState(matchId);
+  const participant = matchState.participants.get(String(participantId));
+
+  if (!participant || participant.role !== "spectator") {
+    return { ok: false, status: 403, message: "Participant is not authorized." };
+  }
+
+  if (matchState.enabled) {
+    return { ok: false, status: 409, message: "Walkie-talkie is already on." };
+  }
+
+  if (listParticipants(matchState, "umpire").length === 0) {
+    return { ok: false, status: 409, message: "No umpire is connected." };
+  }
+
+  const now = Date.now();
+  const cooldownUntil = Number(matchState.requestCooldowns.get(participant.id) || 0);
+  if (cooldownUntil > now) {
+    return {
+      ok: false,
+      status: 429,
+      message: `Please wait ${Math.ceil((cooldownUntil - now) / 1000)} seconds before requesting again.`,
+    };
+  }
+
+  matchState.requestCooldowns.set(participant.id, now + REQUEST_COOLDOWN_MS);
+
+  notifyMatch(matchId, {
+    type: "state",
+    snapshot: buildSnapshot(matchId),
+    notification: {
+      type: "walkie_requested",
+      message: `${participant.name} requested walkie-talkie.`,
+    },
+  });
+
+  notifyParticipant(matchId, participant.id, {
+    type: "request-sent",
+  });
+
+  return { ok: true, snapshot: buildSnapshot(matchId) };
 }
 
 export function claimWalkieSpeaker(matchId, { role, participantId }) {

@@ -16,15 +16,10 @@ export default function LiveMicModal({
   monitor,
 }) {
   const fallbackMonitor = useLocalMicMonitor();
-  const {
-    isActive,
-    isStarting,
-    error,
-    start,
-    stop,
-  } = monitor ?? fallbackMonitor;
+  const { isActive, isStarting, error, start, stop } = monitor ?? fallbackMonitor;
 
   const statusLabel = isStarting ? "READY" : isActive ? "LIVE" : "OFF";
+
   const handleToggle = () => {
     if (isStarting) {
       return;
@@ -51,7 +46,7 @@ export default function LiveMicModal({
             className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06] text-zinc-400 transition-colors hover:bg-white/[0.1] hover:text-white focus:outline-none focus:ring-2 focus:ring-amber-300/35"
             aria-label="Close live commentary"
           >
-            <span className="text-xl leading-none">×</span>
+            <span className="text-xl leading-none">&times;</span>
           </button>
         </div>
 
@@ -91,7 +86,7 @@ export default function LiveMicModal({
 
             <div className="space-y-2">
               <p className="text-2xl font-black tracking-[-0.03em] text-white">
-                Tap to Talk
+                Speaker mic
               </p>
               <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-zinc-300">
                 {statusLabel}
@@ -123,53 +118,32 @@ export default function LiveMicModal({
           </div>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="space-y-2">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500">
-              Mode
-            </span>
-            <select
-              className="w-full rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none transition focus:border-amber-300/30 focus:ring-2 focus:ring-amber-300/20"
-              aria-label="Live commentary mode"
-              defaultValue="default"
-            >
-              <option value="default">Live Voice</option>
-            </select>
-          </label>
-
-          <div className="space-y-2">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500">
-              Status
-            </span>
-            <div className="flex h-[50px] items-center rounded-2xl border border-white/8 bg-white/[0.04] px-4 text-sm text-zinc-300">
-              {isHolding ? "Speaking" : isActive ? "Ready" : "Off"}
-            </div>
-          </div>
-        </div>
-
         <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,24,0.98),rgba(8,8,12,0.98))] px-4 pb-4 pt-5">
           <div className="flex flex-col items-center gap-3">
             <button
               type="button"
               onClick={handleToggle}
-              className={`inline-flex min-h-[64px] w-full items-center justify-center gap-3 rounded-full px-6 py-4 text-base font-black transition-all focus:outline-none focus:ring-2 focus:ring-amber-300/35 ${
+              className={`relative inline-flex h-24 w-24 items-center justify-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-amber-300/35 ${
                 isActive
-                  ? "bg-[linear-gradient(135deg,#34d399,#14b8a6)] text-black shadow-[0_18px_40px_rgba(20,184,166,0.25)]"
-                  : "bg-[linear-gradient(135deg,#fde047,#f59e0b)] text-black shadow-[0_18px_40px_rgba(245,158,11,0.22)] hover:-translate-y-0.5"
+                  ? "border-amber-300/35 bg-[linear-gradient(135deg,#fde047,#f59e0b)] text-black shadow-[0_18px_40px_rgba(245,158,11,0.22)]"
+                  : "border-white/10 bg-white/[0.06] text-zinc-100 hover:-translate-y-0.5 hover:bg-white/[0.09]"
               }`}
-              aria-label={isActive ? "Stop live commentary" : "Start live commentary"}
+              aria-label={isActive ? "Turn speaker mic off" : "Turn speaker mic on"}
             >
-              <FaMicrophone />
-              {isActive ? "Talk off" : "Tap to Talk"}
+              <span
+                className={`absolute inset-[-8px] rounded-full border transition-opacity ${
+                  isActive
+                    ? "animate-pulse border-amber-300/35 opacity-100"
+                    : "border-transparent opacity-0"
+                }`}
+              />
+              <span className="text-[1.65rem]">
+                {isActive ? <FaMicrophone /> : <FaMicrophoneSlash />}
+              </span>
             </button>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-sm font-semibold text-zinc-500 transition-colors hover:text-zinc-300"
-            >
-              Close
-            </button>
+            <p className="text-xs font-medium text-zinc-400">
+              {isActive ? "Tap to stop" : "Tap to speak"}
+            </p>
           </div>
         </div>
       </div>

@@ -204,6 +204,23 @@ export default function AnnouncementControls({
           >
             {statusLabel}
           </span>
+          {simpleMode ? (
+            <button
+              type="button"
+              onClick={() => {
+                onToggleEnabled?.(nextEnabled);
+                updateSetting("enabled", nextEnabled);
+              }}
+              className={`inline-flex min-w-[108px] items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition-all ${
+                settings.enabled
+                  ? "bg-emerald-500 text-black shadow-[0_12px_26px_rgba(16,185,129,0.24)]"
+                  : "bg-white/[0.06] text-white hover:bg-white/[0.1]"
+              }`}
+              aria-label={settings.enabled ? "Turn score feedback off" : "Turn score feedback on"}
+            >
+              {settings.enabled ? "On" : "Off"}
+            </button>
+          ) : null}
           {statusText ? (
             <p className="text-xs text-zinc-500">{statusText}</p>
           ) : null}

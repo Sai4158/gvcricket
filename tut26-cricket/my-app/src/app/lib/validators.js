@@ -160,6 +160,14 @@ export const walkieReleaseSchema = z
   })
   .strict();
 
+export const walkieRequestSchema = z
+  .object({
+    participantId: walkieParticipantSchema,
+    role: z.literal("spectator"),
+    token: z.string().min(16).max(400),
+  })
+  .strict();
+
 export const walkieSignalSchema = z
   .object({
     participantId: walkieParticipantSchema,
@@ -282,6 +290,10 @@ export function validateWalkieClaimPayload(body) {
 
 export function validateWalkieReleasePayload(body) {
   return validateWithSchema(walkieReleaseSchema, body);
+}
+
+export function validateWalkieRequestPayload(body) {
+  return validateWithSchema(walkieRequestSchema, body);
 }
 
 export function validateWalkieSignalPayload(body) {

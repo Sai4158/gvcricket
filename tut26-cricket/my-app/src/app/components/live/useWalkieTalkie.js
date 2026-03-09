@@ -38,6 +38,7 @@ export default function useWalkieTalkie({
   const [error, setError] = useState("");
   const [claiming, setClaiming] = useState(false);
   const [countdown, setCountdown] = useState(30);
+  const [requestCooldownLeft, setRequestCooldownLeft] = useState(0);
   const listenerPcRef = useRef(null);
   const speakerPeersRef = useRef(new Map());
   const localStreamRef = useRef(null);
@@ -291,6 +292,18 @@ export default function useWalkieTalkie({
   }, [participantId, snapshot?.activeSpeakerId, snapshot?.expiresAt]);
 
   useEffect(() => {
+    if (requestCooldownLeft <= 0) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setRequestCooldownLeft((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [requestCooldownLeft]);
+
+  useEffect(() => {
     const transmissionId = snapshot?.transmissionId || "";
     if (!transmissionId || previousTransmissionRef.current === transmissionId) {
       if (!transmissionId) {
@@ -426,6 +439,26 @@ export default function useWalkieTalkie({
 
   const dismissNotice = () => setNotice("");
 
+  const requestEnable = async () => {
+    if (!matchId || !participantId || !token || role !== "spectator" || requestCooldownLeft > 0) {
+      return false;
+    }
+
+    try {
+      await sendJson(`/api/matches/${matchId}/walkie/request`, {
+        participantId,
+        role,
+        token,
+      });
+      setRequestCooldownLeft(30);
+      setNotice("Request sent to umpire.");
+      return true;
+    } catch (nextError) {
+      setError(nextError.message || "Could not send walkie request.");
+      return false;
+    }
+  };
+
   const isSelfTalking = snapshot?.activeSpeakerId === participantId;
   const isBusy = Boolean(snapshot?.busy);
   const otherSpeakerBusy = isBusy && !isSelfTalking;
@@ -444,6 +477,11 @@ export default function useWalkieTalkie({
       role === "umpire" &&
       hasUmpireAccess &&
       Number(snapshot?.spectatorCount || 0) > 0,
+    canRequestEnable:
+      role === "spectator" &&
+      !snapshot?.enabled &&
+      Number(snapshot?.umpireCount || 0) > 0 &&
+      requestCooldownLeft === 0,
     canTalk:
       Boolean(snapshot?.enabled) &&
       !otherSpeakerBusy &&
@@ -453,6 +491,8 @@ export default function useWalkieTalkie({
     toggleEnabled,
     startTalking,
     stopTalking,
+    requestEnable,
+    requestCooldownLeft,
     dismissNotice,
   };
 }

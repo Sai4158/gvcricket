@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { FaMicrophone, FaPhoneVolume, FaTimes, FaUsers } from "react-icons/fa";
+import {
+  FaMicrophone,
+  FaMicrophoneSlash,
+  FaPhoneVolume,
+  FaTimes,
+  FaUsers,
+} from "react-icons/fa";
 
 export function WalkieNotice({ notice, onDismiss }) {
   if (!notice) return null;
@@ -44,32 +50,48 @@ export function WalkieTalkButton({
   };
 
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onPointerDown={() => {
-        void startHold();
-      }}
-      onPointerUp={() => {
-        void endHold();
-      }}
-      onPointerLeave={() => {
-        void endHold();
-      }}
-      onPointerCancel={() => {
-        void endHold();
-      }}
-      className={`inline-flex w-full items-center justify-center gap-3 rounded-[24px] px-5 py-4 text-base font-black transition-all ${
-        disabled
-          ? "cursor-not-allowed bg-zinc-900 text-zinc-500"
-          : active || holding
-          ? "bg-emerald-500 text-black shadow-[0_14px_36px_rgba(16,185,129,0.25)]"
-          : "bg-[linear-gradient(135deg,#fde047,#f59e0b)] text-black shadow-[0_14px_36px_rgba(245,158,11,0.2)] hover:-translate-y-0.5"
-      }`}
-    >
-      <FaMicrophone />
-      {active || holding ? `Talking ${countdown}s` : label}
-    </button>
+    <div className="flex flex-col items-center gap-3">
+      <button
+        type="button"
+        disabled={disabled}
+        onPointerDown={() => {
+          void startHold();
+        }}
+        onPointerUp={() => {
+          void endHold();
+        }}
+        onPointerLeave={() => {
+          void endHold();
+        }}
+        onPointerCancel={() => {
+          void endHold();
+        }}
+        className={`relative inline-flex h-24 w-24 items-center justify-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
+          disabled
+            ? "cursor-not-allowed border-white/5 bg-zinc-900 text-zinc-600"
+            : active || holding
+            ? "border-emerald-300/40 bg-emerald-500 text-black shadow-[0_18px_44px_rgba(16,185,129,0.3)]"
+            : "border-white/10 bg-white/[0.06] text-zinc-100 hover:-translate-y-0.5 hover:bg-white/[0.09]"
+        }`}
+        aria-label={active || holding ? "Release walkie talk" : label}
+      >
+        <span
+          className={`absolute inset-[-8px] rounded-full border transition-opacity ${
+            active || holding
+              ? "animate-pulse border-emerald-300/35 opacity-100"
+              : "border-transparent opacity-0"
+          }`}
+        />
+        <span className="text-[1.65rem]">
+          {active || holding ? <FaMicrophone /> : <FaMicrophoneSlash />}
+        </span>
+      </button>
+      <div className="text-center">
+        <p className="text-xs font-medium text-zinc-400">
+          {active || holding ? `Live ${countdown}s` : "Hold to talk"}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -79,9 +101,12 @@ export default function WalkiePanel({
   notice,
   error,
   canEnable,
+  canRequestEnable,
   canTalk,
   isSelfTalking,
   countdown,
+  requestCooldownLeft,
+  onRequestEnable,
   onToggleEnabled,
   onStartTalking,
   onStopTalking,
@@ -111,6 +136,11 @@ export default function WalkiePanel({
                 {isUmpire ? "Walkie-Talkie" : "Push to Talk"}
               </h3>
               <p className="mt-1 text-sm text-zinc-400">{statusText}</p>
+              <p className="mt-1 text-xs text-zinc-500">
+                {isUmpire
+                  ? "Communicate with spectators live."
+                  : "Talk directly with the umpire."}
+              </p>
             </div>
           </div>
           {isUmpire ? (
@@ -160,14 +190,32 @@ export default function WalkiePanel({
         ) : null}
 
         <div className="mt-5">
-          <WalkieTalkButton
-            active={isSelfTalking}
-            disabled={!canTalk}
-            countdown={countdown}
-            onStart={onStartTalking}
-            onStop={onStopTalking}
-            label={isUmpire ? "Hold to reply" : "Hold to talk"}
-          />
+          {isUmpire || snapshot?.enabled ? (
+            <WalkieTalkButton
+              active={isSelfTalking}
+              disabled={!canTalk}
+              countdown={countdown}
+              onStart={onStartTalking}
+              onStop={onStopTalking}
+              label={isUmpire ? "Hold to reply" : "Hold to talk"}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => onRequestEnable?.()}
+              disabled={!canRequestEnable}
+              className={`inline-flex w-full items-center justify-center gap-3 rounded-[24px] px-5 py-4 text-base font-black transition-all ${
+                canRequestEnable
+                  ? "bg-[linear-gradient(135deg,#34d399,#14b8a6)] text-black shadow-[0_14px_36px_rgba(16,185,129,0.25)]"
+                  : "cursor-not-allowed bg-zinc-900 text-zinc-500"
+              }`}
+            >
+              <FaPhoneVolume />
+              {requestCooldownLeft > 0
+                ? `Request sent ${requestCooldownLeft}s`
+                : "Request walkie"}
+            </button>
+          )}
         </div>
       </section>
     </div>

@@ -177,6 +177,24 @@ export default function MatchPageClient({
     window.prompt("Copy spectator link", link);
   };
 
+  const handleWalkieHoldStart = async () => {
+    if (!isLiveMatch) {
+      return;
+    }
+
+    if (!walkie.snapshot?.enabled) {
+      if (!walkie.canEnable) {
+        return;
+      }
+
+      await walkie.toggleEnabled(true);
+    }
+
+    if (walkie.canTalk || walkie.snapshot?.enabled) {
+      await walkie.startTalking();
+    }
+  };
+
   if (authStatus !== "granted") {
     if (authStatus === "checking") return <Splash>Checking umpire access...</Splash>;
     return (
@@ -237,9 +255,7 @@ export default function MatchPageClient({
             </div>
           ) : null}
           <WalkieNotice
-            notice={
-              walkie.snapshot?.activeSpeakerRole === "spectator" ? walkie.notice : ""
-            }
+            notice={walkie.notice}
             onDismiss={walkie.dismissNotice}
           />
           <BallTracker history={oversHistory} />
@@ -263,7 +279,12 @@ export default function MatchPageClient({
             onWalkie={() => setModal({ type: "walkie" })}
             onMic={() => setModal({ type: "mic" })}
             onShare={handleCopyShareLink}
-            onRules={() => setModal({ type: "rules" })}
+            onWalkieHoldStart={handleWalkieHoldStart}
+            onWalkieHoldEnd={() => walkie.stopTalking()}
+            onMicHoldStart={
+              isLiveMatch ? () => micMonitor.start({ pauseMedia: true }) : undefined
+            }
+            onMicHoldEnd={() => micMonitor.stop({ resumeMedia: true })}
             isWalkieActive={Boolean(walkie.snapshot?.enabled)}
             isCommentaryActive={micMonitor.isActive || micMonitor.isPaused}
             isAnnounceActive={Boolean(umpireSettings.enabled)}
@@ -324,9 +345,12 @@ export default function MatchPageClient({
                 notice: walkie.notice,
                 error: walkie.error,
                 canEnable: walkie.canEnable,
+                canRequestEnable: false,
                 canTalk: walkie.canTalk,
                 isSelfTalking: walkie.isSelfTalking,
                 countdown: walkie.countdown,
+                requestCooldownLeft: 0,
+                onRequestEnable: () => {},
                 onToggleEnabled: walkie.toggleEnabled,
                 onStartTalking: walkie.startTalking,
                 onStopTalking: walkie.stopTalking,

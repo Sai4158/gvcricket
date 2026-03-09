@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { FaArrowLeft, FaCheck, FaCopy, FaMicrophone } from "react-icons/fa";
 import AnnouncementControls from "../live/AnnouncementControls";
 import LiveMicModal from "../live/LiveMicModal";
-import WalkiePanel from "../live/WalkiePanel";
+import WalkiePanel, { WalkieNotice } from "../live/WalkiePanel";
 import useLocalMicMonitor from "../live/useLocalMicMonitor";
 import useAnnouncementSettings from "../live/useAnnouncementSettings";
 import useWalkieTalkie from "../live/useWalkieTalkie";
@@ -215,6 +215,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
       </div>
 
       <div className="w-full max-w-4xl mt-4">
+        <WalkieNotice notice={walkie.notice} onDismiss={walkie.dismissNotice} />
+      </div>
+
+      <div className="w-full max-w-4xl mt-4">
         <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(28,28,32,0.96),rgba(10,10,12,0.96))] p-5 text-center shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-sm">
           <div className="flex flex-col items-center gap-4">
             <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-2xl text-black shadow-[0_12px_30px_rgba(16,185,129,0.35)]">
@@ -249,9 +253,12 @@ export default function SessionViewClient({ sessionId, initialData }) {
             notice={walkie.notice}
             error={walkie.error}
             canEnable={false}
+            canRequestEnable={walkie.canRequestEnable}
             canTalk={walkie.canTalk}
             isSelfTalking={walkie.isSelfTalking}
             countdown={walkie.countdown}
+            requestCooldownLeft={walkie.requestCooldownLeft}
+            onRequestEnable={walkie.requestEnable}
             onToggleEnabled={() => {}}
             onStartTalking={walkie.startTalking}
             onStopTalking={walkie.stopTalking}
