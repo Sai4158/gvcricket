@@ -9,6 +9,7 @@ import { Controls } from "../../components/match/MatchControls";
 import { BallTracker } from "../../components/match/MatchBallHistory";
 import MatchActionGrid from "../../components/match/MatchActionGrid";
 import MatchModalLayer from "../../components/match/MatchModalLayer";
+import useLiveRelativeTime from "../../components/live/useLiveRelativeTime";
 import useMatch, {
   triggerMatchHapticFeedback,
 } from "../../components/match/useMatch";
@@ -25,12 +26,14 @@ export default function MatchPage() {
     error,
     isLoading,
     isUpdating,
+    lastUpdatedAt,
     historyStack,
     handleScoreEvent,
     handleUndo,
     handleNextInningsOrEnd,
     patchAndUpdate,
   } = useMatch(matchId, authStatus === "granted");
+  const liveUpdatedLabel = useLiveRelativeTime(lastUpdatedAt);
 
   const handleCopyShareLink = () => {
     if (!match) return;
@@ -85,6 +88,13 @@ export default function MatchPage() {
     <>
       <main className="min-h-screen font-sans bg-zinc-950 text-white p-4">
         <div className="max-w-md mx-auto pt-8 pb-24">
+          <div className="flex items-center justify-center gap-3 mb-4 text-sm text-zinc-300">
+            <span className="inline-flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse"></span>
+              Live
+            </span>
+            <span>{liveUpdatedLabel}</span>
+          </div>
           {match.result && (
             <div className="bg-green-900/50 text-green-300 p-4 rounded-xl text-center mb-4 ring-1 ring-green-500">
               <h3 className="font-bold text-xl">Match Over</h3>

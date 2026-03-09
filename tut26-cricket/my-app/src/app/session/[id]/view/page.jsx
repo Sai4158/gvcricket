@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import useSWR from "swr";
 import { FaArrowLeft, FaCheck, FaCopy } from "react-icons/fa";
+import useEventSource from "../../../components/live/useEventSource";
+import useLiveRelativeTime from "../../../components/live/useLiveRelativeTime";
 import LiveScoreCard from "../../../components/session-view/LiveScoreCard";
 import SplashMsg from "../../../components/session-view/SplashMsg";
 import TeamInningsDetail from "../../../components/session-view/TeamInningsDetail";
@@ -12,20 +13,25 @@ import { getTeamBundle } from "../../../lib/team-utils";
 export default function ViewSessionPage() {
   const { id: sessionId } = useParams();
   const [copied, setCopied] = useState(false);
+  const [data, setData] = useState(null);
+  const [streamError, setStreamError] = useState("");
   const router = useRouter();
+  const liveUpdatedLabel = useLiveRelativeTime(data?.updatedAt);
 
-  const { data, error } = useSWR(
-    sessionId ? `/api/sessions/${sessionId}` : null,
-    async (url) => {
-      const session = await fetch(url).then((res) => res.json());
-      if (!session.match) throw new Error("Match not linked to session");
-      const match = await fetch(`/api/matches/${session.match}`).then((res) =>
-        res.json()
-      );
-      return { session, match };
+  useEventSource({
+    url: sessionId ? `/api/live/sessions/${sessionId}` : null,
+    event: "session",
+    enabled: Boolean(sessionId),
+    onMessage: (payload) => {
+      setData(payload);
+      setStreamError("");
     },
-    { refreshInterval: 15000 }
-  );
+    onError: () => {
+      if (!data) {
+        setStreamError("Could not load session data.");
+      }
+    },
+  });
 
   const sessionData = data?.session;
   const match = data?.match;
@@ -43,7 +49,7 @@ export default function ViewSessionPage() {
   };
 
   if (!sessionId) return <SplashMsg>No Session ID provided.</SplashMsg>;
-  if (error) return <SplashMsg>Could not load session data.</SplashMsg>;
+  if (streamError) return <SplashMsg>Could not load session data.</SplashMsg>;
   if (!sessionData) return <SplashMsg>Loading Session...</SplashMsg>;
   if (!match) {
     return <SplashMsg>The match for this session has not started yet.</SplashMsg>;
@@ -67,8 +73,14 @@ export default function ViewSessionPage() {
             {sessionData.name}
           </h1>
           <br />
-          <p className="text-green-400 mb-2">Live Spectator View</p>
-          <p className="text-amber-500 font-bold text-xl">Updates Every 15s</p>
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <p className="text-green-400">Live Spectator View</p>
+            <span className="inline-flex items-center gap-2 text-sm text-zinc-300">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse"></span>
+              Live
+            </span>
+          </div>
+          <p className="text-amber-500 font-bold text-xl">{liveUpdatedLabel}</p>
         </div>
         <button
           onClick={handleCopy}

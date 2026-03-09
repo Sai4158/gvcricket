@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import useSWR from "swr";
 import { addBallToHistory, buildWinByWicketsText } from "../../lib/match-scoring";
-
-const fetcher = (url) => fetch(url).then((res) => res.json());
+import useEventSource from "../live/useEventSource";
 
 function triggerHapticFeedback() {
   if (typeof window !== "undefined" && navigator.vibrate) {
@@ -19,16 +17,35 @@ export function triggerMatchHapticFeedback() {
 
 export default function useMatch(matchId, hasAccess) {
   const router = useRouter();
-  const {
-    data: match,
-    error,
-    isLoading,
-    mutate,
-  } = useSWR(matchId && hasAccess ? `/api/matches/${matchId}` : null, fetcher, {
-    revalidateOnFocus: false,
-  });
+  const [match, setMatch] = useState(null);
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(Boolean(matchId && hasAccess));
   const [isUpdating, setIsUpdating] = useState(false);
   const [historyStack, setHistoryStack] = useState([]);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState("");
+
+  useEffect(() => {
+    if (!matchId || !hasAccess) {
+      setMatch(null);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+  }, [hasAccess, matchId]);
+
+  useEventSource({
+    url: matchId && hasAccess ? `/api/live/matches/${matchId}` : null,
+    event: "match",
+    enabled: Boolean(matchId && hasAccess),
+    onMessage: (payload) => {
+      setMatch(payload.match || null);
+      setLastUpdatedAt(payload.updatedAt || "");
+      setError(null);
+      setIsLoading(false);
+    },
+  });
 
   const patchAndUpdate = async (payload, isUndo = false) => {
     if (!matchId || !hasAccess || isUpdating || !match) return;
@@ -39,9 +56,10 @@ export default function useMatch(matchId, hasAccess) {
     }
 
     const optimisticData = { ...match, ...payload };
+    setMatch(optimisticData);
+    setLastUpdatedAt(new Date().toISOString());
 
     try {
-      await mutate(optimisticData, false);
       const response = await fetch(`/api/matches/${matchId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -54,11 +72,10 @@ export default function useMatch(matchId, hasAccess) {
           .catch(() => ({ message: "Failed to update match." }));
         throw new Error(body.message || "Failed to update match.");
       }
-
-      await mutate();
     } catch (caughtError) {
       console.error("Failed to update match:", caughtError);
-      await mutate(match, true);
+      setMatch(match);
+      setError(caughtError);
     } finally {
       setIsUpdating(false);
     }
@@ -133,6 +150,7 @@ export default function useMatch(matchId, hasAccess) {
     error,
     isLoading,
     isUpdating,
+    lastUpdatedAt,
     historyStack,
     handleScoreEvent,
     handleUndo,

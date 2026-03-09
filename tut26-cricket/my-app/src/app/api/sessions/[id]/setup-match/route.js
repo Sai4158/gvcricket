@@ -1,18 +1,55 @@
 import { connectDB } from "../../../../lib/db";
 import { NextResponse } from "next/server";
+import { jsonError, jsonRateLimit } from "../../../../lib/api-response";
+import { writeAuditLog } from "../../../../lib/audit-log";
 import { getMatchAccessCookie } from "../../../../lib/match-access";
+import { getRequestMeta } from "../../../../lib/request-meta";
+import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { buildTeamUpdate } from "../../../../lib/team-utils";
+import { validateSetupMatchPayload } from "../../../../lib/validators";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 
 export async function POST(req, { params }) {
   const { id: sessionId } = params;
   let transactionSession;
+  const meta = getRequestMeta(req);
 
   try {
+    const setupLimit = enforceRateLimit({
+      key: `setup-match:${sessionId}:${meta.ip}`,
+      limit: 4,
+      windowMs: 60 * 1000,
+      blockMs: 60 * 1000,
+    });
+
+    if (!setupLimit.allowed) {
+      await writeAuditLog({
+        action: "match_setup_rate_limited",
+        targetType: "session",
+        targetId: sessionId,
+        status: "failure",
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        metadata: { retryAfterMs: setupLimit.retryAfterMs },
+      });
+
+      return jsonRateLimit(
+        "Too many match setup attempts. Try again shortly.",
+        setupLimit.retryAfterMs
+      );
+    }
+
     await connectDB();
+    const body = await req.json().catch(() => null);
+    const validation = validateSetupMatchPayload(body);
+
+    if (!validation.ok) {
+      return jsonError(validation.message, 400);
+    }
+
     const { teamAName, teamAPlayers, teamBName, teamBPlayers, overs } =
-      await req.json();
+      validation.value;
     const normalizedTeamA = buildTeamUpdate(teamAName, teamAPlayers);
     const normalizedTeamB = buildTeamUpdate(teamBName, teamBPlayers);
 
@@ -24,10 +61,7 @@ export async function POST(req, { params }) {
       !overs ||
       !sessionId
     ) {
-      return Response.json(
-        { message: "Missing required fields." },
-        { status: 400 }
-      );
+      return jsonError("Missing required fields.", 400);
     }
 
     let createdMatch = null;
@@ -79,17 +113,25 @@ export async function POST(req, { params }) {
     const response = NextResponse.json(createdMatch, { status: 201 });
     const matchCookie = getMatchAccessCookie(createdMatch._id);
     response.cookies.set(matchCookie.name, matchCookie.value, matchCookie.options);
+
+    await writeAuditLog({
+      action: "match_setup",
+      targetType: "match",
+      targetId: String(createdMatch._id),
+      status: "success",
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      metadata: { sessionId },
+    });
+
     return response;
   } catch (error) {
     if (error.message === "SESSION_NOT_FOUND") {
-      return Response.json({ message: "Session not found" }, { status: 404 });
+      return jsonError("Session not found", 404);
     }
 
     console.error("Error setting up match:", error);
-    return Response.json(
-      { message: "Error setting up match", error: error.message },
-      { status: 500 }
-    );
+    return jsonError("Error setting up match", 500, { error: error.message });
   } finally {
     if (transactionSession) {
       await transactionSession.endSession();

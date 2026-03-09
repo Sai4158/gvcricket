@@ -55,6 +55,11 @@ const MatchSchema = new mongoose.Schema(
     },
     widesInRow: { type: Number, default: 0 },
     balls: [BallSchema],
+    images: { type: [String], default: [] },
+    announcer: { type: mongoose.Schema.Types.Mixed, default: {} },
+    uiMeta: { type: mongoose.Schema.Types.Mixed, default: {} },
+    mediaUpdatedAt: { type: Date, default: null },
+    lastLiveEvent: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   { timestamps: true }
 );

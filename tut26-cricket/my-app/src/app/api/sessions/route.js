@@ -1,12 +1,57 @@
 import Session from "../../../models/Session.js";
+import { jsonError, jsonRateLimit } from "../../lib/api-response";
+import { writeAuditLog } from "../../lib/audit-log";
 import { connectDB } from "../../lib/db";
+import { getRequestMeta } from "../../lib/request-meta";
+import { enforceRateLimit } from "../../lib/rate-limit";
 import { getTeamBundle } from "../../lib/team-utils";
+import { validateSessionCreatePayload } from "../../lib/validators";
 
 export async function POST(req) {
   try {
-    const body = await req.json();
+    const meta = getRequestMeta(req);
+    const createLimit = enforceRateLimit({
+      key: `session-create:${meta.ip}`,
+      limit: 5,
+      windowMs: 60 * 1000,
+      blockMs: 60 * 1000,
+    });
+
+    if (!createLimit.allowed) {
+      await writeAuditLog({
+        action: "session_create_rate_limited",
+        targetType: "session",
+        status: "failure",
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        metadata: { retryAfterMs: createLimit.retryAfterMs },
+      });
+
+      return jsonRateLimit(
+        "Too many session creation attempts. Try again shortly.",
+        createLimit.retryAfterMs
+      );
+    }
+
+    const body = await req.json().catch(() => null);
+    const validation = validateSessionCreatePayload(body);
+
+    if (!validation.ok) {
+      return jsonError(validation.message, 400);
+    }
+
     await connectDB();
-    const doc = await Session.create(body);
+    const doc = await Session.create(validation.value);
+
+    await writeAuditLog({
+      action: "session_create",
+      targetType: "session",
+      targetId: String(doc._id),
+      status: "success",
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    });
+
     return Response.json(doc, { status: 201 });
   } catch (error) {
     console.error("Error creating session:", error);

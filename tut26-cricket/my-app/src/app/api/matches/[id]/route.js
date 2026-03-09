@@ -1,10 +1,15 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { jsonError, jsonRateLimit } from "../../../lib/api-response";
+import { writeAuditLog } from "../../../lib/audit-log";
 import { connectDB } from "../../../lib/db";
 import {
   getMatchAccessCookieName,
   hasValidMatchAccess,
 } from "../../../lib/match-access";
+import { getRequestMeta } from "../../../lib/request-meta";
+import { enforceRateLimit } from "../../../lib/rate-limit";
+import { validateMatchPatchPayload } from "../../../lib/validators";
 import Match from "../../../../models/Match";
 import Session from "../../../../models/Session";
 
@@ -35,48 +40,81 @@ export async function GET(_req, { params }) {
 
 export async function PATCH(req, { params }) {
   try {
+    const meta = getRequestMeta(req);
     const hasAccess = await requireMatchAccess(params.id);
 
     if (!hasAccess) {
-      return NextResponse.json(
-        { message: "Umpire access required" },
-        { status: 403 }
+      await writeAuditLog({
+        action: "match_patch_denied",
+        targetType: "match",
+        targetId: params.id,
+        status: "failure",
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+      });
+
+      return jsonError("Umpire access required", 403);
+    }
+
+    const updateLimit = enforceRateLimit({
+      key: `match-patch:${params.id}:${meta.ip}`,
+      limit: 12,
+      windowMs: 1000,
+      blockMs: 3000,
+    });
+
+    if (!updateLimit.allowed) {
+      await writeAuditLog({
+        action: "match_patch_rate_limited",
+        targetType: "match",
+        targetId: params.id,
+        status: "failure",
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        metadata: { retryAfterMs: updateLimit.retryAfterMs },
+      });
+
+      return jsonRateLimit(
+        "Too many scoring updates. Slow down briefly.",
+        updateLimit.retryAfterMs
       );
     }
 
-    const data = await req.json();
-    await connectDB();
+    const data = await req.json().catch(() => null);
+    const validation = validateMatchPatchPayload(data);
 
-    const updateQuery = { $set: {} };
-    const updatableFields = [
-      "score",
-      "outs",
-      "result",
-      "isOngoing",
-      "innings",
-      "innings1",
-      "innings2",
-      "balls",
-      "tossWinner",
-      "tossDecision",
-      "teamA",
-      "teamB",
-      "teamAName",
-      "teamBName",
-      "overs",
-    ];
+    if (!validation.ok) {
+      return jsonError(validation.message, 400);
+    }
 
-    for (const key in data) {
-      if (updatableFields.includes(key)) {
-        updateQuery.$set[key] = data[key];
+    const changedFields = Object.keys(validation.value);
+    const isMediaUpdate = changedFields.some(
+      (field) =>
+        field.toLowerCase().includes("image") ||
+        field.toLowerCase().includes("media")
+    );
+
+    if (isMediaUpdate) {
+      const mediaLimit = enforceRateLimit({
+        key: `match-media:${params.id}:${meta.ip}`,
+        limit: 5,
+        windowMs: 60 * 1000,
+        blockMs: 60 * 1000,
+      });
+
+      if (!mediaLimit.allowed) {
+        return jsonRateLimit(
+          "Too many media update attempts. Try again shortly.",
+          mediaLimit.retryAfterMs
+        );
       }
     }
 
-    if (Object.keys(updateQuery.$set).length === 0) {
-      return NextResponse.json(
-        { message: "No valid updatable fields provided" },
-        { status: 400 }
-      );
+    await connectDB();
+
+    const updateQuery = { $set: {} };
+    for (const key in validation.value) {
+      updateQuery.$set[key] = validation.value[key];
     }
 
     const updated = await Match.findByIdAndUpdate(params.id, updateQuery, {
@@ -85,10 +123,7 @@ export async function PATCH(req, { params }) {
     });
 
     if (!updated) {
-      return NextResponse.json(
-        { message: "Match not found for update" },
-        { status: 404 }
-      );
+      return jsonError("Match not found for update", 404);
     }
 
     const sessionUpdate = {};
@@ -111,6 +146,16 @@ export async function PATCH(req, { params }) {
       });
     }
 
+    await writeAuditLog({
+      action: isMediaUpdate ? "match_media_edit" : "match_patch",
+      targetType: "match",
+      targetId: params.id,
+      status: "success",
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      metadata: { fields: changedFields },
+    });
+
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {
     if (error.name === "ValidationError") {
@@ -129,21 +174,37 @@ export async function PATCH(req, { params }) {
 
 export async function DELETE(_req, { params }) {
   try {
+    const meta = getRequestMeta(_req);
     const hasAccess = await requireMatchAccess(params.id);
 
     if (!hasAccess) {
-      return NextResponse.json(
-        { message: "Umpire access required" },
-        { status: 403 }
-      );
+      await writeAuditLog({
+        action: "match_delete_denied",
+        targetType: "match",
+        targetId: params.id,
+        status: "failure",
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+      });
+
+      return jsonError("Umpire access required", 403);
     }
 
     await connectDB();
     const deletedMatch = await Match.findByIdAndDelete(params.id);
 
     if (!deletedMatch) {
-      return NextResponse.json({ message: "Match not found" }, { status: 404 });
+      return jsonError("Match not found", 404);
     }
+
+    await writeAuditLog({
+      action: "match_delete",
+      targetType: "match",
+      targetId: params.id,
+      status: "success",
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    });
 
     return new Response(null, { status: 204 });
   } catch (error) {

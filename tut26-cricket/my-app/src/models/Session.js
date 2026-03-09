@@ -16,6 +16,10 @@ const SessionSchema = new mongoose.Schema(
     teamBName: { type: String, default: "", trim: true },
     teamA: { type: [String], default: [] },
     teamB: { type: [String], default: [] },
+    images: { type: [String], default: [] },
+    announcer: { type: mongoose.Schema.Types.Mixed, default: {} },
+    uiMeta: { type: mongoose.Schema.Types.Mixed, default: {} },
+    mediaUpdatedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
