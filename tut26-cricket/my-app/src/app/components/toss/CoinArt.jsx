@@ -31,7 +31,7 @@ function CoinShell({ rimStroke, frontFill, backFill, text, textColor, imageSize 
         {text}
       </text>
       <image
-        href="/gv.png"
+        href="/gvLogo.png"
         x={60 - imageSize / 2}
         y={60 - imageSize / 2 - 2}
         width={imageSize}
@@ -88,7 +88,7 @@ export function SpinningCoin() {
       />
       <ellipse cx="60" cy="60" rx="30" ry="47" stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" />
       <image
-        href="/gv.png"
+        href="/gvLogo.png"
         x="41"
         y="42"
         width="38"

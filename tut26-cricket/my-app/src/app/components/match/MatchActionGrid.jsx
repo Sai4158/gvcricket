@@ -208,6 +208,9 @@ export default function MatchActionGrid({
   return (
     <div className="mt-8 flex justify-center border-t border-zinc-700 pt-6">
       <div className="space-y-5">
+        <p className="text-center text-[12px] text-white">
+          Hold to talk. Tap to open.
+        </p>
         <div className="grid grid-cols-3 gap-x-4 gap-y-6">
           <ActionIconButton
             onClick={onWalkie}
@@ -304,9 +307,6 @@ export default function MatchActionGrid({
             compact
           />
         </div>
-        <p className="text-center text-[11px] text-zinc-500">
-          Hold to talk. Tap to open.
-        </p>
       </div>
     </div>
   );

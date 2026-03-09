@@ -40,6 +40,8 @@ export default function useWalkieTalkie({
   const previousTransmissionRef = useRef("");
   const snapshotRef = useRef(null);
   const pageMediaDuckRef = useRef([]);
+  const listenerPendingCandidatesRef = useRef([]);
+  const speakerPendingCandidatesRef = useRef(new Map());
 
   useEffect(() => {
     snapshotRef.current = snapshot;
@@ -80,6 +82,7 @@ export default function useWalkieTalkie({
     }
 
     restorePageMedia(pageMediaDuckRef);
+    listenerPendingCandidatesRef.current = [];
   };
 
   const ensureRemoteAudio = useCallback(() => {
@@ -142,6 +145,7 @@ export default function useWalkieTalkie({
       peer.close();
     });
     speakerPeersRef.current.clear();
+    speakerPendingCandidatesRef.current.clear();
   };
 
   const sendJson = useCallback(async (path, body) => {
@@ -212,6 +216,7 @@ export default function useWalkieTalkie({
             }
           };
           speakerPeersRef.current.set(message.fromId, peer);
+          speakerPendingCandidatesRef.current.set(message.fromId, []);
         }
 
         if (payload.type === "offer" && payload.sdp) {
@@ -219,6 +224,12 @@ export default function useWalkieTalkie({
             type: "offer",
             sdp: payload.sdp,
           });
+          const queuedCandidates =
+            speakerPendingCandidatesRef.current.get(message.fromId) || [];
+          for (const candidate of queuedCandidates) {
+            await peer.addIceCandidate(candidate);
+          }
+          speakerPendingCandidatesRef.current.set(message.fromId, []);
           const answer = await peer.createAnswer();
           await peer.setLocalDescription(answer);
           await sendSignal(message.fromId, {
@@ -226,11 +237,19 @@ export default function useWalkieTalkie({
             sdp: answer.sdp || "",
           });
         } else if (payload.type === "ice-candidate" && payload.candidate) {
-          await peer.addIceCandidate({
+          const nextCandidate = {
             candidate: payload.candidate,
             sdpMid: payload.sdpMid || null,
             sdpMLineIndex: payload.sdpMLineIndex ?? null,
-          });
+          };
+          if (peer.remoteDescription) {
+            await peer.addIceCandidate(nextCandidate);
+          } else {
+            const queuedCandidates =
+              speakerPendingCandidatesRef.current.get(message.fromId) || [];
+            queuedCandidates.push(nextCandidate);
+            speakerPendingCandidatesRef.current.set(message.fromId, queuedCandidates);
+          }
         }
 
         return;
@@ -245,12 +264,21 @@ export default function useWalkieTalkie({
           type: "answer",
           sdp: payload.sdp,
         });
+        for (const candidate of listenerPendingCandidatesRef.current) {
+          await listenerPcRef.current.addIceCandidate(candidate);
+        }
+        listenerPendingCandidatesRef.current = [];
       } else if (payload.type === "ice-candidate" && payload.candidate) {
-        await listenerPcRef.current.addIceCandidate({
+        const nextCandidate = {
           candidate: payload.candidate,
           sdpMid: payload.sdpMid || null,
           sdpMLineIndex: payload.sdpMLineIndex ?? null,
-        });
+        };
+        if (listenerPcRef.current.remoteDescription) {
+          await listenerPcRef.current.addIceCandidate(nextCandidate);
+        } else {
+          listenerPendingCandidatesRef.current.push(nextCandidate);
+        }
       }
     } catch (nextError) {
       setError(nextError.message || "Walkie signal failed.");

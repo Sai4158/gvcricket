@@ -19,8 +19,8 @@ const siteName = "GV Cricket";
 const siteDescription =
   "Free live cricket scoring app. Track ball-by-ball scores, manage teams, and get real-time updates for any match.";
 const siteUrl = "https://gvcricket.com/"; // As requested
-const gvLogoPath = "/gv.png";
-const gvIconPath = "/gv.png";
+const gvLogoPath = "/gvLogo.png";
+const gvIconPath = "/gvLogo.png";
 
 export const metadata = {
   metadataBase: new URL(siteUrl),

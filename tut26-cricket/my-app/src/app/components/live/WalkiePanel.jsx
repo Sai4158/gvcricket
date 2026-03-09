@@ -157,8 +157,11 @@ export function WalkieTalkButton({
       </button>
       <div className="text-center">
         <p className="text-xs font-medium text-zinc-400">
-          {active || holding ? `Live ${countdown}s` : "Hold to talk"}
+          {active || holding ? "Live" : "Hold to talk"}
         </p>
+        {active || holding ? (
+          <p className="mt-1 text-[11px] text-zinc-500">{countdown}s</p>
+        ) : null}
       </div>
     </div>
   );
@@ -188,10 +191,14 @@ export default function WalkiePanel({
   const statusText = !snapshot?.enabled
     ? "Walkie-talkie off"
     : snapshot?.activeSpeakerRole === "umpire"
-    ? "Umpire is replying"
+    ? isUmpire
+      ? "You are live"
+      : "Umpire is live"
     : snapshot?.activeSpeakerRole === "spectator"
-    ? "A spectator is speaking"
-    : "Ready to talk";
+    ? isUmpire
+      ? "Spectator is live"
+      : "You are live"
+    : "Walkie-talkie on";
 
   const handleToggle = (checked) => {
     if (isUmpire) {
@@ -244,30 +251,21 @@ export default function WalkiePanel({
           ) : null}
         </div>
 
-        <div className="mt-4 flex items-center gap-3 text-sm text-zinc-400">
+        <div className="mt-4 flex items-center justify-center text-sm text-zinc-400">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1">
             <FaUsers />
             {snapshot?.spectatorCount || 0} spectators
           </span>
-          {snapshot?.busy ? (
-            <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-amber-200">
-              Busy
-            </span>
-          ) : (
-            <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-emerald-200">
-              Idle
-            </span>
-          )}
         </div>
 
         {snapshot?.activeSpeakerRole === "spectator" && isUmpire ? (
-          <div className="mt-4 rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
+          <div className="mt-4 rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-center text-sm text-sky-100">
             {snapshot.activeSpeakerName || "Spectator"} is talking.
           </div>
         ) : null}
 
         {error ? (
-          <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-center text-sm text-rose-200">
             {error}
           </div>
         ) : null}
@@ -305,7 +303,7 @@ export default function WalkiePanel({
           </div>
         ) : null}
 
-        <div className="mt-5">
+        <div className="mt-5 flex justify-center">
           {isUmpire || snapshot?.enabled ? (
             <WalkieTalkButton
               active={isSelfTalking}

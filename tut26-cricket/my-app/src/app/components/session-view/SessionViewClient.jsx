@@ -456,7 +456,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
             </button>
           </header>
 
-          <div className="mt-8">
+          <div className="mt-8 flex justify-center">
             <LiveScoreCard match={match} />
           </div>
         </div>

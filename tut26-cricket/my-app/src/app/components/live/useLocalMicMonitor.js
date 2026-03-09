@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { playUiTone } from "../../lib/page-audio";
+import { duckPageMedia, playUiTone, restorePageMedia } from "../../lib/page-audio";
 
 function getMicErrorMessage(error) {
   const name = String(error?.name || "");
@@ -28,41 +28,26 @@ export default function useLocalMicMonitor() {
   const audioContextRef = useRef(null);
   const gainLevelRef = useRef(2);
   const pausedMediaRef = useRef([]);
+  const isActiveRef = useRef(false);
+  const isPausedRef = useRef(false);
   const [isActive, setIsActive] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [gainLevel, setGainLevelState] = useState(2);
   const [error, setError] = useState("");
 
-  const pausePageMedia = () => {
-    if (typeof document === "undefined") {
-      return;
-    }
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
 
-    const pausedMedia = [];
-    const elements = document.querySelectorAll("audio, video");
-
-    elements.forEach((element) => {
-      if (!element.paused && !element.ended) {
-        pausedMedia.push(element);
-        void element.pause();
-      }
-    });
-
-    pausedMediaRef.current = pausedMedia;
-  };
-
-  const resumePausedMedia = () => {
-    const pausedMedia = pausedMediaRef.current;
-    pausedMediaRef.current = [];
-
-    pausedMedia.forEach((element) => {
-      void element.play().catch(() => {});
-    });
-  };
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
 
   const stop = useCallback(async ({ resumeMedia = false } = {}) => {
-    const wasLive = Boolean(streamRef.current || isActive || isPaused);
+    const wasLive = Boolean(
+      streamRef.current || isActiveRef.current || isPausedRef.current
+    );
 
     try {
       sourceRef.current?.disconnect();
@@ -94,13 +79,13 @@ export default function useLocalMicMonitor() {
     setIsPaused(false);
 
     if (resumeMedia) {
-      resumePausedMedia();
+      restorePageMedia(pausedMediaRef);
     }
 
     if (wasLive) {
       playUiTone({ frequency: 640, durationMs: 140, type: "triangle", volume: 0.035 });
     }
-  }, [isActive, isPaused]);
+  }, []);
 
   const start = async ({ pauseMedia = false } = {}) => {
     if (
@@ -126,7 +111,7 @@ export default function useLocalMicMonitor() {
       await stop({ resumeMedia: false });
 
       if (pauseMedia) {
-        pausePageMedia();
+        duckPageMedia(pausedMediaRef, 0.18);
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -207,8 +192,10 @@ export default function useLocalMicMonitor() {
     }
   };
 
-  useEffect(() => () => {
-    void stop();
+  useEffect(() => {
+    return () => {
+      void stop();
+    };
   }, [stop]);
 
   return {

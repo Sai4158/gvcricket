@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# GV Cricket
 
-## Getting Started
+GV Cricket is a Next.js live cricket scoring app with:
 
-First, run the development server:
+- live umpire scoring
+- live spectator updates over SSE
+- walkie-talkie and speaker mic tools
+- optional match images
+- MongoDB + Mongoose persistence
+
+## Local development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## Required environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Use [.env.example](./.env.example) as the template.
 
-## Learn More
+Required:
 
-To learn more about Next.js, take a look at the following resources:
+- `MONGODB_URI`
+- `MATCH_ACCESS_SECRET`
+- `UMPIRE_ADMIN_PIN`
+- `MATCH_MEDIA_PIN`
+- `IMGBB_API_KEY`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Vercel deployment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This app is configured for Vercel production deployment.
 
-## Deploy on Vercel
+### Recommended project settings
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Framework preset: `Next.js`
+- Node.js version: `20.x`
+- Region: `iad1`
 
-Check out the [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Required Vercel environment variables
+
+Add these in the Vercel dashboard:
+
+- `MONGODB_URI`
+- `MATCH_ACCESS_SECRET`
+- `UMPIRE_ADMIN_PIN`
+- `MATCH_MEDIA_PIN`
+- `IMGBB_API_KEY`
+
+### Important live runtime requirements
+
+- MongoDB must support change streams
+- Use MongoDB Atlas or another replica set deployment
+- The live SSE routes are configured for Node runtime and longer execution windows
+
+## Production notes
+
+- Match images use `gvLogo.png` for app branding and icons
+- SSE live routes are pinned to Node runtime
+- Security headers are applied through middleware
+- MongoDB connections are cached server-side
+- Walkie-talkie state is live-only and not persisted to MongoDB
+
+## Build and test
+
+```bash
+npm run lint
+npm run test
+npm run build
+```
+
+## Deploy checklist
+
+- set all required Vercel env vars
+- verify MongoDB replica set / Atlas change streams
+- verify live routes connect in production
+- verify `gvLogo.png` is used for favicon/app branding
+- verify umpire PIN and image PIN are set correctly

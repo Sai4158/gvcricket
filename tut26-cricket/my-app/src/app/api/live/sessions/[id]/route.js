@@ -6,6 +6,8 @@ import Session from "../../../../../models/Session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
+export const preferredRegion = ["iad1"];
 
 function sseHeaders() {
   return {

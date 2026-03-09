@@ -5,6 +5,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  compress: true,
+  poweredByHeader: false,
+  images: {
+    formats: ["image/avif", "image/webp"],
+  },
+  serverExternalPackages: ["@tensorflow/tfjs", "nsfwjs", "sharp"],
   turbopack: {
     root: __dirname,
   },

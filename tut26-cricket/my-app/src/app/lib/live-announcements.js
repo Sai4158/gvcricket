@@ -293,5 +293,30 @@ export function buildUmpireAnnouncement(event, mode = "simple") {
     return "";
   }
 
-  return describeBall(event.ball);
+  const ball = event.ball;
+  if (!ball) {
+    return "";
+  }
+
+  if (ball.isOut) {
+    return ball.runs > 0
+      ? `${ball.runs} run${ball.runs === 1 ? "" : "s"} and out`
+      : "Out";
+  }
+
+  if (ball.extraType === "wide") {
+    const extraRuns = Math.max(Number(ball.runs || 0) - 1, 0);
+    return extraRuns > 0 ? `Wide plus ${extraRuns}` : "Wide";
+  }
+
+  if (ball.extraType === "noball") {
+    const extraRuns = Math.max(Number(ball.runs || 0) - 1, 0);
+    return extraRuns > 0 ? `No ball plus ${extraRuns}` : "No ball";
+  }
+
+  if (ball.runs === 0) {
+    return "Dot";
+  }
+
+  return `${ball.runs} run${ball.runs === 1 ? "" : "s"}`;
 }

@@ -45,7 +45,7 @@ export default function HeroSection({ liveMatch = null }) {
             transition={{ type: "spring", stiffness: 100, delay: 0.2 }}
           >
             <Image
-              src="/gv.png"
+              src="/gvLogo.png"
               alt="GV Cricket logo"
               width={500}
               height={400}
@@ -69,7 +69,7 @@ export default function HeroSection({ liveMatch = null }) {
                 "linear-gradient(to right, #fde047, #fbcfe8, #fb923c, #fbcfe8, #fde047)",
             }}
           >
-            The Home of GV Cricket.
+            End-to-end cricket scoring, made simple.
           </motion.h1>
         </div>
       </motion.div>
