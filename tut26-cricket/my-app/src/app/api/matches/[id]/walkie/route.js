@@ -2,21 +2,18 @@ import { cookies } from "next/headers";
 import { jsonError } from "../../../../lib/api-response";
 import { writeAuditLog } from "../../../../lib/audit-log";
 import { connectDB } from "../../../../lib/db";
-import { buildSessionMirrorUpdate } from "../../../../lib/match-engine";
 import {
   getMatchAccessCookieName,
   hasValidMatchAccess,
 } from "../../../../lib/match-access";
-import { serializePublicMatch } from "../../../../lib/public-data";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { parseJsonRequest } from "../../../../lib/request-security";
 import { walkieToggleSchema } from "../../../../lib/validators";
 import {
-  hydrateWalkieEnabled,
+  getWalkieSnapshot,
   setWalkieEnabled,
 } from "../../../../lib/walkie-talkie";
 import Match from "../../../../../models/Match";
-import Session from "../../../../../models/Session";
 
 async function hasMatchAccess(matchId, accessVersion) {
   const cookieStore = await cookies();
@@ -50,23 +47,9 @@ export async function POST(req, { params }) {
     }
 
     const { enabled } = parsedRequest.value;
-    const currentSnapshot = hydrateWalkieEnabled(
-      id,
-      Boolean(match.walkieTalkieEnabled)
-    );
-
-    if (enabled && Number(currentSnapshot.spectatorCount || 0) === 0) {
-      return jsonError("At least one spectator must be connected.", 409);
-    }
+    const currentSnapshot = getWalkieSnapshot(id);
 
     const snapshot = setWalkieEnabled(id, enabled);
-
-    match.walkieTalkieEnabled = Boolean(snapshot.enabled);
-    match.walkieTalkieUpdatedAt = new Date();
-    await match.save();
-    await Session.findByIdAndUpdate(match.sessionId, {
-      $set: buildSessionMirrorUpdate(match),
-    });
 
     await writeAuditLog({
       action: enabled ? "walkie_enabled" : "walkie_disabled",
@@ -79,7 +62,6 @@ export async function POST(req, { params }) {
 
     return Response.json(
       {
-        match: serializePublicMatch(match),
         walkie: snapshot,
       },
       { headers: { "Cache-Control": "no-store" } }
@@ -92,12 +74,12 @@ export async function POST(req, { params }) {
 export async function GET(_req, { params }) {
   const { id } = await params;
   await connectDB();
-  const match = await Match.findById(id).select("_id walkieTalkieEnabled");
+  const match = await Match.findById(id).select("_id");
   if (!match) {
     return jsonError("Match not found.", 404);
   }
 
-  const snapshot = hydrateWalkieEnabled(id, Boolean(match.walkieTalkieEnabled));
+  const snapshot = getWalkieSnapshot(id);
   return Response.json(
     {
       walkie: snapshot,

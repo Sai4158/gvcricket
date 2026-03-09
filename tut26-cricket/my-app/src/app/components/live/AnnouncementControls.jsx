@@ -3,7 +3,6 @@
 import { useMemo, useRef, useState } from "react";
 import {
   FaMicrophone,
-  FaPlay,
   FaTimes,
   FaVolumeMute,
   FaVolumeUp,
@@ -20,6 +19,30 @@ function getStatusLabel({ enabled, talkState }) {
   if (talkState === "listening") return "Listening";
   if (talkState === "busy") return "Busy";
   return enabled ? "Ready" : "Ready";
+}
+
+function IosSwitch({ checked, onChange, disabled = false, label }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange?.(!checked)}
+      className={`relative inline-flex h-8 w-[54px] items-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
+        checked
+          ? "border-emerald-300/35 bg-emerald-500 shadow-[0_10px_24px_rgba(16,185,129,0.22)]"
+          : "border-white/10 bg-white/[0.08]"
+      } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+    >
+      <span
+        className={`inline-flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition-transform ${
+          checked ? "translate-x-[26px]" : "translate-x-[3px]"
+        }`}
+      />
+    </button>
+  );
 }
 
 export default function AnnouncementControls({
@@ -108,22 +131,14 @@ export default function AnnouncementControls({
             <FaTimes />
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={() => {
-              onToggleEnabled?.(nextEnabled);
-              updateSetting("enabled", nextEnabled);
+          <IosSwitch
+            checked={settings.enabled}
+            label={settings.enabled ? "Turn commentary off" : "Turn commentary on"}
+            onChange={(checked) => {
+              onToggleEnabled?.(checked);
+              updateSetting("enabled", checked);
             }}
-            className={`inline-flex min-w-[110px] items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition-all ${
-              settings.enabled
-                ? "bg-emerald-500 text-black shadow-[0_12px_26px_rgba(16,185,129,0.24)]"
-                : "bg-white/[0.06] text-white hover:bg-white/[0.1]"
-            }`}
-            aria-label={settings.enabled ? "Stop commentary" : "Start commentary"}
-          >
-            {!settings.enabled ? <FaPlay /> : null}
-            {settings.enabled ? "On" : "Off"}
-          </button>
+          />
         )}
       </div>
 
@@ -205,21 +220,18 @@ export default function AnnouncementControls({
             {statusLabel}
           </span>
           {simpleMode ? (
-            <button
-              type="button"
-              onClick={() => {
-                onToggleEnabled?.(nextEnabled);
-                updateSetting("enabled", nextEnabled);
-              }}
-              className={`inline-flex min-w-[108px] items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition-all ${
+            <IosSwitch
+              checked={settings.enabled}
+              label={
                 settings.enabled
-                  ? "bg-emerald-500 text-black shadow-[0_12px_26px_rgba(16,185,129,0.24)]"
-                  : "bg-white/[0.06] text-white hover:bg-white/[0.1]"
-              }`}
-              aria-label={settings.enabled ? "Turn score feedback off" : "Turn score feedback on"}
-            >
-              {settings.enabled ? "On" : "Off"}
-            </button>
+                  ? "Turn score feedback off"
+                  : "Turn score feedback on"
+              }
+              onChange={(checked) => {
+                onToggleEnabled?.(checked);
+                updateSetting("enabled", checked);
+              }}
+            />
           ) : null}
           {statusText ? (
             <p className="text-xs text-zinc-500">{statusText}</p>

@@ -422,24 +422,34 @@ export function applySafeMatchPatch(matchDocument, patch) {
   if (patch.teamAName !== undefined) nextMatch.teamAName = nextNames.teamAName;
   if (patch.teamBName !== undefined) nextMatch.teamBName = nextNames.teamBName;
   if (patch.teamA !== undefined) {
-    if (!rosterPermissions.teamA) {
+    const nextTeamA = [...patch.teamA];
+    const currentTeamALength = Array.isArray(currentMatch.teamA)
+      ? currentMatch.teamA.length
+      : 0;
+
+    if (!rosterPermissions.teamA && nextTeamA.length !== currentTeamALength) {
       throw new MatchEngineError(
-        `Only ${currentMatch.innings2?.team || "the second innings batting team"} can change players after the first innings.`,
+        `Only ${currentMatch.innings2?.team || "the second innings batting team"} can add or remove players after the first innings.`,
         409
       );
     }
 
-    nextMatch.teamA = [...patch.teamA];
+    nextMatch.teamA = nextTeamA;
   }
   if (patch.teamB !== undefined) {
-    if (!rosterPermissions.teamB) {
+    const nextTeamB = [...patch.teamB];
+    const currentTeamBLength = Array.isArray(currentMatch.teamB)
+      ? currentMatch.teamB.length
+      : 0;
+
+    if (!rosterPermissions.teamB && nextTeamB.length !== currentTeamBLength) {
       throw new MatchEngineError(
-        `Only ${currentMatch.innings2?.team || "the second innings batting team"} can change players after the first innings.`,
+        `Only ${currentMatch.innings2?.team || "the second innings batting team"} can add or remove players after the first innings.`,
         409
       );
     }
 
-    nextMatch.teamB = [...patch.teamB];
+    nextMatch.teamB = nextTeamB;
   }
   if (patch.announcerEnabled !== undefined) {
     nextMatch.announcerEnabled = patch.announcerEnabled;
@@ -477,8 +487,6 @@ export function buildSessionMirrorUpdate(matchDocument) {
     matchImageUploadedBy: match?.matchImageUploadedBy || "",
     announcerEnabled: Boolean(match?.announcerEnabled),
     announcerMode: match?.announcerMode || "",
-    walkieTalkieEnabled: Boolean(match?.walkieTalkieEnabled),
-    walkieTalkieUpdatedAt: match?.walkieTalkieUpdatedAt || null,
     lastEventType: match?.lastEventType || "",
     lastEventText: match?.lastEventText || "",
     adminAccessVersion: Number(match?.adminAccessVersion || 1),

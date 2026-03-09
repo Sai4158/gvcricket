@@ -10,6 +10,30 @@ import {
 import { ModalBase } from "../match/MatchBaseModals";
 import useLocalMicMonitor from "./useLocalMicMonitor";
 
+function IosSwitch({ checked, onChange, disabled = false, label }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange?.(!checked)}
+      className={`relative inline-flex h-8 w-[54px] items-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-amber-300/35 ${
+        checked
+          ? "border-amber-300/35 bg-emerald-500 shadow-[0_10px_24px_rgba(16,185,129,0.22)]"
+          : "border-white/10 bg-white/[0.08]"
+      } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+    >
+      <span
+        className={`inline-flex h-6 w-6 rounded-full bg-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition-transform ${
+          checked ? "translate-x-[26px]" : "translate-x-[3px]"
+        }`}
+      />
+    </button>
+  );
+}
+
 export default function LiveMicModal({
   title = "Live Mic",
   onClose,
@@ -40,14 +64,22 @@ export default function LiveMicModal({
           <h2 className="text-[1.7rem] font-black tracking-[-0.03em] text-white">
             Live Commentary
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06] text-zinc-400 transition-colors hover:bg-white/[0.1] hover:text-white focus:outline-none focus:ring-2 focus:ring-amber-300/35"
-            aria-label="Close live commentary"
-          >
-            <span className="text-xl leading-none">&times;</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <IosSwitch
+              checked={isActive}
+              disabled={isStarting}
+              onChange={() => handleToggle()}
+              label={isActive ? "Turn speaker mic off" : "Turn speaker mic on"}
+            />
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06] text-zinc-400 transition-colors hover:bg-white/[0.1] hover:text-white focus:outline-none focus:ring-2 focus:ring-amber-300/35"
+              aria-label="Close live commentary"
+            >
+              <span className="text-xl leading-none">&times;</span>
+            </button>
+          </div>
         </div>
 
         <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(16,16,22,0.98),rgba(7,7,11,0.98))] px-5 py-6 text-center shadow-[0_22px_70px_rgba(0,0,0,0.4)]">
@@ -108,7 +140,7 @@ export default function LiveMicModal({
             </span>
           </div>
           <p className="mt-2 text-center text-sm text-zinc-400">
-            Phone to Bluetooth speaker.
+            Connect phone to Bluetooth speaker to use phone as a mic.
           </p>
         </div>
 
@@ -118,34 +150,6 @@ export default function LiveMicModal({
           </div>
         ) : null}
 
-        <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,24,0.98),rgba(8,8,12,0.98))] px-4 pb-4 pt-5">
-          <div className="flex flex-col items-center gap-3">
-            <button
-              type="button"
-              onClick={handleToggle}
-              className={`relative inline-flex h-24 w-24 items-center justify-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-amber-300/35 ${
-                isActive
-                  ? "border-amber-300/35 bg-[linear-gradient(135deg,#fde047,#f59e0b)] text-black shadow-[0_18px_40px_rgba(245,158,11,0.22)]"
-                  : "border-white/10 bg-white/[0.06] text-zinc-100 hover:-translate-y-0.5 hover:bg-white/[0.09]"
-              }`}
-              aria-label={isActive ? "Turn speaker mic off" : "Turn speaker mic on"}
-            >
-              <span
-                className={`absolute inset-[-8px] rounded-full border transition-opacity ${
-                  isActive
-                    ? "animate-pulse border-amber-300/35 opacity-100"
-                    : "border-transparent opacity-0"
-                }`}
-              />
-              <span className="text-[1.65rem]">
-                {isActive ? <FaMicrophone /> : <FaMicrophoneSlash />}
-              </span>
-            </button>
-            <p className="text-xs font-medium text-zinc-400">
-              {isActive ? "Tap to stop" : "Tap to speak"}
-            </p>
-          </div>
-        </div>
       </div>
     </ModalBase>
   );

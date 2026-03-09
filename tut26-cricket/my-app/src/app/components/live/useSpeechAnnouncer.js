@@ -2,43 +2,53 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-function pickAmericanVoice(voices) {
-  const preferredNames = [
-    "Samantha",
-    "Ava",
-    "Allison",
-    "Nicky",
-    "Evan",
-    "Moira",
-    "Microsoft Aria Online",
-    "Microsoft Jenny Online",
-    "Microsoft Guy Online",
-    "Microsoft Aria",
-    "Microsoft Jenny",
-    "Microsoft Guy",
-    "Zira",
-    "Aria",
-    "Jenny",
-    "Google US English",
-  ];
+function getVoiceScore(voice) {
+  const name = voice?.name?.toLowerCase() || "";
+  const lang = voice?.lang?.toLowerCase() || "";
 
-  for (const name of preferredNames) {
-    const match = voices.find((voice) => voice.name.includes(name));
-    if (match) return match;
+  let score = 0;
+
+  if (lang.startsWith("en-us")) score += 80;
+  else if (lang.startsWith("en")) score += 45;
+
+  if (voice?.default) score += 12;
+  if (voice?.localService) score += 10;
+
+  if (name.includes("natural")) score += 80;
+  if (name.includes("premium")) score += 40;
+  if (name.includes("enhanced")) score += 35;
+  if (name.includes("neural")) score += 35;
+  if (name.includes("online")) score += 25;
+
+  if (name.includes("samantha")) score += 120;
+  if (name.includes("ava")) score += 110;
+  if (name.includes("allison")) score += 105;
+  if (name.includes("nicky")) score += 100;
+  if (name.includes("google us english")) score += 95;
+  if (name.includes("google")) score += 55;
+  if (name.includes("microsoft aria")) score += 100;
+  if (name.includes("microsoft jenny")) score += 95;
+  if (name.includes("microsoft guy")) score += 90;
+  if (name.includes("aria")) score += 40;
+  if (name.includes("jenny")) score += 35;
+  if (name.includes("guy")) score += 30;
+  if (name.includes("zira")) score -= 80;
+  if (name.includes("david")) score -= 30;
+  if (name.includes("mark")) score -= 15;
+
+  return score;
+}
+
+function pickAmericanVoice(voices) {
+  const englishVoices = voices.filter((voice) =>
+    voice?.lang?.toLowerCase().startsWith("en")
+  );
+
+  if (!englishVoices.length) {
+    return null;
   }
 
-  return (
-    voices.find(
-      (voice) =>
-        voice.lang?.toLowerCase().startsWith("en-us") && voice.localService
-    ) ||
-    voices.find((voice) => voice.lang?.toLowerCase().startsWith("en-us")) ||
-    voices.find(
-      (voice) => voice.lang?.toLowerCase().startsWith("en") && voice.localService
-    ) ||
-    voices.find((voice) => voice.lang?.toLowerCase().startsWith("en")) ||
-    null
-  );
+  return [...englishVoices].sort((a, b) => getVoiceScore(b) - getVoiceScore(a))[0];
 }
 
 function normalizeSpeechText(text) {
@@ -60,12 +70,24 @@ function getSpeechProfile(voice, options) {
     voiceName.includes("aria") ||
     voiceName.includes("jenny") ||
     voiceName.includes("guy");
+  const isGoogleNatural = voiceName.includes("google");
+  const isLegacyVoice = voiceName.includes("zira") || voiceName.includes("david");
 
   return {
     rate:
       options.rate ??
-      (isAppleNatural ? 0.9 : isMicrosoftNatural ? 0.92 : 0.94),
-    pitch: options.pitch ?? (isAppleNatural ? 0.96 : 0.98),
+      (isAppleNatural
+        ? 0.86
+        : isGoogleNatural
+        ? 0.88
+        : isMicrosoftNatural
+        ? 0.89
+        : isLegacyVoice
+        ? 0.83
+        : 0.9),
+    pitch:
+      options.pitch ??
+      (isAppleNatural ? 0.95 : isGoogleNatural ? 0.97 : isLegacyVoice ? 0.92 : 0.96),
   };
 }
 

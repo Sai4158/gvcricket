@@ -6,7 +6,7 @@ import {
 } from "../../../../lib/match-access";
 import { createWalkieParticipantToken } from "../../../../lib/walkie-auth";
 import {
-  hydrateWalkieEnabled,
+  getWalkieSnapshot,
   registerWalkieParticipant,
   subscribeToWalkieMatch,
   subscribeToWalkieParticipant,
@@ -44,7 +44,7 @@ export async function GET(request, { params }) {
 
   await connectDB();
   const match = await Match.findById(id).select(
-    "_id isOngoing result adminAccessVersion walkieTalkieEnabled"
+    "_id isOngoing result adminAccessVersion"
   );
 
   if (!match) {
@@ -77,7 +77,7 @@ export async function GET(request, { params }) {
       };
 
       try {
-        const initialSnapshot = hydrateWalkieEnabled(id, Boolean(match.walkieTalkieEnabled));
+        const initialSnapshot = getWalkieSnapshot(id);
         const registration = registerWalkieParticipant(id, {
           id: participantId,
           role,

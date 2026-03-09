@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { countLegalBalls } from "../../lib/match-scoring";
 import { getBattingTeamBundle } from "../../lib/team-utils";
+import PinPad from "../shared/PinPad";
 
 export function Splash({ children }) {
   return (
@@ -22,36 +23,15 @@ export function AccessGate({ onSubmit, isSubmitting, error }) {
         <p className="text-zinc-400 text-center mb-6">
           Enter the server PIN to unlock match controls.
         </p>
-        <input
-          type="text"
-          inputMode="numeric"
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          name="umpire-access-pin"
-          data-form-type="other"
-          data-lpignore="true"
+        <PinPad
           value={pin}
-          onChange={(event) =>
-            setPin(event.target.value.replace(/[^\d]/g, "").slice(0, 6))
-          }
-          onKeyDown={(event) => {
-            if (event.key === "Enter") onSubmit(pin);
-          }}
-          maxLength={6}
-          className="w-full p-4 text-center text-2xl tracking-[0.65rem] rounded-lg bg-zinc-800 ring-1 ring-zinc-700 focus:ring-blue-500 outline-none text-white"
-          style={{ WebkitTextSecurity: "disc" }}
-          placeholder="------"
+          onChange={setPin}
+          onSubmit={onSubmit}
+          length={4}
+          submitLabel="Enter"
+          isSubmitting={isSubmitting}
         />
         {error && <p className="text-red-400 text-sm mt-4 text-center">{error}</p>}
-        <button
-          onClick={() => onSubmit(pin)}
-          disabled={isSubmitting}
-          className="w-full mt-6 py-3 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-500 transition disabled:opacity-60"
-        >
-          {isSubmitting ? "Checking..." : "Enter"}
-        </button>
       </div>
     </main>
   );

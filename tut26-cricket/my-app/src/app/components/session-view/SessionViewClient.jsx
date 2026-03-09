@@ -1,8 +1,16 @@
 "use client";
 
-import { startTransition, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FaArrowLeft, FaCheck, FaCopy, FaMicrophone } from "react-icons/fa";
+import {
+  FaArrowLeft,
+  FaBluetoothB,
+  FaCheck,
+  FaCopy,
+  FaMicrophone,
+  FaBroadcastTower,
+  FaVolumeUp,
+} from "react-icons/fa";
 import AnnouncementControls from "../live/AnnouncementControls";
 import LiveMicModal from "../live/LiveMicModal";
 import WalkiePanel, { WalkieNotice } from "../live/WalkiePanel";
@@ -21,19 +29,30 @@ import {
   buildSpectatorAnnouncement,
 } from "../../lib/live-announcements";
 import { getTeamBundle } from "../../lib/team-utils";
+import { duckPageMedia, restorePageMedia } from "../../lib/page-audio";
+import { ModalBase } from "../match/MatchBaseModals";
 
 export default function SessionViewClient({ sessionId, initialData }) {
   const [copied, setCopied] = useState(false);
   const [data, setData] = useState(initialData || null);
-  const [isMicOpen, setIsMicOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState(null);
+  const [localWalkieNotice, setLocalWalkieNotice] = useState("");
   const [streamError, setStreamError] = useState("");
+  const [quickWalkieTalking, setQuickWalkieTalking] = useState(false);
   const lastAnnouncedEventRef = useRef("");
+  const overDoneTimerRef = useRef(null);
+  const announcementDuckRef = useRef([]);
+  const announcementRestoreTimerRef = useRef(null);
+  const walkieHoldTimerRef = useRef(null);
+  const walkieHeldRef = useRef(false);
+  const suppressWalkieClickRef = useRef(false);
   const previousEnabledRef = useRef(false);
+  const previousWalkieEnabledRef = useRef(false);
   const router = useRouter();
   const liveUpdatedLabel = useLiveRelativeTime(data?.updatedAt);
   const { settings, updateSetting } = useAnnouncementSettings("spectator");
   const micMonitor = useLocalMicMonitor();
-  const { speak, prime, stop, status, voiceName } = useSpeechAnnouncer(settings);
+  const { speak, prime, stop } = useSpeechAnnouncer(settings);
 
   useEventSource({
     url: sessionId ? `/api/live/sessions/${sessionId}` : null,
@@ -62,6 +81,24 @@ export default function SessionViewClient({ sessionId, initialData }) {
     displayName: sessionData?.name ? `${sessionData.name} Spectator` : "Spectator",
   });
 
+  const speakWithDuck = useCallback((text, options = {}, restoreAfterMs = 2200) => {
+    const spoke = speak(text, options);
+    if (!spoke) {
+      return false;
+    }
+
+    duckPageMedia(announcementDuckRef, 0.18);
+    if (announcementRestoreTimerRef.current) {
+      window.clearTimeout(announcementRestoreTimerRef.current);
+    }
+    announcementRestoreTimerRef.current = window.setTimeout(() => {
+      restorePageMedia(announcementDuckRef);
+      announcementRestoreTimerRef.current = null;
+    }, restoreAfterMs);
+
+    return true;
+  }, [speak]);
+
   useEffect(() => {
     if (!match || !isLiveMatch || !settings.enabled || settings.mode === "silent") {
       previousEnabledRef.current = settings.enabled;
@@ -69,14 +106,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
 
     if (!previousEnabledRef.current && settings.enabled) {
-      speak(buildCurrentScoreAnnouncement(match), {
+      speakWithDuck(buildCurrentScoreAnnouncement(match), {
         key: "spectator-current-score",
         rate: 0.9,
       });
     }
 
     previousEnabledRef.current = settings.enabled;
-  }, [isLiveMatch, match, settings.enabled, settings.mode, speak]);
+  }, [isLiveMatch, match, settings.enabled, settings.mode, speakWithDuck]);
 
   useEffect(() => {
     const event = match?.lastLiveEvent;
@@ -89,18 +126,89 @@ export default function SessionViewClient({ sessionId, initialData }) {
     const line = buildSpectatorAnnouncement(event, match, settings.mode);
     if (!line) return;
 
-    speak(line, {
+    speakWithDuck(line, {
       key: event.id,
       rate: 0.9,
-      minGapMs: 700,
-    });
-  }, [isLiveMatch, match, settings.enabled, settings.mode, speak]);
+      minGapMs: event.overCompleted ? 2000 : 700,
+    }, event.overCompleted ? 1700 : 2200);
+
+    if (overDoneTimerRef.current) {
+      window.clearTimeout(overDoneTimerRef.current);
+      overDoneTimerRef.current = null;
+    }
+
+    if (event.overCompleted) {
+      overDoneTimerRef.current = window.setTimeout(() => {
+        speakWithDuck("Over done.", {
+          key: `${event.id}-over-done`,
+          rate: 0.9,
+          minGapMs: 2000,
+        }, 1500);
+      }, 2000);
+    }
+  }, [isLiveMatch, match, settings.enabled, settings.mode, speakWithDuck]);
 
   useEffect(() => {
     if (!isLiveMatch) {
       stop();
     }
   }, [isLiveMatch, stop]);
+
+  useEffect(() => {
+    return () => {
+      if (overDoneTimerRef.current) {
+        window.clearTimeout(overDoneTimerRef.current);
+      }
+      if (announcementRestoreTimerRef.current) {
+        window.clearTimeout(announcementRestoreTimerRef.current);
+      }
+      restorePageMedia(announcementDuckRef);
+    };
+  }, []);
+
+  useEffect(() => {
+    const walkieEnabled = Boolean(walkie.snapshot?.enabled);
+    previousWalkieEnabledRef.current = previousWalkieEnabledRef.current || false;
+
+    if (
+      isLiveMatch &&
+      walkieEnabled &&
+      !previousWalkieEnabledRef.current
+    ) {
+      const noticeTimer = window.setTimeout(() => {
+        setLocalWalkieNotice("Walkietalkie is on.");
+      }, 0);
+      if (typeof window !== "undefined") {
+        try {
+          const audioContext = new window.AudioContext();
+          const oscillator = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          oscillator.type = "sine";
+          oscillator.frequency.value = 880;
+          gain.gain.setValueAtTime(0.001, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.08, audioContext.currentTime + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.24);
+          oscillator.connect(gain);
+          gain.connect(audioContext.destination);
+          oscillator.start();
+          oscillator.stop(audioContext.currentTime + 0.25);
+          oscillator.onended = () => {
+            void audioContext.close().catch(() => {});
+          };
+        } catch {}
+      }
+      const timer = window.setTimeout(() => {
+        setLocalWalkieNotice("");
+      }, 2400);
+      previousWalkieEnabledRef.current = walkieEnabled;
+      return () => {
+        window.clearTimeout(noticeTimer);
+        window.clearTimeout(timer);
+      };
+    }
+
+    previousWalkieEnabledRef.current = walkieEnabled;
+  }, [isLiveMatch, walkie.snapshot?.enabled]);
 
   useEffect(() => {
     if (match?.result) {
@@ -123,6 +231,53 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
   const teamA = getTeamBundle(match, "teamA");
   const teamB = getTeamBundle(match, "teamB");
+  const showWalkieLauncher = Boolean(match?._id && isLiveMatch);
+  const speakerMicOn = Boolean(micMonitor.isActive || micMonitor.isPaused);
+  const walkieCardTalking = quickWalkieTalking || walkie.isSelfTalking;
+  const launcherCardClass =
+    "flex min-h-[92px] w-full items-center gap-3 rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-4 text-left shadow-[0_18px_50px_rgba(0,0,0,0.32)] backdrop-blur-sm transition-transform hover:-translate-y-0.5";
+  const launcherBadgeClass =
+    "min-w-[58px] rounded-full px-3 py-1 text-center text-xs font-semibold";
+
+  const clearWalkieHoldTimer = () => {
+    if (walkieHoldTimerRef.current) {
+      window.clearTimeout(walkieHoldTimerRef.current);
+      walkieHoldTimerRef.current = null;
+    }
+  };
+
+  const handleWalkieLauncherPressStart = () => {
+    if (!walkie.snapshot?.enabled || !walkie.canTalk) {
+      return;
+    }
+
+    clearWalkieHoldTimer();
+    walkieHoldTimerRef.current = window.setTimeout(async () => {
+      walkieHeldRef.current = true;
+      suppressWalkieClickRef.current = true;
+      setQuickWalkieTalking(true);
+      const started = await walkie.startTalking();
+      if (!started) {
+        walkieHeldRef.current = false;
+        setQuickWalkieTalking(false);
+        suppressWalkieClickRef.current = false;
+      }
+    }, 170);
+  };
+
+  const handleWalkieLauncherPressEnd = async () => {
+    clearWalkieHoldTimer();
+    if (!walkieHeldRef.current) {
+      return;
+    }
+
+    walkieHeldRef.current = false;
+    setQuickWalkieTalking(false);
+    await walkie.stopTalking();
+    window.setTimeout(() => {
+      suppressWalkieClickRef.current = false;
+    }, 80);
+  };
 
   return (
     <main className="min-h-screen bg-zinc-950 text-white font-sans p-4 pb-10 flex flex-col items-center">
@@ -171,101 +326,134 @@ export default function SessionViewClient({ sessionId, initialData }) {
         </div>
       </MatchHeroBackdrop>
 
-      <div className="w-full max-w-4xl mt-6">
-        <AnnouncementControls
-          title="Announce Score"
-          subtitle="Turn on smart live commentary, or replay the score anytime."
-          settings={settings}
-          updateSetting={updateSetting}
-          onToggleEnabled={(nextEnabled) => {
-            if (nextEnabled) {
-              prime();
-              speak("Score announcements on.", {
-                key: "spectator-voice-enabled",
-                rate: 0.9,
-                interrupt: false,
-                userGesture: true,
-                ignoreEnabled: true,
-              });
-            } else {
-              stop();
-            }
+      <div className="w-full max-w-4xl mt-4">
+        <WalkieNotice
+          notice={localWalkieNotice || walkie.notice}
+          onDismiss={() => {
+            setLocalWalkieNotice("");
+            walkie.dismissNotice();
           }}
-          statusText={
-            settings.enabled
-              ? status === "waiting_for_gesture"
-                ? voiceName
-                  ? `Voice ready: ${voiceName} - tap Read live score once to unlock audio on this browser`
-                  : "Tap Read live score once to unlock audio on this browser."
-                : voiceName
-                ? `Voice ready: ${voiceName}`
-                : "Voice will use your browser's English voice."
-              : ""
-          }
-          onAnnounceNow={() =>
-            speak(buildCurrentScoreAnnouncement(match), {
-              key: "spectator-manual-score",
-              rate: 0.9,
-              userGesture: true,
-            })
-          }
-          announceLabel="Read Live Score"
-          announceHint="Replay the latest live score whenever you want."
         />
       </div>
 
       <div className="w-full max-w-4xl mt-4">
-        <WalkieNotice notice={walkie.notice} onDismiss={walkie.dismissNotice} />
-      </div>
-
-      <div className="w-full max-w-4xl mt-4">
-        <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(28,28,32,0.96),rgba(10,10,12,0.96))] p-5 text-center shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-4">
-            <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-2xl text-black shadow-[0_12px_30px_rgba(16,185,129,0.35)]">
-              <FaMicrophone />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-white">Start Commentary Mic</h3>
-              <p className="mt-2 text-sm leading-6 text-zinc-400">
-                Connect this phone to a Bluetooth speaker and use it as a simple live mic.
-              </p>
-            </div>
-            <button
-              onClick={() => setIsMicOpen(true)}
-              className="inline-flex items-center justify-center gap-3 rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-black transition-colors hover:bg-emerald-400"
-              aria-label="Open live microphone"
+        {showWalkieLauncher ? (
+          <button
+            type="button"
+            onClick={() => {
+              if (suppressWalkieClickRef.current) {
+                suppressWalkieClickRef.current = false;
+                return;
+              }
+              setActivePanel("walkie");
+            }}
+            onPointerDown={handleWalkieLauncherPressStart}
+            onPointerUp={() => {
+              void handleWalkieLauncherPressEnd();
+            }}
+            onPointerCancel={() => {
+              void handleWalkieLauncherPressEnd();
+            }}
+            onPointerLeave={() => {
+              void handleWalkieLauncherPressEnd();
+            }}
+            className={`${launcherCardClass} mb-4`}
+            aria-label="Open walkietalkie"
+          >
+            <span className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xl shadow-[0_12px_26px_rgba(16,185,129,0.16)] ${
+              walkieCardTalking
+                ? "bg-emerald-500 text-black"
+                : "bg-emerald-500/14 text-emerald-300"
+            }`}>
+              {walkieCardTalking ? <FaMicrophone /> : <FaBroadcastTower />}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-base font-semibold text-white">
+                Walkietalkie
+              </span>
+              <span className="mt-1 block text-xs text-zinc-400">
+                {walkieCardTalking ? "Release to stop." : "Hold to talk. Tap to open."}
+              </span>
+            </span>
+            <span
+              className={`${launcherBadgeClass} ${
+                walkieCardTalking
+                  ? "bg-emerald-500 text-black"
+                  : walkie.snapshot?.enabled
+                  ? "bg-emerald-500/15 text-emerald-200"
+                  : "bg-rose-500/12 text-rose-200"
+              }`}
             >
-              <FaMicrophone />
-              Start Commentary
-            </button>
-          </div>
-          <div className="mt-4 rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3 text-xs text-zinc-500">
-            Local on this phone only. Best after pairing to a nearby speaker.
-          </div>
-        </section>
-      </div>
+              {walkieCardTalking ? "Live" : walkie.snapshot?.enabled ? "On" : "Off"}
+            </span>
+          </button>
+        ) : null}
 
-      {isLiveMatch && walkie.snapshot?.enabled ? (
-        <div className="w-full max-w-4xl mt-4">
-          <WalkiePanel
-            role="spectator"
-            snapshot={walkie.snapshot}
-            notice={walkie.notice}
-            error={walkie.error}
-            canEnable={false}
-            canRequestEnable={walkie.canRequestEnable}
-            canTalk={walkie.canTalk}
-            isSelfTalking={walkie.isSelfTalking}
-            countdown={walkie.countdown}
-            requestCooldownLeft={walkie.requestCooldownLeft}
-            onRequestEnable={walkie.requestEnable}
-            onToggleEnabled={() => {}}
-            onStartTalking={walkie.startTalking}
-            onStopTalking={walkie.stopTalking}
-            onDismissNotice={walkie.dismissNotice}
-          />
-        </div>
-      ) : null}
+        <button
+          type="button"
+          onClick={() => setActivePanel("mic")}
+          className={launcherCardClass}
+          aria-label="Open speaker mic"
+        >
+          <span
+            className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-xl text-black shadow-[0_12px_26px_rgba(16,185,129,0.28)]"
+            aria-hidden="true"
+          >
+            <FaMicrophone />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-base font-semibold text-white">
+              Speaker mic
+            </span>
+            <span className="mt-1 inline-flex items-center gap-2 text-xs text-zinc-400">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/[0.04]">
+                <FaBluetoothB />
+              </span>
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/[0.04]">
+                <FaVolumeUp />
+              </span>
+              <span>Use phone as a mic.</span>
+            </span>
+          </span>
+          <span
+            className={`${launcherBadgeClass} ${
+              speakerMicOn
+                ? "bg-emerald-500/15 text-emerald-200"
+                : "bg-rose-500/12 text-rose-200"
+            }`}
+          >
+            {speakerMicOn ? "On" : "Off"}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActivePanel("announce")}
+          className={`${launcherCardClass} mt-4`}
+          aria-label="Open announce score"
+        >
+          <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-amber-400/14 text-lg text-amber-200">
+            <FaVolumeUp />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-base font-semibold text-white">
+              Announce score
+            </span>
+            <span className="mt-1 block text-xs text-zinc-400">
+              Read live score.
+            </span>
+          </span>
+          <span
+            className={`${launcherBadgeClass} ${
+              settings.enabled
+                ? "bg-emerald-500/15 text-emerald-200"
+                : "bg-rose-500/12 text-rose-200"
+            }`}
+          >
+            {settings.enabled ? "On" : "Off"}
+          </span>
+        </button>
+      </div>
 
       <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
         <TeamInningsDetail
@@ -293,12 +481,68 @@ export default function SessionViewClient({ sessionId, initialData }) {
           background: #6b7280;
         }
       `}</style>
-      {isMicOpen ? (
+      {activePanel === "mic" ? (
         <LiveMicModal
           title="Spectator Commentary Mic"
           monitor={micMonitor}
-          onClose={() => setIsMicOpen(false)}
+          onClose={() => setActivePanel(null)}
         />
+      ) : null}
+      {activePanel === "announce" ? (
+        <ModalBase title="" onExit={() => setActivePanel(null)} hideHeader>
+          <AnnouncementControls
+            title="Announce Score"
+            settings={settings}
+            updateSetting={updateSetting}
+            simpleMode
+            variant="modal"
+            onClose={() => setActivePanel(null)}
+            onToggleEnabled={(nextEnabled) => {
+              if (nextEnabled) {
+                prime();
+                speakWithDuck("Score announcements on.", {
+                  key: "spectator-voice-enabled",
+                  rate: 0.9,
+                  interrupt: false,
+                  userGesture: true,
+                  ignoreEnabled: true,
+                });
+              } else {
+                stop();
+              }
+            }}
+            statusText=""
+            onAnnounceNow={() =>
+              speakWithDuck(buildCurrentScoreAnnouncement(match), {
+                key: "spectator-manual-score",
+                rate: 0.9,
+                userGesture: true,
+              })
+            }
+            announceLabel="Read Live Score"
+          />
+        </ModalBase>
+      ) : null}
+      {activePanel === "walkie" && showWalkieLauncher ? (
+        <ModalBase title="Walkie-Talkie" onExit={() => setActivePanel(null)}>
+          <WalkiePanel
+            role="spectator"
+            snapshot={walkie.snapshot}
+            notice={walkie.notice}
+            error={walkie.error}
+            canEnable={false}
+            canRequestEnable={walkie.canRequestEnable}
+            canTalk={walkie.canTalk}
+            isSelfTalking={walkie.isSelfTalking}
+            countdown={walkie.countdown}
+            requestCooldownLeft={walkie.requestCooldownLeft}
+            onRequestEnable={walkie.requestEnable}
+            onToggleEnabled={() => {}}
+            onStartTalking={walkie.startTalking}
+            onStopTalking={walkie.stopTalking}
+            onDismissNotice={walkie.dismissNotice}
+          />
+        </ModalBase>
       ) : null}
     </main>
   );

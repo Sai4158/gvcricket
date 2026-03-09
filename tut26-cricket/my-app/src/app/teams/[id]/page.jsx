@@ -76,9 +76,12 @@ export default function TeamSelectionPage() {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-5 py-10 text-zinc-100">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.08),transparent_26%),radial-gradient(circle_at_bottom,rgba(239,68,68,0.08),transparent_24%),linear-gradient(180deg,#050505_0%,#0b0b11_55%,#050505_100%)] px-5 py-10 text-zinc-100">
       <div className="w-full max-w-4xl mx-auto">
         <header className="mb-8 mt-7 text-center">
+          <div className="mb-4 inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-200">
+            Setup
+          </div>
           <div className="flex items-center justify-center gap-3">
             <h1 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-yellow-300 via-rose-200 to-orange-400 bg-clip-text text-transparent">
               Team Selection
@@ -129,12 +132,16 @@ export default function TeamSelectionPage() {
           <button
             onClick={handleSubmit}
             disabled={isLoading}
-            className="flex w-full items-center justify-center gap-3 rounded-[28px] bg-gradient-to-r from-yellow-400 via-orange-400 to-red-500 py-5 text-xl font-black text-white shadow-lg shadow-orange-800/30 transition-all hover:scale-[1.02] active:scale-100 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-3 rounded-[28px] bg-gradient-to-r from-yellow-400 via-orange-400 to-red-500 py-5 text-xl font-black text-white shadow-[0_20px_40px_rgba(249,115,22,0.24)] transition-all hover:scale-[1.02] hover:brightness-105 active:scale-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading ? "Saving..." : "Proceed to Toss"}
             {!isLoading && <FaArrowRight />}
           </button>
-          {error && <p className="text-red-500 text-center mt-4">{error}</p>}
+          {error && (
+            <p className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-center text-sm text-rose-200">
+              {error}
+            </p>
+          )}
         </section>
       </div>
       <AnimatePresence>

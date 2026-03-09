@@ -30,10 +30,22 @@ function getMatchState(matchId) {
       lastNotification: "",
       requestCooldowns: new Map(),
       disconnectTimers: new Map(),
+      pendingRequests: new Map(),
     });
   }
 
-  return store.matches.get(key);
+  const matchState = store.matches.get(key);
+  if (!(matchState.requestCooldowns instanceof Map)) {
+    matchState.requestCooldowns = new Map();
+  }
+  if (!(matchState.disconnectTimers instanceof Map)) {
+    matchState.disconnectTimers = new Map();
+  }
+  if (!(matchState.pendingRequests instanceof Map)) {
+    matchState.pendingRequests = new Map();
+  }
+
+  return matchState;
 }
 
 function toParticipantView(participant) {
@@ -188,6 +200,18 @@ export function registerWalkieParticipant(matchId, participant) {
     snapshot: buildSnapshot(matchId),
   });
 
+  if (nextParticipant.role === "umpire" && matchState.pendingRequests.size > 0) {
+    const latestRequest = [...matchState.pendingRequests.values()].at(-1);
+    notifyMatch(matchId, {
+      type: "state",
+      snapshot: buildSnapshot(matchId),
+      notification: {
+        type: "walkie_requested",
+        message: latestRequest?.message || "A spectator requested walkie-talkie.",
+      },
+    });
+  }
+
   return {
     snapshot: buildSnapshot(matchId),
     cleanup: () => {
@@ -234,6 +258,7 @@ export function setWalkieEnabled(matchId, enabled) {
     clearActiveLock(matchId, "disabled");
   } else {
     matchState.enabled = true;
+    matchState.pendingRequests.clear();
   }
 
   const snapshot = buildSnapshot(matchId);
@@ -263,10 +288,6 @@ export function requestWalkieEnable(matchId, { participantId }) {
     return { ok: false, status: 409, message: "Walkie-talkie is already on." };
   }
 
-  if (listParticipants(matchState, "umpire").length === 0) {
-    return { ok: false, status: 409, message: "No umpire is connected." };
-  }
-
   const now = Date.now();
   const cooldownUntil = Number(matchState.requestCooldowns.get(participant.id) || 0);
   if (cooldownUntil > now) {
@@ -278,13 +299,20 @@ export function requestWalkieEnable(matchId, { participantId }) {
   }
 
   matchState.requestCooldowns.set(participant.id, now + REQUEST_COOLDOWN_MS);
+  const requestMessage = `${participant.name} requested walkie-talkie.`;
+  matchState.pendingRequests.set(participant.id, {
+    participantId: participant.id,
+    name: participant.name,
+    message: requestMessage,
+    requestedAt: new Date(now).toISOString(),
+  });
 
   notifyMatch(matchId, {
     type: "state",
     snapshot: buildSnapshot(matchId),
     notification: {
       type: "walkie_requested",
-      message: `${participant.name} requested walkie-talkie.`,
+      message: requestMessage,
     },
   });
 

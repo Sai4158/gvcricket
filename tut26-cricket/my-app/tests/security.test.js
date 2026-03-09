@@ -83,12 +83,12 @@ test("match access tokens validate by version and PIN checks use constant-time f
   const previousPinHash = process.env.UMPIRE_ADMIN_PIN_HASH;
 
   process.env.MATCH_ACCESS_SECRET = "security-test-secret";
-  process.env.UMPIRE_ADMIN_PIN = "000000";
+  process.env.UMPIRE_ADMIN_PIN = "0000";
   delete process.env.UMPIRE_ADMIN_PIN_HASH;
 
   try {
-    assert.equal(isValidUmpirePin("000000"), true);
-    assert.equal(isValidUmpirePin("111111"), false);
+    assert.equal(isValidUmpirePin("0000"), true);
+    assert.equal(isValidUmpirePin("1111"), false);
 
     const token = createMatchAccessToken("match-123", 2);
     assert.equal(hasValidMatchAccess("match-123", token, 2), true);
@@ -383,12 +383,16 @@ test("spectator commentary includes smart score and chase details", () => {
   });
 
   const fullLine = buildSpectatorAnnouncement(event, after, "full");
-  assert.match(fullLine, /Single/);
-  assert.doesNotMatch(fullLine, /Titans batting\./);
-  assert.doesNotMatch(fullLine, /The score is/);
+  assert.match(fullLine, /Single run/);
+  assert.match(fullLine, /Score 8 runs and 1 out\./);
+  assert.doesNotMatch(fullLine, /after 0\.1\./);
+  assert.doesNotMatch(fullLine, /balls left in the over\./);
+  assert.doesNotMatch(fullLine, /Need 3\./);
+  assert.doesNotMatch(fullLine, /\d+\s*\/\s*\d+/);
 
   const currentScoreLine = buildCurrentScoreAnnouncement(after);
-  assert.match(currentScoreLine, /Titans, 8 for 1 after 0\.1\./);
+  assert.match(currentScoreLine, /Titans, 8 runs and 1 out after 0\.1\./);
+  assert.match(currentScoreLine, /5 balls left in the over\./);
   assert.match(currentScoreLine, /1 over and 5 balls left\./);
   assert.match(currentScoreLine, /Need 3\./);
 });
@@ -425,6 +429,8 @@ test("spectator commentary adds richer context only on bigger moments", () => {
 
   const fullLine = buildSpectatorAnnouncement(event, after, "full");
   assert.match(fullLine, /Four runs/);
-  assert.match(fullLine, /Score 11 for 1\./);
-  assert.match(fullLine, /Need 4\./);
+  assert.match(fullLine, /Score 11 runs and 1 out\./);
+  assert.doesNotMatch(fullLine, /after 0\.1\./);
+  assert.doesNotMatch(fullLine, /balls left in the over\./);
+  assert.doesNotMatch(fullLine, /Need 4\./);
 });

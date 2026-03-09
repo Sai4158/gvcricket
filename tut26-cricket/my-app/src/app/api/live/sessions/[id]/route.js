@@ -38,9 +38,24 @@ export async function GET(request, { params }) {
         await connectDB();
         await ensureLiveUpdates();
 
+        const resolveLatestMatch = async (session) => {
+          if (!session) {
+            return null;
+          }
+
+          if (session.match) {
+            const linkedMatch = await Match.findById(session.match).lean();
+            if (linkedMatch) {
+              return linkedMatch;
+            }
+          }
+
+          return Match.findOne({ sessionId: session._id }).sort({ updatedAt: -1 }).lean();
+        };
+
         const pushSessionPayload = async () => {
           const session = await Session.findById(id).lean();
-          const match = session?.match ? await Match.findById(session.match).lean() : null;
+          const match = await resolveLatestMatch(session);
           const nextMatchId = match?._id ? String(match._id) : "";
 
           if (nextMatchId !== currentMatchId) {

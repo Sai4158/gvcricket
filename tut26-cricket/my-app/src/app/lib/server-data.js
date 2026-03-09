@@ -101,7 +101,7 @@ export async function loadPublicMatchData(matchId) {
 export async function loadTossPageData(matchId) {
   await connectDB();
   const match = await Match.findById(matchId)
-    .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode walkieTalkieEnabled lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
+    .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
     .lean();
 
   if (!match) {
@@ -125,7 +125,7 @@ export async function loadTossPageData(matchId) {
 export async function loadMatchAccessData(matchId) {
   await connectDB();
   const match = await Match.findById(matchId)
-    .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode walkieTalkieEnabled lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
+    .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
     .lean();
 
   if (!match) {

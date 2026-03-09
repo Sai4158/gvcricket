@@ -12,10 +12,12 @@ export function Ball({ ball, ballNumber }) {
     label = ball.runs > 0 ? `${ball.runs}+W` : "W";
   } else if (ball.extraType === "wide") {
     style = "bg-green-600";
-    label = `${ball.runs}Wd`;
+    const extraRuns = Math.max(Number(ball.runs || 0) - 1, 0);
+    label = extraRuns > 0 ? `Wd+${extraRuns}` : "Wd";
   } else if (ball.extraType === "noball") {
     style = "bg-orange-600";
-    label = `${ball.runs}NB`;
+    const extraRuns = Math.max(Number(ball.runs || 0) - 1, 0);
+    label = extraRuns > 0 ? `NB+${extraRuns}` : "NB";
   } else if (ball.runs === 0) {
     label = ".";
   }

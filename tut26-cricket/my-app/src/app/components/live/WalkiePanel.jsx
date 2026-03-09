@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FaMicrophone,
   FaMicrophoneSlash,
@@ -27,6 +27,30 @@ export function WalkieNotice({ notice, onDismiss }) {
   );
 }
 
+function IosSwitch({ checked, onChange, disabled = false, label }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange?.(!checked)}
+      className={`relative inline-flex h-8 w-[54px] items-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
+        checked
+          ? "border-emerald-300/35 bg-emerald-500 shadow-[0_10px_24px_rgba(16,185,129,0.22)]"
+          : "border-white/10 bg-white/[0.08]"
+      } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+    >
+      <span
+        className={`inline-flex h-6 w-6 rounded-full bg-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition-transform ${
+          checked ? "translate-x-[26px]" : "translate-x-[3px]"
+        }`}
+      />
+    </button>
+  );
+}
+
 export function WalkieTalkButton({
   active,
   disabled,
@@ -36,35 +60,80 @@ export function WalkieTalkButton({
   label = "Hold to talk",
 }) {
   const [holding, setHolding] = useState(false);
+  const buttonRef = useRef(null);
+  const holdingRef = useRef(false);
+  const pointerIdRef = useRef(null);
 
-  const startHold = async () => {
-    if (disabled || active || holding) return;
+  const startHold = useCallback(async () => {
+    if (disabled || holdingRef.current) return;
+    holdingRef.current = true;
     setHolding(true);
-    await onStart?.();
-  };
+    try {
+      await onStart?.();
+    } catch {
+      holdingRef.current = false;
+      setHolding(false);
+    }
+  }, [disabled, onStart]);
 
-  const endHold = async () => {
-    if (!holding) return;
+  const endHold = useCallback(async () => {
+    if (!holdingRef.current) return;
+    holdingRef.current = false;
     setHolding(false);
     await onStop?.();
-  };
+  }, [onStop]);
+
+  useEffect(() => {
+    const handlePointerRelease = (event) => {
+      if (
+        pointerIdRef.current !== null &&
+        event.pointerId !== undefined &&
+        event.pointerId !== pointerIdRef.current
+      ) {
+        return;
+      }
+
+      pointerIdRef.current = null;
+      void endHold();
+    };
+
+    window.addEventListener("pointerup", handlePointerRelease);
+    window.addEventListener("pointercancel", handlePointerRelease);
+
+    return () => {
+      window.removeEventListener("pointerup", handlePointerRelease);
+      window.removeEventListener("pointercancel", handlePointerRelease);
+    };
+  }, [endHold]);
+
+  useEffect(() => {
+    if (!active && !holding) {
+      holdingRef.current = false;
+      pointerIdRef.current = null;
+    }
+  }, [active, holding]);
 
   return (
     <div className="flex flex-col items-center gap-3">
       <button
+        ref={buttonRef}
         type="button"
         disabled={disabled}
-        onPointerDown={() => {
+        onPointerDown={(event) => {
+          pointerIdRef.current = event.pointerId;
+          event.currentTarget.setPointerCapture?.(event.pointerId);
           void startHold();
         }}
-        onPointerUp={() => {
+        onPointerUp={(event) => {
+          event.currentTarget.releasePointerCapture?.(event.pointerId);
+        }}
+        onPointerCancel={(event) => {
+          event.currentTarget.releasePointerCapture?.(event.pointerId);
+          pointerIdRef.current = null;
           void endHold();
         }}
-        onPointerLeave={() => {
-          void endHold();
-        }}
-        onPointerCancel={() => {
-          void endHold();
+        onContextMenu={(event) => {
+          event.preventDefault();
         }}
         className={`relative inline-flex h-24 w-24 items-center justify-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
           disabled
@@ -112,7 +181,10 @@ export default function WalkiePanel({
   onStopTalking,
   onDismissNotice,
 }) {
+  const [panelMessage, setPanelMessage] = useState("");
   const isUmpire = role === "umpire";
+  const isRequestNotice =
+    isUmpire && typeof notice === "string" && notice.toLowerCase().includes("requested walkie-talkie");
   const statusText = !snapshot?.enabled
     ? "Walkie-talkie off"
     : snapshot?.activeSpeakerRole === "umpire"
@@ -120,6 +192,21 @@ export default function WalkiePanel({
     : snapshot?.activeSpeakerRole === "spectator"
     ? "A spectator is speaking"
     : "Ready to talk";
+
+  const handleToggle = (checked) => {
+    if (isUmpire) {
+      setPanelMessage("");
+      onToggleEnabled?.(checked);
+      return;
+    }
+
+    if (!checked) {
+      return;
+    }
+
+    setPanelMessage("");
+    onRequestEnable?.();
+  };
 
   return (
     <div className="space-y-4">
@@ -144,20 +231,16 @@ export default function WalkiePanel({
             </div>
           </div>
           {isUmpire ? (
-            <button
-              type="button"
-              onClick={() => onToggleEnabled?.(!snapshot?.enabled)}
-              disabled={!canEnable && !snapshot?.enabled}
-              className={`inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+            <IosSwitch
+              checked={Boolean(snapshot?.enabled)}
+              disabled={false}
+              label={
                 snapshot?.enabled
-                  ? "bg-emerald-500 text-black"
-                  : canEnable
-                  ? "bg-white/10 text-white hover:bg-white/15"
-                  : "cursor-not-allowed bg-zinc-900 text-zinc-500"
-              }`}
-            >
-              {snapshot?.enabled ? "On" : "Off"}
-            </button>
+                  ? "Walkie-talkie on"
+                  : "Turn walkie-talkie on"
+              }
+              onChange={handleToggle}
+            />
           ) : null}
         </div>
 
@@ -189,6 +272,39 @@ export default function WalkiePanel({
           </div>
         ) : null}
 
+        {!error && isRequestNotice ? (
+          <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+            <div className="flex items-center justify-between gap-3">
+              <span>{notice}</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onToggleEnabled?.(true);
+                    onDismissNotice?.();
+                  }}
+                  className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-black"
+                >
+                  Enable
+                </button>
+                <button
+                  type="button"
+                  onClick={onDismissNotice}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-zinc-200"
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {!error && panelMessage ? (
+          <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            {panelMessage}
+          </div>
+        ) : null}
+
         <div className="mt-5">
           {isUmpire || snapshot?.enabled ? (
             <WalkieTalkButton
@@ -200,21 +316,22 @@ export default function WalkiePanel({
               label={isUmpire ? "Hold to reply" : "Hold to talk"}
             />
           ) : (
-            <button
-              type="button"
-              onClick={() => onRequestEnable?.()}
-              disabled={!canRequestEnable}
-              className={`inline-flex w-full items-center justify-center gap-3 rounded-[24px] px-5 py-4 text-base font-black transition-all ${
-                canRequestEnable
-                  ? "bg-[linear-gradient(135deg,#34d399,#14b8a6)] text-black shadow-[0_14px_36px_rgba(16,185,129,0.25)]"
-                  : "cursor-not-allowed bg-zinc-900 text-zinc-500"
-              }`}
-            >
-              <FaPhoneVolume />
-              {requestCooldownLeft > 0
-                ? `Request sent ${requestCooldownLeft}s`
-                : "Request walkie"}
-            </button>
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setPanelMessage("");
+                  onRequestEnable?.();
+                }}
+                disabled={!canRequestEnable || requestCooldownLeft > 0}
+                className="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black shadow-[0_12px_30px_rgba(16,185,129,0.22)] transition disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+              >
+                {requestCooldownLeft > 0 ? `Request sent ${requestCooldownLeft}s` : "Request umpire"}
+              </button>
+              <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-center text-sm text-zinc-400">
+                Ask the umpire to enable walkie-talkie.
+              </div>
+            </div>
           )}
         </div>
       </section>

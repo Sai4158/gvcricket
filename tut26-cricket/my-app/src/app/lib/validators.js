@@ -38,7 +38,7 @@ const oversSchema = z.number().int().min(1).max(50);
 const pinSchema = z
   .string()
   .trim()
-  .regex(/^\d{6}$/, "PIN must be 6 digits.");
+  .regex(/^\d{4}$/, "PIN must be 4 digits.");
 const ballSchema = z
   .object({
     runs: z.number().int().min(0).max(7),

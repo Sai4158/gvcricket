@@ -174,7 +174,7 @@ export function EditTeamsModal({ match, onUpdate, onClose }) {
   const canEditTeamBPlayers = !isSecondInningsLive || initialTeamB.name === secondInningsTeamName;
   const lockedReason =
     isSecondInningsLive && secondInningsTeamName
-      ? `Only ${secondInningsTeamName} can change players after the first innings.`
+      ? `Only ${secondInningsTeamName} can add or remove players right now. Names still work.`
       : "";
 
   const handleSaveChanges = () => {

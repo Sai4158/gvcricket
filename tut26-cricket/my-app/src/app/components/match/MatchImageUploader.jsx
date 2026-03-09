@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FaImage, FaUpload } from "react-icons/fa";
+import { FaImage } from "react-icons/fa";
 import { getAcceptedMatchImageTypes, compressMatchImage } from "./match-image-client";
+import PinPad from "../shared/PinPad";
 
 export default function MatchImageUploader({
   matchId,
@@ -124,27 +125,19 @@ export default function MatchImageUploader({
           <span className="text-xs uppercase tracking-wider text-zinc-400">
             Admin PIN
           </span>
-          <input
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            name="match-image-pin"
-            data-form-type="other"
-            data-lpignore="true"
+          <PinPad
             value={pin}
-            onChange={(event) => {
-              setPin(event.target.value.replace(/[^\d]/g, "").slice(0, 6));
+            onChange={(nextPin) => {
+              setPin(nextPin);
               if (error) {
                 setError("");
               }
             }}
-            maxLength={6}
-            placeholder="Enter PIN for this upload"
-            className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-3 text-sm text-white outline-none"
-            style={{ WebkitTextSecurity: "disc" }}
+            onSubmit={handleUpload}
+            length={4}
+            submitLabel={primaryLabel}
+            isSubmitting={isUploading}
+            submitDisabled={!selectedFile}
           />
         </label>
         <p className="text-xs text-zinc-500">
@@ -154,14 +147,6 @@ export default function MatchImageUploader({
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
-        <button
-          onClick={handleUpload}
-          disabled={!selectedFile || !pin.trim() || isUploading}
-          className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-5 py-3 font-semibold text-black transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <FaUpload />
-          {isUploading ? "Uploading..." : primaryLabel}
-        </button>
         {onSkip && (
           <button
             onClick={onSkip}

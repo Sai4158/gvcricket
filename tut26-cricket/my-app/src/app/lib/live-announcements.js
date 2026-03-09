@@ -22,6 +22,16 @@ function scoreLine(score, outs) {
   return `${score} for ${outs}`;
 }
 
+function scoreDetailLine(score, outs) {
+  return `${score} run${score === 1 ? "" : "s"} and ${outs} wicket${
+    outs === 1 ? "" : "s"
+  }`;
+}
+
+function spokenOutsLine(outs) {
+  return `${outs} out${outs === 1 ? "" : "s"}`;
+}
+
 function safeNumber(value) {
   return Number(value || 0);
 }
@@ -31,6 +41,16 @@ function getBallsRemaining(match) {
     0,
     safeNumber(match?.overs) * 6 - countLegalBalls(getActiveHistory(match))
   );
+}
+
+function getBallsLeftInCurrentOver(match) {
+  const legalBalls = countLegalBalls(getActiveHistory(match));
+  const ballsIntoOver = legalBalls % 6;
+  return ballsIntoOver === 0 ? 0 : 6 - ballsIntoOver;
+}
+
+function getCompletedOvers(match) {
+  return Math.floor(countLegalBalls(getActiveHistory(match)) / 6);
 }
 
 function formatRemainingOvers(match) {
@@ -52,13 +72,7 @@ function formatRemainingOvers(match) {
 }
 
 function shouldReadFullScore(ball) {
-  if (!ball) return true;
-  return (
-    ball.isOut ||
-    ball.extraType === "wide" ||
-    ball.extraType === "noball" ||
-    ball.runs >= 4
-  );
+  return true;
 }
 
 function describeBall(ball) {
@@ -66,28 +80,38 @@ function describeBall(ball) {
 
   if (ball.isOut) {
     if (ball.runs > 0) {
-      return `Wicket. ${pluralize(ball.runs, "run")} completed`;
+      return `Scored ${pluralize(ball.runs, "run")} and 1 out this ball.`;
     }
-    return "Wicket";
+    return "1 out this ball.";
   }
 
   if (ball.extraType === "wide") {
-    if (ball.runs === 1) return "Wide ball";
-    return `Wide. ${pluralize(ball.runs, "run")} added`;
+    const extraRuns = Math.max(Number(ball.runs || 0) - 1, 0);
+    if (extraRuns === 0) return "Wide ball this ball.";
+    return `Wide ball plus ${pluralize(extraRuns, "run")} this ball.`;
   }
 
   if (ball.extraType === "noball") {
-    if (ball.runs === 1) return "No ball";
-    return `No ball. ${pluralize(ball.runs, "run")} added`;
+    const extraRuns = Math.max(Number(ball.runs || 0) - 1, 0);
+    if (extraRuns === 0) return "No ball this ball.";
+    return `No ball plus ${pluralize(extraRuns, "run")} this ball.`;
   }
 
-  if (ball.runs === 0) return "Dot ball";
-  if (ball.runs === 1) return "Single";
-  if (ball.runs === 2) return "Two runs";
-  if (ball.runs === 3) return "Three runs";
-  if (ball.runs === 4) return "Four runs";
-  if (ball.runs === 6) return "Six runs";
-  return pluralize(ball.runs, "run");
+  if (ball.runs === 0) return "Dot ball.";
+  return `Scored ${pluralize(ball.runs, "run")} this ball.`;
+}
+
+function buildBallsLeftLine(match) {
+  const ballsLeft = getBallsLeftInCurrentOver(match);
+  if (ballsLeft <= 0) {
+    return "";
+  }
+
+  if (ballsLeft === 1) {
+    return "This is the last ball for this over.";
+  }
+
+  return `${ballsLeft} ball${ballsLeft === 1 ? "" : "s"} left in the over.`;
 }
 
 function buildChaseEquation(match) {
@@ -110,61 +134,37 @@ function buildChaseEquation(match) {
   } left.`;
 }
 
-function buildOverLine(event) {
-  if (!event?.overCompleted) return "";
-  return `End of over. ${event.battingTeam || "Batting side"} now ${scoreLine(
-    event.score,
-    event.outs
-  )}.`;
-}
-
-function buildFullBallCommentary(event, match) {
-  const base = describeBall(event.ball);
-  const currentScore = `Score ${scoreLine(event.score, event.outs)} after ${
-    event.overs || getOversDisplay(getActiveHistory(match))
-  }.`;
-  const chaseLine = buildChaseEquation(match);
-  const overLine = buildOverLine(event);
-
-  return [base, currentScore, overLine, chaseLine].filter(Boolean).join(" ");
-}
-
-function buildSimpleBallCommentary(event) {
-  const parts = [describeBall(event.ball)];
-
-  if (shouldReadFullScore(event.ball)) {
-    parts.push(`Score ${scoreLine(event.score, event.outs)}.`);
-  }
-
-  return parts.filter(Boolean).join(" ");
+function buildScoreSentence(event) {
+  return `The total score is ${event.score} run${event.score === 1 ? "" : "s"}.`;
 }
 
 function buildSmartBallCommentary(event, match) {
-  const parts = [describeBall(event.ball)];
+  return [describeBall(event.ball), buildScoreSentence(event), buildBallsLeftLine(match)]
+    .filter(Boolean)
+    .join(" ");
+}
 
-  if (event.overCompleted) {
-    parts.push(`Over complete. ${scoreLine(event.score, event.outs)}.`);
-  } else if (shouldReadFullScore(event.ball)) {
-    parts.push(`Score ${scoreLine(event.score, event.outs)}.`);
+export function buildSpectatorOverCompleteAnnouncement(match) {
+  if (!match) return "";
+
+  const oversCompleted = getCompletedOvers(match);
+  const parts = [
+    `The total score is ${safeNumber(match.score)} run${
+      safeNumber(match.score) === 1 ? "" : "s"
+    }.`,
+    `${oversCompleted} over${oversCompleted === 1 ? "" : "s"} have been completed.`,
+  ];
+
+  if (safeNumber(match.outs) > 0) {
+    parts.push(`${safeNumber(match.outs)} batter${safeNumber(match.outs) === 1 ? "" : "s"} out.`);
   }
 
-  if (match?.innings === "second") {
-    const chaseLine = buildChaseEquation(match);
-    if (event.targetChased) {
-      parts.push("Target chased.");
-    } else if (
-      event.ball?.isOut ||
-      event.ball?.runs >= 4 ||
-      event.ball?.extraType ||
-      getBallsRemaining(match) <= 12
-    ) {
-      parts.push(chaseLine);
-    }
-  } else if (event.overCompleted && getBallsRemaining(match) > 0) {
-    parts.push(formatRemainingOvers(match) + ".");
+  const ballsRemaining = getBallsRemaining(match);
+  if (ballsRemaining > 0) {
+    parts.push(`${formatRemainingOvers(match)}.`);
   }
 
-  return parts.filter(Boolean).join(" ");
+  return parts.join(" ");
 }
 
 export function createScoreLiveEvent(matchBefore, matchAfter, ball) {
@@ -231,7 +231,7 @@ export function buildSpectatorAnnouncement(event, match, mode = "full") {
   }
 
   if (event.type === "target_chased" && event.result) {
-    return `${buildFullBallCommentary(event, match)} ${event.result}`;
+    return `${buildSmartBallCommentary(event, match)} ${event.result}`;
   }
 
   if (event.type === "toss_set") {
@@ -251,25 +251,23 @@ export function buildSpectatorAnnouncement(event, match, mode = "full") {
   }
 
   if (mode === "simple") {
-    return buildSimpleBallCommentary(event);
+    return buildSmartBallCommentary(event, match);
   }
 
-  return buildSmartBallCommentary(event, match) || buildFullBallCommentary(event, match);
+  return buildSmartBallCommentary(event, match);
 }
 
 export function buildCurrentScoreAnnouncement(match) {
   if (!match) return "";
 
   const battingTeam = getBattingTeamBundle(match);
-  const activeInningsKey = match.innings === "first" ? "innings1" : "innings2";
-  const overs = getOversDisplay(match[activeInningsKey]?.history ?? []);
-  const chaseLine = buildChaseEquation(match);
-  const ballsLeftLine = formatRemainingOvers(match);
+  const chaseLine = formatRemainingOvers(match);
 
   return [
-    `${battingTeam.name}, ${scoreLine(match.score, match.outs)} after ${overs}.`,
-    ballsLeftLine ? `${ballsLeftLine}.` : "",
-    chaseLine,
+    `Current score for ${battingTeam.name} is ${match.score} run${
+      match.score === 1 ? "" : "s"
+    }.`,
+    chaseLine ? `${chaseLine}.` : "",
   ]
     .filter(Boolean)
     .join(" ");

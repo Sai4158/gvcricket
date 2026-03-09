@@ -45,7 +45,7 @@ export default function HeroSection({ liveMatch = null }) {
             transition={{ type: "spring", stiffness: 100, delay: 0.2 }}
           >
             <Image
-              src="/gvLogo.png"
+              src="/gv.png"
               alt="GV Cricket logo"
               width={500}
               height={400}

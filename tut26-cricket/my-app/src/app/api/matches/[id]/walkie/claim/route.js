@@ -9,7 +9,7 @@ import { getRequestMeta } from "../../../../../lib/request-meta";
 import { parseJsonRequest } from "../../../../../lib/request-security";
 import { walkieClaimSchema } from "../../../../../lib/validators";
 import { hasValidWalkieParticipantToken } from "../../../../../lib/walkie-auth";
-import { claimWalkieSpeaker, hydrateWalkieEnabled } from "../../../../../lib/walkie-talkie";
+import { claimWalkieSpeaker } from "../../../../../lib/walkie-talkie";
 import Match from "../../../../../../models/Match";
 
 async function hasMatchAccess(matchId, accessVersion) {
@@ -30,7 +30,7 @@ export async function POST(req, { params }) {
 
   await connectDB();
   const match = await Match.findById(id).select(
-    "_id isOngoing result adminAccessVersion walkieTalkieEnabled"
+    "_id isOngoing result adminAccessVersion"
   );
   if (!match) {
     return jsonError("Match not found.", 404);
@@ -39,8 +39,6 @@ export async function POST(req, { params }) {
   if (!match.isOngoing || match.result) {
     return jsonError("Walkie-talkie is only available during a live match.", 409);
   }
-
-  hydrateWalkieEnabled(id, Boolean(match.walkieTalkieEnabled));
 
   if (
     !hasValidWalkieParticipantToken(

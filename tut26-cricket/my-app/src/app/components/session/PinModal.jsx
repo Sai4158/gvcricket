@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { FaShieldAlt } from "react-icons/fa";
+import PinPad from "../shared/PinPad";
 
 export default function PinModal({
   onPinSubmit,
@@ -36,28 +37,15 @@ export default function PinModal({
         <p className="text-zinc-400 mb-6">
           Enter the PIN to access scoring controls.
         </p>
-        <input
-          type="password"
-          inputMode="numeric"
-          pattern="[0-9]*"
+        <PinPad
           value={pin}
-          onChange={(event) => setPin(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") handleSubmit();
-          }}
-          maxLength={8}
-          className="w-full p-4 text-center text-2xl tracking-[1rem] rounded-lg bg-zinc-800 ring-1 ring-zinc-700 focus:ring-blue-500 outline-none text-white placeholder:text-zinc-500 transition"
-          placeholder="----"
-          autoFocus
+          onChange={setPin}
+          onSubmit={handleSubmit}
+          length={4}
+          submitLabel="Enter"
+          isSubmitting={isSubmitting}
         />
         {error && <p className="text-red-400 text-sm mt-4">{error}</p>}
-        <button
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-          className="w-full mt-6 py-3 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-500 transition disabled:opacity-60"
-        >
-          {isSubmitting ? "Checking..." : "Enter"}
-        </button>
       </motion.div>
     </motion.div>
   );

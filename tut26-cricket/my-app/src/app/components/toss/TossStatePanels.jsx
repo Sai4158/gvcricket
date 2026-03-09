@@ -46,23 +46,7 @@ export default function TossStatePanels({
             className="flex min-h-[468px] flex-col justify-between"
           >
             <div className="text-center">
-              <div className="mx-auto inline-flex h-20 w-20 items-center justify-center rounded-full border border-amber-300/10 bg-amber-400/10 shadow-[0_0_32px_rgba(245,158,11,0.12)]">
-                <div
-                  aria-hidden="true"
-                  className="h-10 w-10 bg-white/95 shadow-[0_0_10px_rgba(245,158,11,0.35)]"
-                  style={{
-                    WebkitMaskImage: "url('/gvLogo.png')",
-                    maskImage: "url('/gvLogo.png')",
-                    WebkitMaskRepeat: "no-repeat",
-                    maskRepeat: "no-repeat",
-                    WebkitMaskPosition: "center",
-                    maskPosition: "center",
-                    WebkitMaskSize: "contain",
-                    maskSize: "contain",
-                  }}
-                />
-              </div>
-              <h2 className="mt-5 text-3xl font-black text-white">{teamName}</h2>
+              <h2 className="text-3xl font-black text-white">{teamName}</h2>
               <p className="mt-2 text-sm text-zinc-400">Call it.</p>
             </div>
 

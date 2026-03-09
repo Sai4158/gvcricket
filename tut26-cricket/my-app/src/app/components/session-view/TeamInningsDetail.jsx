@@ -11,10 +11,12 @@ function Ball({ runs, isOut, extraType }) {
     label = "W";
   } else if (extraType === "wide") {
     style = "bg-amber-500 text-black";
-    label = `${runs}Wd`;
+    const extraRuns = Math.max(Number(runs || 0) - 1, 0);
+    label = extraRuns > 0 ? `Wd+${extraRuns}` : "Wd";
   } else if (extraType) {
     style = "bg-purple-500 text-white";
-    label = `${runs}${extraType.substring(0, 2)}`;
+    const extraRuns = Math.max(Number(runs || 0) - 1, 0);
+    label = extraRuns > 0 ? `NB+${extraRuns}` : "NB";
   } else if (runs === 0) {
     style = "bg-zinc-700 text-zinc-300";
     label = ".";
