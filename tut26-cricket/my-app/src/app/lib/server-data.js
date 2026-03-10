@@ -2,6 +2,10 @@ import { cookies } from "next/headers";
 import Match from "../../models/Match";
 import Session from "../../models/Session";
 import { connectDB } from "./db";
+import {
+  getDirectorAccessCookieName,
+  hasValidDirectorAccess,
+} from "./director-access";
 import { getMatchAccessCookieName, hasValidMatchAccess } from "./match-access";
 import { serializePublicMatch, serializePublicSession } from "./public-data";
 
@@ -198,5 +202,67 @@ export async function loadHomeLiveBannerData() {
     score: Number(match.score || 0),
     outs: Number(match.outs || 0),
     updatedAt: new Date(match.updatedAt || session.updatedAt || session.createdAt).toISOString(),
+  };
+}
+
+export async function loadDirectorSessionsList() {
+  await connectDB();
+
+  const sessions = await Session.find()
+    .populate({
+      path: "match",
+      select:
+        "teamA teamB teamAName teamBName score outs innings innings1 innings2 isOngoing result _id updatedAt sessionId matchImageUrl",
+    })
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(16);
+
+  const fallbackMatchesBySessionId = await resolveSessionMatches(sessions);
+
+  const mappedSessions = sessions
+    .map((session) => {
+      const resolvedMatch =
+        session.match || fallbackMatchesBySessionId.get(String(session._id)) || null;
+      const publicSession = serializePublicSession({
+        ...(typeof session.toObject === "function" ? session.toObject() : session),
+        match: resolvedMatch?._id || session.match,
+      });
+      const publicMatch = serializePublicMatch(resolvedMatch);
+
+      return {
+        session: publicSession,
+        match: publicMatch,
+        updatedAt: new Date(
+          resolvedMatch?.updatedAt ||
+            session.updatedAt ||
+            session.createdAt ||
+            Date.now()
+        ).toISOString(),
+        isLive: Boolean(resolvedMatch?.isOngoing && !resolvedMatch?.result),
+      };
+    })
+    .sort((left, right) => {
+      if (left.isLive !== right.isLive) {
+        return left.isLive ? -1 : 1;
+      }
+
+      return (
+        new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+      );
+    });
+
+  return mappedSessions;
+}
+
+export async function loadDirectorConsoleData() {
+  await connectDB();
+
+  const cookieStore = await cookies();
+  const directorToken = cookieStore.get(getDirectorAccessCookieName())?.value;
+  const authorized = hasValidDirectorAccess(directorToken);
+
+  return {
+    authorized,
+    sessions: authorized ? await loadDirectorSessionsList() : [],
   };
 }

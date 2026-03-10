@@ -1,0 +1,145 @@
+"use client";
+
+import { FaArrowRight, FaBroadcastTower, FaClock, FaPlayCircle } from "react-icons/fa";
+
+function formatRelativeTime(value) {
+  const date = new Date(value || 0).getTime();
+  if (!date) return "Just now";
+  const diffMs = Math.max(0, Date.now() - date);
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return "Updated just now";
+  if (minutes < 60) return `Updated ${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `Updated ${hours}h ago`;
+}
+
+function SessionCard({ item, onSelect }) {
+  const session = item.session;
+  const match = item.match;
+  const teams =
+    match?.teamAName && match?.teamBName
+      ? `${match.teamAName} vs ${match.teamBName}`
+      : session?.teamAName && session?.teamBName
+      ? `${session.teamAName} vs ${session.teamBName}`
+      : "Teams pending";
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect?.(item)}
+      className="group w-full rounded-[26px] border border-white/10 bg-white/[0.04] p-4 text-left transition hover:-translate-y-0.5 hover:border-white/15"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="truncate text-lg font-semibold text-white">
+            {session?.name || "Untitled Session"}
+          </p>
+          <p className="mt-1 text-sm text-zinc-400">{teams}</p>
+        </div>
+        <span
+          className={`inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-semibold ${
+            item.isLive
+              ? "bg-emerald-500/14 text-emerald-200"
+              : "bg-white/[0.06] text-zinc-300"
+          }`}
+        >
+          {item.isLive ? "Live" : "Done"}
+        </span>
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+        <span className="inline-flex items-center gap-2 text-zinc-400">
+          <FaClock className="text-xs" />
+          {formatRelativeTime(item.updatedAt)}
+        </span>
+        <span className="inline-flex items-center gap-2 text-emerald-200 transition group-hover:translate-x-0.5">
+          Open
+          <FaArrowRight className="text-xs" />
+        </span>
+      </div>
+    </button>
+  );
+}
+
+export default function DirectorSessionPicker({
+  sessions = [],
+  onSelect,
+  onQuickStart,
+}) {
+  const liveSessions = sessions.filter((item) => item.isLive);
+  const recentSessions = sessions.filter((item) => !item.isLive).slice(0, 4);
+
+  if (!sessions.length) {
+    return (
+      <section className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,24,0.98),rgba(8,8,12,0.98))] p-7 text-center shadow-[0_22px_80px_rgba(0,0,0,0.4)]">
+        <span className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/[0.06] text-zinc-200">
+          <FaBroadcastTower className="text-xl" />
+        </span>
+        <h2 className="mt-5 text-2xl font-semibold text-white">No live sessions</h2>
+        <p className="mt-2 text-sm leading-6 text-zinc-400">
+          Start a live match first, then open Director Console to manage audio.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="space-y-6">
+      <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,24,0.98),rgba(8,8,12,0.98))] p-6 shadow-[0_22px_80px_rgba(0,0,0,0.4)]">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-200">
+              Director Mode
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold text-white">
+              Choose a session
+            </h2>
+          </div>
+          {liveSessions[0] ? (
+            <button
+              type="button"
+              onClick={() => onQuickStart?.(liveSessions[0])}
+              className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black shadow-[0_10px_30px_rgba(16,185,129,0.2)]"
+            >
+              <FaPlayCircle />
+              Latest live
+            </button>
+          ) : null}
+        </div>
+
+        {liveSessions.length ? (
+          <div className="mt-6 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
+              Live sessions
+            </p>
+            <div className="space-y-3">
+              {liveSessions.map((item) => (
+                <SessionCard
+                  key={item.session._id}
+                  item={item}
+                  onSelect={onSelect}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {recentSessions.length ? (
+          <div className="mt-6 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
+              Recent sessions
+            </p>
+            <div className="space-y-3">
+              {recentSessions.map((item) => (
+                <SessionCard
+                  key={item.session._id}
+                  item={item}
+                  onSelect={onSelect}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}

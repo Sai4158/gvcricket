@@ -83,53 +83,76 @@ export default function MatchImageUploader({
   };
 
   return (
-    <section className="bg-zinc-900/70 ring-1 ring-white/10 rounded-3xl p-5 sm:p-6 shadow-xl">
-      <div className="flex items-start gap-4 mb-5">
-        <div className="h-11 w-11 rounded-2xl bg-amber-400/15 text-amber-300 flex items-center justify-center text-xl shrink-0">
+    <section className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,20,24,0.96),rgba(10,10,14,0.98))] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.38)] ring-1 ring-white/5 sm:p-6">
+      <div className="mb-5 flex items-start gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-400/12 text-xl text-amber-300 shadow-[0_12px_28px_rgba(245,158,11,0.12)]">
           <FaImage />
         </div>
         <div>
           <h3 className="text-xl font-semibold text-white">{title}</h3>
-          <p className="text-sm text-zinc-400 mt-1">{description}</p>
+          <p className="mt-1 text-sm leading-6 text-zinc-400">{description}</p>
         </div>
       </div>
 
       {currentPreview && (
-        <div className="mb-5 overflow-hidden rounded-2xl border border-white/10">
+        <div className="mb-5 overflow-hidden rounded-[24px] border border-white/10 bg-black/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={currentPreview}
             alt="Selected match"
-            className="w-full max-h-72 object-cover"
+            className="max-h-80 w-full object-cover"
           />
         </div>
       )}
 
       <div className="space-y-4">
-        <input
-          type="file"
-          accept={getAcceptedMatchImageTypes()}
-          onChange={handleSelectFile}
-          className="block w-full text-sm text-zinc-300 file:mr-4 file:rounded-full file:border-0 file:bg-zinc-800 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-zinc-700"
-        />
+        <div className="rounded-[24px] border border-white/8 bg-black/20 p-3">
+          <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/[0.06] text-zinc-400">
+              <FaImage />
+            </span>
+            <label
+              htmlFor={`match-image-upload-${matchId}`}
+              className="inline-flex shrink-0 cursor-pointer items-center rounded-full bg-white/[0.08] px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/[0.12]"
+            >
+              Choose file
+            </label>
+            <div className="min-w-0 flex-1 text-sm text-zinc-400">
+              <p className="truncate">
+                {selectedFile?.name || "No image selected"}
+              </p>
+            </div>
+            <input
+              id={`match-image-upload-${matchId}`}
+              type="file"
+              accept={getAcceptedMatchImageTypes()}
+              onChange={handleSelectFile}
+              className="hidden"
+            />
+          </div>
+        </div>
         <button
           onClick={handleUpload}
           disabled={!selectedFile || isUploading}
-          className="w-full rounded-full bg-emerald-500 px-5 py-3 font-semibold text-black transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-full bg-[linear-gradient(90deg,#10b981_0%,#059669_100%)] px-5 py-3.5 font-semibold text-black shadow-[0_16px_36px_rgba(16,185,129,0.22)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isUploading ? "Uploading..." : primaryLabel}
         </button>
         <p className="text-xs text-zinc-500">
           Images are optional and compressed before upload.
         </p>
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error ? (
+          <p className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+            {error}
+          </p>
+        ) : null}
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
         {onSkip && (
           <button
             onClick={onSkip}
-            className="rounded-full border border-white/10 px-5 py-3 font-semibold text-zinc-200 hover:bg-white/5 transition"
+            className="rounded-full border border-white/10 px-5 py-3 font-semibold text-zinc-200 transition hover:bg-white/5"
           >
             {secondaryLabel}
           </button>

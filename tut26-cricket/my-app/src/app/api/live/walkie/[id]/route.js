@@ -1,6 +1,10 @@
 import { cookies } from "next/headers";
 import { connectDB } from "../../../../lib/db";
 import {
+  getDirectorAccessCookieName,
+  hasValidDirectorAccess,
+} from "../../../../lib/director-access";
+import {
   getMatchAccessCookieName,
   hasValidMatchAccess,
 } from "../../../../lib/match-access";
@@ -40,7 +44,7 @@ export async function GET(request, { params }) {
     return new Response("Invalid participant id.", { status: 400 });
   }
 
-  if (!["umpire", "spectator"].includes(role)) {
+  if (!["umpire", "spectator", "director"].includes(role)) {
     return new Response("Invalid participant role.", { status: 400 });
   }
 
@@ -63,6 +67,15 @@ export async function GET(request, { params }) {
     );
     if (!authorized) {
       return new Response("Umpire access required.", { status: 403 });
+    }
+  }
+
+  if (role === "director") {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(getDirectorAccessCookieName())?.value;
+    const authorized = hasValidDirectorAccess(token);
+    if (!authorized) {
+      return new Response("Director access required.", { status: 403 });
     }
   }
 

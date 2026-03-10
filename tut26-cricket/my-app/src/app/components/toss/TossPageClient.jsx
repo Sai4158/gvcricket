@@ -194,7 +194,7 @@ export default function TossPageClient({
   const teamB = getTeamBundle(matchDetails, "teamB");
   const titleText = "Match Toss";
   const subtitleText = `${teamA.name} vs ${teamB.name}`;
-  const stageLabel = status === "finished" ? "Step 2" : "Step 1";
+  const stageLabel = status === "finished" ? "Step 4" : "Step 3";
 
   return (
     authStatus !== "granted" ? (

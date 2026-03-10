@@ -406,8 +406,10 @@ export default function useWalkieTalkie({
     const shouldListen =
       snapshot.activeSpeakerId &&
       snapshot.activeSpeakerId !== participantId &&
-      ((role === "umpire" && snapshot.activeSpeakerRole === "spectator") ||
-        (role === "spectator" && snapshot.activeSpeakerRole === "umpire"));
+      ((role === "umpire" &&
+        ["spectator", "director"].includes(snapshot.activeSpeakerRole)) ||
+        ((role === "spectator" || role === "director") &&
+          snapshot.activeSpeakerRole === "umpire"));
 
     if (!shouldListen) {
       closeListener();
@@ -493,6 +495,10 @@ export default function useWalkieTalkie({
       return false;
     }
 
+    if (snapshotRef.current?.activeSpeakerId === participantId) {
+      return true;
+    }
+
     setClaiming(true);
     setError("");
 
@@ -519,6 +525,13 @@ export default function useWalkieTalkie({
 
   const stopTalking = async () => {
     if (!matchId || !participantId || !token) {
+      return;
+    }
+
+    if (snapshotRef.current?.activeSpeakerId !== participantId) {
+      restorePageMedia(pageMediaDuckRef);
+      stopLocalStream();
+      closeListener();
       return;
     }
 

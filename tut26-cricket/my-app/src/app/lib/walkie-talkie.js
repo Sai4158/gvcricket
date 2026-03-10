@@ -75,11 +75,13 @@ function buildSnapshot(matchId) {
   const matchState = getMatchState(matchId);
   const spectators = listParticipants(matchState, "spectator");
   const umpires = listParticipants(matchState, "umpire");
+  const directors = listParticipants(matchState, "director");
 
   return {
     enabled: Boolean(matchState.enabled),
     spectatorCount: spectators.length,
     umpireCount: umpires.length,
+    directorCount: directors.length,
     busy: Boolean(matchState.activeSpeakerId),
     activeSpeakerRole: matchState.activeSpeakerRole || "",
     activeSpeakerId: matchState.activeSpeakerId || "",
@@ -180,7 +182,13 @@ export function registerWalkieParticipant(matchId, participant) {
   const nextParticipant = {
     id: String(participant.id),
     role: participant.role,
-    name: participant.name || (participant.role === "umpire" ? "Umpire" : "Spectator"),
+    name:
+      participant.name ||
+      (participant.role === "umpire"
+        ? "Umpire"
+        : participant.role === "director"
+        ? "Director"
+        : "Spectator"),
     connectedAt: new Date().toISOString(),
   };
 
@@ -196,7 +204,10 @@ export function registerWalkieParticipant(matchId, participant) {
     snapshot: buildSnapshot(matchId),
   });
 
-  if (nextParticipant.role === "umpire" && matchState.pendingRequests.size > 0) {
+  if (
+    (nextParticipant.role === "umpire" || nextParticipant.role === "director") &&
+    matchState.pendingRequests.size > 0
+  ) {
     const latestRequest = [...matchState.pendingRequests.values()].at(-1);
     notifyMatch(matchId, {
       type: "state",
@@ -331,12 +342,19 @@ export function claimWalkieSpeaker(matchId, { role, participantId }) {
     return { ok: false, status: 409, message: "Walkie-talkie is off." };
   }
 
-  if (role === "spectator" && listParticipants(matchState, "umpire").length === 0) {
+  if (
+    (role === "spectator" || role === "director") &&
+    listParticipants(matchState, "umpire").length === 0
+  ) {
     return { ok: false, status: 409, message: "No umpire audio available." };
   }
 
-  if (role === "umpire" && listParticipants(matchState, "spectator").length === 0) {
-    return { ok: false, status: 409, message: "No spectators are connected." };
+  if (
+    role === "umpire" &&
+    listParticipants(matchState, "spectator").length === 0 &&
+    listParticipants(matchState, "director").length === 0
+  ) {
+    return { ok: false, status: 409, message: "No listeners are connected." };
   }
 
   if (matchState.activeSpeakerId && matchState.activeSpeakerId !== participant.id) {
@@ -346,6 +364,8 @@ export function claimWalkieSpeaker(matchId, { role, participantId }) {
       message:
         matchState.activeSpeakerRole === "umpire"
           ? "Umpire is replying."
+          : matchState.activeSpeakerRole === "director"
+          ? "Director is talking."
           : "Another spectator is speaking.",
     };
   }
@@ -365,10 +385,17 @@ export function claimWalkieSpeaker(matchId, { role, participantId }) {
     type: "state",
     snapshot,
     notification: {
-      type: participant.role === "spectator" ? "spectator_talking" : "umpire_reply",
+      type:
+        participant.role === "spectator"
+          ? "spectator_talking"
+          : participant.role === "director"
+          ? "director_talking"
+          : "umpire_reply",
       message:
         participant.role === "spectator"
           ? `${participant.name} is talking.`
+          : participant.role === "director"
+          ? "Director is talking."
           : "Umpire is replying.",
     },
   });

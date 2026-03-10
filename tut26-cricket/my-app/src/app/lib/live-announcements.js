@@ -135,6 +135,21 @@ function buildScoreSentence(event) {
   return `The total score is ${event.score} run${event.score === 1 ? "" : "s"}.`;
 }
 
+function buildResultCelebration(resultText) {
+  const result = String(resultText || "").trim();
+  if (!result) {
+    return "";
+  }
+
+  const winnerMatch = result.match(/^(.+?) won by (.+)\.$/i);
+  if (!winnerMatch) {
+    return result;
+  }
+
+  const [, winnerName, margin] = winnerMatch;
+  return `Congratulations ${winnerName}. They won by ${margin}.`;
+}
+
 export function buildSpectatorBallAnnouncement(event) {
   if (!event?.ball) return "";
   return describeBall(event.ball);
@@ -142,6 +157,9 @@ export function buildSpectatorBallAnnouncement(event) {
 
 export function buildSpectatorScoreAnnouncement(event, match) {
   if (!event) return "";
+  if (event.type === "target_chased" || event.type === "match_end") {
+    return "";
+  }
   return [buildScoreSentence(event), buildBallsLeftLine(match)].filter(Boolean).join(" ");
 }
 
@@ -234,11 +252,15 @@ export function buildSpectatorAnnouncement(event, match, mode = "full") {
   }
 
   if (event.type === "match_end" && event.result) {
-    return event.result;
+    return buildResultCelebration(event.result);
   }
 
   if (event.type === "target_chased" && event.result) {
-    return [buildSpectatorBallAnnouncement(event), buildSpectatorScoreAnnouncement(event, match), event.result]
+    return [
+      buildSpectatorBallAnnouncement(event),
+      buildScoreSentence(event),
+      buildResultCelebration(event.result),
+    ]
       .filter(Boolean)
       .join(" ");
   }

@@ -42,6 +42,17 @@ body {
   }
 }
 
+.session-form-input:-webkit-autofill,
+.session-form-input:-webkit-autofill:hover,
+.session-form-input:-webkit-autofill:focus,
+.session-form-input:-webkit-autofill:active {
+  -webkit-text-fill-color: #ffffff;
+  caret-color: #ffffff;
+  -webkit-box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.04) inset;
+  box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.04) inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 /* Keyframes for the soft, breathing glow on the third button */
 @keyframes animate-glow {
   0%,

@@ -136,7 +136,7 @@ const walkieParticipantSchema = z
   .max(80)
   .regex(/^[a-zA-Z0-9._:-]+$/, "participantId is invalid.");
 
-const walkieRoleSchema = z.enum(["umpire", "spectator"]);
+const walkieRoleSchema = z.enum(["umpire", "spectator", "director"]);
 
 export const walkieToggleSchema = z
   .object({

@@ -10,6 +10,7 @@ export default function LiveNowBanner({ liveMatch }) {
     <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex justify-start px-4 pr-24 pt-6 md:justify-center md:px-6 md:pr-6 md:pt-8">
       <Link
         href={`/session/${liveMatch.sessionId}/view`}
+        prefetch={false}
         className="pointer-events-auto relative flex w-full max-w-[calc(100vw-7rem)] items-center justify-between gap-4 overflow-hidden rounded-[28px] border border-white/14 bg-[linear-gradient(145deg,rgba(10,14,18,0.58),rgba(16,20,26,0.38))] px-4 py-3.5 text-white shadow-[0_16px_60px_rgba(0,0,0,0.24)] backdrop-blur-xl transition hover:border-emerald-300/30 hover:bg-[linear-gradient(145deg,rgba(10,14,18,0.66),rgba(16,20,26,0.46))] md:max-w-md"
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.12),transparent_40%)]" />

@@ -35,15 +35,47 @@ export default function HeroSection({ liveMatch = null }) {
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ type: "spring", stiffness: 100, delay: 0.2 }}
+            className="relative"
           >
-            <Image
-              src="/gvLogo.png"
-              alt="GV Cricket logo"
-              width={500}
-              height={400}
-              priority
-              className="mb-5 h-auto w-[340px] max-w-[88vw] object-contain drop-shadow-[0_10px_48px_rgba(255,100,120,0.8)] md:w-[520px]"
+            <motion.div
+              aria-hidden="true"
+              className="absolute inset-0 scale-[1.08] rounded-full bg-[radial-gradient(circle,rgba(255,78,106,0.26)_0%,rgba(255,78,106,0.14)_28%,rgba(251,191,36,0.1)_48%,transparent_72%)] blur-2xl"
+              animate={{
+                opacity: [0.5, 0.82, 0.58],
+                scale: [1, 1.05, 1.01],
+              }}
+              transition={{
+                duration: 5.5,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
             />
+            <motion.div
+              animate={{
+                scale: [1, 1.035, 1],
+                y: [0, -3, 0],
+                filter: [
+                  "drop-shadow(0 10px 46px rgba(255,100,120,0.72))",
+                  "drop-shadow(0 12px 56px rgba(255,110,130,0.92))",
+                  "drop-shadow(0 10px 46px rgba(255,100,120,0.78))",
+                ],
+              }}
+              transition={{
+                duration: 6.5,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+              className="relative"
+            >
+              <Image
+                src="/gvLogo.png"
+                alt="GV Cricket logo"
+                width={500}
+                height={400}
+                priority
+                className="mb-5 h-auto w-[340px] max-w-[88vw] object-contain md:w-[520px]"
+              />
+            </motion.div>
           </motion.div>
           <motion.h1
             initial={{ y: 50, opacity: 0 }}

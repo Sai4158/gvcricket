@@ -2,6 +2,10 @@ import { cookies } from "next/headers";
 import { jsonError } from "../../../../../lib/api-response";
 import { connectDB } from "../../../../../lib/db";
 import {
+  getDirectorAccessCookieName,
+  hasValidDirectorAccess,
+} from "../../../../../lib/director-access";
+import {
   getMatchAccessCookieName,
   hasValidMatchAccess,
 } from "../../../../../lib/match-access";
@@ -16,6 +20,12 @@ async function hasMatchAccess(matchId, accessVersion) {
   const cookieStore = await cookies();
   const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
   return hasValidMatchAccess(matchId, token, accessVersion);
+}
+
+async function hasDirectorAccess() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(getDirectorAccessCookieName())?.value;
+  return hasValidDirectorAccess(token);
 }
 
 export async function POST(req, { params }) {
@@ -55,6 +65,13 @@ export async function POST(req, { params }) {
     const hasAccess = await hasMatchAccess(id, Number(match.adminAccessVersion || 1));
     if (!hasAccess) {
       return jsonError("Umpire access required.", 403);
+    }
+  }
+
+  if (parsedRequest.value.role === "director") {
+    const hasAccess = await hasDirectorAccess();
+    if (!hasAccess) {
+      return jsonError("Director access required.", 403);
     }
   }
 

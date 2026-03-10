@@ -13,10 +13,7 @@ function ChoiceButton({ onClick, tone, children }) {
           : "bg-[linear-gradient(135deg,#e5e7eb,#94a3b8)] text-black shadow-[0_16px_36px_rgba(148,163,184,0.18)]"
       }`}
     >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.28em] opacity-70">
-        Call
-      </div>
-      <div className="mt-2 text-2xl font-black transition-transform group-hover:translate-x-0.5">
+      <div className="text-2xl font-black transition-transform group-hover:translate-x-0.5">
         {children}
       </div>
     </button>
@@ -128,31 +125,25 @@ export default function TossStatePanels({
               <div className="mt-6 flex justify-center">
                 {side === "heads" ? <CoinHeads /> : <CoinTails />}
               </div>
-              <p className="mt-6 text-xs uppercase tracking-[0.38em] text-zinc-500">
+              <p className="mt-6 text-xs uppercase tracking-[0.32em] text-zinc-500">
                 {teamName} called {call}
               </p>
               <h2 className="mt-3 text-3xl font-black leading-tight text-white">
                 {winnerName} won the toss
               </h2>
               <p className="mt-2 text-sm text-zinc-400">
-                Landed on <span className="capitalize text-white">{side}</span>
+                It landed on <span className="capitalize text-white">{side}</span>.
               </p>
             </div>
 
             <div className="w-full">
-              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.34em] text-zinc-500">
-                Next move
-              </p>
               <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={() => onDecision("bat")}
                   disabled={isSubmitting}
                   className="group rounded-[24px] border border-amber-200/40 bg-[linear-gradient(135deg,#fde047_0%,#f59e0b_100%)] px-4 py-4 text-base font-black text-black shadow-[0_18px_40px_rgba(245,158,11,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_44px_rgba(245,158,11,0.28)] disabled:opacity-50 disabled:hover:translate-y-0"
                 >
-                  <span className="block text-[10px] uppercase tracking-[0.28em] opacity-70">
-                    Attack
-                  </span>
-                  <span className="mt-1 block transition-transform group-hover:translate-x-0.5">
+                  <span className="block transition-transform group-hover:translate-x-0.5">
                     {isSubmitting ? "Saving..." : "Bat First"}
                   </span>
                 </button>
@@ -161,10 +152,7 @@ export default function TossStatePanels({
                   disabled={isSubmitting}
                   className="group rounded-[24px] border border-sky-200/20 bg-[linear-gradient(135deg,#38bdf8_0%,#2563eb_100%)] px-4 py-4 text-base font-black text-white shadow-[0_18px_40px_rgba(37,99,235,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_44px_rgba(37,99,235,0.3)] disabled:opacity-50 disabled:hover:translate-y-0"
                 >
-                  <span className="block text-[10px] uppercase tracking-[0.28em] opacity-75">
-                    Control
-                  </span>
-                  <span className="mt-1 block transition-transform group-hover:translate-x-0.5">
+                  <span className="block transition-transform group-hover:translate-x-0.5">
                     {isSubmitting ? "Saving..." : "Bowl First"}
                   </span>
                 </button>

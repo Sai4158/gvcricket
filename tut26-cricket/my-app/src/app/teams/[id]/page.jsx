@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
-import { FaArrowRight, FaInfoCircle, FaMinus, FaPlus } from "react-icons/fa";
+import {
+  FaArrowLeft,
+  FaArrowRight,
+  FaInfoCircle,
+  FaMinus,
+  FaPlus,
+} from "react-icons/fa";
 import TeamsInfoModal from "../../components/teams/InfoModal";
 import TeamRoster, {
   createDefaultRoster,
@@ -78,25 +84,41 @@ export default function TeamSelectionPage() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.08),transparent_26%),radial-gradient(circle_at_bottom,rgba(239,68,68,0.08),transparent_24%),linear-gradient(180deg,#050505_0%,#0b0b11_55%,#050505_100%)] px-5 py-10 text-zinc-100">
       <div className="w-full max-w-4xl mx-auto">
-        <header className="mb-8 mt-7 text-center">
-          <div className="mb-4 inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-200">
-            Setup
+        <header className="mb-8 mt-4">
+          <div className="mb-5 flex items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition hover:bg-white/[0.08] hover:text-amber-300"
+              aria-label="Go back"
+            >
+              <FaArrowLeft size={18} />
+            </button>
+            <div className="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-200">
+              Step 2 of 4
+            </div>
+            <button
+              onClick={() => setIsInfoModalOpen(true)}
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-colors hover:bg-white/[0.08] hover:text-amber-300"
+              aria-label="Open team setup help"
+            >
+              <FaInfoCircle size={22} />
+            </button>
           </div>
-          <div className="flex items-center justify-center gap-3">
-            <h1 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-yellow-300 via-rose-200 to-orange-400 bg-clip-text text-transparent">
+          <div className="text-center">
+            <h1 className="text-4xl font-black tracking-[-0.04em] sm:text-5xl bg-gradient-to-r from-yellow-300 via-rose-200 to-orange-400 bg-clip-text text-transparent">
               Team Selection
             </h1>
+            <div className="mx-auto mt-4 flex max-w-[220px] items-center justify-center gap-2">
+              <span className="h-2 w-10 rounded-full bg-emerald-400/70" />
+              <span className="h-2 w-10 rounded-full bg-amber-300" />
+              <span className="h-2 w-10 rounded-full bg-white/10" />
+              <span className="h-2 w-10 rounded-full bg-white/10" />
+            </div>
           </div>
-          <p className="mx-auto mt-3 max-w-xl text-sm text-zinc-400 sm:text-base">
-            Set names, squad size, and overs before the toss.
+          <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-zinc-400 sm:text-base">
+            Set team names, squad size, and overs before the toss.
           </p>
-          <button
-            onClick={() => setIsInfoModalOpen(true)}
-            className="mt-4 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-colors hover:bg-white/[0.08] hover:text-amber-300"
-            aria-label="Open team setup help"
-          >
-            <FaInfoCircle size={24} />
-          </button>
         </header>
 
         <section className="grid md:grid-cols-2 gap-8 mb-10">

@@ -141,7 +141,9 @@ export default function NewSessionPage() {
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     placeholder="Game 1, finals, or practice"
-                    className="w-full rounded-2xl border border-white/8 bg-white/[0.04] py-4 pl-12 pr-4 text-base text-white outline-none transition placeholder:text-zinc-500 focus:border-amber-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(251,191,36,0.08)]"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="session-form-input w-full rounded-2xl border border-white/8 bg-white/[0.04] py-4 pl-12 pr-4 text-base text-white outline-none transition placeholder:text-zinc-500 focus:border-amber-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(251,191,36,0.08)]"
                   />
                 </div>
               </div>
@@ -160,7 +162,9 @@ export default function NewSessionPage() {
                     value={date}
                     onChange={(event) => setDate(event.target.value)}
                     placeholder="e.g. 3/9/2026"
-                    className="w-full rounded-2xl border border-white/8 bg-white/[0.04] py-4 pl-12 pr-4 text-base text-white outline-none transition placeholder:text-zinc-500 focus:border-sky-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(56,189,248,0.08)]"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="session-form-input w-full rounded-2xl border border-white/8 bg-white/[0.04] py-4 pl-12 pr-4 text-base text-white outline-none transition placeholder:text-zinc-500 focus:border-sky-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(56,189,248,0.08)]"
                   />
                 </div>
               </div>
@@ -172,29 +176,39 @@ export default function NewSessionPage() {
                 >
                   Cover Image
                 </label>
-                <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
-                  <div className="group relative">
-                    <FaImage className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 transition-colors group-focus-within:text-amber-300" />
+                <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                  <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 p-3">
+                    <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/[0.06] text-zinc-400">
+                      <FaImage />
+                    </span>
+                    <label
+                      htmlFor="session-image"
+                      className="inline-flex shrink-0 cursor-pointer items-center rounded-full bg-white/[0.08] px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/[0.12]"
+                    >
+                      Choose file
+                    </label>
+                    <div className="min-w-0 flex-1 text-sm text-zinc-400">
+                      <p className="truncate">
+                        {selectedFileName || "No cover selected"}
+                      </p>
+                    </div>
                     <input
                       id="session-image"
                       type="file"
                       accept={getAcceptedMatchImageTypes()}
                       onChange={handleSelectImage}
-                      className="w-full rounded-2xl border border-white/8 bg-white/[0.04] py-4 pl-12 pr-4 text-sm text-zinc-300 outline-none transition file:mr-4 file:rounded-full file:border-0 file:bg-zinc-800 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-zinc-700 focus:border-amber-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(251,191,36,0.08)]"
+                      className="hidden"
                     />
                   </div>
                   <p className="mt-3 text-xs text-zinc-500">
                     Optional. One image for the whole match.
                   </p>
-                  {selectedFileName ? (
-                    <p className="mt-2 text-sm text-zinc-300">{selectedFileName}</p>
-                  ) : null}
                   {previewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={previewUrl}
                       alt="Selected cover preview"
-                      className="mt-4 h-28 w-full rounded-2xl object-cover"
+                      className="mt-4 h-32 w-full rounded-[20px] border border-white/8 object-cover"
                     />
                   ) : null}
                 </div>

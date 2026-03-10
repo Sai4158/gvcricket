@@ -10,6 +10,11 @@ import {
   isValidUmpirePin,
 } from "../src/app/lib/match-access.js";
 import {
+  createDirectorAccessToken,
+  hasValidDirectorAccess,
+  isValidDirectorPin,
+} from "../src/app/lib/director-access.js";
+import {
   applyMatchAction,
   MatchEngineError,
 } from "../src/app/lib/match-engine.js";
@@ -29,6 +34,13 @@ import {
   buildSpectatorScoreAnnouncement,
   createScoreLiveEvent,
 } from "../src/app/lib/live-announcements.js";
+import {
+  getWalkieSnapshot,
+  hydrateWalkieEnabled,
+  registerWalkieParticipant,
+  requestWalkieEnable,
+  setWalkieEnabled,
+} from "../src/app/lib/walkie-talkie.js";
 
 function buildBaseMatch() {
   return {
@@ -105,6 +117,36 @@ test("match access tokens validate by version and PIN checks use constant-time f
 
     if (previousPinHash === undefined) delete process.env.UMPIRE_ADMIN_PIN_HASH;
     else process.env.UMPIRE_ADMIN_PIN_HASH = previousPinHash;
+  }
+});
+
+test("director access tokens validate and director PIN uses the configured secret", () => {
+  const previousSecret = process.env.MATCH_ACCESS_SECRET;
+  const previousDirectorPin = process.env.DIRECTOR_CONSOLE_PIN;
+  const previousDirectorPinHash = process.env.DIRECTOR_CONSOLE_PIN_HASH;
+
+  process.env.MATCH_ACCESS_SECRET = "director-test-secret";
+  process.env.DIRECTOR_CONSOLE_PIN = "0000";
+  delete process.env.DIRECTOR_CONSOLE_PIN_HASH;
+
+  try {
+    assert.equal(isValidDirectorPin("0000"), true);
+    assert.equal(isValidDirectorPin("1234"), false);
+
+    const token = createDirectorAccessToken();
+    assert.equal(hasValidDirectorAccess(token), true);
+    const [payload, signature] = token.split(".");
+    const tamperedToken = `${payload}.${signature.slice(0, -1)}x`;
+    assert.equal(hasValidDirectorAccess(tamperedToken), false);
+  } finally {
+    if (previousSecret === undefined) delete process.env.MATCH_ACCESS_SECRET;
+    else process.env.MATCH_ACCESS_SECRET = previousSecret;
+
+    if (previousDirectorPin === undefined) delete process.env.DIRECTOR_CONSOLE_PIN;
+    else process.env.DIRECTOR_CONSOLE_PIN = previousDirectorPin;
+
+    if (previousDirectorPinHash === undefined) delete process.env.DIRECTOR_CONSOLE_PIN_HASH;
+    else process.env.DIRECTOR_CONSOLE_PIN_HASH = previousDirectorPinHash;
   }
 });
 
@@ -483,4 +525,109 @@ test("spectator commentary handles last-ball warnings and over summaries", () =>
   assert.match(overLine, /The total score is 6 runs\./);
   assert.match(overLine, /1 over has been completed\./);
   assert.match(overLine, /2 batters were out\./);
+});
+
+test("target chased announcements congratulate the winner without duplicate score lines", () => {
+  const before = {
+    ...buildBaseMatch(),
+    innings: "second",
+    teamAName: "Alpha",
+    teamBName: "Beta",
+    score: 11,
+    outs: 0,
+    innings1: { team: "Alpha", score: 12, history: [] },
+    innings2: {
+      team: "Beta",
+      score: 11,
+      history: [
+        {
+          overNumber: 1,
+          balls: [
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 2, isOut: false, extraType: null },
+            { runs: 4, isOut: false, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+          ],
+        },
+      ],
+    },
+  };
+
+  const after = {
+    ...before,
+    score: 13,
+    result: "Beta won by 3 wickets.",
+    innings2: {
+      team: "Beta",
+      score: 13,
+      history: [
+        {
+          overNumber: 1,
+          balls: [
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 2, isOut: false, extraType: null },
+            { runs: 4, isOut: false, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 2, isOut: false, extraType: null },
+          ],
+        },
+      ],
+    },
+    isOngoing: false,
+  };
+
+  const event = createScoreLiveEvent(before, after, {
+    runs: 2,
+    isOut: false,
+    extraType: null,
+  });
+
+  const line = buildSpectatorAnnouncement(event, after, "full");
+  assert.match(line, /Scored 2 runs this ball\./);
+  assert.match(line, /The total score is 13 runs\./);
+  assert.match(line, /Congratulations Beta\. They won by 3 wickets\./);
+
+  const scoreLine = buildSpectatorScoreAnnouncement(event, after);
+  assert.equal(scoreLine, "");
+});
+
+test("walkie snapshot tracks director presence and spectator requests stay live-only", () => {
+  const matchId = `walkie-test-${Date.now()}`;
+  hydrateWalkieEnabled(matchId, false);
+
+  const umpire = registerWalkieParticipant(matchId, {
+    id: "umpire-1",
+    role: "umpire",
+    name: "Umpire",
+  });
+  const director = registerWalkieParticipant(matchId, {
+    id: "director-1",
+    role: "director",
+    name: "Director",
+  });
+  const spectator = registerWalkieParticipant(matchId, {
+    id: "spectator-1",
+    role: "spectator",
+    name: "Spectator",
+  });
+
+  const beforeEnable = getWalkieSnapshot(matchId);
+  assert.equal(beforeEnable.directorCount, 1);
+  assert.equal(beforeEnable.spectatorCount, 1);
+  assert.equal(beforeEnable.umpireCount, 1);
+  assert.equal(beforeEnable.enabled, false);
+
+  const requestResult = requestWalkieEnable(matchId, {
+    participantId: "spectator-1",
+  });
+  assert.equal(requestResult.ok, true);
+  assert.equal(getWalkieSnapshot(matchId).enabled, false);
+
+  const enabledSnapshot = setWalkieEnabled(matchId, true);
+  assert.equal(enabledSnapshot.enabled, true);
+  assert.equal(enabledSnapshot.directorCount, 1);
+
+  spectator.cleanup();
+  director.cleanup();
+  umpire.cleanup();
 });
