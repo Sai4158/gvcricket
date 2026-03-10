@@ -5,7 +5,7 @@ import { startTransition, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FaArrowLeft } from "react-icons/fa";
 import useEventSource from "../live/useEventSource";
-import MatchImageCard from "../match/MatchImageCard";
+import MatchHeroBackdrop from "../match/MatchHeroBackdrop";
 import { calculateInningsSummary } from "../../lib/match-stats";
 import CongratulationsCard from "./CongratulationsCard";
 import EnhancedScorecard from "./EnhancedScorecard";
@@ -63,20 +63,58 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   return (
     <main className="min-h-screen bg-zinc-950 p-4 sm:p-8 text-zinc-300 font-sans">
       <div className="max-w-5xl mx-auto space-y-12 py-10">
-        <header className="text-center space-y-4">
-          <button
-            onClick={() => router.push("/session")}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 text-zinc-200 hover:bg-zinc-700 transition-colors mb-4"
-          >
-            <FaArrowLeft />
-            <span>Back to Sessions</span>
-          </button>
-          <h1 className="text-5xl font-extrabold text-white">Match Result</h1>
-        </header>
+        <MatchHeroBackdrop match={match} className="mb-2">
+          <div className="px-5 py-7 sm:px-8 sm:py-8">
+            <header className="text-center space-y-4">
+              <button
+                onClick={() => router.push("/session")}
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-zinc-100 backdrop-blur-sm transition-colors hover:bg-black/45"
+              >
+                <FaArrowLeft />
+                <span>Back to Sessions</span>
+              </button>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-amber-300/90">
+                  Match Complete
+                </p>
+                <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
+                  Match Result
+                </h1>
+                <p className="text-sm text-zinc-300">
+                  {match.innings1.team} vs {match.innings2.team}
+                </p>
+              </div>
+            </header>
+
+            <div className="mt-8 grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+              <div className="rounded-[28px] border border-white/10 bg-black/35 p-4 backdrop-blur-md shadow-[0_18px_50px_rgba(0,0,0,0.32)] sm:p-5">
+                {match.result && <CongratulationsCard result={match.result} />}
+              </div>
+              <div className="rounded-[28px] border border-white/10 bg-black/35 p-5 backdrop-blur-md shadow-[0_18px_50px_rgba(0,0,0,0.32)]">
+                <div className="grid grid-cols-2 gap-3 text-center">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
+                    <p className="text-xs uppercase tracking-[0.28em] text-zinc-400">Final score</p>
+                    <p className="mt-2 text-3xl font-black text-white">
+                      {match.score}
+                      <span className="text-zinc-400">/{match.outs}</span>
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
+                    <p className="text-xs uppercase tracking-[0.28em] text-zinc-400">Overs</p>
+                    <p className="mt-2 text-3xl font-black text-white">
+                      {innings2Summary.overs || innings1Summary.overs || "0.0"}
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-4 text-center text-sm text-zinc-300">
+                  Toss won by <span className="font-semibold text-white">{match.tossWinner}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </MatchHeroBackdrop>
 
         <section className="space-y-8">
-          {match.result && <CongratulationsCard result={match.result} />}
-          <MatchImageCard match={match} title="Match Photo" />
           <EnhancedScorecard
             match={match}
             innings1Summary={innings1Summary}

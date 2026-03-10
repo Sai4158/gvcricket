@@ -19,7 +19,7 @@ Open `http://localhost:3000`.
 
 ## Required environment variables
 
-Use [.env.example](./.env.example) as the template.
+Use `.env`.
 
 Required:
 

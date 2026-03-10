@@ -84,7 +84,11 @@ export default function MatchImageUploader({
       setPin("");
       onUploaded?.(payload);
     } catch (caughtError) {
-      setError(caughtError.message);
+      const message =
+        /pin/i.test(caughtError.message || "")
+          ? "Wrong PIN. You can continue without an image."
+          : caughtError.message;
+      setError(message);
       setPin("");
     } finally {
       setIsUploading(false);
@@ -141,7 +145,7 @@ export default function MatchImageUploader({
           />
         </label>
         <p className="text-xs text-zinc-500">
-          Images are compressed before upload, limited to safe raster formats, and require the admin PIN every time.
+          Images are optional, compressed before upload, and require the admin PIN every time.
         </p>
         {error && <p className="text-sm text-red-400">{error}</p>}
       </div>
