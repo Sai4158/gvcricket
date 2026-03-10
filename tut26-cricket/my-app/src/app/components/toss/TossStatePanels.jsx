@@ -54,10 +54,11 @@ export default function TossStatePanels({
               <motion.div
                 animate={{ rotateY: 720 }}
                 transition={{
-                  duration: 3.2,
+                  duration: 6,
                   ease: "linear",
                   repeat: Number.POSITIVE_INFINITY,
                 }}
+                className="[transform-style:preserve-3d]"
               >
                 <SpinningCoin />
               </motion.div>
@@ -105,6 +106,7 @@ export default function TossStatePanels({
             <motion.div
               animate={{ rotateY: 1440 }}
               transition={{ duration: 2.2, ease: "easeInOut" }}
+              className="[transform-style:preserve-3d]"
             >
               <SpinningCoin />
             </motion.div>

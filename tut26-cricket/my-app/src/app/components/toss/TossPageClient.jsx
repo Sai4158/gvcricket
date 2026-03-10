@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FaHandSparkles, FaRedo } from "react-icons/fa";
-import MatchImageUploader from "../match/MatchImageUploader";
+import { FaArrowLeft, FaHandSparkles, FaRedo } from "react-icons/fa";
 import { AccessGate, Splash } from "../match/MatchStatusShell";
 import useMatchAccess from "../match/useMatchAccess";
 import TossStatePanels from "./TossStatePanels";
 import { getTeamBundle } from "../../lib/team-utils";
+
+const PENDING_SESSION_IMAGE_KEY = "gv-pending-session-image";
 
 function createActionId(prefix) {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -38,7 +39,6 @@ export default function TossPageClient({
   const [matchDetails, setMatchDetails] = useState(initialMatch);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [showImageStep, setShowImageStep] = useState(false);
 
   useEffect(() => {
     if (status !== "counting" || countdown <= 0) {
@@ -112,7 +112,44 @@ export default function TossPageClient({
       }
 
       setMatchDetails(payload.match);
-      setShowImageStep(true);
+
+      if (typeof window !== "undefined") {
+        const rawPendingImage = window.sessionStorage.getItem(
+          PENDING_SESSION_IMAGE_KEY
+        );
+
+        if (rawPendingImage) {
+          try {
+            const pendingImage = JSON.parse(rawPendingImage);
+            if (pendingImage?.dataUrl) {
+              const imageResponse = await fetch(pendingImage.dataUrl);
+              const imageBlob = await imageResponse.blob();
+              const uploadForm = new FormData();
+              uploadForm.append(
+                "image",
+                new File(
+                  [imageBlob],
+                  pendingImage.fileName || "session-cover.jpg",
+                  {
+                    type: pendingImage.type || imageBlob.type || "image/jpeg",
+                  }
+                )
+              );
+
+              await fetch(`/api/matches/${matchId}/image`, {
+                method: "POST",
+                body: uploadForm,
+              });
+            }
+          } catch {
+            // Continue to the match even if the optional image fails.
+          } finally {
+            window.sessionStorage.removeItem(PENDING_SESSION_IMAGE_KEY);
+          }
+        }
+      }
+
+      router.push(`/match/${matchId}`);
     } catch (caughtError) {
       setError(caughtError.message || "Failed to update toss.");
     } finally {
@@ -126,7 +163,6 @@ export default function TossPageClient({
     setCountdown(3);
     setTossResult({ side: null, winnerName: null, call: null });
     setIsSubmitting(false);
-    setShowImageStep(false);
     setError("");
   };
 
@@ -156,12 +192,9 @@ export default function TossPageClient({
 
   const teamA = getTeamBundle(matchDetails, "teamA");
   const teamB = getTeamBundle(matchDetails, "teamB");
-  const titleText = showImageStep ? "Ready to Start" : "Match Toss";
-  const subtitleText = showImageStep
-    ? "Add a cover, or skip."
-    : `${teamA.name} vs ${teamB.name}`;
-  const stageLabel =
-    showImageStep ? "Step 3" : status === "finished" ? "Step 2" : "Step 1";
+  const titleText = "Match Toss";
+  const subtitleText = `${teamA.name} vs ${teamB.name}`;
+  const stageLabel = status === "finished" ? "Step 2" : "Step 1";
 
   return (
     authStatus !== "granted" ? (
@@ -182,6 +215,14 @@ export default function TossPageClient({
 
           <div className="relative">
             <div className="mb-6 flex items-start justify-between gap-4">
+              <button
+                onClick={() => router.back()}
+                className="mt-1 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
+                aria-label="Go back"
+              >
+                <FaArrowLeft />
+              </button>
+
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-300">
                   <FaHandSparkles className="text-[10px]" />
@@ -195,46 +236,22 @@ export default function TossPageClient({
 
               <button
                 onClick={redoToss}
-                className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
+                className="mt-1 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
                 aria-label="Redo Toss"
               >
                 <FaRedo />
               </button>
             </div>
 
-            {showImageStep ? (
-              <div className="space-y-6">
-                <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-4 py-4 text-center">
-                  <p className="text-base font-semibold text-white">
-                    Toss complete. {tossResult.winnerName} chose to {matchDetails.tossDecision}.
-                  </p>
-                  <p className="mt-2 text-sm text-zinc-400">Add an image or go live.</p>
-                </div>
-
-                <MatchImageUploader
-                  matchId={String(matchDetails._id)}
-                  existingImageUrl={matchDetails.matchImageUrl || ""}
-                  onUploaded={() => {
-                    router.push(`/match/${matchId}`);
-                  }}
-                  onSkip={() => router.push(`/match/${matchId}`)}
-                  title="Optional match image"
-                  description="Poster, ground photo, or team image. You can also add it later."
-                  primaryLabel="Start Match"
-                  secondaryLabel="Skip for now"
-                />
-              </div>
-            ) : (
-              <TossStatePanels
-                status={status}
-                countdown={countdown}
-                teamName={teamA.name}
-                tossResult={tossResult}
-                isSubmitting={isSubmitting}
-                onChoice={handleChoice}
-                onDecision={startMatch}
-              />
-            )}
+            <TossStatePanels
+              status={status}
+              countdown={countdown}
+              teamName={teamA.name}
+              tossResult={tossResult}
+              isSubmitting={isSubmitting}
+              onChoice={handleChoice}
+              onDecision={startMatch}
+            />
           </div>
         </section>
       </div>

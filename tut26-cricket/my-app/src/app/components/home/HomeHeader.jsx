@@ -11,7 +11,7 @@ export default function HomeHeader() {
   const { scrollY } = useScroll();
 
   useEffect(() => {
-    return scrollY.onChange((latest) => {
+    return scrollY.on("change", (latest) => {
       const previous = scrollY.getPrevious();
       if (latest > previous && latest > 150 && !isMenuOpen) {
         setHidden(true);
@@ -48,7 +48,7 @@ export default function HomeHeader() {
       }}
       animate={hidden ? "hidden" : "visible"}
       transition={{ duration: 0.35, ease: "easeInOut" }}
-      className="pointer-events-none fixed top-0 left-0 right-0 z-50 p-6 flex justify-end md:hidden font-sans"
+      className="pointer-events-none fixed top-0 left-0 right-0 z-50 px-6 pt-8 pb-6 flex justify-end md:hidden font-sans"
     >
       <motion.button
         whileTap={{ scale: 0.9 }}

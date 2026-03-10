@@ -1,6 +1,12 @@
 "use client";
 
-function CoinShell({ rimStroke, frontFill, backFill, text, textColor, imageSize = 34 }) {
+function CoinShell({
+  rimStroke,
+  frontFill,
+  backFill,
+  text,
+  textColor,
+}) {
   return (
     <svg width="180" height="180" viewBox="0 0 120 120" fill="none">
       <defs>
@@ -20,24 +26,16 @@ function CoinShell({ rimStroke, frontFill, backFill, text, textColor, imageSize 
       <circle cx="60" cy="60" r="47" stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" />
       <text
         x="60"
-        y="25"
+        y="62"
         fontFamily="Arial, sans-serif"
-        fontSize="13"
+        fontSize="16"
         fill={textColor}
         textAnchor="middle"
         fontWeight="800"
-        letterSpacing="4"
+        letterSpacing="5"
       >
         {text}
       </text>
-      <image
-        href="/gvLogo.png"
-        x={60 - imageSize / 2}
-        y={60 - imageSize / 2 - 2}
-        width={imageSize}
-        height={imageSize}
-        preserveAspectRatio="xMidYMid meet"
-      />
     </svg>
   );
 }
@@ -50,7 +48,6 @@ export function CoinHeads() {
       backFill="#b8860b"
       text="HEADS"
       textColor="#5f4300"
-      imageSize={38}
     />
   );
 }
@@ -63,62 +60,19 @@ export function CoinTails() {
       backFill="#94a3b8"
       text="TAILS"
       textColor="#374151"
-      imageSize={38}
     />
   );
 }
 
 export function SpinningCoin() {
   return (
-    <svg width="180" height="180" viewBox="0 0 120 120" fill="none">
-      <defs>
-        <radialGradient id="spin-grad">
-          <stop offset="0%" stopColor="#facc15" />
-          <stop offset="100%" stopColor="#b8860b" />
-        </radialGradient>
-      </defs>
-      <ellipse
-        cx="60"
-        cy="60"
-        rx="38"
-        ry="55"
-        fill="url(#spin-grad)"
-        stroke="#8a6200"
-        strokeWidth="5"
-      />
-      <ellipse cx="60" cy="60" rx="30" ry="47" stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" />
-      <image
-        href="/gvLogo.png"
-        x="41"
-        y="42"
-        width="38"
-        height="38"
-        preserveAspectRatio="xMidYMid meet"
-      />
-      <text
-        x="60"
-        y="22"
-        fontFamily="Arial, sans-serif"
-        fontSize="10"
-        fill="#5f4300"
-        textAnchor="middle"
-        fontWeight="800"
-        letterSpacing="3"
-      >
-        HEADS
-      </text>
-      <text
-        x="60"
-        y="103"
-        fontFamily="Arial, sans-serif"
-        fontSize="10"
-        fill="#5f4300"
-        textAnchor="middle"
-        fontWeight="800"
-        letterSpacing="3"
-      >
-        TAILS
-      </text>
-    </svg>
+    <div className="relative h-[180px] w-[180px] [transform-style:preserve-3d]">
+      <div className="absolute inset-0 [backface-visibility:hidden]">
+        <CoinHeads />
+      </div>
+      <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)]">
+        <CoinTails />
+      </div>
+    </div>
   );
 }

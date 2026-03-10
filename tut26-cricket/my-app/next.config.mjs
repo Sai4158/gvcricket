@@ -9,6 +9,20 @@ const nextConfig = {
   poweredByHeader: false,
   images: {
     formats: ["image/avif", "image/webp"],
+    localPatterns: [
+      {
+        pathname: "/gvLogo.png",
+      },
+      {
+        pathname: "/videos/**",
+      },
+      {
+        pathname: "/Thumb1.png",
+      },
+      {
+        pathname: "/api/matches/**",
+      },
+    ],
   },
   serverExternalPackages: ["@tensorflow/tfjs", "nsfwjs", "sharp"],
   turbopack: {

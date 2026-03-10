@@ -1,9 +1,14 @@
 import crypto from "node:crypto";
+import { cookies } from "next/headers";
 import { jsonError, jsonRateLimit } from "../../../../lib/api-response";
 import { writeAuditLog } from "../../../../lib/audit-log";
 import { connectDB } from "../../../../lib/db";
 import { buildSessionMirrorUpdate } from "../../../../lib/match-engine";
-import { isValidUmpirePin } from "../../../../lib/match-access";
+import {
+  getMatchAccessCookieName,
+  hasValidMatchAccess,
+  isValidUmpirePin,
+} from "../../../../lib/match-access";
 import {
   buildPublicMatchImageUrl,
   isSafeRemoteMatchImageUrl,
@@ -19,7 +24,6 @@ import { serializePublicMatch } from "../../../../lib/public-data";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { parseMultipartRequest } from "../../../../lib/request-security";
-import { pinSchema } from "../../../../lib/validators";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 
@@ -78,9 +82,17 @@ export async function POST(req, { params }) {
       return jsonError("Match not found.", 404);
     }
 
-    const pinValue = parsedRequest.value.get("pin");
-    const parsedPin = pinSchema.safeParse(pinValue);
-    if (!parsedPin.success || !isValidUmpirePin(parsedPin.data)) {
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get(getMatchAccessCookieName(id))?.value;
+    const hasCookieAccess = hasValidMatchAccess(
+      id,
+      accessToken,
+      Number(match.adminAccessVersion || 1)
+    );
+    const pinValue = String(parsedRequest.value.get("pin") || "").trim();
+    const hasPinAccess = Boolean(pinValue) && isValidUmpirePin(pinValue);
+
+    if (!hasCookieAccess && !hasPinAccess) {
       await writeAuditLog({
         action: "match_media_upload_denied",
         targetType: "match",
@@ -90,7 +102,7 @@ export async function POST(req, { params }) {
         userAgent: meta.userAgent,
       });
 
-      return jsonError("Correct admin PIN required for image upload.", 401);
+      return jsonError("Umpire access required for image upload.", 401);
     }
 
     const file = parsedRequest.value.get("image");

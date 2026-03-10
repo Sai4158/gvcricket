@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { FaImage } from "react-icons/fa";
 import { getAcceptedMatchImageTypes, compressMatchImage } from "./match-image-client";
-import PinPad from "../shared/PinPad";
 
 export default function MatchImageUploader({
   matchId,
@@ -17,7 +16,6 @@ export default function MatchImageUploader({
 }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
-  const [pin, setPin] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState("");
 
@@ -55,10 +53,6 @@ export default function MatchImageUploader({
 
   const handleUpload = async () => {
     if (!selectedFile || isUploading) return;
-    if (!pin.trim()) {
-      setError("Enter the admin PIN to upload an image.");
-      return;
-    }
 
     setIsUploading(true);
     setError("");
@@ -67,7 +61,6 @@ export default function MatchImageUploader({
       const compressedFile = await compressMatchImage(selectedFile);
       const formData = new FormData();
       formData.append("image", compressedFile);
-      formData.append("pin", pin.trim());
 
       const response = await fetch(`/api/matches/${matchId}/image`, {
         method: "POST",
@@ -81,15 +74,9 @@ export default function MatchImageUploader({
 
       setSelectedFile(null);
       setPreviewUrl("");
-      setPin("");
       onUploaded?.(payload);
     } catch (caughtError) {
-      const message =
-        /pin/i.test(caughtError.message || "")
-          ? "Wrong PIN. You can continue without an image."
-          : caughtError.message;
-      setError(message);
-      setPin("");
+      setError(caughtError.message || "Image upload failed.");
     } finally {
       setIsUploading(false);
     }
@@ -125,27 +112,15 @@ export default function MatchImageUploader({
           onChange={handleSelectFile}
           className="block w-full text-sm text-zinc-300 file:mr-4 file:rounded-full file:border-0 file:bg-zinc-800 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-zinc-700"
         />
-        <label className="block space-y-2">
-          <span className="text-xs uppercase tracking-wider text-zinc-400">
-            Admin PIN
-          </span>
-          <PinPad
-            value={pin}
-            onChange={(nextPin) => {
-              setPin(nextPin);
-              if (error) {
-                setError("");
-              }
-            }}
-            onSubmit={handleUpload}
-            length={4}
-            submitLabel={primaryLabel}
-            isSubmitting={isUploading}
-            submitDisabled={!selectedFile}
-          />
-        </label>
+        <button
+          onClick={handleUpload}
+          disabled={!selectedFile || isUploading}
+          className="w-full rounded-full bg-emerald-500 px-5 py-3 font-semibold text-black transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isUploading ? "Uploading..." : primaryLabel}
+        </button>
         <p className="text-xs text-zinc-500">
-          Images are optional, compressed before upload, and require the admin PIN every time.
+          Images are optional and compressed before upload.
         </p>
         {error && <p className="text-sm text-red-400">{error}</p>}
       </div>

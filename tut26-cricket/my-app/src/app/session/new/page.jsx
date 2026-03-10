@@ -3,16 +3,69 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { FaArrowRight, FaCalendarAlt, FaPen } from "react-icons/fa";
+import { FaArrowRight, FaCalendarAlt, FaImage, FaPen } from "react-icons/fa";
+import {
+  compressMatchImage,
+  getAcceptedMatchImageTypes,
+} from "../../components/match/match-image-client";
 
 const today = new Date().toLocaleDateString("en-US");
+const PENDING_SESSION_IMAGE_KEY = "gv-pending-session-image";
 
 export default function NewSessionPage() {
   const [name, setName] = useState("");
   const [date, setDate] = useState(today);
+  const [selectedFileName, setSelectedFileName] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
+
+  const handleSelectImage = async (event) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      setSelectedFileName("");
+      setPreviewUrl("");
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(PENDING_SESSION_IMAGE_KEY);
+      }
+      return;
+    }
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Please choose a JPG, PNG, or WEBP image.");
+      return;
+    }
+
+    setError("");
+
+    try {
+      const compressedFile = await compressMatchImage(file);
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("Could not prepare the image."));
+        reader.readAsDataURL(compressedFile);
+      });
+
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(
+          PENDING_SESSION_IMAGE_KEY,
+          JSON.stringify({
+            fileName: compressedFile.name,
+            type: compressedFile.type,
+            dataUrl,
+          })
+        );
+      }
+
+      setSelectedFileName(file.name);
+      setPreviewUrl(dataUrl);
+    } catch (caughtError) {
+      setError(caughtError.message || "Could not prepare the image.");
+    }
+  };
 
   const createSession = async () => {
     setError("");
@@ -52,7 +105,7 @@ export default function NewSessionPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.12),transparent_32%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.12),transparent_30%),linear-gradient(180deg,#050505_0%,#0b0b11_52%,#050505_100%)] px-4 py-10 text-zinc-200">
+    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.12),transparent_32%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.12),transparent_30%),linear-gradient(180deg,#050505_0%,#0b0b11_52%,#050505_100%)] px-4 py-10 text-zinc-200">
       <div className="mx-auto w-full max-w-md">
         <div className="mb-5 text-center">
           <div className="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-200">
@@ -109,6 +162,41 @@ export default function NewSessionPage() {
                     placeholder="e.g. 3/9/2026"
                     className="w-full rounded-2xl border border-white/8 bg-white/[0.04] py-4 pl-12 pr-4 text-base text-white outline-none transition placeholder:text-zinc-500 focus:border-sky-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(56,189,248,0.08)]"
                   />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="session-image"
+                  className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500"
+                >
+                  Cover Image
+                </label>
+                <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
+                  <div className="group relative">
+                    <FaImage className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 transition-colors group-focus-within:text-amber-300" />
+                    <input
+                      id="session-image"
+                      type="file"
+                      accept={getAcceptedMatchImageTypes()}
+                      onChange={handleSelectImage}
+                      className="w-full rounded-2xl border border-white/8 bg-white/[0.04] py-4 pl-12 pr-4 text-sm text-zinc-300 outline-none transition file:mr-4 file:rounded-full file:border-0 file:bg-zinc-800 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-zinc-700 focus:border-amber-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(251,191,36,0.08)]"
+                    />
+                  </div>
+                  <p className="mt-3 text-xs text-zinc-500">
+                    Optional. One image for the whole match.
+                  </p>
+                  {selectedFileName ? (
+                    <p className="mt-2 text-sm text-zinc-300">{selectedFileName}</p>
+                  ) : null}
+                  {previewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={previewUrl}
+                      alt="Selected cover preview"
+                      className="mt-4 h-28 w-full rounded-2xl object-cover"
+                    />
+                  ) : null}
                 </div>
               </div>
             </div>

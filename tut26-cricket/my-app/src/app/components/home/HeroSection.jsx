@@ -1,25 +1,17 @@
 "use client";
 
-import { useRef } from "react";
 import Image from "next/image";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion } from "framer-motion";
 import LiveNowBanner from "./LiveNowBanner";
 
 export default function HeroSection({ liveMatch = null }) {
-  const heroRef = useRef(null);
-  const { scrollYProgress } = useScroll({
-    target: heroRef,
-    offset: ["start start", "end start"],
-  });
-
-  const heroScale = useTransform(scrollYProgress, [0, 1], [1, 1.5]);
-  const heroOpacity = useTransform(scrollYProgress, [0, 1], [1, 0]);
-
   return (
-    <section ref={heroRef} className="h-screen relative overflow-hidden">
+    <section className="relative h-screen overflow-hidden">
       <motion.div
-        style={{ scale: heroScale, opacity: heroOpacity }}
-        className="sticky top-0 h-screen flex flex-col items-center justify-center text-center"
+        initial={{ opacity: 0.9, scale: 1.04 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+        className="sticky top-0 flex h-screen flex-col items-center justify-center text-center"
       >
         <LiveNowBanner liveMatch={liveMatch} />
         <div
@@ -60,7 +52,7 @@ export default function HeroSection({ liveMatch = null }) {
             className="
               animate-[animate-gradient_5s_linear_infinite]
               bg-clip-text text-transparent
-              text-6xl md:text-8xl font-extrabold tracking-tight
+              text-5xl md:text-7xl font-semibold tracking-tight
               drop-shadow-[0_0_1rem_rgba(249,115,22,0.4)]
             "
             style={{
