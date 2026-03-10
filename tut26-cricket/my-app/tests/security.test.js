@@ -39,6 +39,7 @@ import {
   hydrateWalkieEnabled,
   registerWalkieParticipant,
   requestWalkieEnable,
+  respondToWalkieRequest,
   setWalkieEnabled,
 } from "../src/app/lib/walkie-talkie.js";
 
@@ -427,18 +428,76 @@ test("spectator commentary uses simple ball-first wording and separate score lin
   });
 
   const fullLine = buildSpectatorAnnouncement(event, after, "full");
-  assert.match(fullLine, /Scored 1 run this ball\./);
-  assert.doesNotMatch(fullLine, /The total score is/);
-  assert.doesNotMatch(fullLine, /out/);
+  assert.equal(fullLine, "1 run.");
 
   const scoreLine = buildSpectatorScoreAnnouncement(event, after);
-  assert.match(scoreLine, /The total score is 8 runs\./);
-  assert.match(scoreLine, /5 balls left in the over\./);
+  assert.equal(scoreLine, "");
 
   const currentScoreLine = buildCurrentScoreAnnouncement(after);
-  assert.match(currentScoreLine, /The current score for Titans is 8 runs\./);
-  assert.match(currentScoreLine, /1 out\./);
-  assert.match(currentScoreLine, /1 over and 5 balls left\./);
+  assert.match(currentScoreLine, /Score is 8 for 1\./);
+  assert.match(currentScoreLine, /0 overs are done\./);
+  assert.match(currentScoreLine, /2 overs are left\./);
+  assert.match(currentScoreLine, /3 needed from 1 over and 5 balls\./);
+});
+
+test("walkie requests support spectator and director, prevent duplicates, and require umpire response", () => {
+  const matchId = `walkie-${Date.now()}`;
+
+  const spectatorRegistration = registerWalkieParticipant(matchId, {
+    id: "spectator:test-user",
+    role: "spectator",
+    name: "North End Spectator",
+  });
+  const directorRegistration = registerWalkieParticipant(matchId, {
+    id: "director:test-user",
+    role: "director",
+    name: "Director Booth",
+  });
+
+  try {
+    hydrateWalkieEnabled(matchId, false);
+
+    const spectatorRequest = requestWalkieEnable(matchId, {
+      participantId: "spectator:test-user",
+      role: "spectator",
+    });
+    assert.equal(spectatorRequest.ok, true);
+    assert.equal(spectatorRequest.snapshot.pendingRequests.length, 1);
+    assert.equal(spectatorRequest.snapshot.pendingRequests[0].role, "spectator");
+
+    const duplicateRequest = requestWalkieEnable(matchId, {
+      participantId: "spectator:test-user",
+      role: "spectator",
+    });
+    assert.equal(duplicateRequest.ok, false);
+    assert.equal(duplicateRequest.status, 409);
+
+    const directorRequest = requestWalkieEnable(matchId, {
+      participantId: "director:test-user",
+      role: "director",
+    });
+    assert.equal(directorRequest.ok, true);
+    assert.equal(directorRequest.snapshot.pendingRequests.length, 2);
+
+    const dismissed = respondToWalkieRequest(matchId, {
+      requestId: directorRequest.snapshot.pendingRequests[1].requestId,
+      action: "dismiss",
+    });
+    assert.equal(dismissed.ok, true);
+    assert.equal(dismissed.snapshot.pendingRequests.length, 1);
+    assert.equal(dismissed.snapshot.pendingRequests[0].role, "spectator");
+
+    const accepted = respondToWalkieRequest(matchId, {
+      requestId: dismissed.snapshot.pendingRequests[0].requestId,
+      action: "accept",
+    });
+    assert.equal(accepted.ok, true);
+    assert.equal(accepted.snapshot.enabled, true);
+    assert.equal(accepted.snapshot.pendingRequests.length, 0);
+  } finally {
+    spectatorRegistration.cleanup();
+    directorRegistration.cleanup();
+  }
 });
 
 test("spectator commentary handles last-ball warnings and over summaries", () => {
@@ -494,11 +553,10 @@ test("spectator commentary handles last-ball warnings and over summaries", () =>
   });
 
   const fullLine = buildSpectatorAnnouncement(event, after, "full");
-  assert.match(fullLine, /Scored 1 run this ball\./);
+  assert.equal(fullLine, "1 run.");
 
   const scoreLine = buildSpectatorScoreAnnouncement(event, after);
-  assert.match(scoreLine, /The total score is 5 runs\./);
-  assert.match(scoreLine, /This is the last ball for this over\./);
+  assert.equal(scoreLine, "This is the last ball of the over.");
 
   const overLine = buildSpectatorOverCompleteAnnouncement({
     ...after,
@@ -522,9 +580,11 @@ test("spectator commentary handles last-ball warnings and over summaries", () =>
       ],
     },
   });
-  assert.match(overLine, /The total score is 6 runs\./);
-  assert.match(overLine, /1 over has been completed\./);
-  assert.match(overLine, /2 batters were out\./);
+  assert.match(overLine, /Over complete\./);
+  assert.match(overLine, /Score is 6 for 2\./);
+  assert.match(overLine, /1 over is done\./);
+  assert.match(overLine, /1 over is left\./);
+  assert.match(overLine, /1 wicket fell in this over\./);
 });
 
 test("target chased announcements congratulate the winner without duplicate score lines", () => {
@@ -583,12 +643,80 @@ test("target chased announcements congratulate the winner without duplicate scor
   });
 
   const line = buildSpectatorAnnouncement(event, after, "full");
-  assert.match(line, /Scored 2 runs this ball\./);
-  assert.match(line, /The total score is 13 runs\./);
-  assert.match(line, /Congratulations Beta\. They won by 3 wickets\./);
+  assert.equal(line, "2 runs.");
 
   const scoreLine = buildSpectatorScoreAnnouncement(event, after);
-  assert.equal(scoreLine, "");
+  assert.match(scoreLine, /Score is 13 for 0\./);
+  assert.match(scoreLine, /Match over\./);
+  assert.match(scoreLine, /Beta wins by 3 wickets\./);
+});
+
+test("spectator commentary gives progress reminders and clean undo lines", () => {
+  const match = {
+    ...buildBaseMatch(),
+    score: 4,
+    outs: 0,
+    innings1: {
+      team: "Falcons",
+      score: 4,
+      history: [
+        {
+          overNumber: 1,
+          balls: [
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 2, isOut: false, extraType: null },
+            { runs: 0, isOut: false, extraType: null },
+          ],
+        },
+      ],
+    },
+  };
+
+  const ballTwoEvent = {
+    id: "evt-ball-2",
+    type: "score_update",
+    ball: { runs: 1, isOut: false, extraType: null },
+    score: 2,
+    outs: 0,
+    overCompleted: false,
+  };
+  const ballFourEvent = {
+    id: "evt-ball-4",
+    type: "score_update",
+    ball: { runs: 0, isOut: false, extraType: null },
+    score: 4,
+    outs: 0,
+    overCompleted: false,
+  };
+  const undoEvent = {
+    id: "evt-undo",
+    type: "undo",
+    score: 4,
+    outs: 0,
+  };
+
+  assert.equal(
+    buildSpectatorScoreAnnouncement(ballTwoEvent, {
+      ...match,
+      innings1: {
+        ...match.innings1,
+        history: [
+          {
+            overNumber: 1,
+            balls: [
+              { runs: 1, isOut: false, extraType: null },
+              { runs: 1, isOut: false, extraType: null },
+            ],
+          },
+        ],
+      },
+    }),
+    "This is ball 2."
+  );
+
+  assert.equal(buildSpectatorScoreAnnouncement(ballFourEvent, match), "This is ball 4.");
+  assert.equal(buildSpectatorAnnouncement(undoEvent, match, "full"), "Umpire has undone the last ball.");
 });
 
 test("walkie snapshot tracks director presence and spectator requests stay live-only", () => {
@@ -619,6 +747,7 @@ test("walkie snapshot tracks director presence and spectator requests stay live-
 
   const requestResult = requestWalkieEnable(matchId, {
     participantId: "spectator-1",
+    role: "spectator",
   });
   assert.equal(requestResult.ok, true);
   assert.equal(getWalkieSnapshot(matchId).enabled, false);

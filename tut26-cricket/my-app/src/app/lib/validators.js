@@ -163,8 +163,15 @@ export const walkieReleaseSchema = z
 export const walkieRequestSchema = z
   .object({
     participantId: walkieParticipantSchema,
-    role: z.literal("spectator"),
+    role: z.enum(["spectator", "director"]),
     token: z.string().min(16).max(400),
+  })
+  .strict();
+
+export const walkieRespondSchema = z
+  .object({
+    requestId: z.string().min(12).max(140),
+    action: z.enum(["accept", "dismiss"]),
   })
   .strict();
 

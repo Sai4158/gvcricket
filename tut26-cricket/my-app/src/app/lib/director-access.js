@@ -30,7 +30,7 @@ function getDirectorSecret() {
 }
 
 function hashPin(pin) {
-  return crypto.scryptSync(String(pin || ""), getDirectorSecret(), 64);
+  return crypto.scryptSync(String(pin || "").trim(), getDirectorSecret(), 64);
 }
 
 function signTokenPayload(payload) {

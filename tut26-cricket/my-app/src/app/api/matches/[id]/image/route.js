@@ -23,7 +23,11 @@ import { moderateMatchImageBuffer } from "../../../../lib/match-image-moderation
 import { serializePublicMatch } from "../../../../lib/public-data";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
-import { parseMultipartRequest } from "../../../../lib/request-security";
+import {
+  parseJsonRequest,
+  parseMultipartRequest,
+} from "../../../../lib/request-security";
+import { pinPayloadSchema } from "../../../../lib/validators";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 
@@ -230,5 +234,109 @@ export async function POST(req, { params }) {
       status === 503 ? "Image moderation is temporarily unavailable." : "Failed to upload the match image.",
       status
     );
+  }
+}
+
+export async function DELETE(req, { params }) {
+  const { id } = await params;
+  const meta = getRequestMeta(req);
+  const deleteLimit = enforceRateLimit({
+    key: `match-image-delete:${id}:${meta.ip}`,
+    limit: 5,
+    windowMs: 5 * 60 * 1000,
+    blockMs: 2 * 60 * 1000,
+  });
+
+  if (!deleteLimit.allowed) {
+    await writeAuditLog({
+      action: "match_media_delete_rate_limited",
+      targetType: "match",
+      targetId: id,
+      status: "failure",
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      metadata: { retryAfterMs: deleteLimit.retryAfterMs },
+    });
+
+    return jsonRateLimit(
+      "Too many image removal attempts. Try again shortly.",
+      deleteLimit.retryAfterMs
+    );
+  }
+
+  try {
+    const parsedRequest = await parseJsonRequest(req, pinPayloadSchema, {
+      maxBytes: 2048,
+    });
+    if (!parsedRequest.ok) {
+      return jsonError(parsedRequest.message, parsedRequest.status);
+    }
+
+    if (!isValidUmpirePin(parsedRequest.value.pin)) {
+      await writeAuditLog({
+        action: "match_media_delete_denied",
+        targetType: "match",
+        targetId: id,
+        status: "failure",
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+      });
+
+      return jsonError("Incorrect PIN.", 401);
+    }
+
+    await connectDB();
+    const match = await Match.findById(id);
+    if (!match) {
+      return jsonError("Match not found.", 404);
+    }
+
+    match.matchImageUrl = "";
+    match.matchImagePublicId = "";
+    match.matchImageStorageUrlEnc = "";
+    match.matchImageStorageUrlHash = "";
+    match.matchImageUploadedAt = null;
+    match.matchImageUploadedBy = "";
+    match.mediaUpdatedAt = new Date();
+    match.lastEventType = "image_update";
+    match.lastEventText = "Match image removed.";
+    match.lastLiveEvent = {
+      id: `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`,
+      type: "image_update",
+      summaryText: "Match image removed.",
+      createdAt: new Date().toISOString(),
+    };
+    await match.save();
+
+    await Session.findByIdAndUpdate(match.sessionId, {
+      $set: buildSessionMirrorUpdate(match),
+    });
+
+    await writeAuditLog({
+      action: "match_media_delete",
+      targetType: "match",
+      targetId: id,
+      status: "success",
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    });
+
+    return Response.json(serializePublicMatch(match), {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (error) {
+    await writeAuditLog({
+      action: "match_media_delete",
+      targetType: "match",
+      targetId: id,
+      status: "failure",
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      metadata: { message: error.message },
+    });
+
+    return jsonError("Failed to remove the match image.", 500);
   }
 }

@@ -4,6 +4,7 @@ const SPEAKER_MAX_MS = 30_000;
 const CLEANUP_GRACE_MS = 3_000;
 const REQUEST_COOLDOWN_MS = 30_000;
 const DISCONNECT_GRACE_MS = 5_000;
+const REQUEST_MAX_AGE_MS = 120_000;
 
 const emitter = globalThis.__gvWalkieEmitter || new EventEmitter();
 globalThis.__gvWalkieEmitter = emitter;
@@ -71,6 +72,42 @@ function notifyParticipant(matchId, participantId, payload) {
   emitter.emit(`walkie:participant:${matchId}:${participantId}`, payload);
 }
 
+function prunePendingRequests(matchId, matchState = getMatchState(matchId)) {
+  const now = Date.now();
+  let changed = false;
+
+  for (const [participantId, request] of matchState.pendingRequests.entries()) {
+    const expiresAt = request?.expiresAt ? Date.parse(request.expiresAt) : 0;
+    if (expiresAt && expiresAt <= now) {
+      matchState.pendingRequests.delete(participantId);
+      notifyParticipant(matchId, participantId, {
+        type: "request-expired",
+        requestId: request.requestId,
+      });
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
+function listPendingRequests(matchId, matchState = getMatchState(matchId)) {
+  prunePendingRequests(matchId, matchState);
+  return [...matchState.pendingRequests.values()]
+    .sort((left, right) => {
+      return (
+        new Date(left.requestedAt).getTime() - new Date(right.requestedAt).getTime()
+      );
+    })
+    .map((request) => ({
+      requestId: request.requestId,
+      participantId: request.participantId,
+      role: request.role,
+      name: request.name,
+      requestedAt: request.requestedAt,
+    }));
+}
+
 function buildSnapshot(matchId) {
   const matchState = getMatchState(matchId);
   const spectators = listParticipants(matchState, "spectator");
@@ -89,6 +126,7 @@ function buildSnapshot(matchId) {
     lockStartedAt: matchState.lockStartedAt || "",
     expiresAt: matchState.expiresAt || "",
     transmissionId: matchState.transmissionId || "",
+    pendingRequests: listPendingRequests(matchId, matchState),
     updatedAt: new Date().toISOString(),
   };
 }
@@ -135,9 +173,16 @@ function clearActiveLock(matchId, reason = "ended") {
   }
 }
 
-function disableForNoSpectators(matchId) {
+function disableForNoListeners(matchId) {
   const matchState = getMatchState(matchId);
   if (!matchState.enabled) {
+    return;
+  }
+
+  const listenerCount =
+    listParticipants(matchState, "spectator").length +
+    listParticipants(matchState, "director").length;
+  if (listenerCount > 0) {
     return;
   }
 
@@ -242,8 +287,11 @@ export function registerWalkieParticipant(matchId, participant) {
           snapshot: buildSnapshot(matchId),
         });
 
-        if (listParticipants(settledState, "spectator").length === 0) {
-          disableForNoSpectators(matchId);
+        if (
+          listParticipants(settledState, "spectator").length === 0 &&
+          listParticipants(settledState, "director").length === 0
+        ) {
+          disableForNoListeners(matchId);
         }
       }, DISCONNECT_GRACE_MS);
 
@@ -260,6 +308,7 @@ export function hydrateWalkieEnabled(matchId, enabled) {
 
 export function setWalkieEnabled(matchId, enabled) {
   const matchState = getMatchState(matchId);
+  const handledRequests = listPendingRequests(matchId, matchState);
   if (!enabled) {
     matchState.enabled = false;
     clearActiveLock(matchId, "disabled");
@@ -269,6 +318,14 @@ export function setWalkieEnabled(matchId, enabled) {
   }
 
   const snapshot = buildSnapshot(matchId);
+  if (enabled) {
+    handledRequests.forEach((request) => {
+      notifyParticipant(matchId, request.participantId, {
+        type: "request-accepted",
+        requestId: request.requestId,
+      });
+    });
+  }
   notifyMatch(matchId, {
     type: "state",
     snapshot,
@@ -283,11 +340,15 @@ export function setWalkieEnabled(matchId, enabled) {
   return snapshot;
 }
 
-export function requestWalkieEnable(matchId, { participantId }) {
+export function requestWalkieEnable(matchId, { participantId, role }) {
   const matchState = getMatchState(matchId);
   const participant = matchState.participants.get(String(participantId));
 
-  if (!participant || participant.role !== "spectator") {
+  if (
+    !participant ||
+    participant.role !== role ||
+    !["spectator", "director"].includes(participant.role)
+  ) {
     return { ok: false, status: 403, message: "Participant is not authorized." };
   }
 
@@ -296,6 +357,15 @@ export function requestWalkieEnable(matchId, { participantId }) {
   }
 
   const now = Date.now();
+  const existingRequest = matchState.pendingRequests.get(participant.id);
+  if (existingRequest) {
+    return {
+      ok: false,
+      status: 409,
+      message: "Request already sent. Waiting for umpire.",
+    };
+  }
+
   const cooldownUntil = Number(matchState.requestCooldowns.get(participant.id) || 0);
   if (cooldownUntil > now) {
     return {
@@ -306,12 +376,19 @@ export function requestWalkieEnable(matchId, { participantId }) {
   }
 
   matchState.requestCooldowns.set(participant.id, now + REQUEST_COOLDOWN_MS);
-  const requestMessage = `${participant.name} requested walkie-talkie.`;
+  const requestId = `${participant.id}:${now}`;
+  const requestMessage =
+    participant.role === "director"
+      ? `${participant.name} requested walkie-talkie.`
+      : `${participant.name} requested walkie-talkie.`;
   matchState.pendingRequests.set(participant.id, {
+    requestId,
     participantId: participant.id,
+    role: participant.role,
     name: participant.name,
     message: requestMessage,
     requestedAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + REQUEST_MAX_AGE_MS).toISOString(),
   });
 
   notifyMatch(matchId, {
@@ -320,14 +397,63 @@ export function requestWalkieEnable(matchId, { participantId }) {
     notification: {
       type: "walkie_requested",
       message: requestMessage,
+      request: {
+        requestId,
+        participantId: participant.id,
+        role: participant.role,
+        name: participant.name,
+      },
     },
   });
 
   notifyParticipant(matchId, participant.id, {
     type: "request-sent",
+    requestId,
   });
 
   return { ok: true, snapshot: buildSnapshot(matchId) };
+}
+
+export function respondToWalkieRequest(matchId, { requestId, action }) {
+  const matchState = getMatchState(matchId);
+  const request = listPendingRequests(matchId, matchState).find(
+    (entry) => entry.requestId === requestId
+  );
+
+  if (!request) {
+    return { ok: false, status: 404, message: "Walkie request not found." };
+  }
+
+  if (action === "dismiss") {
+    matchState.pendingRequests.delete(request.participantId);
+    const snapshot = buildSnapshot(matchId);
+    notifyParticipant(matchId, request.participantId, {
+      type: "request-dismissed",
+      requestId: request.requestId,
+    });
+    notifyMatch(matchId, {
+      type: "state",
+      snapshot,
+      notification: {
+        type: "walkie_request_dismissed",
+        message: `${request.name} walkie request was dismissed.`,
+        request,
+      },
+    });
+    return { ok: true, snapshot };
+  }
+
+  const snapshot = setWalkieEnabled(matchId, true);
+  notifyMatch(matchId, {
+    type: "state",
+    snapshot,
+    notification: {
+      type: "walkie_request_accepted",
+      message: `${request.name} walkie request was accepted.`,
+      request,
+    },
+  });
+  return { ok: true, snapshot };
 }
 
 export function claimWalkieSpeaker(matchId, { role, participantId }) {

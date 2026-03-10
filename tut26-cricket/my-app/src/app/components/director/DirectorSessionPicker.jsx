@@ -1,6 +1,7 @@
 "use client";
 
-import { FaArrowRight, FaBroadcastTower, FaClock, FaPlayCircle } from "react-icons/fa";
+import { useState } from "react";
+import { FaArrowRight, FaBroadcastTower, FaClock, FaInfoCircle, FaPlayCircle } from "react-icons/fa";
 
 function formatRelativeTime(value) {
   const date = new Date(value || 0).getTime();
@@ -13,15 +14,27 @@ function formatRelativeTime(value) {
   return `Updated ${hours}h ago`;
 }
 
+function getSessionTeams(item) {
+  const match = item.match;
+  const session = item.session;
+  const teamA = match?.teamAName || session?.teamAName || "";
+  const teamB = match?.teamBName || session?.teamBName || "";
+  const hasTeams = Boolean(teamA && teamB);
+  const isDefaultTeams =
+    teamA.trim().toLowerCase() === "team a" &&
+    teamB.trim().toLowerCase() === "team b";
+
+  return {
+    hasCustomTeams: hasTeams && !isDefaultTeams,
+    teamLabel: hasTeams ? `${teamA} vs ${teamB}` : "",
+  };
+}
+
 function SessionCard({ item, onSelect }) {
   const session = item.session;
-  const match = item.match;
-  const teams =
-    match?.teamAName && match?.teamBName
-      ? `${match.teamAName} vs ${match.teamBName}`
-      : session?.teamAName && session?.teamBName
-      ? `${session.teamAName} vs ${session.teamBName}`
-      : "Teams pending";
+  const { hasCustomTeams, teamLabel } = getSessionTeams(item);
+  const primaryTitle = hasCustomTeams ? teamLabel : session?.name || "Untitled Session";
+  const secondaryLabel = hasCustomTeams ? session?.name || "" : "";
 
   return (
     <button
@@ -32,9 +45,11 @@ function SessionCard({ item, onSelect }) {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="truncate text-lg font-semibold text-white">
-            {session?.name || "Untitled Session"}
+            {primaryTitle}
           </p>
-          <p className="mt-1 text-sm text-zinc-400">{teams}</p>
+          {secondaryLabel ? (
+            <p className="mt-1 text-sm text-zinc-400">{secondaryLabel}</p>
+          ) : null}
         </div>
         <span
           className={`inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-semibold ${
@@ -65,6 +80,7 @@ export default function DirectorSessionPicker({
   onSelect,
   onQuickStart,
 }) {
+  const [showHelp, setShowHelp] = useState(false);
   const liveSessions = sessions.filter((item) => item.isLive);
   const recentSessions = sessions.filter((item) => !item.isLive).slice(0, 4);
 
@@ -94,17 +110,33 @@ export default function DirectorSessionPicker({
               Choose a session
             </h2>
           </div>
-          {liveSessions[0] ? (
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => onQuickStart?.(liveSessions[0])}
-              className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black shadow-[0_10px_30px_rgba(16,185,129,0.2)]"
+              onClick={() => setShowHelp((current) => !current)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-200 transition hover:bg-white/[0.1]"
+              aria-label="How session selection works"
             >
-              <FaPlayCircle />
-              Latest live
+              <FaInfoCircle />
             </button>
-          ) : null}
+            {liveSessions[0] ? (
+              <button
+                type="button"
+                onClick={() => onQuickStart?.(liveSessions[0])}
+                className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black shadow-[0_10px_30px_rgba(16,185,129,0.2)]"
+              >
+                <FaPlayCircle />
+                Latest live
+              </button>
+            ) : null}
+          </div>
         </div>
+
+        {showHelp ? (
+          <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-6 text-zinc-300">
+            Pick the newest live session to manage. If there is only one live match, use Latest live for a faster jump into the audio console.
+          </div>
+        ) : null}
 
         {liveSessions.length ? (
           <div className="mt-6 space-y-3">

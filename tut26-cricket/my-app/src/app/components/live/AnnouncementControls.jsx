@@ -7,6 +7,7 @@ import {
   FaVolumeMute,
   FaVolumeUp,
 } from "react-icons/fa";
+import DarkSelect from "../shared/DarkSelect";
 
 const MODES = [
   { value: "full", label: "Full Commentary" },
@@ -248,18 +249,12 @@ export default function AnnouncementControls({
             <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500">
               Mode
             </span>
-            <select
+            <DarkSelect
               value={settings.mode}
-              onChange={(event) => updateSetting("mode", event.target.value)}
-              className="w-full rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none transition focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-400/20"
-              aria-label="Commentary mode"
-            >
-              {MODES.map((mode) => (
-                <option key={mode.value} value={mode.value}>
-                  {mode.label}
-                </option>
-              ))}
-            </select>
+              options={MODES}
+              onChange={(nextValue) => updateSetting("mode", nextValue)}
+              ariaLabel="Commentary mode"
+            />
           </label>
 
           <div className="space-y-2">

@@ -32,6 +32,7 @@ export default function useWalkieTalkie({
   const [claiming, setClaiming] = useState(false);
   const [countdown, setCountdown] = useState(30);
   const [requestCooldownLeft, setRequestCooldownLeft] = useState(0);
+  const [requestState, setRequestState] = useState("idle");
   const listenerPcRef = useRef(null);
   const speakerPeersRef = useRef(new Map());
   const localStreamRef = useRef(null);
@@ -174,6 +175,28 @@ export default function useWalkieTalkie({
       payload,
     });
   }, [matchId, participantId, role, sendJson, token]);
+
+  const respondToRequest = useCallback(
+    async (requestId, action) => {
+      if (!matchId || role !== "umpire" || !hasUmpireAccess) {
+        return false;
+      }
+
+      try {
+        const payload = await sendJson(`/api/matches/${matchId}/walkie/respond`, {
+          requestId,
+          action,
+        });
+        setSnapshot(payload.walkie || null);
+        setError("");
+        return true;
+      } catch (nextError) {
+        setError(nextError.message || "Could not update walkie request.");
+        return false;
+      }
+    },
+    [hasUmpireAccess, matchId, role, sendJson]
+  );
 
   const ensureSpeakerStream = async () => {
     if (localStreamRef.current) {
@@ -319,6 +342,18 @@ export default function useWalkieTalkie({
         setNotice(payload.notification.message);
       }
 
+      if (payload.notification?.type === "walkie_requested" && role === "umpire") {
+        playUiTone({ frequency: 1080, durationMs: 120, type: "sine", volume: 0.03 });
+      }
+
+      if (payload.notification?.type === "walkie_request_accepted" && role !== "umpire") {
+        playUiTone({ frequency: 920, durationMs: 120, type: "sine", volume: 0.03 });
+      }
+
+      if (payload.notification?.type === "walkie_request_dismissed" && role !== "umpire") {
+        playUiTone({ frequency: 520, durationMs: 110, type: "triangle", volume: 0.02 });
+      }
+
       setSnapshot(payload.snapshot || null);
       setError("");
     };
@@ -336,6 +371,32 @@ export default function useWalkieTalkie({
         playUiTone({ frequency: 620, durationMs: 130, type: "triangle", volume: 0.03 });
         closeListener();
         stopLocalStream();
+        return;
+      }
+
+      if (payload?.type === "request-sent") {
+        setRequestState("pending");
+        setNotice("Request sent. Waiting for umpire.");
+        return;
+      }
+
+      if (payload?.type === "request-accepted") {
+        setRequestState("accepted");
+        setNotice("Umpire enabled walkie-talkie.");
+        playUiTone({ frequency: 920, durationMs: 120, type: "sine", volume: 0.03 });
+        return;
+      }
+
+      if (payload?.type === "request-dismissed") {
+        setRequestState("dismissed");
+        setNotice("Umpire dismissed the walkie request.");
+        playUiTone({ frequency: 520, durationMs: 110, type: "triangle", volume: 0.02 });
+        return;
+      }
+
+      if (payload?.type === "request-expired") {
+        setRequestState("idle");
+        setNotice("Walkie request expired.");
       }
     };
 
@@ -360,7 +421,16 @@ export default function useWalkieTalkie({
       source.removeEventListener("error", handleError);
       source.close();
     };
-  }, [eventSourceUrl, handleIncomingSignal]);
+  }, [eventSourceUrl, handleIncomingSignal, role]);
+
+  useEffect(() => {
+    if (snapshot?.enabled) {
+      setRequestState((current) => (current === "pending" ? "accepted" : current));
+      return;
+    }
+
+    setRequestState((current) => (current === "accepted" ? "idle" : current));
+  }, [role, snapshot?.enabled]);
 
   useEffect(() => {
     if (!snapshot?.expiresAt || snapshot.activeSpeakerId !== participantId) {
@@ -554,7 +624,14 @@ export default function useWalkieTalkie({
   const dismissNotice = () => setNotice("");
 
   const requestEnable = async () => {
-    if (!matchId || !participantId || !token || role !== "spectator" || requestCooldownLeft > 0) {
+    if (
+      !matchId ||
+      !participantId ||
+      !token ||
+      !["spectator", "director"].includes(role) ||
+      requestCooldownLeft > 0 ||
+      requestState === "pending"
+    ) {
       return false;
     }
 
@@ -566,7 +643,8 @@ export default function useWalkieTalkie({
       });
       primeRemoteAudio();
       setRequestCooldownLeft(30);
-      setNotice("Request sent to umpire.");
+      setRequestState("pending");
+      setNotice("Request sent. Waiting for umpire.");
       return true;
     } catch (nextError) {
       setError(nextError.message || "Could not send walkie request.");
@@ -592,7 +670,7 @@ export default function useWalkieTalkie({
       role === "umpire" &&
       hasUmpireAccess,
     canRequestEnable:
-      role === "spectator" &&
+      ["spectator", "director"].includes(role) &&
       !snapshot?.enabled &&
       requestCooldownLeft === 0,
     canTalk:
@@ -606,6 +684,10 @@ export default function useWalkieTalkie({
     stopTalking,
     requestEnable,
     requestCooldownLeft,
+    requestState,
+    pendingRequests: snapshot?.pendingRequests || [],
     dismissNotice,
+    acceptRequest: (requestId) => respondToRequest(requestId, "accept"),
+    dismissRequest: (requestId) => respondToRequest(requestId, "dismiss"),
   };
 }

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import useLocalMicMonitor from "../live/useLocalMicMonitor";
 import useAnnouncementSettings from "../live/useAnnouncementSettings";
-import { WalkieNotice } from "../live/WalkiePanel";
+import { WalkieNotice, WalkieRequestQueue } from "../live/WalkiePanel";
 import useWalkieTalkie from "../live/useWalkieTalkie";
 import MatchHeroBackdrop from "./MatchHeroBackdrop";
 import { countLegalBalls } from "../../lib/match-scoring";
@@ -258,6 +258,13 @@ export default function MatchPageClient({
             notice={walkie.notice}
             onDismiss={walkie.dismissNotice}
           />
+          {isLiveMatch && walkie.pendingRequests?.length ? (
+            <WalkieRequestQueue
+              requests={walkie.pendingRequests}
+              onAccept={walkie.acceptRequest}
+              onDismiss={walkie.dismissRequest}
+            />
+          ) : null}
           <BallTracker history={oversHistory} />
           <Controls
             onScore={handleAnnouncedScoreEvent}
@@ -352,11 +359,15 @@ export default function MatchPageClient({
                 isSelfTalking: walkie.isSelfTalking,
                 countdown: walkie.countdown,
                 requestCooldownLeft: 0,
+                requestState: "idle",
+                pendingRequests: walkie.pendingRequests,
                 onRequestEnable: () => {},
                 onToggleEnabled: walkie.toggleEnabled,
                 onStartTalking: walkie.startTalking,
                 onStopTalking: walkie.stopTalking,
                 onDismissNotice: walkie.dismissNotice,
+                onAcceptRequest: walkie.acceptRequest,
+                onDismissRequest: walkie.dismissRequest,
               }
             : null
         }

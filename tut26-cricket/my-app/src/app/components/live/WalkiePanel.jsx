@@ -27,6 +27,60 @@ export function WalkieNotice({ notice, onDismiss }) {
   );
 }
 
+function roleLabel(role) {
+  if (role === "director") return "Director";
+  if (role === "umpire") return "Umpire";
+  return "Spectator";
+}
+
+export function WalkieRequestQueue({
+  requests = [],
+  onAccept,
+  onDismiss,
+}) {
+  if (!requests.length) return null;
+
+  return (
+    <div className="mt-4 space-y-3">
+      {requests.map((request) => (
+        <div
+          key={request.requestId}
+          className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100">
+                  {roleLabel(request.role)}
+                </span>
+              </div>
+              <p className="text-sm font-medium text-white">
+                {request.name} wants walkie-talkie.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onAccept?.(request.requestId)}
+                className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-black"
+              >
+                Accept
+              </button>
+              <button
+                type="button"
+                onClick={() => onDismiss?.(request.requestId)}
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-zinc-200"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function IosSwitch({ checked, onChange, disabled = false, label }) {
   return (
     <button
@@ -178,31 +232,32 @@ export default function WalkiePanel({
   isSelfTalking,
   countdown,
   requestCooldownLeft,
+  requestState = "idle",
+  pendingRequests = [],
   onRequestEnable,
   onToggleEnabled,
   onStartTalking,
   onStopTalking,
   onDismissNotice,
+  onAcceptRequest,
+  onDismissRequest,
 }) {
-  const [panelMessage, setPanelMessage] = useState("");
   const isUmpire = role === "umpire";
-  const isRequestNotice =
-    isUmpire && typeof notice === "string" && notice.toLowerCase().includes("requested walkie-talkie");
+  const canShowRequestAction = !snapshot?.enabled && !isUmpire;
   const statusText = !snapshot?.enabled
     ? "Walkie-talkie off"
+    : isSelfTalking
+    ? "You are live"
     : snapshot?.activeSpeakerRole === "umpire"
-    ? isUmpire
-      ? "You are live"
-      : "Umpire is live"
+    ? "Umpire is live"
+    : snapshot?.activeSpeakerRole === "director"
+    ? "Director is live"
     : snapshot?.activeSpeakerRole === "spectator"
-    ? isUmpire
-      ? "Spectator is live"
-      : "You are live"
-    : "Walkie-talkie on";
+    ? "Spectator is live"
+    : "Ready";
 
   const handleToggle = (checked) => {
     if (isUmpire) {
-      setPanelMessage("");
       onToggleEnabled?.(checked);
       return;
     }
@@ -211,9 +266,24 @@ export default function WalkiePanel({
       return;
     }
 
-    setPanelMessage("");
     onRequestEnable?.();
   };
+
+  const requestButtonLabel =
+    requestState === "pending"
+      ? requestCooldownLeft > 0
+        ? `Request sent ${requestCooldownLeft}s`
+        : "Request sent"
+      : requestState === "dismissed"
+      ? "Request again"
+      : "Request walkie";
+
+  const helperText =
+    requestState === "pending"
+      ? "Waiting for umpire."
+      : requestState === "dismissed"
+      ? "Umpire dismissed the request."
+      : "Ask the umpire to enable walkie-talkie.";
 
   return (
     <div className="space-y-4">
@@ -233,6 +303,8 @@ export default function WalkiePanel({
               <p className="mt-1 text-xs text-zinc-500">
                 {isUmpire
                   ? "Communicate with spectators live."
+                  : role === "director"
+                  ? "Talk directly with the umpire."
                   : "Talk directly with the umpire."}
               </p>
             </div>
@@ -256,50 +328,25 @@ export default function WalkiePanel({
             <FaUsers />
             {snapshot?.spectatorCount || 0} spectators
           </span>
+          {Number(snapshot?.directorCount || 0) > 0 ? (
+            <span className="ml-2 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1">
+              <FaPhoneVolume />
+              {snapshot?.directorCount || 0} director
+            </span>
+          ) : null}
         </div>
 
-        {snapshot?.activeSpeakerRole === "spectator" && isUmpire ? (
-          <div className="mt-4 rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-center text-sm text-sky-100">
-            {snapshot.activeSpeakerName || "Spectator"} is talking.
-          </div>
+        {isUmpire ? (
+          <WalkieRequestQueue
+            requests={pendingRequests}
+            onAccept={onAcceptRequest}
+            onDismiss={onDismissRequest}
+          />
         ) : null}
 
         {error ? (
           <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-center text-sm text-rose-200">
             {error}
-          </div>
-        ) : null}
-
-        {!error && isRequestNotice ? (
-          <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-            <div className="flex items-center justify-between gap-3">
-              <span>{notice}</span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onToggleEnabled?.(true);
-                    onDismissNotice?.();
-                  }}
-                  className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-black"
-                >
-                  Enable
-                </button>
-                <button
-                  type="button"
-                  onClick={onDismissNotice}
-                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-zinc-200"
-                >
-                  Not now
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {!error && panelMessage ? (
-          <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-            {panelMessage}
           </div>
         ) : null}
 
@@ -313,22 +360,25 @@ export default function WalkiePanel({
               onStop={onStopTalking}
               label={isUmpire ? "Hold to reply" : "Hold to talk"}
             />
-          ) : (
+          ) : canShowRequestAction ? (
             <div className="space-y-3">
               <button
                 type="button"
                 onClick={() => {
-                  setPanelMessage("");
                   onRequestEnable?.();
                 }}
-                disabled={!canRequestEnable || requestCooldownLeft > 0}
+                disabled={!canRequestEnable || requestState === "pending"}
                 className="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black shadow-[0_12px_30px_rgba(16,185,129,0.22)] transition disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
               >
-                {requestCooldownLeft > 0 ? `Request sent ${requestCooldownLeft}s` : "Request umpire"}
+                {requestButtonLabel}
               </button>
               <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-center text-sm text-zinc-400">
-                Ask the umpire to enable walkie-talkie.
+                {helperText}
               </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-center text-sm text-zinc-400">
+              Walkie is unavailable right now.
             </div>
           )}
         </div>

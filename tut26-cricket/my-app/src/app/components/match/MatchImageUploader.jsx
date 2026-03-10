@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FaImage } from "react-icons/fa";
+import ImagePinModal from "../shared/ImagePinModal";
 import { getAcceptedMatchImageTypes, compressMatchImage } from "./match-image-client";
 
 export default function MatchImageUploader({
@@ -18,6 +19,10 @@ export default function MatchImageUploader({
   const [previewUrl, setPreviewUrl] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState("");
+  const [pendingPinFile, setPendingPinFile] = useState(null);
+  const [pin, setPin] = useState("");
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const inputRef = useRef(null);
 
   const currentPreview = useMemo(
     () => previewUrl || existingImageUrl || "",
@@ -47,8 +52,51 @@ export default function MatchImageUploader({
     }
 
     setError("");
-    setSelectedFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
+    setPendingPinFile(file);
+    setIsPinModalOpen(true);
+    event.target.value = "";
+  };
+
+  const handleConfirmPin = async (nextPin) => {
+    if (!pendingPinFile) {
+      throw new Error("Choose a picture first.");
+    }
+
+    const response = await fetch("/api/media/pin-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin: nextPin }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.message || "Incorrect PIN.");
+    }
+
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    setPin(nextPin);
+    setSelectedFile(pendingPinFile);
+    setPreviewUrl(URL.createObjectURL(pendingPinFile));
+    setPendingPinFile(null);
+    setIsPinModalOpen(false);
+  };
+
+  const handleContinueWithout = () => {
+    setPendingPinFile(null);
+    setSelectedFile(null);
+    setPin("");
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl("");
+    }
+    setIsPinModalOpen(false);
+    setError("");
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+    onSkip?.();
   };
 
   const handleUpload = async () => {
@@ -61,6 +109,7 @@ export default function MatchImageUploader({
       const compressedFile = await compressMatchImage(selectedFile);
       const formData = new FormData();
       formData.append("image", compressedFile);
+      formData.append("pin", pin);
 
       const response = await fetch(`/api/matches/${matchId}/image`, {
         method: "POST",
@@ -73,6 +122,7 @@ export default function MatchImageUploader({
       }
 
       setSelectedFile(null);
+      setPin("");
       setPreviewUrl("");
       onUploaded?.(payload);
     } catch (caughtError) {
@@ -123,6 +173,7 @@ export default function MatchImageUploader({
               </p>
             </div>
             <input
+              ref={inputRef}
               id={`match-image-upload-${matchId}`}
               type="file"
               accept={getAcceptedMatchImageTypes()}
@@ -158,6 +209,16 @@ export default function MatchImageUploader({
           </button>
         )}
       </div>
+      <ImagePinModal
+        isOpen={isPinModalOpen}
+        title={existingImageUrl ? "Replace picture" : "Add picture"}
+        subtitle="Enter the 4-digit PIN before using this match image."
+        confirmLabel="Use this picture"
+        showContinueWithout={true}
+        onConfirm={handleConfirmPin}
+        onContinueWithout={handleContinueWithout}
+        onClose={handleContinueWithout}
+      />
     </section>
   );
 }

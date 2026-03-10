@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { countLegalBalls } from "../../lib/match-scoring";
 import { getBattingTeamBundle } from "../../lib/team-utils";
-import PinPad from "../shared/PinPad";
 
 export function Splash({ children }) {
   return (
@@ -23,14 +22,34 @@ export function AccessGate({ onSubmit, isSubmitting, error }) {
         <p className="text-zinc-400 text-center mb-6">
           Enter the server PIN to unlock match controls.
         </p>
-        <PinPad
-          value={pin}
-          onChange={setPin}
-          onSubmit={onSubmit}
-          length={4}
-          submitLabel="Enter"
-          isSubmitting={isSubmitting}
-        />
+        <div className="space-y-4">
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={4}
+            value={pin}
+            onChange={(event) =>
+              setPin(event.target.value.replace(/\D/g, "").slice(0, 4))
+            }
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                onSubmit(pin);
+              }
+            }}
+            placeholder="0000"
+            className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-blue-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(59,130,246,0.08)]"
+          />
+          <button
+            type="button"
+            onClick={() => onSubmit(pin)}
+            disabled={isSubmitting || pin.length !== 4}
+            className="w-full rounded-2xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isSubmitting ? "Checking..." : "Enter"}
+          </button>
+        </div>
         {error && <p className="text-red-400 text-sm mt-4 text-center">{error}</p>}
       </div>
     </main>

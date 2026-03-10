@@ -162,21 +162,47 @@ export default function SessionViewClient({ sessionId, initialData }) {
     return true;
   }, [speak]);
 
+  const clearAnnouncementTimers = useCallback(() => {
+    if (overDoneTimerRef.current) {
+      window.clearTimeout(overDoneTimerRef.current);
+      overDoneTimerRef.current = null;
+    }
+    if (scoreFollowUpTimerRef.current) {
+      window.clearTimeout(scoreFollowUpTimerRef.current);
+      scoreFollowUpTimerRef.current = null;
+    }
+    if (announcementRestoreTimerRef.current) {
+      window.clearTimeout(announcementRestoreTimerRef.current);
+      announcementRestoreTimerRef.current = null;
+    }
+    restorePageMedia(announcementDuckRef);
+  }, []);
+
   useEffect(() => {
-    if (!match || !isLiveMatch || !settings.enabled || settings.mode === "silent") {
-      previousEnabledRef.current = settings.enabled;
+    const announcerEnabled = Boolean(match && isLiveMatch && settings.enabled && settings.mode !== "silent");
+
+    if (!announcerEnabled) {
+      if (previousEnabledRef.current) {
+        clearAnnouncementTimers();
+        stop();
+      }
+      previousEnabledRef.current = false;
       return;
     }
 
-    if (!previousEnabledRef.current && settings.enabled) {
-      speakWithDuck(buildCurrentScoreAnnouncement(match), {
-        key: "spectator-current-score",
+    if (!previousEnabledRef.current) {
+      lastAnnouncedEventRef.current = match?.lastLiveEvent?.id || "";
+      clearAnnouncementTimers();
+      stop();
+      speakWithDuck("Score announcer is now on. I will announce the next update.", {
+        key: `spectator-announcer-on-${match?._id || "match"}`,
         rate: 0.9,
-      });
+        interrupt: true,
+      }, 1400);
     }
 
-    previousEnabledRef.current = settings.enabled;
-  }, [isLiveMatch, match, settings.enabled, settings.mode, speakWithDuck]);
+    previousEnabledRef.current = true;
+  }, [clearAnnouncementTimers, isLiveMatch, match, settings.enabled, settings.mode, speakWithDuck, stop]);
 
   useEffect(() => {
     const event = match?.lastLiveEvent;
@@ -235,18 +261,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
   useEffect(() => {
     return () => {
-      if (overDoneTimerRef.current) {
-        window.clearTimeout(overDoneTimerRef.current);
-      }
-      if (scoreFollowUpTimerRef.current) {
-        window.clearTimeout(scoreFollowUpTimerRef.current);
-      }
-      if (announcementRestoreTimerRef.current) {
-        window.clearTimeout(announcementRestoreTimerRef.current);
-      }
-      restorePageMedia(announcementDuckRef);
+      clearAnnouncementTimers();
     };
-  }, []);
+  }, [clearAnnouncementTimers]);
 
   useEffect(() => {
     const walkieEnabled = Boolean(walkie.snapshot?.enabled);
@@ -783,11 +800,15 @@ export default function SessionViewClient({ sessionId, initialData }) {
             isSelfTalking={walkie.isSelfTalking}
             countdown={walkie.countdown}
             requestCooldownLeft={walkie.requestCooldownLeft}
+            requestState={walkie.requestState}
+            pendingRequests={walkie.pendingRequests}
             onRequestEnable={walkie.requestEnable}
             onToggleEnabled={() => {}}
             onStartTalking={walkie.startTalking}
             onStopTalking={walkie.stopTalking}
             onDismissNotice={walkie.dismissNotice}
+            onAcceptRequest={() => {}}
+            onDismissRequest={() => {}}
           />
         </ModalBase>
       ) : null}

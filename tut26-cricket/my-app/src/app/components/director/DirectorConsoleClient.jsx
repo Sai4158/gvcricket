@@ -1,6 +1,7 @@
 "use client";
 
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
+import { Howl } from "howler";
 import Link from "next/link";
 import {
   FaArrowLeft,
@@ -9,6 +10,8 @@ import {
   FaCompactDisc,
   FaForward,
   FaHeadphones,
+  FaInfoCircle,
+  FaLock,
   FaMicrophone,
   FaMusic,
   FaPause,
@@ -19,6 +22,7 @@ import {
   FaWifi,
 } from "react-icons/fa";
 import SessionCoverHero from "../shared/SessionCoverHero";
+import DarkSelect from "../shared/DarkSelect";
 import DirectorPinGate from "./DirectorPinGate";
 import DirectorSessionPicker from "./DirectorSessionPicker";
 import useEventSource from "../live/useEventSource";
@@ -32,14 +36,14 @@ import { getBattingTeamBundle } from "../../lib/team-utils";
 import { playUiTone } from "../../lib/page-audio";
 
 const SOUND_EFFECTS = [
-  { id: "horn", label: "Stadium horn", accent: "emerald" },
-  { id: "cheer", label: "Crowd cheer", accent: "sky" },
-  { id: "wicket", label: "Wicket hit", accent: "rose" },
-  { id: "six", label: "Six burst", accent: "amber" },
-  { id: "boundary", label: "Boundary clap", accent: "violet" },
-  { id: "drum", label: "Drum roll", accent: "orange" },
-  { id: "start", label: "Match start", accent: "teal" },
-  { id: "break", label: "Break stinger", accent: "fuchsia" },
+  { id: "horn", label: "Stadium horn", accent: "emerald", src: "/audio/effects/stadium-horn.wav" },
+  { id: "cheer", label: "Crowd cheer", accent: "sky", src: "/audio/effects/crowd-cheer.wav" },
+  { id: "wicket", label: "Wicket hit", accent: "rose", src: "/audio/effects/wicket-hit.wav" },
+  { id: "six", label: "Six burst", accent: "amber", src: "/audio/effects/six-burst.wav" },
+  { id: "boundary", label: "Boundary clap", accent: "violet", src: "/audio/effects/boundary-clap.wav" },
+  { id: "drum", label: "Drum roll", accent: "orange", src: "/audio/effects/drum-roll.wav" },
+  { id: "start", label: "Match start", accent: "teal", src: "/audio/effects/match-start.wav" },
+  { id: "break", label: "Break stinger", accent: "fuchsia", src: "/audio/effects/break-stinger.wav" },
 ];
 
 function createSpeechSettings() {
@@ -113,7 +117,37 @@ function IosSwitch({ checked, onChange, label, disabled = false }) {
   );
 }
 
-function Card({ title, subtitle = "", icon, children, action = null }) {
+function HelpButton({ title, body }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-200 transition hover:bg-white/[0.1] focus:outline-none focus:ring-2 focus:ring-emerald-400/35"
+        aria-label={`How ${title} works`}
+      >
+        <FaInfoCircle />
+      </button>
+      {open ? (
+        <div className="absolute right-0 top-12 z-20 w-72 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(26,26,32,0.98),rgba(11,11,16,0.98))] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+          <p className="text-sm font-semibold text-white">{title}</p>
+          <p className="mt-2 text-sm leading-6 text-zinc-300">{body}</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Card({
+  title,
+  subtitle = "",
+  icon,
+  children,
+  action = null,
+  help = null,
+}) {
   return (
     <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.98),rgba(10,10,14,0.98))] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.35)]">
       <div className="mb-4 flex items-start justify-between gap-4">
@@ -126,7 +160,10 @@ function Card({ title, subtitle = "", icon, children, action = null }) {
             {subtitle ? <p className="mt-1 text-sm text-zinc-400">{subtitle}</p> : null}
           </div>
         </div>
-        {action}
+        <div className="flex items-center gap-2">
+          {help ? <HelpButton title={help.title} body={help.body} /> : null}
+          {action}
+        </div>
       </div>
       {children}
     </section>
@@ -177,6 +214,10 @@ function SessionHeader({
           </div>
 
           <div className="flex items-center gap-2">
+            <HelpButton
+              title="Director console"
+              body="Pick the live session, use the PA mic, run music and effects, and request walkie with the umpire from this screen."
+            />
             <button
               type="button"
               onClick={readCurrentScore}
@@ -248,9 +289,7 @@ export default function DirectorConsoleClient({
   const [musicMessage, setMusicMessage] = useState("");
   const [directorHoldLive, setDirectorHoldLive] = useState(false);
   const audioRef = useRef(null);
-  const effectAudioContextRef = useRef(null);
-  const effectMasterGainRef = useRef(null);
-  const effectNodesRef = useRef([]);
+  const effectPlayersRef = useRef(new Map());
   const musicUrlsRef = useRef([]);
   const speech = useSpeechAnnouncer(createSpeechSettings());
   const micMonitor = useLocalMicMonitor();
@@ -274,8 +313,14 @@ export default function DirectorConsoleClient({
   }, [selectedSession]);
 
   useEffect(() => {
+    const effectPlayers = effectPlayersRef.current;
     return () => {
       musicUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      effectPlayers.forEach((player) => {
+        try {
+          player.unload();
+        } catch {}
+      });
     };
   }, []);
 
@@ -430,36 +475,54 @@ export default function DirectorConsoleClient({
     audio.volume = musicVolume * masterVolume;
   }, [masterVolume, musicVolume]);
 
-  const ensureEffectAudio = async () => {
-    if (typeof window === "undefined") {
+  const ensureEffectPlayer = (effectId) => {
+    const existing = effectPlayersRef.current.get(effectId);
+    const nextVolume = Math.max(
+      0,
+      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * effectsVolume * masterVolume)
+    );
+
+    if (existing) {
+      existing.volume(nextVolume);
+      return existing;
+    }
+
+    const config = SOUND_EFFECTS.find((effect) => effect.id === effectId);
+    if (!config) {
       return null;
     }
 
-    if (!effectAudioContextRef.current) {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContextClass) {
-        return null;
-      }
-      effectAudioContextRef.current = new AudioContextClass({
-        latencyHint: "interactive",
-      });
-      effectMasterGainRef.current = effectAudioContextRef.current.createGain();
-      effectMasterGainRef.current.gain.value = effectsVolume * masterVolume;
-      effectMasterGainRef.current.connect(effectAudioContextRef.current.destination);
-    }
+    const player = new Howl({
+      src: [config.src],
+      html5: true,
+      preload: true,
+      volume: nextVolume,
+      onend: () => {
+        setSoundboardLive((current) => (current === effectId ? "" : current));
+      },
+      onstop: () => {
+        setSoundboardLive((current) => (current === effectId ? "" : current));
+      },
+      onloaderror: () => {
+        setMusicMessage("Could not load that effect.");
+      },
+      onplayerror: () => {
+        setMusicMessage("Tap again to allow effect playback.");
+      },
+    });
 
-    if (effectAudioContextRef.current.state === "suspended") {
-      await effectAudioContextRef.current.resume();
-    }
-
-    return effectAudioContextRef.current;
+    effectPlayersRef.current.set(effectId, player);
+    return player;
   };
 
   useEffect(() => {
-    if (effectMasterGainRef.current) {
-      effectMasterGainRef.current.gain.value =
-        (micMonitor.isActive ? 0.22 : 1) * effectsVolume * masterVolume;
-    }
+    const nextVolume = Math.max(
+      0,
+      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * effectsVolume * masterVolume)
+    );
+    effectPlayersRef.current.forEach((player) => {
+      player.volume(nextVolume);
+    });
   }, [effectsVolume, masterVolume, micMonitor.isActive]);
 
   useEffect(() => {
@@ -498,191 +561,31 @@ export default function DirectorConsoleClient({
   }, []);
 
   const stopAllEffects = () => {
-    effectNodesRef.current.forEach((entry) => {
+    effectPlayersRef.current.forEach((player) => {
       try {
-        entry.node.stop?.();
-      } catch {}
-      try {
-        entry.node.disconnect?.();
-      } catch {}
-      try {
-        entry.gain?.disconnect?.();
+        player.stop();
       } catch {}
     });
-    effectNodesRef.current = [];
     setSoundboardLive("");
   };
 
-  const scheduleOscillator = (context, masterGain, options) => {
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    oscillator.type = options.type || "sine";
-    oscillator.frequency.setValueAtTime(options.from, context.currentTime);
-    oscillator.frequency.linearRampToValueAtTime(
-      options.to ?? options.from,
-      context.currentTime + (options.durationMs || 300) / 1000
-    );
-    gain.gain.setValueAtTime(0.001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(
-      (options.volume ?? 0.16) * effectsVolume * masterVolume,
-      context.currentTime + 0.02
-    );
-    gain.gain.exponentialRampToValueAtTime(
-      0.001,
-      context.currentTime + (options.durationMs || 300) / 1000
-    );
-    oscillator.connect(gain);
-    gain.connect(masterGain);
-    oscillator.start(context.currentTime);
-    oscillator.stop(context.currentTime + (options.durationMs || 300) / 1000);
-    effectNodesRef.current.push({ node: oscillator, gain });
-    oscillator.onended = () => {
-      effectNodesRef.current = effectNodesRef.current.filter(
-        (entry) => entry.node !== oscillator
-      );
-      try {
-        gain.disconnect();
-      } catch {}
-      if (!effectNodesRef.current.length) {
-        setSoundboardLive("");
-      }
-    };
-  };
-
   const playEffect = async (effectId) => {
-    const context = await ensureEffectAudio();
-    if (!context || !effectMasterGainRef.current) {
+    const player = ensureEffectPlayer(effectId);
+    if (!player) {
       return;
     }
 
     stopAllEffects();
     setSoundboardLive(effectId);
-
-    const masterGain = effectMasterGainRef.current;
-    if (effectId === "horn") {
-      scheduleOscillator(context, masterGain, {
-        from: 540,
-        to: 620,
-        durationMs: 420,
-        type: "sawtooth",
-        volume: 0.18,
-      });
-      window.setTimeout(() => {
-        scheduleOscillator(context, masterGain, {
-          from: 620,
-          to: 540,
-          durationMs: 420,
-          type: "sawtooth",
-          volume: 0.18,
-        });
-      }, 180);
-      return;
-    }
-
-    if (effectId === "cheer") {
-      [440, 554, 660, 740].forEach((frequency, index) => {
-        window.setTimeout(() => {
-          scheduleOscillator(context, masterGain, {
-            from: frequency,
-            to: frequency + 40,
-            durationMs: 260,
-            type: "triangle",
-            volume: 0.1,
-          });
-        }, index * 90);
-      });
-      return;
-    }
-
-    if (effectId === "wicket") {
-      scheduleOscillator(context, masterGain, {
-        from: 880,
-        to: 330,
-        durationMs: 360,
-        type: "square",
-        volume: 0.16,
-      });
-      return;
-    }
-
-    if (effectId === "six") {
-      [523, 659, 784].forEach((frequency, index) => {
-        window.setTimeout(() => {
-          scheduleOscillator(context, masterGain, {
-            from: frequency,
-            to: frequency,
-            durationMs: 240,
-            type: "triangle",
-            volume: 0.13,
-          });
-        }, index * 120);
-      });
-      return;
-    }
-
-    if (effectId === "boundary") {
-      [420, 520, 620].forEach((frequency, index) => {
-        window.setTimeout(() => {
-          scheduleOscillator(context, masterGain, {
-            from: frequency,
-            to: frequency + 35,
-            durationMs: 140,
-            type: "triangle",
-            volume: 0.12,
-          });
-        }, index * 80);
-      });
-      return;
-    }
-
-    if (effectId === "drum") {
-      [110, 90, 70, 60].forEach((frequency, index) => {
-        window.setTimeout(() => {
-          scheduleOscillator(context, masterGain, {
-            from: frequency,
-            to: 30,
-            durationMs: 180,
-            type: "square",
-            volume: 0.16,
-          });
-        }, index * 120);
-      });
-      return;
-    }
-
-    if (effectId === "start") {
-      [392, 494, 587, 784].forEach((frequency, index) => {
-        window.setTimeout(() => {
-          scheduleOscillator(context, masterGain, {
-            from: frequency,
-            to: frequency,
-            durationMs: 180,
-            type: "triangle",
-            volume: 0.12,
-          });
-        }, index * 110);
-      });
-      return;
-    }
-
-    if (effectId === "break") {
-      scheduleOscillator(context, masterGain, {
-        from: 740,
-        to: 420,
-        durationMs: 240,
-        type: "sine",
-        volume: 0.14,
-      });
-      window.setTimeout(() => {
-        scheduleOscillator(context, masterGain, {
-          from: 420,
-          to: 240,
-          durationMs: 260,
-          type: "sine",
-          volume: 0.12,
-        });
-      }, 160);
-    }
+    player.stop();
+    player.seek(0);
+    player.volume(
+      Math.max(
+        0,
+        Math.min(1, (micMonitor.isActive ? 0.24 : 1) * effectsVolume * masterVolume)
+      )
+    );
+    player.play();
   };
 
   const stopAllAudio = async () => {
@@ -812,20 +715,6 @@ export default function DirectorConsoleClient({
     );
   };
 
-  if (!authorized) {
-    return (
-      <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center px-4 py-10">
-        <DirectorPinGate
-          pin={pin}
-          onPinChange={setPin}
-          onSubmit={submitDirectorPin}
-          isSubmitting={isSubmittingPin}
-          error={authError}
-        />
-      </div>
-    );
-  }
-
   if (showPicker || !selectedSession) {
     return (
       <div className="mx-auto w-full max-w-5xl px-4 py-8">
@@ -837,14 +726,16 @@ export default function DirectorConsoleClient({
             <FaArrowLeft />
             Home
           </Link>
-          <button
-            type="button"
-            onClick={logout}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-zinc-200"
-          >
-            <FaPowerOff />
-            Exit
-          </button>
+          {authorized ? (
+            <button
+              type="button"
+              onClick={logout}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-zinc-200"
+            >
+              <FaPowerOff />
+              Exit
+            </button>
+          ) : null}
         </div>
         <DirectorSessionPicker
           sessions={sessions}
@@ -890,14 +781,16 @@ export default function DirectorConsoleClient({
           >
             Change session
           </button>
-          <button
-            type="button"
-            onClick={logout}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-zinc-200"
-          >
-            <FaPowerOff />
-            Exit
-          </button>
+          {authorized ? (
+            <button
+              type="button"
+              onClick={logout}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-zinc-200"
+            >
+              <FaPowerOff />
+              Exit
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -905,28 +798,60 @@ export default function DirectorConsoleClient({
         selectedSession={selectedSession}
         liveMatch={liveMatch}
         onChangeSession={() => setShowPicker(true)}
-        readCurrentScore={readCurrentScore}
+        readCurrentScore={authorized ? readCurrentScore : () => {}}
       />
 
-      <div className="mb-5 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
-          <FaWifi className="text-emerald-300" />
-          {liveUpdatedLabel}
-        </span>
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
-          <FaHeadphones className="text-zinc-200" />
-          {speakerMessage || "Using phone speaker output."}
-        </span>
-      </div>
+      {!authorized ? (
+        <div className="mt-6">
+          <DirectorPinGate
+            pin={pin}
+            onPinChange={setPin}
+            onSubmit={submitDirectorPin}
+            isSubmitting={isSubmittingPin}
+            error={authError}
+          />
+        </div>
+      ) : null}
 
-      <WalkieNotice notice={walkie.notice} onDismiss={walkie.dismissNotice} />
+      {authorized ? (
+        <div className="mb-5 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
+            <FaWifi className="text-emerald-300" />
+            {liveUpdatedLabel}
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
+            <FaHeadphones className="text-zinc-200" />
+            {speakerMessage || "Using phone speaker output."}
+          </span>
+        </div>
+      ) : null}
 
-      {consoleError ? (
+      {authorized ? <WalkieNotice notice={walkie.notice} onDismiss={walkie.dismissNotice} /> : null}
+
+      {authorized && consoleError ? (
         <div className="mb-5 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
           {consoleError}
         </div>
       ) : null}
 
+      {!authorized ? (
+        <div className="mt-6 rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.96),rgba(10,10,14,0.98))] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.35)]">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-white">
+              <FaLock />
+            </span>
+            <div>
+              <h2 className="text-lg font-semibold text-white">Enter PIN to manage session</h2>
+              <p className="mt-1 text-sm text-zinc-400">
+                Browse first, then enter the 4-digit PIN to use PA mic, music, effects,
+                and walkie controls.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {authorized ? (
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-5">
           <Card
@@ -937,6 +862,10 @@ export default function DirectorConsoleClient({
                 : "Hold to talk over PA"
             }
             icon={<FaMicrophone />}
+            help={{
+              title: "PA mic",
+              body: "Press and hold to speak over the phone speaker or connected Bluetooth speaker. Music and effects duck automatically while you talk.",
+            }}
             action={
               <span
                 className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
@@ -1002,6 +931,10 @@ export default function DirectorConsoleClient({
             title="Walkie with umpire"
             subtitle="Shared live channel"
             icon={<FaBroadcastTower />}
+            help={{
+              title: "Walkie with umpire",
+              body: "Request walkie when it is off. Once the umpire accepts, only one person can hold the channel at a time.",
+            }}
             action={
               <span
                 className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
@@ -1030,8 +963,12 @@ export default function DirectorConsoleClient({
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-300">
                   {walkie.snapshot?.enabled
-                    ? "Hold to talk back to the umpire. One speaker at a time stays enforced."
-                    : "Walkie is off until the umpire enables it."}
+                    ? "Hold to talk back to the umpire."
+                    : walkie.requestState === "pending"
+                    ? "Request sent. Waiting for umpire."
+                    : walkie.requestState === "dismissed"
+                    ? "Umpire dismissed the request."
+                    : "Ask the umpire to enable walkie."}
                 </div>
                 {walkie.error ? (
                   <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
@@ -1043,17 +980,34 @@ export default function DirectorConsoleClient({
                 <IosSwitch
                   checked={Boolean(walkie.snapshot?.enabled)}
                   label="Walkie state"
-                  onChange={() => {}}
-                  disabled
+                  onChange={() => {
+                    if (!walkie.snapshot?.enabled) {
+                      void walkie.requestEnable();
+                    }
+                  }}
+                  disabled={Boolean(walkie.snapshot?.enabled)}
                 />
-                <WalkieTalkButton
-                  active={walkie.isSelfTalking}
-                  disabled={!walkie.canTalk}
-                  countdown={walkie.countdown}
-                  onStart={walkie.startTalking}
-                  onStop={walkie.stopTalking}
-                  label="Hold to talk to umpire"
-                />
+                {walkie.snapshot?.enabled ? (
+                  <WalkieTalkButton
+                    active={walkie.isSelfTalking}
+                    disabled={!walkie.canTalk}
+                    countdown={walkie.countdown}
+                    onStart={walkie.startTalking}
+                    onStop={walkie.stopTalking}
+                    label="Hold to talk to umpire"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void walkie.requestEnable()}
+                    disabled={!walkie.canRequestEnable}
+                    className="rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-black shadow-[0_12px_30px_rgba(16,185,129,0.22)] transition disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+                  >
+                    {walkie.requestState === "pending"
+                      ? "Request sent"
+                      : "Request walkie"}
+                  </button>
+                )}
               </div>
             </div>
           </Card>
@@ -1062,6 +1016,10 @@ export default function DirectorConsoleClient({
             title="Soundboard"
             subtitle="Stadium cues"
             icon={<FaBullhorn />}
+            help={{
+              title: "Soundboard",
+              body: "Play quick stadium effects like horn, cheer, wicket, or break stingers. Use Stop effects to cut every cue immediately.",
+            }}
             action={
               <button
                 type="button"
@@ -1115,6 +1073,10 @@ export default function DirectorConsoleClient({
             title="Speaker Output"
             subtitle="Phone, browser, or Bluetooth speaker"
             icon={<FaHeadphones />}
+            help={{
+              title: "Speaker output",
+              body: "Choose the current phone speaker or another available audio output. On some mobile browsers the app uses the current device output automatically.",
+            }}
             action={
               <span className="inline-flex rounded-full bg-emerald-500/14 px-3 py-1 text-xs font-semibold text-emerald-200">
                 {speakerDevices.length ? "Selectable" : "Auto"}
@@ -1131,20 +1093,20 @@ export default function DirectorConsoleClient({
                 <span className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
                   Output device
                 </span>
-                <select
+                <DarkSelect
                   value={speakerDeviceId}
-                  onChange={(event) => {
-                    void handleSpeakerOutputChange(event.target.value);
+                  ariaLabel="Output device"
+                  options={[
+                    { value: "default", label: "Phone / current output" },
+                    ...speakerDevices.map((device) => ({
+                      value: device.deviceId,
+                      label: device.label || "External speaker",
+                    })),
+                  ]}
+                  onChange={(nextValue) => {
+                    void handleSpeakerOutputChange(nextValue);
                   }}
-                  className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white"
-                >
-                  <option value="default">Phone / current output</option>
-                  {speakerDevices.map((device) => (
-                    <option key={device.deviceId} value={device.deviceId}>
-                      {device.label || "External speaker"}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
               <label className="space-y-2">
                 <span className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
@@ -1167,6 +1129,10 @@ export default function DirectorConsoleClient({
             title="Music Deck"
             subtitle="Local tracks from this phone"
             icon={<FaMusic />}
+            help={{
+              title: "Music deck",
+              body: "Load local audio files from the phone, then play, pause, stop, or skip them during the session. The deck stays local to this browser.",
+            }}
             action={
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black shadow-[0_10px_30px_rgba(16,185,129,0.2)]">
                 <FaCompactDisc />
@@ -1290,6 +1256,10 @@ export default function DirectorConsoleClient({
             title="Quick actions"
             subtitle="Fast control"
             icon={<FaBroadcastTower />}
+            help={{
+              title: "Quick actions",
+              body: "Read the current score aloud or stop every audio source instantly if you need a clean reset.",
+            }}
           >
             <div className="grid gap-3 sm:grid-cols-2">
               <button
@@ -1312,6 +1282,7 @@ export default function DirectorConsoleClient({
           </Card>
         </div>
       </div>
+      ) : null}
     </div>
   );
 }

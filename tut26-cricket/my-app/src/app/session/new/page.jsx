@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FaArrowRight, FaCalendarAlt, FaImage, FaPen } from "react-icons/fa";
+import ImagePinModal from "../../components/shared/ImagePinModal";
 import {
   compressMatchImage,
   getAcceptedMatchImageTypes,
@@ -19,6 +20,10 @@ export default function NewSessionPage() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [pendingImageFile, setPendingImageFile] = useState(null);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [isCreatePinModalOpen, setIsCreatePinModalOpen] = useState(false);
+  const fileInputRef = useRef(null);
   const router = useRouter();
 
   const handleSelectImage = async (event) => {
@@ -39,31 +44,76 @@ export default function NewSessionPage() {
     }
 
     setError("");
+    setPendingImageFile(file);
+    setIsPinModalOpen(true);
+    event.target.value = "";
+  };
 
-    try {
-      const compressedFile = await compressMatchImage(file);
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ""));
-        reader.onerror = () => reject(new Error("Could not prepare the image."));
-        reader.readAsDataURL(compressedFile);
-      });
+  const handleConfirmImagePin = async (pin) => {
+    if (!pendingImageFile) {
+      throw new Error("Choose a picture first.");
+    }
 
-      if (typeof window !== "undefined") {
-        window.sessionStorage.setItem(
-          PENDING_SESSION_IMAGE_KEY,
-          JSON.stringify({
-            fileName: compressedFile.name,
-            type: compressedFile.type,
-            dataUrl,
-          })
-        );
-      }
+    const response = await fetch("/api/media/pin-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin }),
+    });
+    const payload = await response.json().catch(() => ({}));
 
-      setSelectedFileName(file.name);
-      setPreviewUrl(dataUrl);
-    } catch (caughtError) {
-      setError(caughtError.message || "Could not prepare the image.");
+    if (!response.ok) {
+      throw new Error(payload.message || "Incorrect PIN.");
+    }
+
+    const compressedFile = await compressMatchImage(pendingImageFile);
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("Could not prepare the image."));
+      reader.readAsDataURL(compressedFile);
+    });
+
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem(
+        PENDING_SESSION_IMAGE_KEY,
+        JSON.stringify({
+          fileName: compressedFile.name,
+          type: compressedFile.type,
+          dataUrl,
+        })
+      );
+    }
+
+    setSelectedFileName(pendingImageFile.name);
+    setPreviewUrl(dataUrl);
+    setPendingImageFile(null);
+    setIsPinModalOpen(false);
+  };
+
+  const handleContinueWithoutImage = () => {
+    setPendingImageFile(null);
+    setSelectedFileName("");
+    setPreviewUrl("");
+    setIsPinModalOpen(false);
+    setError("");
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(PENDING_SESSION_IMAGE_KEY);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const verifyPin = async (pin) => {
+    const response = await fetch("/api/media/pin-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin }),
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(payload.message || "Incorrect PIN.");
     }
   };
 
@@ -80,9 +130,16 @@ export default function NewSessionPage() {
       return;
     }
 
+    setIsCreatePinModalOpen(true);
+  };
+
+  const handleConfirmCreatePin = async (pin) => {
+    setError("");
     setSaving(true);
 
     try {
+      await verifyPin(pin);
+
       const res = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -97,9 +154,12 @@ export default function NewSessionPage() {
       }
 
       const session = await res.json();
+      setIsCreatePinModalOpen(false);
       router.push(`/teams/${session._id}`);
     } catch (caughtError) {
       setError(caughtError.message);
+      throw caughtError;
+    } finally {
       setSaving(false);
     }
   };
@@ -183,9 +243,9 @@ export default function NewSessionPage() {
                     </span>
                     <label
                       htmlFor="session-image"
-                      className="inline-flex shrink-0 cursor-pointer items-center rounded-full bg-white/[0.08] px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/[0.12]"
+                      className="btn-ui btn-ui-quiet inline-flex shrink-0 cursor-pointer !rounded-full !px-4 !py-2 text-sm"
                     >
-                      Choose file
+                      Upload picture
                     </label>
                     <div className="min-w-0 flex-1 text-sm text-zinc-400">
                       <p className="truncate">
@@ -193,6 +253,7 @@ export default function NewSessionPage() {
                       </p>
                     </div>
                     <input
+                      ref={fileInputRef}
                       id="session-image"
                       type="file"
                       accept={getAcceptedMatchImageTypes()}
@@ -224,7 +285,7 @@ export default function NewSessionPage() {
             <button
               onClick={createSession}
               disabled={saving}
-              className="mt-8 flex w-full items-center justify-center gap-3 rounded-2xl bg-[linear-gradient(90deg,#facc15_0%,#f59e0b_54%,#fb7185_100%)] px-6 py-4 text-lg font-bold text-black shadow-[0_18px_40px_rgba(245,158,11,0.22)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
+              className="btn-ui btn-ui-primary mt-8 w-full rounded-2xl px-6 py-4 text-lg font-semibold"
             >
               {saving ? "Creating..." : "Next: Select Teams"}
               {!saving && <FaArrowRight />}
@@ -241,6 +302,29 @@ export default function NewSessionPage() {
           </div>
         </div>
       </div>
+      <ImagePinModal
+        isOpen={isPinModalOpen}
+        title="Upload picture"
+        subtitle="Enter the 4-digit PIN before adding a session cover image."
+        confirmLabel="Use this picture"
+        showContinueWithout={true}
+        onConfirm={handleConfirmImagePin}
+        onContinueWithout={handleContinueWithoutImage}
+        onClose={handleContinueWithoutImage}
+      />
+      <ImagePinModal
+        isOpen={isCreatePinModalOpen}
+        title="Create session"
+        subtitle="Enter the 4-digit PIN before creating a new match session."
+        confirmLabel="Create session"
+        showContinueWithout={false}
+        onConfirm={handleConfirmCreatePin}
+        onClose={() => {
+          if (!saving) {
+            setIsCreatePinModalOpen(false);
+          }
+        }}
+      />
     </main>
   );
 }

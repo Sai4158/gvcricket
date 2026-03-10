@@ -3,13 +3,15 @@
 import dynamic from "next/dynamic";
 import { startTransition, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft, FaImage, FaTrashAlt } from "react-icons/fa";
 import useEventSource from "../live/useEventSource";
 import MatchHeroBackdrop from "../match/MatchHeroBackdrop";
+import ImagePinModal from "../shared/ImagePinModal";
 import { calculateInningsSummary } from "../../lib/match-stats";
 import CongratulationsCard from "./CongratulationsCard";
 import EnhancedScorecard from "./EnhancedScorecard";
 import PlayerLists from "./PlayerLists";
+import ResultInsightsSections from "./ResultInsightsSections";
 import PlayerStatsSection from "./PlayerStatsSection";
 
 const RunsPerOverChart = dynamic(() => import("./RunsPerOverChart"), {
@@ -23,6 +25,8 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   const router = useRouter();
   const [match, setMatch] = useState(initialMatch);
   const [streamError, setStreamError] = useState("");
+  const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
+  const [removeError, setRemoveError] = useState("");
 
   useEventSource({
     url: matchId ? `/api/live/matches/${matchId}` : null,
@@ -60,15 +64,33 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   const innings1Summary = calculateInningsSummary(match.innings1);
   const innings2Summary = calculateInningsSummary(match.innings2);
 
+  const handleRemoveImage = async (pin) => {
+    const response = await fetch(`/api/matches/${matchId}/image`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.message || "Failed to remove the image.");
+    }
+
+    startTransition(() => {
+      setMatch(payload);
+      setRemoveError("");
+      setIsRemoveModalOpen(false);
+    });
+  };
+
   return (
     <main className="min-h-screen bg-zinc-950 p-4 sm:p-8 text-zinc-300 font-sans">
       <div className="max-w-5xl mx-auto space-y-12 py-10">
         <MatchHeroBackdrop match={match} className="mb-2">
           <div className="px-5 py-7 sm:px-8 sm:py-8">
-            <header className="text-center space-y-4">
+            <header className="relative text-center space-y-4">
               <button
                 onClick={() => router.push("/session")}
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-zinc-100 backdrop-blur-sm transition-colors hover:bg-black/45"
+                className="absolute left-0 top-0 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-zinc-100 backdrop-blur-sm transition-colors hover:bg-black/45"
               >
                 <FaArrowLeft />
                 <span>Back to Sessions</span>
@@ -86,7 +108,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
               </div>
             </header>
 
-            <div className="mt-8 grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="mt-8 grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
               <div className="rounded-[28px] border border-white/10 bg-black/35 p-4 backdrop-blur-md shadow-[0_18px_50px_rgba(0,0,0,0.32)] sm:p-5">
                 {match.result && <CongratulationsCard result={match.result} />}
               </div>
@@ -122,6 +144,55 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           />
         </section>
 
+        {match?.matchImageUrl ? (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.32em] text-amber-300/85">
+                  Match Photo
+                </p>
+                <h2 className="mt-2 text-3xl font-bold text-white">Session Cover</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setRemoveError("");
+                  setIsRemoveModalOpen(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-full border border-rose-400/20 bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/15"
+              >
+                <FaTrashAlt />
+                <span>Remove</span>
+              </button>
+            </div>
+            <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.94),rgba(10,10,14,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
+              <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
+                <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400/12 text-amber-300">
+                  <FaImage />
+                </span>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Shared match image</h3>
+                  <p className="text-sm text-zinc-400">
+                    This cover stays with the whole session.
+                  </p>
+                </div>
+              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={match.matchImageUrl}
+                alt={match.name || "Match cover"}
+                className="max-h-[420px] w-full object-cover"
+                loading="lazy"
+              />
+            </div>
+            {removeError ? (
+              <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                {removeError}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
         <section className="space-y-8">
           <h2 className="text-3xl font-bold text-white text-center pt-8 border-t border-white/10">
             Graphical Analysis
@@ -140,6 +211,8 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           />
         </section>
 
+        <ResultInsightsSections match={match} />
+
         <PlayerStatsSection match={match} />
 
         <section>
@@ -155,6 +228,14 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           </button>
         </footer>
       </div>
+      <ImagePinModal
+        isOpen={isRemoveModalOpen}
+        title="Remove picture"
+        subtitle="Enter the 4-digit PIN to remove this session image."
+        confirmLabel="Remove picture"
+        onConfirm={handleRemoveImage}
+        onClose={() => setIsRemoveModalOpen(false)}
+      />
     </main>
   );
 }

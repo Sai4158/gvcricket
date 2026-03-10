@@ -260,9 +260,10 @@ export async function loadDirectorConsoleData() {
   const cookieStore = await cookies();
   const directorToken = cookieStore.get(getDirectorAccessCookieName())?.value;
   const authorized = hasValidDirectorAccess(directorToken);
+  const sessions = await loadDirectorSessionsList();
 
   return {
     authorized,
-    sessions: authorized ? await loadDirectorSessionsList() : [],
+    sessions,
   };
 }

@@ -45,7 +45,7 @@ export default function HeroSection({ liveMatch = null }) {
                 scale: [1, 1.05, 1.01],
               }}
               transition={{
-                duration: 5.5,
+                duration: 3.4,
                 repeat: Infinity,
                 ease: "easeInOut",
               }}
@@ -61,7 +61,7 @@ export default function HeroSection({ liveMatch = null }) {
                 ],
               }}
               transition={{
-                duration: 6.5,
+                duration: 4.1,
                 repeat: Infinity,
                 ease: "easeInOut",
               }}
