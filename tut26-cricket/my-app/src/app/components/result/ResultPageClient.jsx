@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { startTransition, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FaArrowLeft, FaImage, FaTrashAlt } from "react-icons/fa";
 import useEventSource from "../live/useEventSource";
@@ -27,6 +27,26 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   const [streamError, setStreamError] = useState("");
   const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
   const [removeError, setRemoveError] = useState("");
+  const [showConfetti, setShowConfetti] = useState(true);
+
+  const confettiPieces = useMemo(
+    () =>
+      Array.from({ length: 28 }, (_, index) => ({
+        id: index,
+        left: `${(index * 17) % 100}%`,
+        delay: `${(index % 8) * 0.18}s`,
+        duration: `${4 + (index % 5) * 0.45}s`,
+        rotate: `${(index % 2 === 0 ? 1 : -1) * (10 + index * 3)}deg`,
+        color:
+          ["#f6b400", "#fde68a", "#ffffff", "#ffdd57", "#f59e0b"][index % 5],
+      })),
+    []
+  );
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setShowConfetti(false), 5000);
+    return () => window.clearTimeout(timeout);
+  }, []);
 
   useEventSource({
     url: matchId ? `/api/live/matches/${matchId}` : null,
@@ -85,16 +105,37 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   return (
     <main className="min-h-screen bg-zinc-950 p-4 sm:p-8 text-zinc-300 font-sans">
       <div className="max-w-5xl mx-auto space-y-12 py-10">
+        <div className="flex justify-start">
+          <button
+            onClick={() => router.push("/session")}
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-zinc-100 backdrop-blur-sm transition-colors hover:bg-black/45"
+          >
+            <FaArrowLeft />
+            <span>Back to Sessions</span>
+          </button>
+        </div>
+
         <MatchHeroBackdrop match={match} className="mb-2">
           <div className="px-5 py-7 sm:px-8 sm:py-8">
-            <header className="relative text-center space-y-4">
-              <button
-                onClick={() => router.push("/session")}
-                className="absolute left-0 top-0 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-zinc-100 backdrop-blur-sm transition-colors hover:bg-black/45"
-              >
-                <FaArrowLeft />
-                <span>Back to Sessions</span>
-              </button>
+            {showConfetti ? (
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[320px] overflow-hidden">
+                {confettiPieces.map((piece) => (
+                  <span
+                    key={piece.id}
+                    className="absolute top-[-10%] h-3 w-2 rounded-full opacity-80 animate-[result-confetti_var(--confetti-duration)_linear_forwards]"
+                    style={{
+                      left: piece.left,
+                      backgroundColor: piece.color,
+                      animationDelay: piece.delay,
+                      ["--confetti-duration"]: piece.duration,
+                      transform: `rotate(${piece.rotate})`,
+                    }}
+                  />
+                ))}
+                <div className="absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.18))]" />
+              </div>
+            ) : null}
+            <header className="text-center space-y-4">
               <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.35em] text-amber-300/90">
                   Match Complete
@@ -109,9 +150,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
             </header>
 
             <div className="mt-8 grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
-              <div className="rounded-[28px] border border-white/10 bg-black/35 p-4 backdrop-blur-md shadow-[0_18px_50px_rgba(0,0,0,0.32)] sm:p-5">
-                {match.result && <CongratulationsCard result={match.result} />}
-              </div>
+              {match.result && <CongratulationsCard result={match.result} />}
               <div className="rounded-[28px] border border-white/10 bg-black/35 p-5 backdrop-blur-md shadow-[0_18px_50px_rgba(0,0,0,0.32)]">
                 <div className="grid grid-cols-2 gap-3 text-center">
                   <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">

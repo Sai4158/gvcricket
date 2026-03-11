@@ -7,6 +7,7 @@ import { formatRelativeTime } from "./formatRelativeTime";
 
 function buildStatusMeta(session) {
   const isLive = Boolean(session.isLive);
+  const hasSavedScore = Boolean(session.match);
   const referenceDate = session.updatedAt || session.createdAt;
 
   if (isLive) {
@@ -25,7 +26,7 @@ function buildStatusMeta(session) {
   return {
     badge,
     tone: "ended",
-    summary: "Final score available",
+    summary: hasSavedScore ? "Final score available" : "No score to view",
   };
 }
 
@@ -68,7 +69,9 @@ export default function SessionCard({ session, onUmpireClick }) {
             </h2>
             <p className="mt-2 text-sm text-zinc-400">{dateLabel}</p>
             {teamLine ? (
-              <p className="mt-1 truncate text-sm text-zinc-500">{teamLine}</p>
+              <p className="mt-2 truncate text-lg font-semibold tracking-[-0.02em] text-white">
+                {teamLine}
+              </p>
             ) : null}
           </div>
           <span

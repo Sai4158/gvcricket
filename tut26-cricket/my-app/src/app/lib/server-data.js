@@ -53,13 +53,14 @@ async function findMatchForSession(session) {
 export async function loadSessionsIndexData() {
   await connectDB();
 
-  const sessions = await Session.find()
+  const sessions = (await Session.find()
     .populate({
       path: "match",
       select:
         "teamA teamB teamAName teamBName score outs innings innings1 innings2 isOngoing result _id updatedAt",
     })
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 }))
+    .filter((session) => !session?.isDraft);
 
   const fallbackMatchesBySessionId = await resolveSessionMatches(sessions);
 
@@ -217,10 +218,11 @@ export async function loadHomeLiveBannerData() {
 
   const fiveHoursAgo = new Date(Date.now() - 5 * 60 * 60 * 1000);
 
-  const sessions = await Session.find()
+  const sessions = (await Session.find()
     .sort({ createdAt: -1, _id: -1 })
     .limit(12)
-    .lean();
+    .lean())
+    .filter((session) => !session?.isDraft);
 
   let session = null;
   let match = null;
@@ -274,14 +276,15 @@ export async function loadHomeLiveBannerData() {
 export async function loadDirectorSessionsList() {
   await connectDB();
 
-  const sessions = await Session.find()
+  const sessions = (await Session.find()
     .populate({
       path: "match",
       select:
         "teamA teamB teamAName teamBName score outs innings innings1 innings2 isOngoing result _id updatedAt sessionId matchImageUrl",
     })
     .sort({ createdAt: -1, _id: -1 })
-    .limit(16);
+    .limit(16))
+    .filter((session) => !session?.isDraft);
 
   const fallbackMatchesBySessionId = await resolveSessionMatches(sessions);
 

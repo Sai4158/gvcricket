@@ -29,7 +29,6 @@ function getAccessSecret() {
     process.env.MATCH_MEDIA_PIN_HASH ||
     process.env.MATCH_MEDIA_PIN ||
     process.env.UMPIRE_PIN ||
-    process.env.MONGODB_URI ||
     "gv-cricket-local-secret"
   );
 }

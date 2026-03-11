@@ -24,7 +24,6 @@ function getDirectorSecret() {
     process.env.DIRECTOR_CONSOLE_PIN ||
     process.env.UMPIRE_ADMIN_PIN_HASH ||
     process.env.UMPIRE_ADMIN_PIN ||
-    process.env.MONGODB_URI ||
     "gv-cricket-director-secret"
   );
 }

@@ -12,6 +12,7 @@ import {
 } from "../../components/match/match-image-client";
 
 const PENDING_SESSION_IMAGE_KEY = "gv-pending-session-image";
+const getDraftTokenKey = (sessionId) => `session_${sessionId}_draftToken`;
 
 export default function NewSessionPage() {
   const [name, setName] = useState("");
@@ -127,6 +128,12 @@ export default function NewSessionPage() {
       }
 
       const session = await res.json();
+      if (typeof window !== "undefined" && session?.draftToken && session?._id) {
+        window.sessionStorage.setItem(
+          getDraftTokenKey(session._id),
+          String(session.draftToken)
+        );
+      }
       router.push(`/teams/${session._id}`);
     } catch (caughtError) {
       setError(caughtError.message);

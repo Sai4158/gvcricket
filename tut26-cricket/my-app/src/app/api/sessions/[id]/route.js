@@ -14,7 +14,12 @@ import { serializePublicSession } from "../../../lib/public-data";
 import { getRequestMeta } from "../../../lib/request-meta";
 import { enforceRateLimit } from "../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../lib/request-security";
-import { pinSchema, sessionPatchObjectSchema } from "../../../lib/validators";
+import { hasValidDraftToken } from "../../../lib/session-draft";
+import {
+  pinSchema,
+  sessionDraftDeleteSchema,
+  sessionPatchObjectSchema,
+} from "../../../lib/validators";
 
 const sessionAdminPatchSchema = z
   .object({
@@ -151,5 +156,68 @@ export async function PATCH(req, { params }) {
     });
   } catch {
     return jsonError("Could not update the session.", 500);
+  }
+}
+
+export async function DELETE(req, { params }) {
+  const { id } = await params;
+  const meta = getRequestMeta(req);
+  const deleteLimit = enforceRateLimit({
+    key: `session-draft-delete:${id}:${meta.ip}`,
+    limit: 6,
+    windowMs: 60 * 1000,
+    blockMs: 60 * 1000,
+  });
+
+  if (!deleteLimit.allowed) {
+    return jsonRateLimit(
+      "Too many draft delete attempts. Try again shortly.",
+      deleteLimit.retryAfterMs
+    );
+  }
+
+  try {
+    const parsedRequest = await parseJsonRequest(req, sessionDraftDeleteSchema, {
+      maxBytes: 4096,
+    });
+    if (!parsedRequest.ok) {
+      return jsonError(parsedRequest.message, parsedRequest.status);
+    }
+
+    await connectDB();
+    const session = await Session.findById(id).lean();
+    if (!session) {
+      return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+    }
+
+    if (!session.isDraft || session.match || session.isLive) {
+      return jsonError("Only unfinished draft sessions can be removed.", 409);
+    }
+
+    if (!hasValidDraftToken(session, parsedRequest.value.draftToken)) {
+      return jsonError("Draft access denied.", 403);
+    }
+
+    await Session.deleteOne({ _id: id });
+
+    await writeAuditLog({
+      action: "session_draft_delete",
+      targetType: "session",
+      targetId: id,
+      status: "success",
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    });
+
+    return Response.json(
+      { ok: true },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
+  } catch {
+    return jsonError("Could not remove the draft session.", 500);
   }
 }

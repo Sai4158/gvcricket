@@ -9,6 +9,7 @@ import { serializePublicMatch } from "../../../../lib/public-data";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../../lib/request-security";
+import { hasValidDraftToken } from "../../../../lib/session-draft";
 import { setupMatchSchema } from "../../../../lib/validators";
 import { z } from "zod";
 
@@ -67,6 +68,10 @@ export async function POST(req, { params }) {
         throw new Error("SESSION_NOT_FOUND");
       }
 
+      if (session.isDraft && !hasValidDraftToken(session, parsedRequest.value.draftToken)) {
+        throw new Error("DRAFT_ACCESS_DENIED");
+      }
+
       const existingMatch = session.match
         ? await Match.findById(session.match).session(transactionSession)
         : null;
@@ -111,6 +116,8 @@ export async function POST(req, { params }) {
       session.tossWinner = tossWinner;
       session.match = finalMatch._id;
       session.isLive = true;
+      session.isDraft = false;
+      session.draftTokenHash = "";
       await session.save({ session: transactionSession });
     });
 
@@ -140,6 +147,10 @@ export async function POST(req, { params }) {
   } catch (error) {
     if (error.message === "SESSION_NOT_FOUND") {
       return jsonError("Session not found.", 404);
+    }
+
+    if (error.message === "DRAFT_ACCESS_DENIED") {
+      return jsonError("Draft access denied.", 403);
     }
 
     return jsonError("Could not start the match.", 500);

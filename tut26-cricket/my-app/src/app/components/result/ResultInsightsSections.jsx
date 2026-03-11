@@ -236,27 +236,6 @@ export default function ResultInsightsSections({ match }) {
         </div>
       </SectionShell>
 
-      <SectionShell title="Ball-by-Ball Timeline" icon={<FaChartBar />}>
-        <div className="flex flex-wrap gap-2">
-          {allTimeline.length ? (
-            allTimeline.map((ball, index) => (
-              <div
-                key={`${ball.inningsLabel}-${ball.overBall}-${index}`}
-                className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3 text-center"
-              >
-                <p className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">
-                  {ball.inningsLabel}
-                </p>
-                <p className="mt-2 text-lg font-black text-white">{ball.label}</p>
-                <p className="mt-1 text-xs text-zinc-400">{ball.overBall}</p>
-              </div>
-            ))
-          ) : (
-            <p className="text-zinc-400">No ball history available.</p>
-          )}
-        </div>
-      </SectionShell>
-
       <SectionShell title="Over Summary" icon={<FaChartBar />}>
         <div className="grid gap-3 md:grid-cols-2">
           {allOverSummaries.length ? (

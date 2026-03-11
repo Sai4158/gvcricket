@@ -21,11 +21,14 @@ export default function HomeHeader() {
     });
   }, [isMenuOpen, scrollY]);
 
-  const handleScrollToCommunity = () => {
-    setIsMenuOpen(false);
+  const handleCommunityClick = (event) => {
     const element = document.getElementById("community-highlights");
+    setIsMenuOpen(false);
+
     if (element) {
-      element.scrollIntoView({ behavior: "smooth" });
+      event.preventDefault();
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.history.replaceState(null, "", "/#community-highlights");
     }
   };
 
@@ -33,7 +36,11 @@ export default function HomeHeader() {
     { href: "/session/new", text: "Start Match", icon: FaArrowRight },
     { href: "/session", text: "View Past/Live Sessions" },
     { type: "divider" },
-    { onClick: handleScrollToCommunity, text: "Community Highlights" },
+    {
+      href: "/#community-highlights",
+      text: "Community Highlights",
+      onClick: handleCommunityClick,
+    },
     { href: "/rules", text: "Community Rules" },
   ];
 
@@ -114,7 +121,7 @@ export default function HomeHeader() {
                         {link.href ? (
                           <Link
                             href={link.href}
-                            onClick={() => setIsMenuOpen(false)}
+                            onClick={link.onClick || (() => setIsMenuOpen(false))}
                             className={linkStyles}
                           >
                             <span>{link.text}</span>

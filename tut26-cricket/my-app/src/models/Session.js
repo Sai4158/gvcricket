@@ -6,6 +6,8 @@ const SessionSchema = new mongoose.Schema(
     date: { type: String, default: "", trim: true },
     overs: { type: Number, default: null },
     isLive: { type: Boolean, default: false },
+    isDraft: { type: Boolean, default: false },
+    draftTokenHash: { type: String, default: "", trim: true },
     match: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Match",

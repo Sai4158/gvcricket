@@ -20,6 +20,7 @@ import StepFlow from "../../components/shared/StepFlow";
 export default function TeamSelectionPage() {
   const { id: sessionId } = useParams();
   const router = useRouter();
+  const draftTokenKey = `session_${sessionId}_draftToken`;
   const [teamA, setTeamA] = useSessionStorageState(
     `session_${sessionId}_teamA_v2`,
     createDefaultRoster("Team A")
@@ -35,6 +36,33 @@ export default function TeamSelectionPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+
+  const deleteDraftSession = async () => {
+    if (typeof window === "undefined") return;
+    const draftToken = window.sessionStorage.getItem(draftTokenKey);
+    if (!draftToken) return;
+
+    try {
+      await fetch(`/api/sessions/${sessionId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draftToken }),
+        keepalive: true,
+      });
+    } catch {
+      // Ignore cleanup errors; the session is hidden as a draft anyway.
+    } finally {
+      window.sessionStorage.removeItem(draftTokenKey);
+      window.sessionStorage.removeItem(`session_${sessionId}_teamA_v2`);
+      window.sessionStorage.removeItem(`session_${sessionId}_teamB_v2`);
+      window.sessionStorage.removeItem(`session_${sessionId}_overs_v2`);
+    }
+  };
+
+  const handleBack = async () => {
+    await deleteDraftSession();
+    router.push("/session/new");
+  };
 
   const handleSubmit = async () => {
     const finalTeamAName = teamA.name.trim();
@@ -65,6 +93,10 @@ export default function TeamSelectionPage() {
           teamBName: finalTeamBName,
           teamBPlayers: finalTeamBPlayers,
           overs,
+          draftToken:
+            typeof window !== "undefined"
+              ? window.sessionStorage.getItem(draftTokenKey) || ""
+              : "",
         }),
       });
 
@@ -89,7 +121,7 @@ export default function TeamSelectionPage() {
           <div className="mb-5 flex items-center justify-between gap-4">
             <button
               type="button"
-              onClick={() => router.back()}
+              onClick={handleBack}
               className="btn-ui-icon"
               aria-label="Go back"
             >

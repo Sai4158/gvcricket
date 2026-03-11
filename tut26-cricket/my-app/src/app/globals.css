@@ -77,6 +77,20 @@ body {
     transform: translateY(-6px);
   }
 }
+
+@keyframes result-confetti {
+  0% {
+    transform: translate3d(0, -12%, 0) rotate(0deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate3d(28px, 340px, 0) rotate(420deg);
+    opacity: 0;
+  }
+}
 /* Add to src/app/globals.css if you don't have it */
 @keyframes animate-gradient-slow {
   to {
@@ -274,4 +288,100 @@ body {
     0 10px 28px rgba(0, 0, 0, 0.14);
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+.home-liquid-surface .liquid-glass,
+.home-liquid-surface .liquid-glass-soft,
+.home-liquid-surface .liquid-pill,
+.home-liquid-surface .liquid-icon {
+  isolation: isolate;
+}
+
+.home-liquid-surface .liquid-glass {
+  border-color: rgba(255, 255, 255, 0.24);
+  background:
+    linear-gradient(
+      120deg,
+      rgba(255, 255, 255, 0.25) 0%,
+      rgba(255, 255, 255, 0.1) 16%,
+      rgba(255, 255, 255, 0.03) 34%,
+      rgba(255, 255, 255, 0.14) 52%,
+      rgba(255, 255, 255, 0.02) 68%,
+      rgba(255, 255, 255, 0.12) 100%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08) 28%, rgba(255, 255, 255, 0.03) 100%),
+    radial-gradient(circle at 14% -8%, rgba(255, 255, 255, 0.5), transparent 32%),
+    radial-gradient(circle at 88% 112%, rgba(255, 214, 153, 0.16), transparent 32%);
+  background-attachment: fixed, scroll, scroll, scroll;
+  box-shadow:
+    0 22px 60px rgba(0, 0, 0, 0.2),
+    0 12px 28px rgba(255, 208, 132, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(28px) saturate(180%) brightness(1.03);
+  -webkit-backdrop-filter: blur(28px) saturate(180%) brightness(1.03);
+}
+
+.home-liquid-surface .liquid-glass::before {
+  background:
+    radial-gradient(circle at 18% 10%, rgba(255, 255, 255, 0.34), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 28%, transparent 78%, rgba(255, 255, 255, 0.04)),
+    linear-gradient(120deg, transparent 16%, rgba(255, 255, 255, 0.2) 34%, rgba(255, 255, 255, 0.06) 42%, transparent 58%);
+  opacity: 0.98;
+}
+
+.home-liquid-surface .liquid-glass::after {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12), transparent 20%, transparent 76%, rgba(255, 255, 255, 0.06)),
+    radial-gradient(circle at 78% 16%, rgba(255, 255, 255, 0.18), transparent 20%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 -20px 32px rgba(0, 0, 0, 0.06);
+  opacity: 0.95;
+}
+
+.home-liquid-surface .liquid-glass-soft {
+  border-color: rgba(255, 255, 255, 0.2);
+  background:
+    linear-gradient(
+      120deg,
+      rgba(255, 255, 255, 0.19) 0%,
+      rgba(255, 255, 255, 0.08) 18%,
+      rgba(255, 255, 255, 0.03) 36%,
+      rgba(255, 255, 255, 0.11) 54%,
+      rgba(255, 255, 255, 0.02) 72%,
+      rgba(255, 255, 255, 0.1) 100%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05));
+  background-attachment: fixed, scroll;
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(24px) saturate(168%) brightness(1.02);
+  -webkit-backdrop-filter: blur(24px) saturate(168%) brightness(1.02);
+}
+
+.home-liquid-surface .liquid-pill {
+  border-color: rgba(255, 255, 255, 0.24);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.11)),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 10px 24px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(18px) saturate(165%);
+  -webkit-backdrop-filter: blur(18px) saturate(165%);
+}
+
+.home-liquid-surface .liquid-icon {
+  border-color: rgba(255, 255, 255, 0.22);
+  background:
+    radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.26), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 12px 30px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(18px) saturate(165%);
+  -webkit-backdrop-filter: blur(18px) saturate(165%);
 }

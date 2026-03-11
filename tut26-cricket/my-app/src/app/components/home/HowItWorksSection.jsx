@@ -156,9 +156,6 @@ export default function HowItWorksSection() {
 
         <div className="liquid-glass rounded-[32px] p-7 md:p-10">
           <div className="mx-auto max-w-3xl text-center">
-            <span className="liquid-pill inline-flex rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-cyan-50">
-              How this app works
-            </span>
             <h2 className="mt-5 text-4xl font-semibold tracking-[-0.04em] text-white md:text-5xl">
               Built for fast, simple scoring
             </h2>

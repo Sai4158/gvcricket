@@ -35,6 +35,10 @@ const requiredNameSchema = buildStringSchema({ min: 1, max: 80 });
 const playerNameSchema = buildStringSchema({ min: 1, max: 48 });
 const playerArraySchema = z.array(playerNameSchema).min(1).max(15);
 const oversSchema = z.number().int().min(1).max(50);
+const draftTokenSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-f0-9]{32,96}$/i, "draftToken is invalid.");
 const pinSchema = z
   .string()
   .trim()
@@ -76,6 +80,13 @@ export const setupMatchSchema = z
     teamAPlayers: playerArraySchema,
     teamBPlayers: playerArraySchema,
     overs: z.coerce.number().int().min(1).max(50),
+    draftToken: draftTokenSchema.optional(),
+  })
+  .strict();
+
+export const sessionDraftDeleteSchema = z
+  .object({
+    draftToken: draftTokenSchema,
   })
   .strict();
 
@@ -279,6 +290,10 @@ export function validateSessionPatchPayload(body) {
   return validateWithSchema(sessionPatchSchema, body);
 }
 
+export function validateSessionDraftDeletePayload(body) {
+  return validateWithSchema(sessionDraftDeleteSchema, body);
+}
+
 export function validateMatchPatchPayload(body) {
   return validateWithSchema(matchPatchSchema, body);
 }
@@ -307,4 +322,4 @@ export function validateWalkieSignalPayload(body) {
   return validateWithSchema(walkieSignalSchema, body);
 }
 
-export { inningsSchema, oversSchema, pinSchema };
+export { draftTokenSchema, inningsSchema, oversSchema, pinSchema };

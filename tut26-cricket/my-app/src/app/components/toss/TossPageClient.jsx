@@ -10,6 +10,7 @@ import { getTeamBundle } from "../../lib/team-utils";
 import StepFlow from "../shared/StepFlow";
 
 const PENDING_SESSION_IMAGE_KEY = "gv-pending-session-image";
+const getDraftTokenKey = (sessionId) => `session_${sessionId}_draftToken`;
 
 function createActionId(prefix) {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -118,6 +119,10 @@ export default function TossPageClient({
             overs: Number(matchDetails.overs || 6),
             tossWinner: tossResult.winnerName,
             tossDecision: decision,
+            draftToken:
+              typeof window !== "undefined"
+                ? window.sessionStorage.getItem(getDraftTokenKey(sessionId)) || ""
+                : "",
           };
 
       const res = await fetch(requestUrl, {
@@ -138,6 +143,7 @@ export default function TossPageClient({
         window.sessionStorage.removeItem(`session_${sessionId}_teamA_v2`);
         window.sessionStorage.removeItem(`session_${sessionId}_teamB_v2`);
         window.sessionStorage.removeItem(`session_${sessionId}_overs_v2`);
+        window.sessionStorage.removeItem(getDraftTokenKey(sessionId));
       }
 
       if (typeof window !== "undefined") {

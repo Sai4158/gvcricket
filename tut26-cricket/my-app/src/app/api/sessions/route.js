@@ -7,6 +7,7 @@ import { serializePublicSession } from "../../lib/public-data";
 import { getRequestMeta } from "../../lib/request-meta";
 import { enforceRateLimit } from "../../lib/rate-limit";
 import { parseJsonRequest } from "../../lib/request-security";
+import { createDraftToken, createDraftTokenHash } from "../../lib/session-draft";
 import { sessionCreateSchema } from "../../lib/validators";
 
 export async function POST(req) {
@@ -43,7 +44,12 @@ export async function POST(req) {
     }
 
     await connectDB();
-    const session = await Session.create(parsedRequest.value);
+    const draftToken = createDraftToken();
+    const session = await Session.create({
+      ...parsedRequest.value,
+      isDraft: true,
+      draftTokenHash: createDraftTokenHash(draftToken),
+    });
 
     await writeAuditLog({
       action: "session_create",
@@ -54,12 +60,18 @@ export async function POST(req) {
       userAgent: meta.userAgent,
     });
 
-    return Response.json(serializePublicSession(session), {
+    return Response.json(
+      {
+        ...serializePublicSession(session),
+        draftToken,
+      },
+      {
       status: 201,
       headers: {
         "Cache-Control": "no-store",
       },
-    });
+      }
+    );
   } catch {
     return jsonError("Could not create the session.", 500);
   }

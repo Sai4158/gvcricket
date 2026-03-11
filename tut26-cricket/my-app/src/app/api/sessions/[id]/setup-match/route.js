@@ -6,6 +6,7 @@ import { serializePublicSession } from "../../../../lib/public-data";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../../lib/request-security";
+import { hasValidDraftToken } from "../../../../lib/session-draft";
 import { buildTeamUpdate } from "../../../../lib/team-utils";
 import { setupMatchSchema } from "../../../../lib/validators";
 import Session from "../../../../../models/Session";
@@ -52,25 +53,26 @@ export async function POST(req, { params }) {
       parsedRequest.value;
     const normalizedTeamA = buildTeamUpdate(teamAName, teamAPlayers);
     const normalizedTeamB = buildTeamUpdate(teamBName, teamBPlayers);
-    const updatedSession = await Session.findByIdAndUpdate(
-      sessionId,
-      {
-        $set: {
-          teamA: normalizedTeamA.players,
-          teamB: normalizedTeamB.players,
-          teamAName: normalizedTeamA.name,
-          teamBName: normalizedTeamB.name,
-          overs,
-        },
-      },
-      { new: true }
-    );
-
-    if (!updatedSession) {
+    const existingSession = await Session.findById(sessionId);
+    if (!existingSession) {
       throw new Error("SESSION_NOT_FOUND");
     }
 
-    const response = NextResponse.json(serializePublicSession(updatedSession), {
+    if (
+      existingSession.isDraft &&
+      !hasValidDraftToken(existingSession, parsedRequest.value.draftToken)
+    ) {
+      return jsonError("Draft access denied.", 403);
+    }
+
+    existingSession.teamA = normalizedTeamA.players;
+    existingSession.teamB = normalizedTeamB.players;
+    existingSession.teamAName = normalizedTeamA.name;
+    existingSession.teamBName = normalizedTeamB.name;
+    existingSession.overs = overs;
+    await existingSession.save();
+
+    const response = NextResponse.json(serializePublicSession(existingSession), {
       status: 201,
       headers: {
         "Cache-Control": "no-store",
@@ -80,7 +82,7 @@ export async function POST(req, { params }) {
     await writeAuditLog({
       action: "session_setup_draft",
       targetType: "session",
-      targetId: String(updatedSession._id),
+      targetId: String(existingSession._id),
       status: "success",
       ip: meta.ip,
       userAgent: meta.userAgent,

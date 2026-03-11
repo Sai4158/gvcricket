@@ -17,7 +17,7 @@ export default async function HomePage() {
   return (
     <>
       <HomeHeader />
-      <main className="bg-black text-zinc-200 font-sans">
+      <main className="home-liquid-surface bg-black text-zinc-200 font-sans">
         <HeroSection liveMatch={liveMatch} />
         <div className="relative z-10 bg-[linear-gradient(155deg,theme(colors.red.900)_0%,theme(colors.black)_40%)] py-24 md:py-32 px-5 space-y-24 md:space-y-40">
           <PrimaryActionsSection />
@@ -27,6 +27,12 @@ export default async function HomePage() {
             <p className="text-zinc-400">
               &copy; {new Date().getFullYear()} GV Cricket. All rights reserved.
             </p>
+            <a
+              href="https://gvcricket.com"
+              className="mt-2 inline-block text-zinc-400 transition-colors duration-200 hover:text-zinc-200"
+            >
+              gvcricket.com
+            </a>
           </footer>
         </div>
       </main>
