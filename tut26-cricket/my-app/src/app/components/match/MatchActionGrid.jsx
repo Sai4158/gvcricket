@@ -92,6 +92,7 @@ function ActionIconButton({
   onClick,
   onHoldStart,
   onHoldEnd,
+  onPressFeedback,
   icon,
   label,
   colorClass,
@@ -105,6 +106,7 @@ function ActionIconButton({
   const holdTimerRef = useRef(null);
   const holdStartedRef = useRef(false);
   const suppressClickRef = useRef(false);
+  const feedbackTriggeredRef = useRef(false);
 
   const clearHoldTimer = () => {
     if (holdTimerRef.current) {
@@ -114,10 +116,13 @@ function ActionIconButton({
   };
 
   const beginPress = () => {
+    feedbackTriggeredRef.current = false;
     if (disabled || !onHoldStart) {
       return;
     }
 
+    onPressFeedback?.();
+    feedbackTriggeredRef.current = true;
     clearHoldTimer();
     holdTimerRef.current = window.setTimeout(() => {
       holdStartedRef.current = true;
@@ -140,12 +145,16 @@ function ActionIconButton({
 
   return (
     <motion.button
-      whileTap={{ scale: 0.95 }}
+      whileTap={{ scale: 0.92, y: 2 }}
       onClick={() => {
         if (holdStartedRef.current || suppressClickRef.current) {
           holdStartedRef.current = false;
           return;
         }
+        if (!feedbackTriggeredRef.current) {
+          onPressFeedback?.();
+        }
+        feedbackTriggeredRef.current = false;
         onClick?.();
       }}
       disabled={disabled}
@@ -153,7 +162,7 @@ function ActionIconButton({
       onPointerUp={endPress}
       onPointerLeave={endPress}
       onPointerCancel={endPress}
-      className={`relative flex flex-col items-center justify-center text-zinc-300 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`press-feedback relative flex flex-col items-center justify-center text-zinc-300 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40 ${
         compact ? "w-24 gap-2 p-2" : "w-24 gap-2 p-2"
       }`}
     >
@@ -199,8 +208,10 @@ export default function MatchActionGrid({
   onWalkieHoldEnd,
   onMicHoldStart,
   onMicHoldEnd,
+  onPressFeedback,
   isWalkieActive = false,
   isWalkieTalking = false,
+  isWalkieFinishing = false,
   isCommentaryActive = false,
   isCommentaryTalking = false,
   isAnnounceActive = false,
@@ -216,15 +227,26 @@ export default function MatchActionGrid({
             onClick={onWalkie}
             onHoldStart={onWalkieHoldStart}
             onHoldEnd={onWalkieHoldEnd}
+            onPressFeedback={onPressFeedback}
             icon={<WalkieIcon />}
             label="Walkietalkie"
             colorClass="text-emerald-300"
             active={isWalkieActive}
             talking={isWalkieTalking}
-            badge={isWalkieTalking ? "Live" : isWalkieActive ? "On" : "Off"}
+            badge={
+              isWalkieTalking
+                ? "Live"
+                : isWalkieFinishing
+                ? "Finishing"
+                : isWalkieActive
+                ? "On"
+                : "Off"
+            }
             badgeClass={
               isWalkieTalking
                 ? "border-cyan-400/30 bg-cyan-500/15 text-cyan-100"
+                : isWalkieFinishing
+                ? "border-amber-400/25 bg-amber-500/12 text-amber-100"
                 : isWalkieActive
                 ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
                 : "border-rose-400/20 bg-rose-500/10 text-rose-200"
@@ -234,6 +256,7 @@ export default function MatchActionGrid({
             onClick={onMic}
             onHoldStart={onMicHoldStart}
             onHoldEnd={onMicHoldEnd}
+            onPressFeedback={onPressFeedback}
             icon={<CommentaryIcon />}
             label="Speaker mic"
             colorClass="text-amber-300"
@@ -250,6 +273,7 @@ export default function MatchActionGrid({
           />
           <ActionIconButton
             onClick={onUndo}
+            onPressFeedback={onPressFeedback}
             icon={<LuUndo2 />}
             label="Undo"
             colorClass="text-zinc-400"
@@ -258,6 +282,7 @@ export default function MatchActionGrid({
           />
           <ActionIconButton
             onClick={onCommentary}
+            onPressFeedback={onPressFeedback}
             icon={<AnnounceIcon />}
             label="Score feedback"
             colorClass="text-cyan-300"
@@ -271,6 +296,7 @@ export default function MatchActionGrid({
           />
           <ActionIconButton
             onClick={onEditTeams}
+            onPressFeedback={onPressFeedback}
             icon={<FaUserEdit />}
             label="Edit teams"
             colorClass="text-sky-400"
@@ -279,6 +305,7 @@ export default function MatchActionGrid({
           />
           <ActionIconButton
             onClick={onEditOvers}
+            onPressFeedback={onPressFeedback}
             icon={<FaRegClock />}
             label="Edit overs"
             colorClass="text-amber-400"
@@ -287,6 +314,7 @@ export default function MatchActionGrid({
           />
           <ActionIconButton
             onClick={onHistory}
+            onPressFeedback={onPressFeedback}
             icon={<FaBookOpen />}
             label="History"
             colorClass="text-violet-400"
@@ -294,6 +322,7 @@ export default function MatchActionGrid({
           />
           <ActionIconButton
             onClick={onImage}
+            onPressFeedback={onPressFeedback}
             icon={<FaImage />}
             label="Image"
             colorClass="text-zinc-200"
@@ -301,6 +330,7 @@ export default function MatchActionGrid({
           />
           <ActionIconButton
             onClick={onShare}
+            onPressFeedback={onPressFeedback}
             icon={<FaShareAlt />}
             label="Share"
             colorClass="text-green-400"

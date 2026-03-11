@@ -10,6 +10,11 @@ export default function HomeHeader() {
   const [hidden, setHidden] = useState(false);
   const { scrollY } = useScroll();
   const closeMenu = () => setIsMenuOpen(false);
+  const handleDrawerDragEnd = (_event, info) => {
+    if (info.offset.x > 90 || info.velocity.x > 700) {
+      closeMenu();
+    }
+  };
 
   useEffect(() => {
     return scrollY.on("change", (latest) => {
@@ -36,13 +41,13 @@ export default function HomeHeader() {
   const navLinks = [
     { href: "/session/new", text: "Start Match", icon: FaArrowRight },
     { href: "/session", text: "All Sessions" },
-    { type: "divider" },
     {
       href: "/#product-demo",
       text: "See It In Action",
       onClick: handleDemoClick,
     },
-    { href: "/rules", text: "Scoring Rules" },
+    { type: "divider" },
+    { href: "/rules", text: "GV Community Custom Rule Sheet" },
   ];
 
   const linkStyles =
@@ -78,25 +83,31 @@ export default function HomeHeader() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ ease: "easeInOut", duration: 0.4 }}
+            transition={{ ease: "easeOut", duration: 0.28 }}
             className="pointer-events-auto fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
-            onClick={closeMenu}
-            onPointerUp={closeMenu}
+            onTap={closeMenu}
           >
             <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", stiffness: 350, damping: 35 }}
-              className="pointer-events-auto fixed top-0 right-0 bottom-0 w-4/5 max-w-xs bg-zinc-900/60 backdrop-blur-xl p-6 flex flex-col shadow-2xl border-l border-zinc-700/80"
+              initial={{ x: "100%", opacity: 0.9, scale: 0.98 }}
+              animate={{ x: 0, opacity: 1, scale: 1 }}
+              exit={{ x: "100%", opacity: 0.96, scale: 0.985 }}
+              transition={{ type: "spring", stiffness: 360, damping: 34, mass: 0.9 }}
+              drag="x"
+              dragDirectionLock
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={{ left: 0, right: 0.14 }}
+              onDragEnd={handleDrawerDragEnd}
+              className="pointer-events-auto fixed top-0 right-0 bottom-0 w-4/5 max-w-xs bg-zinc-900/60 backdrop-blur-xl p-6 flex flex-col shadow-2xl border-l border-zinc-700/80 will-change-transform"
               onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => event.stopPropagation()}
+              onTap={(event) => event.stopPropagation()}
             >
               <div className="flex justify-start mb-8">
                 <motion.button
                   type="button"
-                  whileTap={{ scale: 0.9 }}
-                  onClick={closeMenu}
-                  onPointerUp={closeMenu}
+                  whileTap={{ scale: 0.9, rotate: -8 }}
+                  whileHover={{ scale: 1.04 }}
+                  onTap={closeMenu}
                   className="pointer-events-auto p-2"
                   aria-label="Close navigation menu"
                 >

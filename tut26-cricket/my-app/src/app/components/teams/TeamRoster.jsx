@@ -141,8 +141,9 @@ export default function TeamRoster({ color, roster, setRoster }) {
             onClick={removeLastPlayer}
             disabled={roster.players.length <= 1}
             className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-zinc-200 transition-colors hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Remove player"
           >
-            <FaMinus />
+            <span className="text-[1.25rem] font-medium leading-none">−</span>
           </button>
           <span className="w-8 text-center text-3xl font-black text-white">
             {roster.players.length}
@@ -151,8 +152,9 @@ export default function TeamRoster({ color, roster, setRoster }) {
             onClick={addPlayer}
             disabled={roster.players.length >= 15}
             className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-zinc-200 transition-colors hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Add player"
           >
-            <FaPlus />
+            <span className="text-[1.25rem] font-medium leading-none">+</span>
           </button>
         </div>
       </div>

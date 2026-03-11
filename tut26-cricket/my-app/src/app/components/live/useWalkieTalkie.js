@@ -801,9 +801,10 @@ export default function useWalkieTalkie({
     }
   };
 
-  const isSelfTalking = snapshot?.activeSpeakerId === participantId;
+  const holdsSpeakerLock = snapshot?.activeSpeakerId === participantId;
+  const isSelfTalking = holdsSpeakerLock && !isFinishing;
   const isBusy = Boolean(snapshot?.busy);
-  const otherSpeakerBusy = isBusy && !isSelfTalking;
+  const otherSpeakerBusy = isBusy && !holdsSpeakerLock;
   const isLiveOrFinishing = isSelfTalking || isFinishing;
 
   return {
@@ -828,6 +829,7 @@ export default function useWalkieTalkie({
       requestCooldownLeft === 0,
     canTalk:
       Boolean(snapshot?.enabled) &&
+      !isFinishing &&
       !otherSpeakerBusy &&
       (role === "umpire"
         ? Number(snapshot?.spectatorCount || 0) > 0

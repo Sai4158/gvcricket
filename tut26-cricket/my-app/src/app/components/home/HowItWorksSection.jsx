@@ -25,18 +25,6 @@ const cardMotionProps = {
 
 const updateCards = [
   {
-    icon: FaImage,
-    title: "Session cover image",
-    copy: "One uploaded image now carries across live, spectator, result, and stats screens.",
-    accent: "amber",
-  },
-  {
-    icon: FaVolumeUp,
-    title: "Score speech",
-    copy: "Live score announcements now read the ball and total clearly with smarter timing.",
-    accent: "cyan",
-  },
-  {
     icon: FaBroadcastTower,
     title: "Walkietalkie",
     copy: "Live talk between spectator, umpire, and now the director console with shared channel control.",
@@ -53,6 +41,30 @@ const updateCards = [
     title: "Director mode",
     copy: "A new control room page for PA mic, music, effects, and walkie with the umpire.",
     accent: "violet",
+  },
+  {
+    icon: FaVolumeUp,
+    title: "Score speech",
+    copy: "Live score announcements now read the ball and score clearly with smarter timing.",
+    accent: "cyan",
+  },
+  {
+    icon: FaImage,
+    title: "Session cover image",
+    copy: "One uploaded image now carries across live, spectator, result, and stats screens.",
+    accent: "amber",
+  },
+  {
+    icon: FaPenSquare,
+    title: "Live result insights",
+    copy: "Final results now include richer match insights, over summaries, and cleaner stats.",
+    accent: "rose",
+  },
+  {
+    icon: FaCoins,
+    title: "Step-by-step setup",
+    copy: "Session, teams, toss, and start now follow one cleaner 4-step match flow.",
+    accent: "yellow",
   },
 ];
 
@@ -134,11 +146,11 @@ export default function HowItWorksSection() {
               Built for faster live scoring
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-white/78 md:text-lg">
-              Match cover images, score speech, walkie-talkie, speaker mic, and director controls in one scoring flow.
+              Walkie, speaker mic, director controls, score speech, session cover images, and cleaner result insights in one scoring flow.
             </p>
           </div>
 
-          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {updateCards.map((card) => (
               <motion.div
                 key={card.title}

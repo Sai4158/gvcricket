@@ -75,6 +75,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     () => new Array(Number(match?.undoCount || 0)).fill(null),
     [match?.undoCount]
   );
+  const tossPending = !match?.tossWinner || !match?.tossDecision;
 
   const sendAction = async (action) => {
     if (!matchId || !hasAccess || isUpdating) return null;
@@ -152,6 +153,11 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
   const handleScoreEvent = (runs, isOut = false, extraType = null) => {
     if (!match || match.result || !hasAccess) return;
+    if (tossPending) {
+      setError(null);
+      router.replace(`/toss/${matchId}`);
+      return;
+    }
 
     triggerHapticFeedback();
     sendAction({
@@ -165,6 +171,11 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
   const handleUndo = async () => {
     triggerHapticFeedback();
+    if (tossPending) {
+      setError(null);
+      router.replace(`/toss/${matchId}`);
+      return;
+    }
     if (!match?.undoCount) return;
 
     await sendAction({
@@ -175,6 +186,11 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
   const handleNextInningsOrEnd = async () => {
     if (!match || !hasAccess) return;
+    if (tossPending) {
+      setError(null);
+      router.replace(`/toss/${matchId}`);
+      return;
+    }
 
     if (match.result && !match.isOngoing) {
       router.push(`/result/${matchId}`);

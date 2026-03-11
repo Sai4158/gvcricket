@@ -61,6 +61,7 @@ export function serializePublicSession(sessionDocument) {
     isLive: Boolean(session.isLive),
     match: session.match ? String(session.match?._id || session.match) : null,
     tossWinner: session.tossWinner || "",
+    tossDecision: session.tossDecision || "",
     teamAName: teamA.name,
     teamBName: teamB.name,
     teamA: teamA.players,

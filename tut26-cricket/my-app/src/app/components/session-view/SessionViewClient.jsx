@@ -584,8 +584,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const teamB = getTeamBundle(match, "teamB");
   const showWalkieLauncher = Boolean(match?._id && isLiveMatch);
   const speakerMicOn = Boolean(micMonitor.isActive || micMonitor.isPaused);
-  const walkieCardTalking =
-    quickWalkieTalking || walkie.isSelfTalking || walkie.isFinishing;
+  const walkieCardTalking = quickWalkieTalking || walkie.isSelfTalking;
+  const walkieCardFinishing = walkie.isFinishing;
   const speakerCardTalking = quickSpeakerTalking || micMonitor.isActive;
   const speakerSwitchOn = Boolean(speakerMicOn || activePanel === "mic");
   const announceSwitchOn = Boolean(settings.enabled);
@@ -693,7 +693,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                 Walkietalkie
               </span>
               <span className="mt-1 block text-xs text-zinc-400">
-                {walkie.isFinishing
+                {walkieCardFinishing
                   ? "Finishing message."
                   : walkieCardTalking
                   ? "You are speaking."
@@ -729,13 +729,15 @@ export default function SessionViewClient({ sessionId, initialData }) {
                     event.stopPropagation();
                     void handleWalkieLauncherPressEnd();
                   }}
-                  className={`inline-flex h-12 w-12 items-center justify-center rounded-full border transition ${
+                    className={`inline-flex h-12 w-12 items-center justify-center rounded-full border transition ${
                     walkieCardTalking
                       ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_24px_rgba(16,185,129,0.35)]"
+                      : walkieCardFinishing
+                      ? "border-amber-300/40 bg-amber-500/12 text-amber-100 shadow-[0_0_22px_rgba(245,158,11,0.18)]"
                       : "border-white/12 bg-white/[0.05] text-white"
                   }`}
                 >
-                  {walkieCardTalking ? <FaMicrophone /> : <FaMicrophoneSlash />}
+                  {walkieCardTalking ? <FaMicrophone /> : walkieCardFinishing ? <FaMicrophoneSlash /> : <FaMicrophoneSlash />}
                 </button>
               ) : null}
             </span>

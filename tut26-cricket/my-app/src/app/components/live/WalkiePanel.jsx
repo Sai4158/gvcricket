@@ -37,7 +37,6 @@ function roleLabel(role) {
 export function WalkieRequestQueue({
   requests = [],
   onAccept,
-  onDismiss,
 }) {
   if (!requests.length) return null;
 
@@ -59,23 +58,14 @@ export function WalkieRequestQueue({
                 {request.name} wants walkie-talkie.
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => onAccept?.(request.requestId)}
-                className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-black"
-              >
-                Accept
-              </button>
-              <button
-                type="button"
-                onClick={() => onDismiss?.(request.requestId)}
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-zinc-200"
-              >
-                Dismiss
-              </button>
-            </div>
           </div>
+          <button
+            type="button"
+            onClick={() => onAccept?.(request.requestId)}
+            className="mt-4 flex w-full items-center justify-center rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black shadow-[0_14px_34px_rgba(16,185,129,0.24)] transition hover:bg-emerald-400"
+          >
+            Accept
+          </button>
         </div>
       ))}
     </div>

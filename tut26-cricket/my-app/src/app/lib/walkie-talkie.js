@@ -131,6 +131,22 @@ function buildSnapshot(matchId) {
   };
 }
 
+function getSpeakerNotice(role) {
+  if (role === "spectator") {
+    return "Spectator is talking.";
+  }
+
+  if (role === "director") {
+    return "Director is talking.";
+  }
+
+  if (role === "umpire") {
+    return "Umpire is replying.";
+  }
+
+  return "Someone is talking.";
+}
+
 function clearActiveLock(matchId, reason = "ended") {
   const matchState = getMatchState(matchId);
   if (matchState.timeoutId) {
@@ -517,12 +533,7 @@ export function claimWalkieSpeaker(matchId, { role, participantId }) {
           : participant.role === "director"
           ? "director_talking"
           : "umpire_reply",
-      message:
-        participant.role === "spectator"
-          ? `${participant.name} is talking.`
-          : participant.role === "director"
-          ? "Director is talking."
-          : "Umpire is replying.",
+      message: getSpeakerNotice(participant.role),
     },
   });
 

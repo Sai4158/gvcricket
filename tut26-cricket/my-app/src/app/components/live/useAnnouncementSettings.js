@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
+
+const SETTINGS_VERSION = 2;
 
 const DEFAULTS = {
   spectator: {
+    version: SETTINGS_VERSION,
     enabled: false,
     muted: false,
     volume: 0.85,
@@ -11,6 +14,7 @@ const DEFAULTS = {
     accessibilityMode: false,
   },
   umpire: {
+    version: SETTINGS_VERSION,
     enabled: true,
     muted: false,
     volume: 0.75,
@@ -69,17 +73,41 @@ export default function useAnnouncementSettings(role) {
 
   const settings = useMemo(() => {
     try {
-      return rawValue
-        ? {
-            ...DEFAULTS[role],
-            ...JSON.parse(rawValue),
-          }
-        : DEFAULTS[role];
+      if (!rawValue) {
+        return DEFAULTS[role];
+      }
+
+      const parsed = JSON.parse(rawValue);
+      const isLegacyUmpireSetting =
+        role === "umpire" &&
+        (!parsed.version || parsed.version < SETTINGS_VERSION);
+
+      return {
+        ...DEFAULTS[role],
+        ...parsed,
+        ...(isLegacyUmpireSetting ? { enabled: true } : {}),
+        version: SETTINGS_VERSION,
+      };
     } catch (error) {
       console.error("Failed to load announcer settings:", error);
       return DEFAULTS[role];
     }
   }, [rawValue, role]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !rawValue) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(rawValue);
+      if (!parsed.version || parsed.version < SETTINGS_VERSION) {
+        window.localStorage.setItem(getStorageKey(role), JSON.stringify(settings));
+      }
+    } catch {
+      window.localStorage.setItem(getStorageKey(role), JSON.stringify(settings));
+    }
+  }, [rawValue, role, settings]);
 
   const updateSetting = (key, value) => {
     if (typeof window === "undefined") {

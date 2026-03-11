@@ -1,4 +1,5 @@
 "use client";
+import { useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FaCircle } from "react-icons/fa";
 import { CoinHeads, CoinTails, SpinningCoin } from "./CoinArt";
@@ -7,10 +8,10 @@ function ChoiceButton({ onClick, tone, children }) {
   return (
     <button
       onClick={onClick}
-      className={`group flex min-h-[96px] flex-1 items-center justify-center rounded-[24px] border px-5 py-4 text-center transition duration-300 hover:-translate-y-0.5 ${
+      className={`btn-ui press-feedback group flex min-h-[96px] flex-1 items-center justify-center rounded-[24px] px-5 py-4 text-center transition duration-300 hover:-translate-y-0.5 ${
         tone === "heads"
-          ? "border-amber-300/18 bg-[linear-gradient(180deg,rgba(244,181,49,0.92),rgba(216,137,30,0.92))] text-black shadow-[0_14px_30px_rgba(216,137,30,0.16)]"
-          : "border-white/10 bg-[linear-gradient(180deg,rgba(38,38,46,0.98),rgba(18,18,24,0.98))] text-white shadow-[0_14px_30px_rgba(0,0,0,0.22)]"
+          ? "btn-ui-glass-dark"
+          : "btn-ui-glass-dark-alt"
       }`}
     >
       <div className="text-[1.55rem] font-extrabold uppercase tracking-[0.22em] transition-transform group-hover:translate-x-0.5">
@@ -29,10 +30,40 @@ export default function TossStatePanels({
   onChoice,
   onDecision,
 }) {
-  const { winnerName, call, side } = tossResult;
+  const { winnerName, side } = tossResult;
+  const confettiPieces = useMemo(
+    () =>
+      Array.from({ length: 20 }, (_, index) => ({
+        id: index,
+        left: `${(index * 19) % 100}%`,
+        delay: `${(index % 6) * 0.14}s`,
+        duration: `${4.2 + (index % 4) * 0.4}s`,
+        rotate: `${(index % 2 === 0 ? 1 : -1) * (12 + index * 3)}deg`,
+        color: ["#f6b400", "#fde68a", "#ffffff", "#f59e0b"][index % 4],
+      })),
+    []
+  );
 
   return (
-    <div className="min-h-[520px] rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,24,0.96),rgba(8,8,12,0.98))] px-5 py-6 shadow-[0_22px_60px_rgba(0,0,0,0.28)]">
+    <div className="relative min-h-[520px] rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,24,0.96),rgba(8,8,12,0.98))] px-5 py-6 shadow-[0_22px_60px_rgba(0,0,0,0.28)]">
+      {status === "finished" ? (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[260px] overflow-hidden">
+          {confettiPieces.map((piece) => (
+            <span
+              key={piece.id}
+              className="absolute top-[-10%] h-3 w-2 rounded-full opacity-80 animate-[result-confetti_var(--confetti-duration)_linear_forwards]"
+              style={{
+                left: piece.left,
+                backgroundColor: piece.color,
+                animationDelay: piece.delay,
+                ["--confetti-duration"]: piece.duration,
+                transform: `rotate(${piece.rotate})`,
+              }}
+            />
+          ))}
+          <div className="absolute inset-x-0 bottom-0 h-20 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.16))]" />
+        </div>
+      ) : null}
       <AnimatePresence mode="wait">
         {status === "choosing" ? (
           <motion.div
@@ -125,11 +156,8 @@ export default function TossStatePanels({
               <div className="mt-6 flex justify-center">
                 {side === "heads" ? <CoinHeads /> : <CoinTails />}
               </div>
-              <p className="mt-6 text-sm text-zinc-400">
-                {teamName} called {call}.
-              </p>
-              <h2 className="mt-3 text-[2.1rem] font-bold leading-tight tracking-tight text-white">
-                {winnerName} won the toss
+              <h2 className="mt-6 text-balance text-[1.9rem] font-bold uppercase leading-[1.05] tracking-[0.04em] text-white sm:text-[2.2rem]">
+                {winnerName} won
               </h2>
               <p className="mt-2 text-sm text-zinc-400">
                 Landed on <span className="capitalize text-white">{side}</span>.
@@ -141,7 +169,7 @@ export default function TossStatePanels({
                 <button
                   onClick={() => onDecision("bat")}
                   disabled={isSubmitting}
-                  className="btn-ui btn-ui-primary group rounded-[24px] px-4 py-4 text-base font-medium disabled:hover:translate-y-0"
+                  className="btn-ui btn-ui-glass-dark group rounded-[24px] px-4 py-4 text-base font-medium disabled:hover:translate-y-0"
                 >
                   <span className="block transition-transform group-hover:translate-x-0.5">
                     {isSubmitting ? "Saving..." : "Bat First"}
@@ -150,7 +178,7 @@ export default function TossStatePanels({
                 <button
                   onClick={() => onDecision("bowl")}
                   disabled={isSubmitting}
-                  className="btn-ui btn-ui-neutral group rounded-[24px] px-4 py-4 text-base font-medium disabled:hover:translate-y-0"
+                  className="btn-ui btn-ui-glass-dark-alt group rounded-[24px] px-4 py-4 text-base font-medium disabled:hover:translate-y-0"
                 >
                   <span className="block transition-transform group-hover:translate-x-0.5">
                     {isSubmitting ? "Saving..." : "Bowl First"}

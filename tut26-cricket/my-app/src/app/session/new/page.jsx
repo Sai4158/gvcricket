@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FaArrowRight, FaImage, FaPen } from "react-icons/fa";
+import { FaArrowLeft, FaArrowRight, FaImage, FaPen } from "react-icons/fa";
 import ImagePinModal from "../../components/shared/ImagePinModal";
 import StepFlow from "../../components/shared/StepFlow";
 import {
@@ -145,6 +145,17 @@ export default function NewSessionPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.12),transparent_32%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.12),transparent_30%),linear-gradient(180deg,#050505_0%,#0b0b11_52%,#050505_100%)] px-4 py-10 text-zinc-200">
       <div className="mx-auto w-full max-w-md">
+        <div className="mb-5 flex items-center justify-start">
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="btn-ui-icon"
+            aria-label="Go back"
+          >
+            <FaArrowLeft size={18} />
+          </button>
+        </div>
+
         <div className="mb-5 text-center">
           <StepFlow currentStep={1} />
         </div>
@@ -214,7 +225,7 @@ export default function NewSessionPage() {
                       className="hidden"
                     />
                   </div>
-                  <p className="mt-3 pl-1 text-xs font-medium text-zinc-500">Optional</p>
+                  <p className="mt-3 text-center text-xs font-medium text-zinc-500">Optional</p>
                   {previewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -236,20 +247,11 @@ export default function NewSessionPage() {
             <button
               onClick={createSession}
               disabled={saving}
-              className="btn-ui btn-ui-primary mt-8 w-full rounded-2xl px-6 py-4 text-lg font-semibold"
+              className="btn-ui btn-ui-glass-dark mt-8 w-full rounded-[24px] px-6 py-4 text-lg font-semibold"
             >
               {saving ? "Creating..." : "Next: Select Teams"}
               {!saving && <FaArrowRight />}
             </button>
-
-            <div className="mt-6 text-center">
-              <Link
-                href="/"
-                className="text-sm text-zinc-400 transition hover:text-white"
-              >
-                Back to Home
-              </Link>
-            </div>
           </div>
         </div>
       </div>

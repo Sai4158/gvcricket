@@ -167,6 +167,75 @@ body {
   background: linear-gradient(180deg, rgba(34, 197, 94, 0.24), rgba(14, 116, 72, 0.18));
 }
 
+.btn-ui-glass-dark {
+  background:
+    linear-gradient(180deg, rgba(114, 82, 16, 0.58), rgba(33, 24, 10, 0.54)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0)),
+    radial-gradient(circle at 18% 0%, rgba(255, 241, 199, 0.34), transparent 38%),
+    radial-gradient(circle at 82% 100%, rgba(251, 191, 36, 0.18), transparent 46%);
+  border-color: rgba(255, 227, 154, 0.34);
+  color: #fffaf0;
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.18),
+    0 0 28px rgba(251, 191, 36, 0.12),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(140, 92, 22, 0.18);
+  backdrop-filter: blur(20px) saturate(165%);
+  -webkit-backdrop-filter: blur(20px) saturate(165%);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-ui-glass-dark::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.02) 38%, rgba(255, 255, 255, 0) 58%);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.btn-ui-glass-dark > * {
+  position: relative;
+  z-index: 1;
+}
+
+.btn-ui-glass-dark:hover {
+  border-color: rgba(255, 233, 174, 0.46);
+  background:
+    linear-gradient(180deg, rgba(128, 91, 18, 0.64), rgba(40, 28, 10, 0.6)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)),
+    radial-gradient(circle at 18% 0%, rgba(255, 246, 214, 0.42), transparent 38%),
+    radial-gradient(circle at 82% 100%, rgba(251, 191, 36, 0.22), transparent 46%);
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.2),
+    0 0 34px rgba(251, 191, 36, 0.16),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.24),
+    inset 0 -1px 0 rgba(140, 92, 22, 0.2);
+}
+
+.btn-ui-glass-dark-alt {
+  background:
+    linear-gradient(180deg, rgba(28, 30, 42, 0.95), rgba(12, 12, 18, 0.98)),
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.12), transparent 42%);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f4f7fb;
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+
+.btn-ui-glass-dark-alt:hover {
+  border-color: rgba(96, 165, 250, 0.24);
+  background:
+    linear-gradient(180deg, rgba(32, 34, 48, 0.98), rgba(14, 14, 22, 1)),
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.16), transparent 42%);
+}
+
 .btn-ui-neutral {
   background: linear-gradient(180deg, rgba(34, 34, 40, 0.96), rgba(16, 16, 20, 0.96));
   border-color: rgba(255, 255, 255, 0.1);

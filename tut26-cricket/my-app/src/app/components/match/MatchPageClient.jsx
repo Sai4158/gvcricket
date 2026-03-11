@@ -71,6 +71,7 @@ export default function MatchPageClient({
     hasUmpireAccess: authStatus === "granted",
     displayName: "Umpire",
   });
+  const hasPendingWalkieRequests = Boolean(isLiveMatch && walkie.pendingRequests?.length);
 
   useEffect(() => {
     lastLocalActionRef.current = "";
@@ -143,6 +144,15 @@ export default function MatchPageClient({
       userGesture: true,
       ignoreEnabled: true,
     });
+  };
+
+  const handleUmpirePressFeedback = () => {
+    triggerMatchHapticFeedback();
+  };
+
+  const openModalWithFeedback = (type) => {
+    triggerMatchHapticFeedback();
+    setModal({ type });
   };
 
   const handleCopyShareLink = async () => {
@@ -254,11 +264,13 @@ export default function MatchPageClient({
               {error.message || "Match update failed."}
             </div>
           ) : null}
-          <WalkieNotice
-            notice={walkie.notice}
-            onDismiss={walkie.dismissNotice}
-          />
-          {isLiveMatch && walkie.pendingRequests?.length ? (
+          {!hasPendingWalkieRequests ? (
+            <WalkieNotice
+              notice={walkie.notice}
+              onDismiss={walkie.dismissNotice}
+            />
+          ) : null}
+          {hasPendingWalkieRequests ? (
             <WalkieRequestQueue
               requests={walkie.pendingRequests}
               onAccept={walkie.acceptRequest}
@@ -268,9 +280,9 @@ export default function MatchPageClient({
           <BallTracker history={oversHistory} />
           <Controls
             onScore={handleAnnouncedScoreEvent}
-            onOut={() => setModal({ type: "out" })}
-            onNoBall={() => setModal({ type: "noball" })}
-            onWide={() => setModal({ type: "wide" })}
+            onOut={() => openModalWithFeedback("out")}
+            onNoBall={() => openModalWithFeedback("noball")}
+            onWide={() => openModalWithFeedback("wide")}
             setInfoText={setInfoText}
             disabled={controlsDisabled}
           />
@@ -292,8 +304,10 @@ export default function MatchPageClient({
               isLiveMatch ? () => micMonitor.start({ pauseMedia: true }) : undefined
             }
             onMicHoldEnd={() => micMonitor.stop({ resumeMedia: true })}
+            onPressFeedback={handleUmpirePressFeedback}
             isWalkieActive={Boolean(walkie.snapshot?.enabled)}
-            isWalkieTalking={Boolean(walkie.isLiveOrFinishing)}
+            isWalkieTalking={Boolean(walkie.isSelfTalking)}
+            isWalkieFinishing={Boolean(walkie.isFinishing)}
             isCommentaryActive={micMonitor.isActive || micMonitor.isPaused}
             isCommentaryTalking={Boolean(micMonitor.isActive)}
             isAnnounceActive={Boolean(umpireSettings.enabled)}

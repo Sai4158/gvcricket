@@ -71,6 +71,8 @@ export async function loadSessionsIndexData() {
     return {
       ...serializePublicSession({
         ...(typeof session.toObject === "function" ? session.toObject() : session),
+        tossWinner: resolvedMatch?.tossWinner || session.tossWinner || "",
+        tossDecision: resolvedMatch?.tossDecision || session.tossDecision || "",
         match: resolvedMatch?._id || session.match,
       }),
       updatedAt: resolvedMatch?.updatedAt || session.updatedAt,

@@ -9,10 +9,7 @@ const STEPS = [
 
 export default function StepFlow({ currentStep = 1, className = "" }) {
   return (
-    <div className={`space-y-3 ${className}`}>
-      <div className="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-200">
-        Step {currentStep} of 4
-      </div>
+    <div className={className}>
       <div className="flex items-center justify-center gap-2 sm:gap-3">
         {STEPS.map((step, index) => {
           const isDone = step.number < currentStep;

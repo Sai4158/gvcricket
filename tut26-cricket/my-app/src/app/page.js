@@ -2,6 +2,7 @@ import CommunityHighlightsSection from "./components/home/CommunityHighlightsSec
 import HeroSection from "./components/home/HeroSection";
 import HomeHeader from "./components/home/HomeHeader";
 import HowItWorksSection from "./components/home/HowItWorksSection";
+import LearnCricketCard from "./components/home/LearnCricketCard";
 import PrimaryActionsSection from "./components/home/PrimaryActionsSection";
 import { absoluteUrl, siteConfig } from "./lib/site-metadata";
 import { loadHomeLiveBannerData } from "./lib/server-data";
@@ -53,6 +54,7 @@ export default async function HomePage() {
           <PrimaryActionsSection />
           <HowItWorksSection />
           <CommunityHighlightsSection />
+          <LearnCricketCard />
           <footer className="text-center pt-24 pb-12 border-t border-white/10">
             <p className="text-zinc-400">
               &copy; {new Date().getFullYear()} GV Cricket. All rights reserved.

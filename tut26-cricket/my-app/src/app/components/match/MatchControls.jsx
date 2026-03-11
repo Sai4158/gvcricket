@@ -6,10 +6,10 @@ import { FaInfoCircle } from "react-icons/fa";
 function ScoreButton({ onClick, disabled, className, children }) {
   return (
     <motion.button
-      whileTap={{ scale: 0.95 }}
+      whileTap={{ scale: 0.92, y: 2 }}
       onClick={onClick}
       disabled={disabled}
-      className={className}
+      className={`press-feedback ${className}`}
     >
       {children}
     </motion.button>
@@ -27,22 +27,24 @@ function ButtonWithInfo({
   return (
     <div className="relative flex-1 col-span-2">
       <motion.button
-        whileTap={{ scale: 0.95 }}
+        whileTap={{ scale: 0.92, y: 2 }}
         onClick={onClick}
         disabled={disabled}
-        className={className}
+        className={`press-feedback pr-12 ${className}`}
       >
         {children}
       </motion.button>
       <button
+        type="button"
         onPointerDown={(event) => {
           event.stopPropagation();
           setInfoText(info);
         }}
         onPointerUp={() => setTimeout(() => setInfoText(null), 2000)}
-        className="absolute top-1 right-1 w-6 h-6 bg-black/20 rounded-full flex items-center justify-center text-zinc-300 hover:text-white transition-colors"
+        aria-label="Show scoring help"
+        className="press-feedback absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-black/30 text-zinc-100 shadow-[0_6px_16px_rgba(0,0,0,0.25)] transition-colors hover:bg-black/40 hover:text-white"
       >
-        <FaInfoCircle size={12} />
+        <FaInfoCircle size={13} />
       </button>
     </div>
   );
@@ -112,10 +114,10 @@ export function Controls({
 export function ActionButton({ onClick, icon, label, colorClass, disabled }) {
   return (
     <motion.button
-      whileTap={{ scale: 0.95 }}
+      whileTap={{ scale: 0.92, y: 2 }}
       onClick={onClick}
       disabled={disabled}
-      className="flex flex-col items-center justify-center gap-2 p-2 text-zinc-300 hover:text-white transition w-24 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="press-feedback flex flex-col items-center justify-center gap-2 p-2 text-zinc-300 hover:text-white transition w-24 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <div className={`text-4xl ${colorClass}`}>{icon}</div>
       <span className="text-sm font-bold uppercase tracking-wider">{label}</span>

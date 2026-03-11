@@ -143,7 +143,7 @@ export default function TeamSelectionPage() {
               Team Selection
             </h1>
           </div>
-          <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-zinc-400 sm:text-base">
+          <p className="mx-auto mt-4 max-w-xl text-center text-sm leading-6 text-zinc-400 sm:text-base">
             Set team names, squad size, and overs before the toss.
           </p>
         </header>
@@ -163,8 +163,9 @@ export default function TeamSelectionPage() {
               <button
                 onClick={() => overs > 1 && setOvers(overs - 1)}
                 className="btn-ui btn-ui-quiet h-11 w-11 rounded-2xl p-0"
+                aria-label="Decrease overs"
               >
-                <FaMinus />
+                <span className="text-[1.35rem] font-medium leading-none">−</span>
               </button>
               <span className="w-12 text-center text-4xl font-black text-white">
                 {overs}
@@ -172,8 +173,9 @@ export default function TeamSelectionPage() {
               <button
                 onClick={() => overs < 50 && setOvers(overs + 1)}
                 className="btn-ui btn-ui-quiet h-11 w-11 rounded-2xl p-0"
+                aria-label="Increase overs"
               >
-                <FaPlus />
+                <span className="text-[1.35rem] font-medium leading-none">+</span>
               </button>
             </div>
           </div>
@@ -181,7 +183,7 @@ export default function TeamSelectionPage() {
           <button
             onClick={handleSubmit}
             disabled={isLoading}
-            className="btn-ui btn-ui-primary w-full rounded-[28px] py-5 text-xl font-semibold"
+            className="btn-ui btn-ui-glass-dark w-full rounded-[28px] py-5 text-xl font-semibold"
           >
             {isLoading ? "Saving..." : "Proceed to Toss"}
             {!isLoading && <FaArrowRight />}

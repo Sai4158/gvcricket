@@ -19,7 +19,10 @@ const cardMotionProps = {
 
 export default function PrimaryActionsSection() {
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col items-center gap-10 text-center">
+    <section
+      id="quick-start"
+      className="mx-auto flex w-full max-w-4xl scroll-mt-24 flex-col items-center gap-10 text-center"
+    >
       <div className="max-w-2xl space-y-4">
         <div className="mx-auto inline-flex items-center rounded-full border border-amber-300/16 bg-amber-300/8 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.34em] text-amber-100">
           Free cricket scoring

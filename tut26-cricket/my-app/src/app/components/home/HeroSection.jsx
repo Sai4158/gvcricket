@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import Image from "next/image";
 import { motion, useScroll, useSpring, useTransform } from "framer-motion";
+import { FaAngleDown } from "react-icons/fa";
 import LiveNowBanner from "./LiveNowBanner";
 
 export default function HeroSection({ liveMatch = null }) {
@@ -32,6 +33,13 @@ export default function HeroSection({ liveMatch = null }) {
     useTransform(scrollYProgress, [0, 1], [0.22, 0.48]),
     { stiffness: 120, damping: 22, mass: 0.28 }
   );
+
+  const handleScrollToStart = () => {
+    const target = document.getElementById("quick-start");
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
 
   return (
     <section ref={sectionRef} className="relative h-screen overflow-hidden">
@@ -109,7 +117,7 @@ export default function HeroSection({ liveMatch = null }) {
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ type: "spring", stiffness: 100, delay: 0.3 }}
-            className="relative"
+            className="relative mt-2"
           >
             <motion.span
               aria-hidden="true"
@@ -135,6 +143,26 @@ export default function HeroSection({ liveMatch = null }) {
             </motion.span>
           </motion.h1>
         </div>
+        <motion.button
+          type="button"
+          onClick={handleScrollToStart}
+          aria-label="Scroll down to the main actions"
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.55, duration: 0.45, ease: "easeOut" }}
+          className="absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-2 text-white/80 outline-none transition hover:text-white focus-visible:text-white"
+        >
+          <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-white/58">
+            Explore more
+          </span>
+          <motion.span
+            animate={{ y: [0, 5, 0], opacity: [0.8, 1, 0.8] }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/14 bg-white/5 backdrop-blur-md"
+          >
+            <FaAngleDown className="text-lg" />
+          </motion.span>
+        </motion.button>
       </motion.div>
     </section>
   );
