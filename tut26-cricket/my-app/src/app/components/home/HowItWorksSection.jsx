@@ -19,7 +19,7 @@ import AnimatedSection from "./AnimatedSection";
 const cardMotionProps = {
   initial: { opacity: 0, y: 26, scale: 0.985 },
   whileInView: { opacity: 1, y: 0, scale: 1 },
-  viewport: { once: true, amount: 0.18 },
+  viewport: { once: true, amount: 0.1, margin: "0px 0px -8% 0px" },
   transition: { duration: 0.42, ease: "easeOut" },
 };
 
@@ -146,6 +146,11 @@ export default function HowItWorksSection() {
                 className="liquid-glass-soft rounded-[26px] p-5"
               >
                 <motion.span
+                  initial={{ opacity: 0, scale: 0.88, y: 10 }}
+                  whileInView={{ opacity: 1, scale: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.38, ease: "easeOut", delay: 0.08 }}
+                  whileHover={{ y: -2, scale: 1.03 }}
                   whileTap={{ scale: 0.98 }}
                   className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-2xl text-2xl ${getAccentClasses(
                     card.accent
@@ -153,12 +158,24 @@ export default function HowItWorksSection() {
                 >
                   <card.icon />
                 </motion.span>
-                <h3 className="mt-5 text-lg font-semibold text-white">
+                <motion.h3
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.34, ease: "easeOut", delay: 0.12 }}
+                  className="mt-5 text-lg font-semibold text-white"
+                >
                   {card.title}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-white/72">
+                </motion.h3>
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.34, ease: "easeOut", delay: 0.16 }}
+                  className="mt-2 text-sm leading-6 text-white/72"
+                >
                   {card.copy}
-                </p>
+                </motion.p>
               </motion.div>
             ))}
           </div>
@@ -182,6 +199,11 @@ export default function HowItWorksSection() {
                 className="liquid-glass-soft rounded-[26px] p-5"
               >
                 <motion.span
+                  initial={{ opacity: 0, scale: 0.88, y: 10 }}
+                  whileInView={{ opacity: 1, scale: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.38, ease: "easeOut", delay: 0.08 }}
+                  whileHover={{ y: -2, scale: 1.03 }}
                   whileTap={{ scale: 0.98 }}
                   className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-2xl text-2xl ${getAccentClasses(
                     card.accent
@@ -189,10 +211,24 @@ export default function HowItWorksSection() {
                 >
                   <card.icon />
                 </motion.span>
-                <h3 className="mt-5 text-xl font-semibold text-white">
+                <motion.h3
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.34, ease: "easeOut", delay: 0.12 }}
+                  className="mt-5 text-xl font-semibold text-white"
+                >
                   {card.title}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-white/72">{card.copy}</p>
+                </motion.h3>
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.34, ease: "easeOut", delay: 0.16 }}
+                  className="mt-2 text-sm leading-6 text-white/72"
+                >
+                  {card.copy}
+                </motion.p>
               </motion.div>
             ))}
           </div>

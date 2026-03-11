@@ -12,7 +12,7 @@ export default function YouTubeVideoPlayer({ videoId, title }) {
     <motion.figure
       initial={{ opacity: 0, y: 28, scale: 0.985 }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
-      viewport={{ once: true, amount: 0.18 }}
+      viewport={{ once: true, amount: 0.1, margin: "0px 0px -8% 0px" }}
       transition={{ duration: 0.42, ease: "easeOut" }}
       className="liquid-glass group relative overflow-hidden rounded-[30px] p-2.5 transition-all duration-300 hover:border-white/28 hover:shadow-[0_18px_48px_rgba(0,0,0,0.32)]"
     >
@@ -45,18 +45,31 @@ export default function YouTubeVideoPlayer({ videoId, title }) {
             />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(0,0,0,0.4))]" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="liquid-pill flex h-[72px] w-[72px] items-center justify-center rounded-full border border-white/24 bg-white/14 text-white shadow-[0_10px_26px_rgba(0,0,0,0.22)] transition group-hover:scale-105">
+              <motion.span
+                initial={{ opacity: 0, scale: 0.86 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.35, ease: "easeOut", delay: 0.12 }}
+                whileHover={{ scale: 1.06 }}
+                className="liquid-pill flex h-[72px] w-[72px] items-center justify-center rounded-full border border-white/24 bg-white/14 text-white shadow-[0_10px_26px_rgba(0,0,0,0.22)] transition group-hover:scale-105"
+              >
                 <FaPlay className="ml-1 h-5 w-5" />
-              </span>
+              </motion.span>
             </div>
           </button>
         )}
         </div>
       </div>
-      <figcaption className="relative mt-2 overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.05] px-4 py-3 text-center text-[15px] font-medium text-white/84 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-colors">
+      <motion.figcaption
+        initial={{ opacity: 0, y: 10 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.2 }}
+        transition={{ duration: 0.34, ease: "easeOut", delay: 0.14 }}
+        className="relative mt-2 overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.05] px-4 py-3 text-center text-[15px] font-medium text-white/84 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-colors"
+      >
         <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.01))]" />
         <span className="relative">{title}</span>
-      </figcaption>
+      </motion.figcaption>
     </motion.figure>
   );
 }

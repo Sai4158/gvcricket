@@ -575,7 +575,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
   if (!sessionId) return <SplashMsg>No Session ID provided.</SplashMsg>;
   if (streamError) return <SplashMsg>Could not load session data.</SplashMsg>;
-  if (!sessionData) return <SplashMsg>Loading Session...</SplashMsg>;
+  if (!sessionData) return <SplashMsg loading>Loading Session...</SplashMsg>;
   if (!match) {
     return <SplashMsg>The match for this session has not started yet.</SplashMsg>;
   }

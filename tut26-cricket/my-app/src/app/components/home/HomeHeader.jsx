@@ -46,7 +46,7 @@ export default function HomeHeader() {
   ];
 
   const linkStyles =
-    "flex w-full items-center justify-between gap-4 rounded-2xl px-3 py-3 text-2xl font-light text-zinc-300 transition-all duration-200 hover:bg-white/6 hover:text-white active:scale-[0.98] active:bg-white/10 active:text-white";
+    "press-feedback flex w-full items-center justify-between gap-4 rounded-2xl px-3 py-3 text-2xl font-light text-zinc-300 transition-all duration-200 hover:bg-white/6 hover:text-white active:bg-white/10 active:text-white";
 
   const handleNavClick = (event, onClick) => {
     closeMenu();
@@ -79,7 +79,7 @@ export default function HomeHeader() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ ease: "easeInOut", duration: 0.4 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
+            className="pointer-events-auto fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
             onClick={closeMenu}
             onPointerUp={closeMenu}
           >
@@ -88,15 +88,16 @@ export default function HomeHeader() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", stiffness: 350, damping: 35 }}
-              className="fixed top-0 right-0 bottom-0 w-4/5 max-w-xs bg-zinc-900/60 backdrop-blur-xl p-6 flex flex-col shadow-2xl border-l border-zinc-700/80"
+              className="pointer-events-auto fixed top-0 right-0 bottom-0 w-4/5 max-w-xs bg-zinc-900/60 backdrop-blur-xl p-6 flex flex-col shadow-2xl border-l border-zinc-700/80"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex justify-start mb-8">
                 <motion.button
+                  type="button"
                   whileTap={{ scale: 0.9 }}
                   onClick={closeMenu}
                   onPointerUp={closeMenu}
-                  className="p-2"
+                  className="pointer-events-auto p-2"
                   aria-label="Close navigation menu"
                 >
                   <FaTimes className="text-white h-8 w-8" />

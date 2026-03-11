@@ -8,6 +8,7 @@ import {
   FaTimes,
   FaUsers,
 } from "react-icons/fa";
+import LiquidLoader from "../shared/LiquidLoader";
 
 export function WalkieNotice({ notice, onDismiss }) {
   if (!notice) return null;
@@ -378,12 +379,26 @@ export default function WalkiePanel({
                   onRequestEnable?.();
                 }}
                 disabled={!canRequestEnable || requestState === "pending"}
-                className="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black shadow-[0_12px_30px_rgba(16,185,129,0.22)] transition disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black shadow-[0_12px_30px_rgba(16,185,129,0.22)] transition disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
               >
-                {requestButtonLabel}
+                {requestState === "pending" ? (
+                  <>
+                    <LiquidLoader size="sm" label="Sending walkie request" className="text-current" />
+                    <span>{requestButtonLabel}</span>
+                  </>
+                ) : (
+                  requestButtonLabel
+                )}
               </button>
               <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-center text-sm text-zinc-400">
-                {helperText}
+                {requestState === "pending" ? (
+                  <div className="flex items-center justify-center gap-2 text-zinc-300">
+                    <LiquidLoader size="sm" label="Waiting for umpire" />
+                    <span>{helperText}</span>
+                  </div>
+                ) : (
+                  helperText
+                )}
               </div>
             </div>
           ) : (
