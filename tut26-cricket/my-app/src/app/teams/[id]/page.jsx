@@ -89,7 +89,7 @@ export default function TeamSelectionPage() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition hover:bg-white/[0.08] hover:text-amber-300"
+              className="btn-ui-icon"
               aria-label="Go back"
             >
               <FaArrowLeft size={18} />
@@ -99,7 +99,7 @@ export default function TeamSelectionPage() {
             </div>
             <button
               onClick={() => setIsInfoModalOpen(true)}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-colors hover:bg-white/[0.08] hover:text-amber-300"
+              className="btn-ui-icon"
               aria-label="Open team setup help"
             >
               <FaInfoCircle size={22} />
@@ -135,7 +135,7 @@ export default function TeamSelectionPage() {
             <div className="flex items-center gap-4">
               <button
                 onClick={() => overs > 1 && setOvers(overs - 1)}
-                className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-zinc-100 transition-colors hover:bg-white/15"
+                className="btn-ui btn-ui-quiet h-11 w-11 rounded-2xl p-0"
               >
                 <FaMinus />
               </button>
@@ -144,7 +144,7 @@ export default function TeamSelectionPage() {
               </span>
               <button
                 onClick={() => overs < 50 && setOvers(overs + 1)}
-                className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-zinc-100 transition-colors hover:bg-white/15"
+                className="btn-ui btn-ui-quiet h-11 w-11 rounded-2xl p-0"
               >
                 <FaPlus />
               </button>
@@ -154,7 +154,7 @@ export default function TeamSelectionPage() {
           <button
             onClick={handleSubmit}
             disabled={isLoading}
-            className="flex w-full items-center justify-center gap-3 rounded-[28px] bg-gradient-to-r from-yellow-400 via-orange-400 to-red-500 py-5 text-xl font-black text-white shadow-[0_20px_40px_rgba(249,115,22,0.24)] transition-all hover:scale-[1.02] hover:brightness-105 active:scale-100 disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn-ui btn-ui-primary w-full rounded-[28px] py-5 text-xl font-semibold"
           >
             {isLoading ? "Saving..." : "Proceed to Toss"}
             {!isLoading && <FaArrowRight />}

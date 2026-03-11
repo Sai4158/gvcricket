@@ -102,7 +102,7 @@ export default function SessionCard({ session, onUmpireClick }) {
             <>
               <button
                 onClick={() => onUmpireClick(session)}
-                className="inline-flex flex-1 min-w-[150px] items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(37,99,235,0.22)] transition hover:bg-blue-500"
+                className="btn-ui btn-ui-neutral inline-flex flex-1 min-w-[150px] rounded-2xl px-4 py-3 text-sm"
               >
                 <FaLock />
                 <span>Umpire Mode</span>
@@ -110,7 +110,7 @@ export default function SessionCard({ session, onUmpireClick }) {
               <Link
                 href={scoreHref}
                 prefetch={false}
-                className="inline-flex flex-1 min-w-[150px] items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#facc15,#f59e0b)] px-4 py-3 text-sm font-semibold text-black shadow-[0_16px_30px_rgba(245,158,11,0.2)] transition hover:brightness-110"
+                className="btn-ui btn-ui-primary inline-flex flex-1 min-w-[150px] rounded-2xl px-4 py-3 text-sm"
               >
                 <FaEye />
                 <span>View Live Score</span>
@@ -120,7 +120,7 @@ export default function SessionCard({ session, onUmpireClick }) {
             <Link
               href={scoreHref}
               prefetch={false}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(5,150,105,0.2)] transition hover:bg-emerald-500"
+              className="btn-ui btn-ui-secondary inline-flex w-full rounded-2xl px-4 py-3 text-sm"
             >
               <FaArrowUpRightFromSquare />
               <span>See Final Score</span>

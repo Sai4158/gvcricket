@@ -7,10 +7,10 @@ function ChoiceButton({ onClick, tone, children }) {
   return (
     <button
       onClick={onClick}
-      className={`group flex-1 rounded-[24px] px-5 py-4 text-left transition duration-300 hover:-translate-y-0.5 ${
+      className={`group flex-1 rounded-[24px] border px-5 py-4 text-left transition duration-300 hover:-translate-y-0.5 ${
         tone === "heads"
-          ? "bg-[linear-gradient(135deg,#fde047,#f59e0b)] text-black shadow-[0_16px_36px_rgba(245,158,11,0.24)]"
-          : "bg-[linear-gradient(135deg,#e5e7eb,#94a3b8)] text-black shadow-[0_16px_36px_rgba(148,163,184,0.18)]"
+          ? "border-amber-300/18 bg-[linear-gradient(180deg,rgba(244,181,49,0.92),rgba(216,137,30,0.92))] text-black shadow-[0_14px_30px_rgba(216,137,30,0.16)]"
+          : "border-white/10 bg-[linear-gradient(180deg,rgba(48,48,56,0.98),rgba(22,22,28,0.98))] text-white shadow-[0_14px_30px_rgba(0,0,0,0.22)]"
       }`}
     >
       <div className="text-2xl font-black transition-transform group-hover:translate-x-0.5">
@@ -141,7 +141,7 @@ export default function TossStatePanels({
                 <button
                   onClick={() => onDecision("bat")}
                   disabled={isSubmitting}
-                  className="group rounded-[24px] border border-amber-200/40 bg-[linear-gradient(135deg,#fde047_0%,#f59e0b_100%)] px-4 py-4 text-base font-black text-black shadow-[0_18px_40px_rgba(245,158,11,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_44px_rgba(245,158,11,0.28)] disabled:opacity-50 disabled:hover:translate-y-0"
+                  className="btn-ui btn-ui-primary group rounded-[24px] px-4 py-4 text-base font-semibold disabled:hover:translate-y-0"
                 >
                   <span className="block transition-transform group-hover:translate-x-0.5">
                     {isSubmitting ? "Saving..." : "Bat First"}
@@ -150,7 +150,7 @@ export default function TossStatePanels({
                 <button
                   onClick={() => onDecision("bowl")}
                   disabled={isSubmitting}
-                  className="group rounded-[24px] border border-sky-200/20 bg-[linear-gradient(135deg,#38bdf8_0%,#2563eb_100%)] px-4 py-4 text-base font-black text-white shadow-[0_18px_40px_rgba(37,99,235,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_44px_rgba(37,99,235,0.3)] disabled:opacity-50 disabled:hover:translate-y-0"
+                  className="btn-ui btn-ui-neutral group rounded-[24px] px-4 py-4 text-base font-semibold disabled:hover:translate-y-0"
                 >
                   <span className="block transition-transform group-hover:translate-x-0.5">
                     {isSubmitting ? "Saving..." : "Bowl First"}
