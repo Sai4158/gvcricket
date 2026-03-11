@@ -1,7 +1,7 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { FaArrowUpRightFromSquare, FaEye, FaLock, FaRadio } from "react-icons/fa6";
 import { formatRelativeTime } from "./formatRelativeTime";
 
@@ -30,7 +30,7 @@ function buildStatusMeta(session) {
   };
 }
 
-export default function SessionCard({ session, onUmpireClick }) {
+function SessionCard({ session, onUmpireClick }) {
   const isLive = session.isLive;
   const statusMeta = buildStatusMeta(session);
   const scoreHref =
@@ -46,14 +46,16 @@ export default function SessionCard({ session, onUmpireClick }) {
   const dateLabel = session.date || new Date(session.createdAt).toLocaleString();
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+    <div
       className={`group relative overflow-hidden rounded-[24px] border p-6 shadow-[0_22px_70px_rgba(0,0,0,0.28)] transition-all hover:-translate-y-1 hover:border-white/18 ${
         isLive
           ? "border-emerald-400/20 bg-[linear-gradient(180deg,rgba(12,18,18,0.98),rgba(8,10,12,0.98))]"
           : "border-white/10 bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))]"
       }`}
+      style={{
+        contentVisibility: "auto",
+        containIntrinsicSize: "320px",
+      }}
     >
       <div
         className={`pointer-events-none absolute inset-x-0 top-0 h-28 opacity-70 blur-3xl ${
@@ -64,12 +66,12 @@ export default function SessionCard({ session, onUmpireClick }) {
       <div className="relative flex h-full flex-col">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="truncate text-2xl font-semibold tracking-[-0.03em] text-white">
+            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-white [overflow-wrap:anywhere]">
               {session.name || "Untitled Session"}
             </h2>
             <p className="mt-2 text-sm text-zinc-400">{dateLabel}</p>
             {teamLine ? (
-              <p className="mt-2 truncate text-lg font-semibold tracking-[-0.02em] text-white">
+              <p className="mt-2 text-lg font-semibold tracking-[-0.02em] text-white [overflow-wrap:anywhere]">
                 {teamLine}
               </p>
             ) : null}
@@ -136,6 +138,8 @@ export default function SessionCard({ session, onUmpireClick }) {
           )}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
+
+export default memo(SessionCard);

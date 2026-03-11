@@ -1,12 +1,40 @@
 "use client";
 
+import { useRef } from "react";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { motion, useScroll, useSpring, useTransform } from "framer-motion";
 import LiveNowBanner from "./LiveNowBanner";
 
 export default function HeroSection({ liveMatch = null }) {
+  const sectionRef = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start start", "end start"],
+  });
+
+  const logoScrollScale = useSpring(
+    useTransform(scrollYProgress, [0, 1], [1, 1.9]),
+    { stiffness: 120, damping: 22, mass: 0.28 }
+  );
+  const logoScrollY = useSpring(
+    useTransform(scrollYProgress, [0, 1], [0, 42]),
+    { stiffness: 120, damping: 22, mass: 0.28 }
+  );
+  const headingScrollScale = useSpring(
+    useTransform(scrollYProgress, [0, 1], [1, 1.42]),
+    { stiffness: 120, damping: 22, mass: 0.28 }
+  );
+  const headingScrollY = useSpring(
+    useTransform(scrollYProgress, [0, 1], [0, 28]),
+    { stiffness: 120, damping: 22, mass: 0.28 }
+  );
+  const headingGlowOpacity = useSpring(
+    useTransform(scrollYProgress, [0, 1], [0.22, 0.48]),
+    { stiffness: 120, damping: 22, mass: 0.28 }
+  );
+
   return (
-    <section className="relative h-screen overflow-hidden">
+    <section ref={sectionRef} className="relative h-screen overflow-hidden">
       <motion.div
         initial={{ opacity: 0.9, scale: 1.04 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -51,49 +79,60 @@ export default function HeroSection({ liveMatch = null }) {
               }}
             />
             <motion.div
-              animate={{
-                scale: [1, 1.035, 1],
-                y: [0, -3, 0],
-                filter: [
-                  "drop-shadow(0 10px 46px rgba(255,100,120,0.72))",
-                  "drop-shadow(0 12px 56px rgba(255,110,130,0.92))",
-                  "drop-shadow(0 10px 46px rgba(255,100,120,0.78))",
-                ],
-              }}
-              transition={{
-                duration: 4.1,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-              className="relative"
+              style={{ scale: logoScrollScale, y: logoScrollY }}
+              className="relative will-change-transform"
             >
-              <Image
-                src="/gvLogo.png"
-                alt="GV Cricket logo"
-                width={500}
-                height={400}
-                priority
-                className="mb-5 h-auto w-[340px] max-w-[88vw] object-contain md:w-[520px]"
-              />
+              <motion.div
+                animate={{
+                  scale: [1, 1.035, 1],
+                  y: [0, -3, 0],
+                }}
+                transition={{
+                  duration: 4.1,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                className="relative"
+              >
+                <Image
+                  src="/gvLogo.png"
+                  alt="GV Cricket logo"
+                  width={500}
+                  height={400}
+                  priority
+                  className="mb-5 h-auto w-[340px] max-w-[88vw] object-contain md:w-[520px]"
+                />
+              </motion.div>
             </motion.div>
           </motion.div>
           <motion.h1
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ type: "spring", stiffness: 100, delay: 0.3 }}
-            className="
-              animate-[animate-gradient_5s_linear_infinite]
-              bg-clip-text text-transparent
-              text-5xl md:text-7xl font-semibold tracking-tight
-              drop-shadow-[0_0_1rem_rgba(249,115,22,0.4)]
-            "
-            style={{
-              backgroundSize: "200% auto",
-              backgroundImage:
-                "linear-gradient(to right, #fde047, #fbcfe8, #fb923c, #fbcfe8, #fde047)",
-            }}
+            className="relative"
           >
-            End-to-end cricket scoring, made simple.
+            <motion.span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-1/2 z-0 h-24 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(249,115,22,0.28)_0%,rgba(251,191,36,0.12)_42%,transparent_72%)] blur-3xl"
+              style={{ opacity: headingGlowOpacity }}
+            />
+            <motion.span
+              style={{
+                scale: headingScrollScale,
+                y: headingScrollY,
+                backgroundSize: "200% auto",
+                backgroundImage:
+                  "linear-gradient(to right, #fde047, #fbcfe8, #fb923c, #fbcfe8, #fde047)",
+              }}
+              className="
+                relative z-10 block
+                animate-[animate-gradient_5s_linear_infinite]
+                bg-clip-text text-transparent
+                text-5xl md:text-7xl font-semibold tracking-tight will-change-transform
+              "
+            >
+              End-to-end cricket scoring, made simple.
+            </motion.span>
           </motion.h1>
         </div>
       </motion.div>

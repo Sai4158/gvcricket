@@ -755,6 +755,8 @@ export default function DirectorConsoleClient({
   const currentTrack = musicTracks[currentTrackIndex];
   const walkieStatus = !walkie.snapshot?.enabled
     ? "Off"
+    : walkie.isFinishing
+    ? "Finishing"
     : walkie.isSelfTalking
     ? "Director Live"
     : walkie.snapshot?.activeSpeakerRole === "umpire"
@@ -933,7 +935,7 @@ export default function DirectorConsoleClient({
             icon={<FaBroadcastTower />}
             help={{
               title: "Walkie with umpire",
-              body: "Request walkie when it is off. Once the umpire accepts, only one person can hold the channel at a time.",
+              body: "Request walkie when it is off. Once it is on, you can talk with the umpire or spectators. Only one person can hold the channel at a time.",
             }}
             action={
               <span
@@ -963,7 +965,7 @@ export default function DirectorConsoleClient({
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-300">
                   {walkie.snapshot?.enabled
-                    ? "Hold to talk back to the umpire."
+                    ? "Hold to talk with the live channel."
                     : walkie.requestState === "pending"
                     ? "Request sent. Waiting for umpire."
                     : walkie.requestState === "dismissed"
@@ -990,8 +992,10 @@ export default function DirectorConsoleClient({
                 {walkie.snapshot?.enabled ? (
                   <WalkieTalkButton
                     active={walkie.isSelfTalking}
+                    finishing={walkie.isFinishing}
                     disabled={!walkie.canTalk}
                     countdown={walkie.countdown}
+                    finishDelayLeft={walkie.finishDelayLeft}
                     onStart={walkie.startTalking}
                     onStop={walkie.stopTalking}
                     label="Hold to talk to umpire"

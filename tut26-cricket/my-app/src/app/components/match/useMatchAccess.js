@@ -36,9 +36,18 @@ export default function useMatchAccess(matchId, initialAuthStatus = "checking") 
 
     if (!shouldCheck) return;
 
-    fetch(`/api/matches/${matchId}/auth`)
+    const controller = new AbortController();
+
+    fetch(`/api/matches/${matchId}/auth`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
       .then((res) => res.json())
       .then((data) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
         if (data.authorized) {
           window.localStorage.setItem(getRememberKey(matchId), "granted");
           setAuthStatus("granted");
@@ -48,17 +57,14 @@ export default function useMatchAccess(matchId, initialAuthStatus = "checking") 
         window.localStorage.removeItem(getRememberKey(matchId));
         setAuthStatus("locked");
       })
-      .catch(() => {
-        if (
-          typeof window !== "undefined" &&
-          window.localStorage.getItem(getRememberKey(matchId)) === "granted"
-        ) {
-          setAuthStatus("granted");
+      .catch((error) => {
+        if (error?.name === "AbortError") {
           return;
         }
-
         setAuthStatus("locked");
       });
+
+    return () => controller.abort();
   }, [initialAuthStatus, matchId]);
 
   const submitPin = async (pin) => {

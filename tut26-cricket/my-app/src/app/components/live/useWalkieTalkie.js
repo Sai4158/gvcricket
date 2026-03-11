@@ -3,6 +3,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { duckPageMedia, playUiTone, restorePageMedia } from "../../lib/page-audio";
 
+const WALKIE_FINISH_DELAY_MS = 2000;
+
+export function shouldReceiveWalkieAudio({ participantId, snapshot }) {
+  if (!snapshot?.enabled) {
+    return false;
+  }
+
+  const activeSpeakerId = snapshot.activeSpeakerId || "";
+  if (!activeSpeakerId || activeSpeakerId === participantId) {
+    return false;
+  }
+
+  return true;
+}
+
 function getParticipantId(matchId, role) {
   if (typeof window === "undefined") {
     return "";
@@ -31,6 +46,8 @@ export default function useWalkieTalkie({
   const [error, setError] = useState("");
   const [claiming, setClaiming] = useState(false);
   const [countdown, setCountdown] = useState(30);
+  const [isFinishing, setIsFinishing] = useState(false);
+  const [finishDelayLeft, setFinishDelayLeft] = useState(0);
   const [requestCooldownLeft, setRequestCooldownLeft] = useState(0);
   const [requestState, setRequestState] = useState("idle");
   const listenerPcRef = useRef(null);
@@ -43,10 +60,24 @@ export default function useWalkieTalkie({
   const pageMediaDuckRef = useRef([]);
   const listenerPendingCandidatesRef = useRef([]);
   const speakerPendingCandidatesRef = useRef(new Map());
+  const finishTimerRef = useRef(null);
+  const finishDeadlineRef = useRef(0);
+  const isFinishingRef = useRef(false);
+  const releaseInFlightRef = useRef(false);
+  const suppressOwnTransmissionEndedRef = useRef(false);
+  const tokenRef = useRef("");
 
   useEffect(() => {
     snapshotRef.current = snapshot;
   }, [snapshot]);
+
+  useEffect(() => {
+    isFinishingRef.current = isFinishing;
+  }, [isFinishing]);
+
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
 
   useEffect(() => {
     if (!matchId || !role) {
@@ -69,7 +100,7 @@ export default function useWalkieTalkie({
     return `/api/live/walkie/${matchId}?${params.toString()}`;
   }, [displayName, enabled, matchId, participantId, role]);
 
-  const closeListener = () => {
+  const closeListener = useCallback(() => {
     if (listenerPcRef.current) {
       listenerPcRef.current.ontrack = null;
       listenerPcRef.current.onicecandidate = null;
@@ -84,7 +115,34 @@ export default function useWalkieTalkie({
 
     restorePageMedia(pageMediaDuckRef);
     listenerPendingCandidatesRef.current = [];
-  };
+  }, []);
+
+  const clearFinishTimer = useCallback(() => {
+    if (finishTimerRef.current) {
+      window.clearTimeout(finishTimerRef.current);
+      finishTimerRef.current = null;
+    }
+    finishDeadlineRef.current = 0;
+    setFinishDelayLeft(0);
+  }, []);
+
+  const playWalkieStartTone = useCallback(() => {
+    playUiTone({
+      frequency: 1040,
+      durationMs: 170,
+      type: "sine",
+      volume: 0.07,
+    });
+  }, []);
+
+  const playWalkieEndTone = useCallback(() => {
+    playUiTone({
+      frequency: 660,
+      durationMs: 170,
+      type: "triangle",
+      volume: 0.065,
+    });
+  }, []);
 
   const ensureRemoteAudio = useCallback(() => {
     if (typeof window === "undefined") {
@@ -137,7 +195,7 @@ export default function useWalkieTalkie({
     };
   }, [primeRemoteAudio]);
 
-  const stopLocalStream = () => {
+  const stopLocalStream = useCallback(() => {
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
 
@@ -147,7 +205,42 @@ export default function useWalkieTalkie({
     });
     speakerPeersRef.current.clear();
     speakerPendingCandidatesRef.current.clear();
-  };
+  }, []);
+
+  const finalizeTransmission = useCallback(
+    ({ playTone = false } = {}) => {
+      clearFinishTimer();
+      releaseInFlightRef.current = false;
+      suppressOwnTransmissionEndedRef.current = false;
+      setIsFinishing(false);
+      if (playTone) {
+        playWalkieEndTone();
+      }
+      restorePageMedia(pageMediaDuckRef);
+      stopLocalStream();
+      closeListener();
+    },
+    [clearFinishTimer, closeListener, playWalkieEndTone, stopLocalStream]
+  );
+
+  useEffect(() => {
+    closeListener();
+    stopLocalStream();
+    clearFinishTimer();
+    previousTransmissionRef.current = "";
+    snapshotRef.current = null;
+    remoteAudioPrimedRef.current = false;
+    setToken("");
+    setSnapshot(null);
+    setNotice("");
+    setError("");
+    setClaiming(false);
+    setCountdown(30);
+    setIsFinishing(false);
+    setFinishDelayLeft(0);
+    setRequestCooldownLeft(0);
+    setRequestState("idle");
+  }, [clearFinishTimer, closeListener, enabled, matchId, role, stopLocalStream]);
 
   const sendJson = useCallback(async (path, body) => {
     const response = await fetch(path, {
@@ -163,18 +256,20 @@ export default function useWalkieTalkie({
   }, []);
 
   const sendSignal = useCallback(async (toId, payload) => {
-    if (!matchId || !participantId || !token) {
+    const activeToken = tokenRef.current;
+
+    if (!matchId || !participantId || !activeToken) {
       return;
     }
 
     await sendJson(`/api/matches/${matchId}/walkie/signal`, {
       participantId,
       role,
-      token,
+      token: activeToken,
       toId,
       payload,
     });
-  }, [matchId, participantId, role, sendJson, token]);
+  }, [matchId, participantId, role, sendJson]);
 
   const respondToRequest = useCallback(
     async (requestId, action) => {
@@ -368,7 +463,17 @@ export default function useWalkieTalkie({
     const handleParticipant = (message) => {
       const payload = parseMessage(message);
       if (payload?.type === "transmission-ended") {
-        playUiTone({ frequency: 620, durationMs: 130, type: "triangle", volume: 0.03 });
+        const ownTransmissionEnded =
+          suppressOwnTransmissionEndedRef.current ||
+          releaseInFlightRef.current ||
+          isFinishingRef.current;
+
+        if (ownTransmissionEnded) {
+          finalizeTransmission({ playTone: false });
+          return;
+        }
+
+        playWalkieEndTone();
         closeListener();
         stopLocalStream();
         return;
@@ -421,7 +526,16 @@ export default function useWalkieTalkie({
       source.removeEventListener("error", handleError);
       source.close();
     };
-  }, [eventSourceUrl, handleIncomingSignal, role]);
+  }, [
+    closeListener,
+    eventSourceUrl,
+    finalizeTransmission,
+    handleIncomingSignal,
+    participantId,
+    playWalkieEndTone,
+    role,
+    stopLocalStream,
+  ]);
 
   useEffect(() => {
     if (snapshot?.enabled) {
@@ -443,11 +557,28 @@ export default function useWalkieTalkie({
         0,
         Math.ceil((new Date(snapshot.expiresAt).getTime() - Date.now()) / 1000)
       );
-      setCountdown(remaining);
-    }, 250);
+      setCountdown((current) => (current === remaining ? current : remaining));
+    }, 500);
 
     return () => window.clearInterval(timer);
   }, [participantId, snapshot?.activeSpeakerId, snapshot?.expiresAt]);
+
+  useEffect(() => {
+    if (!isFinishing || !finishDeadlineRef.current) {
+      setFinishDelayLeft(0);
+      return undefined;
+    }
+
+    const timer = window.setInterval(() => {
+      const remaining = Math.max(
+        0,
+        Math.ceil((finishDeadlineRef.current - Date.now()) / 1000)
+      );
+      setFinishDelayLeft((current) => (current === remaining ? current : remaining));
+    }, 250);
+
+    return () => window.clearInterval(timer);
+  }, [isFinishing]);
 
   useEffect(() => {
     if (requestCooldownLeft <= 0) {
@@ -461,25 +592,23 @@ export default function useWalkieTalkie({
     return () => window.clearTimeout(timer);
   }, [requestCooldownLeft]);
 
+  const activeSpeakerId = snapshot?.activeSpeakerId || "";
+  const activeSpeakerRole = snapshot?.activeSpeakerRole || "";
+  const transmissionId = snapshot?.transmissionId || "";
+  const shouldListen = shouldReceiveWalkieAudio({
+    participantId,
+    snapshot,
+  });
+
   useEffect(() => {
-    const transmissionId = snapshot?.transmissionId || "";
     if (!transmissionId || previousTransmissionRef.current === transmissionId) {
       if (!transmissionId) {
-        closeListener();
-        stopLocalStream();
+        finalizeTransmission({ playTone: false });
       }
       return;
     }
 
     previousTransmissionRef.current = transmissionId;
-
-    const shouldListen =
-      snapshot.activeSpeakerId &&
-      snapshot.activeSpeakerId !== participantId &&
-      ((role === "umpire" &&
-        ["spectator", "director"].includes(snapshot.activeSpeakerRole)) ||
-        ((role === "spectator" || role === "director") &&
-          snapshot.activeSpeakerRole === "umpire"));
 
     if (!shouldListen) {
       closeListener();
@@ -487,7 +616,7 @@ export default function useWalkieTalkie({
     }
 
     duckPageMedia(pageMediaDuckRef, 0.18);
-    playUiTone({ frequency: 920, durationMs: 140, type: "sine", volume: 0.035 });
+    playWalkieStartTone();
 
     const peer = createPeerConnection();
     const remoteStream = new MediaStream();
@@ -509,7 +638,7 @@ export default function useWalkieTalkie({
 
     peer.onicecandidate = (event) => {
       if (event.candidate) {
-        void sendSignal(snapshot.activeSpeakerId, {
+        void sendSignal(activeSpeakerId, {
           type: "ice-candidate",
           candidate: event.candidate.candidate,
           sdpMid: event.candidate.sdpMid || "",
@@ -522,7 +651,7 @@ export default function useWalkieTalkie({
       peer.addTransceiver("audio", { direction: "recvonly" });
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
-      await sendSignal(snapshot.activeSpeakerId, {
+      await sendSignal(activeSpeakerId, {
         type: "offer",
         sdp: offer.sdp || "",
       });
@@ -534,19 +663,26 @@ export default function useWalkieTalkie({
       closeListener();
     };
   }, [
+    closeListener,
     ensureRemoteAudio,
+    finalizeTransmission,
     participantId,
+    playWalkieStartTone,
     role,
     sendSignal,
-    snapshot?.activeSpeakerId,
-    snapshot?.activeSpeakerRole,
-    snapshot?.transmissionId,
+    activeSpeakerId,
+    activeSpeakerRole,
+    transmissionId,
+    shouldListen,
+    stopLocalStream,
   ]);
 
-  useEffect(() => () => {
-    closeListener();
-    stopLocalStream();
-  }, []);
+  useEffect(
+    () => () => {
+      finalizeTransmission({ playTone: false });
+    },
+    [finalizeTransmission]
+  );
 
   const toggleEnabled = async (nextEnabled) => {
     if (!matchId || role !== "umpire" || !hasUmpireAccess) {
@@ -565,6 +701,10 @@ export default function useWalkieTalkie({
       return false;
     }
 
+    clearFinishTimer();
+    setIsFinishing(false);
+    suppressOwnTransmissionEndedRef.current = false;
+
     if (snapshotRef.current?.activeSpeakerId === participantId) {
       return true;
     }
@@ -581,8 +721,8 @@ export default function useWalkieTalkie({
 
       primeRemoteAudio();
       duckPageMedia(pageMediaDuckRef, 0.18);
-      playUiTone({ frequency: 920, durationMs: 140, type: "sine", volume: 0.035 });
       await ensureSpeakerStream();
+      playWalkieStartTone();
       setSnapshot(payload.walkie || null);
       return true;
     } catch (nextError) {
@@ -598,27 +738,36 @@ export default function useWalkieTalkie({
       return;
     }
 
-    if (snapshotRef.current?.activeSpeakerId !== participantId) {
-      restorePageMedia(pageMediaDuckRef);
-      stopLocalStream();
-      closeListener();
+    if (isFinishingRef.current) {
       return;
     }
 
-    try {
-      await sendJson(`/api/matches/${matchId}/walkie/release`, {
-        participantId,
-        role,
-        token,
-      });
-    } catch {
-      // Best effort release; local cleanup still runs.
-    } finally {
-      playUiTone({ frequency: 620, durationMs: 130, type: "triangle", volume: 0.03 });
-      restorePageMedia(pageMediaDuckRef);
-      stopLocalStream();
-      closeListener();
+    if (snapshotRef.current?.activeSpeakerId !== participantId) {
+      finalizeTransmission({ playTone: false });
+      return;
     }
+
+    clearFinishTimer();
+    setIsFinishing(true);
+    finishDeadlineRef.current = Date.now() + WALKIE_FINISH_DELAY_MS;
+    setFinishDelayLeft(Math.ceil(WALKIE_FINISH_DELAY_MS / 1000));
+
+    finishTimerRef.current = window.setTimeout(async () => {
+      releaseInFlightRef.current = true;
+      suppressOwnTransmissionEndedRef.current = true;
+
+      try {
+        await sendJson(`/api/matches/${matchId}/walkie/release`, {
+          participantId,
+          role,
+          token,
+        });
+      } catch {
+        // Best effort release; local cleanup still runs.
+      } finally {
+        finalizeTransmission({ playTone: true });
+      }
+    }, WALKIE_FINISH_DELAY_MS);
   };
 
   const dismissNotice = () => setNotice("");
@@ -655,6 +804,7 @@ export default function useWalkieTalkie({
   const isSelfTalking = snapshot?.activeSpeakerId === participantId;
   const isBusy = Boolean(snapshot?.busy);
   const otherSpeakerBusy = isBusy && !isSelfTalking;
+  const isLiveOrFinishing = isSelfTalking || isFinishing;
 
   return {
     participantId,
@@ -664,6 +814,9 @@ export default function useWalkieTalkie({
     countdown,
     claiming,
     isSelfTalking,
+    isFinishing,
+    isLiveOrFinishing,
+    finishDelayLeft,
     isBusy,
     otherSpeakerBusy,
     canEnable:

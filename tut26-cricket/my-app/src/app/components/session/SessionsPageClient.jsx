@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
@@ -108,15 +108,12 @@ export default function SessionsPageClient({ initialSessions }) {
   const [hasManualPageSize, setHasManualPageSize] = useState(false);
   const router = useRouter();
   const sessions = useMemo(() => initialSessions ?? [], [initialSessions]);
+  const deferredSearchQuery = useDeferredValue(searchInput.trim().toLowerCase());
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setSearchQuery(searchInput.trim().toLowerCase());
-      setPage(1);
-    }, 160);
-
-    return () => window.clearTimeout(timer);
-  }, [searchInput]);
+    setSearchQuery(deferredSearchQuery);
+    setPage(1);
+  }, [deferredSearchQuery]);
 
   useEffect(() => {
     if (hasManualPageSize) {
@@ -133,10 +130,19 @@ export default function SessionsPageClient({ initialSessions }) {
     return () => mediaQuery.removeEventListener("change", syncPageSize);
   }, [hasManualPageSize]);
 
+  const indexedSessions = useMemo(
+    () =>
+      sessions.map((session) => ({
+        ...session,
+        __searchText: buildSearchText(session),
+      })),
+    [sessions]
+  );
+
   const filteredSessions = useMemo(() => {
     const searched = searchQuery
-      ? sessions.filter((session) => buildSearchText(session).includes(searchQuery))
-      : sessions;
+      ? indexedSessions.filter((session) => session.__searchText.includes(searchQuery))
+      : indexedSessions;
 
     const filtered = searched.filter((session) => {
       if (filterBy === "live") return session.isLive;
@@ -145,7 +151,7 @@ export default function SessionsPageClient({ initialSessions }) {
     });
 
     return sortSessions(filtered, sortBy);
-  }, [filterBy, searchQuery, sessions, sortBy]);
+  }, [filterBy, indexedSessions, searchQuery, sortBy]);
 
   const pageSize = pageSizeValue === "all" ? filteredSessions.length || 1 : Number(pageSizeValue);
   const totalPages = Math.max(1, Math.ceil(filteredSessions.length / pageSize));
@@ -165,6 +171,11 @@ export default function SessionsPageClient({ initialSessions }) {
   useEffect(() => {
     setPage((current) => Math.min(current, totalPages));
   }, [totalPages]);
+
+  const handleOpenUmpirePin = useCallback((nextSession) => {
+    setPinError("");
+    setSelectedSession(nextSession);
+  }, []);
 
   const handlePinSubmit = async (pin) => {
     if (!selectedSession?.match || !selectedSession.isLive) return;
@@ -325,10 +336,7 @@ export default function SessionsPageClient({ initialSessions }) {
                   <SessionCard
                     key={session._id}
                     session={session}
-                    onUmpireClick={(nextSession) => {
-                      setPinError("");
-                      setSelectedSession(nextSession);
-                    }}
+                    onUmpireClick={handleOpenUmpirePin}
                   />
                 ))}
               </div>

@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "tsx --test tests"
+    "test": "tsx --test tests",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^4.22.0",

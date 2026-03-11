@@ -83,4 +83,8 @@ const MatchSchema = new mongoose.Schema(
   { timestamps: true, strict: true, strictQuery: true }
 );
 
+MatchSchema.index({ sessionId: 1 });
+MatchSchema.index({ isOngoing: 1, createdAt: -1 });
+MatchSchema.index({ updatedAt: -1 });
+
 export default mongoose.models.Match || mongoose.model("Match", MatchSchema);

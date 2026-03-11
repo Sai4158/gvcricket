@@ -104,6 +104,32 @@ export default function useSpeechAnnouncer(settings) {
   const lastSpokenRef = useRef({ key: "", at: 0 });
   const isPrimedRef = useRef(false);
   const pendingSpeakRef = useRef(null);
+  const currentSequenceRef = useRef(null);
+  const pendingSequenceRef = useRef(null);
+  const utteranceRef = useRef(null);
+  const stepTimerRef = useRef(null);
+  const sequenceTokenRef = useRef(0);
+
+  const clearStepTimer = useCallback(() => {
+    if (stepTimerRef.current) {
+      window.clearTimeout(stepTimerRef.current);
+      stepTimerRef.current = null;
+    }
+  }, []);
+
+  const hardStop = useCallback(() => {
+    clearStepTimer();
+    currentSequenceRef.current = null;
+    pendingSequenceRef.current = null;
+    utteranceRef.current = null;
+    sequenceTokenRef.current += 1;
+
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+
+    setStatus((current) => (current === "unsupported" ? current : "ready"));
+  }, [clearStepTimer]);
 
   useEffect(() => {
     if (!canUseSpeechSynthesis()) return undefined;
@@ -137,53 +163,76 @@ export default function useSpeechAnnouncer(settings) {
     };
   }, []);
 
-  const performSpeak = useCallback(
-    (text, options = {}) => {
-      if (
-        !text ||
-        (!settings.enabled && !options.ignoreEnabled) ||
-        settings.muted ||
-        settings.mode === "silent" ||
-        !canUseSpeechSynthesis()
-      ) {
+  const runSequence = useCallback(
+    (sequence, token = sequenceTokenRef.current) => {
+      if (!sequence?.items?.length || !canUseSpeechSynthesis()) {
+        setStatus((current) => (current === "unsupported" ? current : "ready"));
         return false;
       }
 
-      const key = options.key || text;
-      const now = Date.now();
-      const minGap = options.minGapMs ?? 450;
-      if (
-        lastSpokenRef.current.key === key &&
-        now - lastSpokenRef.current.at < minGap
-      ) {
-        return false;
-      }
-
-      lastSpokenRef.current = { key, at: now };
-
-      if (
-        options.interrupt !== false &&
-        (window.speechSynthesis.speaking || window.speechSynthesis.pending)
-      ) {
-        window.speechSynthesis.cancel();
+      currentSequenceRef.current = sequence;
+      const nextItem = sequence.items[sequence.index] || null;
+      if (!nextItem?.text) {
+        const pending = pendingSequenceRef.current;
+        currentSequenceRef.current = null;
+        if (pending) {
+          pendingSequenceRef.current = null;
+          return runSequence({ ...pending, index: 0 }, sequenceTokenRef.current);
+        }
+        setStatus((current) => (current === "unsupported" ? current : "ready"));
+        return true;
       }
 
       try {
         window.speechSynthesis.resume?.();
       } catch {
-        // Ignore resume failures and try to speak anyway.
+        // Ignore resume failures and keep going.
       }
 
-      const utterance = new SpeechSynthesisUtterance(normalizeSpeechText(text));
-      const profile = getSpeechProfile(voice, options);
+      const utterance = new SpeechSynthesisUtterance(normalizeSpeechText(nextItem.text));
+      const profile = getSpeechProfile(voice, nextItem);
       utterance.voice = voice;
       utterance.lang = voice?.lang || "en-US";
       utterance.rate = profile.rate;
       utterance.pitch = profile.pitch;
       utterance.volume = settings.volume;
-      utterance.onstart = () => setStatus("speaking");
-      utterance.onend = () => setStatus("ready");
+      utteranceRef.current = utterance;
+
+      utterance.onstart = () => {
+        if (token !== sequenceTokenRef.current) {
+          return;
+        }
+        setStatus("speaking");
+      };
+
+      utterance.onend = () => {
+        if (token !== sequenceTokenRef.current) {
+          return;
+        }
+
+        utteranceRef.current = null;
+        const pauseAfterMs = nextItem.pauseAfterMs ?? sequence.pauseAfterMs ?? 0;
+        const nextSequence = {
+          ...sequence,
+          index: sequence.index + 1,
+        };
+
+        clearStepTimer();
+        stepTimerRef.current = window.setTimeout(() => {
+          if (token !== sequenceTokenRef.current) {
+            return;
+          }
+          runSequence(nextSequence, token);
+        }, pauseAfterMs);
+      };
+
       utterance.onerror = () => {
+        if (token !== sequenceTokenRef.current) {
+          return;
+        }
+        utteranceRef.current = null;
+        currentSequenceRef.current = null;
+        pendingSequenceRef.current = null;
         setStatus("blocked");
       };
 
@@ -196,12 +245,98 @@ export default function useSpeechAnnouncer(settings) {
 
       return true;
     },
+    [clearStepTimer, settings.volume, voice]
+  );
+
+  const queueSequence = useCallback(
+    (items, options = {}) => {
+      if (
+        !items?.length ||
+        (!settings.enabled && !options.ignoreEnabled) ||
+        settings.muted ||
+        settings.mode === "silent" ||
+        !canUseSpeechSynthesis()
+      ) {
+        return false;
+      }
+
+      const normalizedItems = items
+        .map((item) =>
+          typeof item === "string"
+            ? { text: item, pauseAfterMs: options.pauseAfterMs ?? 0 }
+            : {
+                ...item,
+                text: item?.text || "",
+              }
+        )
+        .filter((item) => item.text);
+
+      if (!normalizedItems.length) {
+        return false;
+      }
+
+      const key = options.key || normalizedItems.map((item) => item.text).join("|");
+      const now = Date.now();
+      const minGap = options.minGapMs ?? 450;
+      if (
+        lastSpokenRef.current.key === key &&
+        now - lastSpokenRef.current.at < minGap
+      ) {
+        return false;
+      }
+
+      lastSpokenRef.current = { key, at: now };
+
+      const request = {
+        key,
+        items: normalizedItems,
+        index: 0,
+        pauseAfterMs: options.pauseAfterMs ?? 0,
+        priority: options.priority ?? 1,
+      };
+
+      if (!isPrimedRef.current && !options.userGesture) {
+        pendingSpeakRef.current = { type: "sequence", items: normalizedItems, options };
+        setStatus("waiting_for_gesture");
+        return false;
+      }
+
+      if (options.userGesture) {
+        isPrimedRef.current = true;
+        setStatus((current) => (current === "unsupported" ? current : "ready"));
+      }
+
+      const hasActiveSpeech =
+        Boolean(currentSequenceRef.current) ||
+        Boolean(utteranceRef.current) ||
+        Boolean(stepTimerRef.current) ||
+        window.speechSynthesis.speaking ||
+        window.speechSynthesis.pending;
+
+      if (!hasActiveSpeech) {
+        clearStepTimer();
+        sequenceTokenRef.current += 1;
+        return runSequence(request, sequenceTokenRef.current);
+      }
+
+      const currentPriority = currentSequenceRef.current?.priority ?? 1;
+      if (options.interrupt === true || request.priority > currentPriority) {
+        clearStepTimer();
+        pendingSequenceRef.current = null;
+        sequenceTokenRef.current += 1;
+        window.speechSynthesis.cancel();
+        return runSequence(request, sequenceTokenRef.current);
+      }
+
+      pendingSequenceRef.current = request;
+      return true;
+    },
     [
+      clearStepTimer,
+      runSequence,
       settings.enabled,
       settings.mode,
       settings.muted,
-      settings.volume,
-      voice,
     ]
   );
 
@@ -221,7 +356,11 @@ export default function useSpeechAnnouncer(settings) {
       if (pendingSpeakRef.current) {
         const nextPending = pendingSpeakRef.current;
         pendingSpeakRef.current = null;
-        performSpeak(nextPending.text, nextPending.options);
+        if (nextPending.type === "sequence") {
+          queueSequence(nextPending.items, nextPending.options);
+        } else {
+          queueSequence([{ text: nextPending.text }], nextPending.options);
+        }
       }
 
       return true;
@@ -229,7 +368,7 @@ export default function useSpeechAnnouncer(settings) {
       setStatus("blocked");
       return false;
     }
-  }, [performSpeak]);
+  }, [queueSequence]);
 
   useEffect(() => {
     if (!canUseSpeechSynthesis()) return undefined;
@@ -281,18 +420,23 @@ export default function useSpeechAnnouncer(settings) {
           // Ignore resume failures and continue with direct user-gesture speech.
         }
         pendingSpeakRef.current = null;
-        return performSpeak(text, options);
+        return queueSequence([{ text }], options);
       }
 
       if (!isPrimedRef.current) {
-        pendingSpeakRef.current = { text, options };
+        pendingSpeakRef.current = { type: "single", text, options };
         setStatus("waiting_for_gesture");
         return false;
       }
 
-      return performSpeak(text, options);
+      return queueSequence([{ text }], options);
     },
-    [performSpeak]
+    [queueSequence]
+  );
+
+  const speakSequence = useCallback(
+    (items, options = {}) => queueSequence(items, options),
+    [queueSequence]
   );
 
   const stop = useCallback(() => {
@@ -301,15 +445,18 @@ export default function useSpeechAnnouncer(settings) {
     }
 
     pendingSpeakRef.current = null;
-    window.speechSynthesis.cancel();
-    setStatus((current) => (current === "unsupported" ? current : "ready"));
-  }, []);
+    hardStop();
+  }, [hardStop]);
+
+  useEffect(() => () => hardStop(), [hardStop]);
 
   return {
     speak,
+    speakSequence,
     prime,
     stop,
     isSupported: status !== "unsupported",
+    isSpeaking: status === "speaking",
     status,
     voiceName: voice?.name || "",
   };

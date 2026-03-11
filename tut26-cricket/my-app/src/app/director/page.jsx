@@ -1,5 +1,19 @@
 import DirectorConsoleClient from "../components/director/DirectorConsoleClient";
+import { absoluteUrl } from "../lib/site-metadata";
 import { loadDirectorConsoleData } from "../lib/server-data";
+
+export const metadata = {
+  title: "Director Console",
+  description:
+    "Private director console for PA mic, match audio, effects, and walkie control.",
+  alternates: {
+    canonical: absoluteUrl("/director"),
+  },
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default async function DirectorPage() {
   const data = await loadDirectorConsoleData();

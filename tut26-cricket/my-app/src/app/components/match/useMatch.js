@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import useEventSource from "../live/useEventSource";
 
@@ -31,6 +31,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
   );
   const [isUpdating, setIsUpdating] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState("");
+  const lastStreamUpdateRef = useRef(initialMatch?.updatedAt || "");
 
   useEffect(() => {
     if (!matchId || !hasAccess) {
@@ -50,6 +51,11 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     event: "match",
     enabled: Boolean(matchId && hasAccess),
     onMessage: (payload) => {
+      if (payload.updatedAt && payload.updatedAt === lastStreamUpdateRef.current) {
+        return;
+      }
+
+      lastStreamUpdateRef.current = payload.updatedAt || "";
       startTransition(() => {
         setMatch(payload.match || null);
         setLastUpdatedAt(payload.updatedAt || "");

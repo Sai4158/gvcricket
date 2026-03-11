@@ -13,8 +13,8 @@ export function WalkieNotice({ notice, onDismiss }) {
   if (!notice) return null;
 
   return (
-    <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-      <span>{notice}</span>
+    <div className="mb-4 flex items-start justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+      <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{notice}</span>
       <button
         type="button"
         onClick={onDismiss}
@@ -107,8 +107,10 @@ function IosSwitch({ checked, onChange, disabled = false, label }) {
 
 export function WalkieTalkButton({
   active,
+  finishing = false,
   disabled,
   countdown,
+  finishDelayLeft = 0,
   onStart,
   onStop,
   label = "Hold to talk",
@@ -192,28 +194,30 @@ export function WalkieTalkButton({
         className={`relative inline-flex h-24 w-24 items-center justify-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
           disabled
             ? "cursor-not-allowed border-white/5 bg-zinc-900 text-zinc-600"
-            : active || holding
+            : active || holding || finishing
             ? "border-emerald-300/40 bg-emerald-500 text-black shadow-[0_18px_44px_rgba(16,185,129,0.3)]"
             : "border-white/10 bg-white/[0.06] text-zinc-100 hover:-translate-y-0.5 hover:bg-white/[0.09]"
         }`}
-        aria-label={active || holding ? "Release walkie talk" : label}
+        aria-label={active || holding || finishing ? "Release walkie talk" : label}
       >
         <span
           className={`absolute inset-[-8px] rounded-full border transition-opacity ${
-            active || holding
+            active || holding || finishing
               ? "animate-pulse border-emerald-300/35 opacity-100"
               : "border-transparent opacity-0"
           }`}
         />
         <span className="text-[1.65rem]">
-          {active || holding ? <FaMicrophone /> : <FaMicrophoneSlash />}
+          {active || holding || finishing ? <FaMicrophone /> : <FaMicrophoneSlash />}
         </span>
       </button>
       <div className="text-center">
         <p className="text-xs font-medium text-zinc-400">
-          {active || holding ? "Live" : "Hold to talk"}
+          {finishing ? "Finishing" : active || holding ? "Live" : "Hold to talk"}
         </p>
-        {active || holding ? (
+        {finishing ? (
+          <p className="mt-1 text-[11px] text-zinc-500">{finishDelayLeft || 2}s</p>
+        ) : active || holding ? (
           <p className="mt-1 text-[11px] text-zinc-500">{countdown}s</p>
         ) : null}
       </div>
@@ -230,7 +234,9 @@ export default function WalkiePanel({
   canRequestEnable,
   canTalk,
   isSelfTalking,
+  isFinishing,
   countdown,
+  finishDelayLeft,
   requestCooldownLeft,
   requestState = "idle",
   pendingRequests = [],
@@ -246,6 +252,8 @@ export default function WalkiePanel({
   const canShowRequestAction = !snapshot?.enabled && !isUmpire;
   const statusText = !snapshot?.enabled
     ? "Walkie-talkie off"
+    : isFinishing
+    ? "Finishing"
     : isSelfTalking
     ? "You are live"
     : snapshot?.activeSpeakerRole === "umpire"
@@ -302,10 +310,10 @@ export default function WalkiePanel({
               <p className="mt-1 text-sm text-zinc-400">{statusText}</p>
               <p className="mt-1 text-xs text-zinc-500">
                 {isUmpire
-                  ? "Communicate with spectators live."
+                  ? "Talk with spectators and director."
                   : role === "director"
-                  ? "Talk directly with the umpire."
-                  : "Talk directly with the umpire."}
+                  ? "Talk with umpire or spectators."
+                  : "Talk with umpire or spectators."}
               </p>
             </div>
           </div>
@@ -354,8 +362,10 @@ export default function WalkiePanel({
           {isUmpire || snapshot?.enabled ? (
             <WalkieTalkButton
               active={isSelfTalking}
+              finishing={isFinishing}
               disabled={!canTalk}
               countdown={countdown}
+              finishDelayLeft={finishDelayLeft}
               onStart={onStartTalking}
               onStop={onStopTalking}
               label={isUmpire ? "Hold to reply" : "Hold to talk"}

@@ -43,5 +43,9 @@ const SessionSchema = new mongoose.Schema(
   { timestamps: true, strict: true, strictQuery: true }
 );
 
+SessionSchema.index({ isDraft: 1, createdAt: -1 });
+SessionSchema.index({ isLive: 1, createdAt: -1 });
+SessionSchema.index({ match: 1 });
+
 export default mongoose.models.Session ||
   mongoose.model("Session", SessionSchema);

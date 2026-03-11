@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FaArrowLeft, FaImage, FaTrashAlt } from "react-icons/fa";
 import useEventSource from "../live/useEventSource";
@@ -28,6 +28,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
   const [removeError, setRemoveError] = useState("");
   const [showConfetti, setShowConfetti] = useState(true);
+  const lastStreamUpdateRef = useRef(initialMatch?.updatedAt || "");
 
   const confettiPieces = useMemo(
     () =>
@@ -53,6 +54,11 @@ export default function ResultPageClient({ matchId, initialMatch }) {
     event: "match",
     enabled: Boolean(matchId) && Boolean(!match || match.isOngoing),
     onMessage: (payload) => {
+      if (payload.updatedAt && payload.updatedAt === lastStreamUpdateRef.current) {
+        return;
+      }
+
+      lastStreamUpdateRef.current = payload.updatedAt || "";
       startTransition(() => {
         setMatch(payload.match || null);
         setStreamError("");

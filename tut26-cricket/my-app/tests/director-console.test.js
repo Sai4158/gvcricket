@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { shouldReceiveWalkieAudio } from "../src/app/components/live/useWalkieTalkie.js";
 import {
   createDirectorAccessToken,
   hasValidDirectorAccess,
@@ -44,6 +45,43 @@ test("director PIN validation trims spaces and rejects invalid characters", () =
     if (previousSecret === undefined) delete process.env.MATCH_ACCESS_SECRET;
     else process.env.MATCH_ACCESS_SECRET = previousSecret;
   }
+});
+
+test("shared walkie audio lets every non-speaker listen to the active speaker", () => {
+  const snapshot = {
+    enabled: true,
+    activeSpeakerId: "spectator:one",
+    activeSpeakerRole: "spectator",
+  };
+
+  assert.equal(
+    shouldReceiveWalkieAudio({
+      participantId: "spectator:one",
+      snapshot,
+    }),
+    false
+  );
+  assert.equal(
+    shouldReceiveWalkieAudio({
+      participantId: "spectator:two",
+      snapshot,
+    }),
+    true
+  );
+  assert.equal(
+    shouldReceiveWalkieAudio({
+      participantId: "director:one",
+      snapshot,
+    }),
+    true
+  );
+  assert.equal(
+    shouldReceiveWalkieAudio({
+      participantId: "umpire:one",
+      snapshot,
+    }),
+    true
+  );
 });
 
 test("director and spectator can request walkie and umpire must accept or dismiss", () => {

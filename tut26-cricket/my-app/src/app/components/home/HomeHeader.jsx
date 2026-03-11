@@ -9,6 +9,7 @@ export default function HomeHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
   const { scrollY } = useScroll();
+  const closeMenu = () => setIsMenuOpen(false);
 
   useEffect(() => {
     return scrollY.on("change", (latest) => {
@@ -21,31 +22,36 @@ export default function HomeHeader() {
     });
   }, [isMenuOpen, scrollY]);
 
-  const handleCommunityClick = (event) => {
-    const element = document.getElementById("community-highlights");
-    setIsMenuOpen(false);
+  const handleDemoClick = (event) => {
+    const element = document.getElementById("product-demo");
+    closeMenu();
 
     if (element) {
       event.preventDefault();
       element.scrollIntoView({ behavior: "smooth", block: "start" });
-      window.history.replaceState(null, "", "/#community-highlights");
+      window.history.replaceState(null, "", "/#product-demo");
     }
   };
 
   const navLinks = [
     { href: "/session/new", text: "Start Match", icon: FaArrowRight },
-    { href: "/session", text: "View Past/Live Sessions" },
+    { href: "/session", text: "All Sessions" },
     { type: "divider" },
     {
-      href: "/#community-highlights",
-      text: "Community Highlights",
-      onClick: handleCommunityClick,
+      href: "/#product-demo",
+      text: "See It In Action",
+      onClick: handleDemoClick,
     },
-    { href: "/rules", text: "Community Rules" },
+    { href: "/rules", text: "Scoring Rules" },
   ];
 
   const linkStyles =
-    "text-2xl font-light text-zinc-300 hover:text-white transition-colors duration-300 flex items-center gap-3";
+    "flex w-full items-center justify-between gap-4 rounded-2xl px-3 py-3 text-2xl font-light text-zinc-300 transition-all duration-200 hover:bg-white/6 hover:text-white active:scale-[0.98] active:bg-white/10 active:text-white";
+
+  const handleNavClick = (event, onClick) => {
+    closeMenu();
+    onClick?.(event);
+  };
 
   return (
     <motion.header
@@ -74,7 +80,8 @@ export default function HomeHeader() {
             exit={{ opacity: 0 }}
             transition={{ ease: "easeInOut", duration: 0.4 }}
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
-            onClick={() => setIsMenuOpen(false)}
+            onClick={closeMenu}
+            onPointerUp={closeMenu}
           >
             <motion.div
               initial={{ x: "100%" }}
@@ -87,7 +94,8 @@ export default function HomeHeader() {
               <div className="flex justify-start mb-8">
                 <motion.button
                   whileTap={{ scale: 0.9 }}
-                  onClick={() => setIsMenuOpen(false)}
+                  onClick={closeMenu}
+                  onPointerUp={closeMenu}
                   className="p-2"
                   aria-label="Close navigation menu"
                 >
@@ -121,14 +129,17 @@ export default function HomeHeader() {
                         {link.href ? (
                           <Link
                             href={link.href}
-                            onClick={link.onClick || (() => setIsMenuOpen(false))}
+                            onClick={(event) => handleNavClick(event, link.onClick)}
                             className={linkStyles}
                           >
                             <span>{link.text}</span>
                             {link.icon && <link.icon className="h-5 w-5" />}
                           </Link>
                         ) : (
-                          <button onClick={link.onClick} className={linkStyles}>
+                          <button
+                            onClick={(event) => handleNavClick(event, link.onClick)}
+                            className={linkStyles}
+                          >
                             <span>{link.text}</span>
                             {link.icon && <link.icon className="h-5 w-5" />}
                           </button>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { FaChevronDown } from "react-icons/fa";
 
 export default function DarkSelect({
@@ -11,8 +12,9 @@ export default function DarkSelect({
   placeholder = "Select",
 }) {
   const [open, setOpen] = useState(false);
-  const [openUpward, setOpenUpward] = useState(false);
+  const [menuStyle, setMenuStyle] = useState(null);
   const rootRef = useRef(null);
+  const positionFrameRef = useRef(0);
 
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -28,17 +30,90 @@ export default function DarkSelect({
   const selectedOption =
     options.find((option) => option.value === value) || options[0] || null;
 
-  const toggleOpen = () => {
-    if (!open && rootRef.current && typeof window !== "undefined") {
-      const rect = rootRef.current.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      const estimatedMenuHeight = Math.min(options.length * 54 + 16, 280);
-      const spaceBelow = viewportHeight - rect.bottom;
-      const spaceAbove = rect.top;
-
-      setOpenUpward(spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow);
+  const updateMenuPosition = useCallback(() => {
+    if (!rootRef.current || typeof window === "undefined") {
+      return;
     }
 
+    const rect = rootRef.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const estimatedMenuHeight = Math.min(options.length * 54 + 16, 280);
+    const spaceBelow = Math.max(0, viewportHeight - rect.bottom - 12);
+    const spaceAbove = Math.max(0, rect.top - 12);
+    const shouldOpenUpward =
+      spaceBelow < Math.min(estimatedMenuHeight, 220) && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(
+      140,
+      Math.min(280, shouldOpenUpward ? spaceAbove : spaceBelow, viewportHeight - 24)
+    );
+    const width = Math.min(rect.width, viewportWidth - 16);
+    const left = Math.min(Math.max(8, rect.left), viewportWidth - width - 8);
+
+    setMenuStyle({
+      left,
+      top: shouldOpenUpward
+        ? Math.max(8, rect.top - maxHeight - 8)
+        : Math.min(viewportHeight - maxHeight - 8, rect.bottom + 8),
+      width,
+      maxHeight,
+    });
+  }, [options.length]);
+
+  const scheduleMenuPosition = useCallback(() => {
+    if (positionFrameRef.current || typeof window === "undefined") {
+      return;
+    }
+
+    positionFrameRef.current = window.requestAnimationFrame(() => {
+      positionFrameRef.current = 0;
+      updateMenuPosition();
+    });
+  }, [updateMenuPosition]);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    scheduleMenuPosition();
+
+    const handleWindowChange = () => {
+      scheduleMenuPosition();
+    };
+
+    window.addEventListener("resize", handleWindowChange);
+    window.addEventListener("scroll", handleWindowChange, {
+      capture: true,
+      passive: true,
+    });
+
+    return () => {
+      if (positionFrameRef.current) {
+        window.cancelAnimationFrame(positionFrameRef.current);
+        positionFrameRef.current = 0;
+      }
+      window.removeEventListener("resize", handleWindowChange);
+      window.removeEventListener("scroll", handleWindowChange, true);
+    };
+  }, [open, scheduleMenuPosition]);
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [open]);
+
+  const toggleOpen = () => {
     setOpen((current) => !current);
   };
 
@@ -59,41 +134,49 @@ export default function DarkSelect({
           }`}
         />
       </button>
-
-      {open ? (
-        <div
-          role="listbox"
-          className={`absolute left-0 right-0 z-30 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/98 p-2 shadow-[0_22px_70px_rgba(0,0,0,0.48)] backdrop-blur-xl ${
-            openUpward ? "bottom-[calc(100%+8px)]" : "top-[calc(100%+8px)]"
-          }`}
-        >
-          <div className="max-h-[280px] overflow-y-auto">
-            {options.map((option) => {
-            const selected = option.value === value;
-
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={selected}
-                onClick={() => {
-                  onChange?.(option.value);
-                  setOpen(false);
-                }}
-                className={`block w-full rounded-xl px-3 py-3 text-left text-sm transition ${
-                  selected
-                    ? "bg-emerald-500/14 text-emerald-200"
-                    : "text-zinc-200 hover:bg-white/[0.05]"
-                }`}
+      {typeof document !== "undefined" && open && menuStyle
+        ? createPortal(
+            <div
+              role="listbox"
+              className="fixed z-[80] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/98 p-2 shadow-[0_22px_70px_rgba(0,0,0,0.48)] backdrop-blur-xl"
+              style={{
+                left: menuStyle.left,
+                top: menuStyle.top,
+                width: menuStyle.width,
+              }}
+            >
+              <div
+                className="overflow-y-auto overscroll-contain"
+                style={{ maxHeight: menuStyle.maxHeight }}
               >
-                <span className="block truncate">{option.label}</span>
-              </button>
-            );
-            })}
-          </div>
-        </div>
-      ) : null}
+                {options.map((option) => {
+                  const selected = option.value === value;
+
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      onClick={() => {
+                        onChange?.(option.value);
+                        setOpen(false);
+                      }}
+                      className={`block w-full rounded-xl px-3 py-3 text-left text-sm transition ${
+                        selected
+                          ? "bg-emerald-500/14 text-emerald-200"
+                          : "text-zinc-200 hover:bg-white/[0.05]"
+                      }`}
+                    >
+                      <span className="block truncate">{option.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }

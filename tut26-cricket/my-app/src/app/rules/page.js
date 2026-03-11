@@ -1,13 +1,21 @@
-"use client";
-
 import Link from "next/link";
 import { FaArrowLeft } from "react-icons/fa";
+import { absoluteUrl } from "../lib/site-metadata";
 import { RuleItem, RulesSection } from "../components/rules/RulesSection";
 import {
   appGuideIcon,
   appGuideSections,
   ruleSections,
 } from "../components/rules/rule-sections";
+
+export const metadata = {
+  title: "Cricket Scoring Rules and App Guide",
+  description:
+    "Read the cricket scoring rules, app guide, and match flow used inside GV Cricket.",
+  alternates: {
+    canonical: absoluteUrl("/rules"),
+  },
+};
 
 export default function RulesPage() {
   const AppGuideIcon = appGuideIcon;

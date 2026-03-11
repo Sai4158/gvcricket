@@ -44,11 +44,11 @@ function SessionCard({ item, onSelect }) {
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="truncate text-lg font-semibold text-white">
+          <p className="text-lg font-semibold text-white [overflow-wrap:anywhere]">
             {primaryTitle}
           </p>
           {secondaryLabel ? (
-            <p className="mt-1 text-sm text-zinc-400">{secondaryLabel}</p>
+            <p className="mt-1 text-sm text-zinc-400 [overflow-wrap:anywhere]">{secondaryLabel}</p>
           ) : null}
         </div>
         <span

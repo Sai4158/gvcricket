@@ -1,7 +1,7 @@
 {
   "name": "GV Cricket",
   "short_name": "GVCricket",
-  "description": "Track your games ball by ball with an easy to use live scoring app.",
+  "description": "Free cricket scoring app with live score updates, umpire mode, spectator view, walkie-talkie, and final stats.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",

@@ -80,6 +80,31 @@ function isImportantEvent(ball) {
   );
 }
 
+export function getSpectatorAnnouncementPriority(event) {
+  if (!event) return 0;
+  if (
+    event.type === "undo" ||
+    event.type === "match_end" ||
+    event.type === "target_chased"
+  ) {
+    return 3;
+  }
+
+  if (event.overCompleted || event.ball?.isOut) {
+    return 3;
+  }
+
+  if (
+    isBoundary(event.ball) ||
+    event.ball?.extraType === "wide" ||
+    event.ball?.extraType === "noball"
+  ) {
+    return 2;
+  }
+
+  return 1;
+}
+
 function buildRunsCall(runs) {
   return `${pluralizeRuns(runs)}.`;
 }

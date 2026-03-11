@@ -6,9 +6,16 @@ export default function useLiveRelativeTime(timestamp) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 5000);
+    if (!timestamp) {
+      const timer = setInterval(() => setNow(Date.now()), 15000);
+      return () => clearInterval(timer);
+    }
+
+    const diff = Math.max(0, Date.now() - new Date(timestamp).getTime());
+    const intervalMs = diff < 60000 ? 5000 : 15000;
+    const timer = setInterval(() => setNow(Date.now()), intervalMs);
     return () => clearInterval(timer);
-  }, []);
+  }, [timestamp]);
 
   return useMemo(() => {
     if (!timestamp) return "Waiting for update";

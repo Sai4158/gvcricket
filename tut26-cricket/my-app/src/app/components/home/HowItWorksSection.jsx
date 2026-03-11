@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import {
   FaBroadcastTower,
   FaBullhorn,
@@ -14,6 +15,13 @@ import {
   FaVolumeUp,
 } from "react-icons/fa";
 import AnimatedSection from "./AnimatedSection";
+
+const cardMotionProps = {
+  initial: { opacity: 0, y: 26, scale: 0.985 },
+  whileInView: { opacity: 1, y: 0, scale: 1 },
+  viewport: { once: true, amount: 0.18 },
+  transition: { duration: 0.42, ease: "easeOut" },
+};
 
 const updateCards = [
   {
@@ -117,72 +125,75 @@ export default function HowItWorksSection() {
       className="mx-auto w-full max-w-6xl scroll-mt-28 overflow-hidden"
     >
       <div className="space-y-8">
-        <div className="liquid-glass rounded-[32px] p-7 md:p-10">
+        <div className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(18,18,24,0.72),rgba(10,10,16,0.58))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.28)] md:p-10">
           <div className="mx-auto max-w-3xl text-center">
             <span className="liquid-pill inline-flex rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-amber-50">
-              Latest update
+              Latest features
             </span>
             <h2 className="mt-5 text-4xl font-semibold tracking-[-0.04em] text-white md:text-5xl">
-              New live audio and session tools
+              Built for faster live scoring
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-white/78 md:text-lg">
-              Cleaner scoring. Better voice. Stronger session identity.
+              Match cover images, score speech, walkie-talkie, speaker mic, and director controls in one scoring flow.
             </p>
           </div>
 
           <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             {updateCards.map((card) => (
-              <div
+              <motion.div
                 key={card.title}
+                {...cardMotionProps}
                 className="liquid-glass-soft rounded-[26px] p-5"
               >
-                <span
+                <motion.span
+                  whileTap={{ scale: 0.98 }}
                   className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-2xl text-2xl ${getAccentClasses(
                     card.accent
                   )}`}
                 >
                   <card.icon />
-                </span>
+                </motion.span>
                 <h3 className="mt-5 text-lg font-semibold text-white">
                   {card.title}
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-white/72">
                   {card.copy}
                 </p>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
 
-        <div className="liquid-glass rounded-[32px] p-7 md:p-10">
+        <div className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(18,18,24,0.72),rgba(10,10,16,0.58))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.28)] md:p-10">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="mt-5 text-4xl font-semibold tracking-[-0.04em] text-white md:text-5xl">
-              Built for fast, simple scoring
+              From toss to final result
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-white/78 md:text-lg">
-              Say goodbye to memorizing. GV Cricket keeps match control, live scoring,
-              spectator updates, toss, and results in one smooth flow.
+              GV Cricket keeps setup, live scoring, spectator updates, announcer calls, and final stats in one simple cricket scoring app.
             </p>
           </div>
 
           <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {coreCards.map((card) => (
-              <div
+              <motion.div
                 key={card.title}
+                {...cardMotionProps}
                 className="liquid-glass-soft rounded-[26px] p-5"
               >
-                <span
+                <motion.span
+                  whileTap={{ scale: 0.98 }}
                   className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-2xl text-2xl ${getAccentClasses(
                     card.accent
                   )}`}
                 >
                   <card.icon />
-                </span>
+                </motion.span>
                 <h3 className="mt-5 text-xl font-semibold text-white">
                   {card.title}
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-white/72">{card.copy}</p>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>

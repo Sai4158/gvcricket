@@ -293,7 +293,7 @@ export default function MatchPageClient({
             }
             onMicHoldEnd={() => micMonitor.stop({ resumeMedia: true })}
             isWalkieActive={Boolean(walkie.snapshot?.enabled)}
-            isWalkieTalking={Boolean(walkie.isSelfTalking)}
+            isWalkieTalking={Boolean(walkie.isLiveOrFinishing)}
             isCommentaryActive={micMonitor.isActive || micMonitor.isPaused}
             isCommentaryTalking={Boolean(micMonitor.isActive)}
             isAnnounceActive={Boolean(umpireSettings.enabled)}
@@ -357,7 +357,9 @@ export default function MatchPageClient({
                 canRequestEnable: false,
                 canTalk: walkie.canTalk,
                 isSelfTalking: walkie.isSelfTalking,
+                isFinishing: walkie.isFinishing,
                 countdown: walkie.countdown,
+                finishDelayLeft: walkie.finishDelayLeft,
                 requestCooldownLeft: 0,
                 requestState: "idle",
                 pendingRequests: walkie.pendingRequests,
