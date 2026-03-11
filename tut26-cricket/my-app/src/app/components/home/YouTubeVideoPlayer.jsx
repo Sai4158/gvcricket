@@ -8,8 +8,11 @@ export default function YouTubeVideoPlayer({ videoId, title }) {
   const thumbnailUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
 
   return (
-    <figure className="overflow-hidden rounded-3xl bg-zinc-900 shadow-lg shadow-black/40 ring-1 ring-white/10 transition-all duration-300 hover:ring-yellow-400/40">
-      <div className="aspect-video">
+    <figure className="liquid-glass group relative overflow-hidden rounded-[30px] p-2.5 transition-all duration-300 hover:border-white/28 hover:shadow-[0_18px_48px_rgba(0,0,0,0.32)]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.16),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,210,130,0.12),transparent_30%)] opacity-90" />
+      <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-black/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),transparent)]" />
+        <div className="aspect-video">
         {isPlaying ? (
           <iframe
             src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`}
@@ -23,7 +26,7 @@ export default function YouTubeVideoPlayer({ videoId, title }) {
           <button
             type="button"
             onClick={() => setIsPlaying(true)}
-            className="group relative h-full w-full overflow-hidden bg-black text-left"
+            className="relative h-full w-full overflow-hidden bg-black/20 text-left"
             aria-label={`Play ${title}`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -31,19 +34,21 @@ export default function YouTubeVideoPlayer({ videoId, title }) {
               src={thumbnailUrl}
               alt={title}
               loading="lazy"
-              className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+              className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.035]"
             />
-            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.18),rgba(0,0,0,0.5))]" />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(0,0,0,0.4))]" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white shadow-[0_16px_40px_rgba(0,0,0,0.4)] backdrop-blur-md transition group-hover:scale-105 group-hover:bg-black/65">
+              <span className="liquid-pill flex h-[72px] w-[72px] items-center justify-center rounded-full border border-white/24 bg-white/14 text-white shadow-[0_10px_26px_rgba(0,0,0,0.22)] transition group-hover:scale-105">
                 <FaPlay className="ml-1 h-5 w-5" />
               </span>
             </div>
           </button>
         )}
+        </div>
       </div>
-      <figcaption className="p-4 text-center font-medium text-zinc-300 transition-colors">
-        {title}
+      <figcaption className="relative mt-2 overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.05] px-4 py-3 text-center text-[15px] font-medium text-white/84 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-colors">
+        <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.01))]" />
+        <span className="relative">{title}</span>
       </figcaption>
     </figure>
   );

@@ -108,21 +108,83 @@ export async function loadTossPageData(matchId) {
     .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
     .lean();
 
-  if (!match) {
-    return { authStatus: "locked", match: null };
+  if (match) {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
+    const authorized = hasValidMatchAccess(
+      matchId,
+      token,
+      Number(match.adminAccessVersion || 1)
+    );
+
+    return {
+      authStatus: authorized ? "granted" : "locked",
+      match: serializePublicMatch(match),
+      sessionId: String(match.sessionId || ""),
+      hasCreatedMatch: true,
+      actualMatchId: String(match._id),
+    };
   }
 
-  const cookieStore = await cookies();
-  const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
-  const authorized = hasValidMatchAccess(
-    matchId,
-    token,
-    Number(match.adminAccessVersion || 1)
-  );
+  const session = await Session.findById(matchId)
+    .select("_id name teamA teamB teamAName teamBName overs match isLive tossWinner matchImageUrl matchImagePublicId matchImageUploadedAt matchImageUploadedBy updatedAt createdAt")
+    .lean();
+
+  if (!session) {
+    return { authStatus: "locked", match: null, sessionId: "", hasCreatedMatch: false, actualMatchId: "" };
+  }
+
+  if (session.match) {
+    const linkedMatch = await Match.findById(session.match)
+      .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
+      .lean();
+
+    if (linkedMatch) {
+      const cookieStore = await cookies();
+      const token = cookieStore.get(getMatchAccessCookieName(String(linkedMatch._id)))?.value;
+      const authorized = hasValidMatchAccess(
+        String(linkedMatch._id),
+        token,
+        Number(linkedMatch.adminAccessVersion || 1)
+      );
+
+      return {
+        authStatus: authorized ? "granted" : "locked",
+        match: serializePublicMatch(linkedMatch),
+        sessionId: String(session._id),
+        hasCreatedMatch: true,
+        actualMatchId: String(linkedMatch._id),
+      };
+    }
+  }
 
   return {
-    authStatus: authorized ? "granted" : "locked",
-    match: serializePublicMatch(match),
+    authStatus: "granted",
+    match: {
+      _id: String(session._id),
+      sessionId: String(session._id),
+      teamA: Array.isArray(session.teamA) ? session.teamA : [],
+      teamB: Array.isArray(session.teamB) ? session.teamB : [],
+      teamAName: session.teamAName || "Team A",
+      teamBName: session.teamBName || "Team B",
+      overs: Number(session.overs || 6),
+      tossWinner: "",
+      tossDecision: "",
+      score: 0,
+      outs: 0,
+      isOngoing: false,
+      innings: "first",
+      result: "",
+      innings1: { team: "", score: 0, history: [] },
+      innings2: { team: "", score: 0, history: [] },
+      balls: [],
+      matchImageUrl: session.matchImageUrl || "",
+      createdAt: session.createdAt || null,
+      updatedAt: session.updatedAt || null,
+    },
+    sessionId: String(session._id),
+    hasCreatedMatch: false,
+    actualMatchId: "",
   };
 }
 
@@ -194,6 +256,9 @@ export async function loadHomeLiveBannerData() {
     (Array.isArray(match.teamB) ? match.teamB[0] : "") ||
     "Team B";
 
+  const publicMatch = serializePublicMatch(match);
+  const publicSession = serializePublicSession(session);
+
   return {
     sessionId: String(session._id),
     matchId: String(match._id),
@@ -201,6 +266,7 @@ export async function loadHomeLiveBannerData() {
     teamBName,
     score: Number(match.score || 0),
     outs: Number(match.outs || 0),
+    matchImageUrl: publicMatch?.matchImageUrl || publicSession?.matchImageUrl || "",
     updatedAt: new Date(match.updatedAt || session.updatedAt || session.createdAt).toISOString(),
   };
 }

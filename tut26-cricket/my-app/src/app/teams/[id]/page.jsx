@@ -15,6 +15,7 @@ import TeamRoster, {
   createDefaultRoster,
 } from "../../components/teams/TeamRoster";
 import useSessionStorageState from "../../components/teams/useSessionStorageState";
+import StepFlow from "../../components/shared/StepFlow";
 
 export default function TeamSelectionPage() {
   const { id: sessionId } = useParams();
@@ -73,8 +74,8 @@ export default function TeamSelectionPage() {
         );
       }
 
-      const match = await response.json();
-      router.push(`/toss/${match._id}`);
+      await response.json();
+      router.push(`/toss/${sessionId}`);
     } catch (caughtError) {
       setError(caughtError.message);
       setIsLoading(false);
@@ -94,9 +95,6 @@ export default function TeamSelectionPage() {
             >
               <FaArrowLeft size={18} />
             </button>
-            <div className="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-200">
-              Step 2 of 4
-            </div>
             <button
               onClick={() => setIsInfoModalOpen(true)}
               className="btn-ui-icon"
@@ -105,16 +103,13 @@ export default function TeamSelectionPage() {
               <FaInfoCircle size={22} />
             </button>
           </div>
+          <div className="mb-6 text-center">
+            <StepFlow currentStep={2} />
+          </div>
           <div className="text-center">
-            <h1 className="text-4xl font-black tracking-[-0.04em] sm:text-5xl bg-gradient-to-r from-yellow-300 via-rose-200 to-orange-400 bg-clip-text text-transparent">
+            <h1 className="text-4xl font-black tracking-[-0.04em] text-white sm:text-5xl">
               Team Selection
             </h1>
-            <div className="mx-auto mt-4 flex max-w-[220px] items-center justify-center gap-2">
-              <span className="h-2 w-10 rounded-full bg-emerald-400/70" />
-              <span className="h-2 w-10 rounded-full bg-amber-300" />
-              <span className="h-2 w-10 rounded-full bg-white/10" />
-              <span className="h-2 w-10 rounded-full bg-white/10" />
-            </div>
           </div>
           <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-zinc-400 sm:text-base">
             Set team names, squad size, and overs before the toss.

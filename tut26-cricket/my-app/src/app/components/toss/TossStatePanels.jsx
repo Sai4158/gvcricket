@@ -7,13 +7,13 @@ function ChoiceButton({ onClick, tone, children }) {
   return (
     <button
       onClick={onClick}
-      className={`group flex-1 rounded-[24px] border px-5 py-4 text-left transition duration-300 hover:-translate-y-0.5 ${
+      className={`group flex min-h-[96px] flex-1 items-center justify-center rounded-[24px] border px-5 py-4 text-center transition duration-300 hover:-translate-y-0.5 ${
         tone === "heads"
           ? "border-amber-300/18 bg-[linear-gradient(180deg,rgba(244,181,49,0.92),rgba(216,137,30,0.92))] text-black shadow-[0_14px_30px_rgba(216,137,30,0.16)]"
-          : "border-white/10 bg-[linear-gradient(180deg,rgba(48,48,56,0.98),rgba(22,22,28,0.98))] text-white shadow-[0_14px_30px_rgba(0,0,0,0.22)]"
+          : "border-white/10 bg-[linear-gradient(180deg,rgba(38,38,46,0.98),rgba(18,18,24,0.98))] text-white shadow-[0_14px_30px_rgba(0,0,0,0.22)]"
       }`}
     >
-      <div className="text-2xl font-black transition-transform group-hover:translate-x-0.5">
+      <div className="text-[1.55rem] font-extrabold uppercase tracking-[0.22em] transition-transform group-hover:translate-x-0.5">
         {children}
       </div>
     </button>
@@ -32,7 +32,7 @@ export default function TossStatePanels({
   const { winnerName, call, side } = tossResult;
 
   return (
-    <div className="min-h-[520px] rounded-[28px] border border-white/10 bg-white/[0.03] px-5 py-6">
+    <div className="min-h-[520px] rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,24,0.96),rgba(8,8,12,0.98))] px-5 py-6 shadow-[0_22px_60px_rgba(0,0,0,0.28)]">
       <AnimatePresence mode="wait">
         {status === "choosing" ? (
           <motion.div
@@ -43,8 +43,8 @@ export default function TossStatePanels({
             className="flex min-h-[468px] flex-col justify-between"
           >
             <div className="text-center">
-              <h2 className="text-3xl font-black text-white">{teamName}</h2>
-              <p className="mt-2 text-sm text-zinc-400">Call it.</p>
+              <h2 className="text-[2.15rem] font-bold tracking-tight text-white">{teamName}</h2>
+              <p className="mt-2 text-sm text-zinc-400">Choose heads or tails.</p>
             </div>
 
             <div className="py-8 flex justify-center">
@@ -87,7 +87,7 @@ export default function TossStatePanels({
             <div className="my-8">
               <SpinningCoin />
             </div>
-            <p className="text-sm uppercase tracking-[0.35em] text-zinc-500">In</p>
+            <p className="text-sm uppercase tracking-[0.35em] text-zinc-500">Starting in</p>
             <p className="mt-2 text-8xl font-black text-white">{countdown}</p>
           </motion.div>
         ) : null}
@@ -125,14 +125,14 @@ export default function TossStatePanels({
               <div className="mt-6 flex justify-center">
                 {side === "heads" ? <CoinHeads /> : <CoinTails />}
               </div>
-              <p className="mt-6 text-xs uppercase tracking-[0.32em] text-zinc-500">
-                {teamName} called {call}
+              <p className="mt-6 text-sm text-zinc-400">
+                {teamName} called {call}.
               </p>
-              <h2 className="mt-3 text-3xl font-black leading-tight text-white">
+              <h2 className="mt-3 text-[2.1rem] font-bold leading-tight tracking-tight text-white">
                 {winnerName} won the toss
               </h2>
               <p className="mt-2 text-sm text-zinc-400">
-                It landed on <span className="capitalize text-white">{side}</span>.
+                Landed on <span className="capitalize text-white">{side}</span>.
               </p>
             </div>
 
@@ -141,7 +141,7 @@ export default function TossStatePanels({
                 <button
                   onClick={() => onDecision("bat")}
                   disabled={isSubmitting}
-                  className="btn-ui btn-ui-primary group rounded-[24px] px-4 py-4 text-base font-semibold disabled:hover:translate-y-0"
+                  className="btn-ui btn-ui-primary group rounded-[24px] px-4 py-4 text-base font-medium disabled:hover:translate-y-0"
                 >
                   <span className="block transition-transform group-hover:translate-x-0.5">
                     {isSubmitting ? "Saving..." : "Bat First"}
@@ -150,7 +150,7 @@ export default function TossStatePanels({
                 <button
                   onClick={() => onDecision("bowl")}
                   disabled={isSubmitting}
-                  className="btn-ui btn-ui-neutral group rounded-[24px] px-4 py-4 text-base font-semibold disabled:hover:translate-y-0"
+                  className="btn-ui btn-ui-neutral group rounded-[24px] px-4 py-4 text-base font-medium disabled:hover:translate-y-0"
                 >
                   <span className="block transition-transform group-hover:translate-x-0.5">
                     {isSubmitting ? "Saving..." : "Bowl First"}

@@ -6,21 +6,30 @@ export const dynamic = "force-dynamic";
 
 export default async function TossPage({ params }) {
   const { id } = await params;
-  const { match: initialMatch, authStatus } = await loadTossPageData(id);
+  const {
+    match: initialMatch,
+    authStatus,
+    sessionId,
+    hasCreatedMatch,
+    actualMatchId,
+  } = await loadTossPageData(id);
 
   if (
+    hasCreatedMatch &&
     initialMatch &&
     initialMatch.tossWinner &&
     initialMatch.tossDecision
   ) {
-    redirect(`/match/${id}`);
+    redirect(`/match/${actualMatchId || id}`);
   }
 
   return (
     <TossPageClient
-      matchId={id}
+      matchId={actualMatchId || ""}
+      sessionId={sessionId || id}
       initialMatch={initialMatch}
       initialAuthStatus={authStatus}
+      hasCreatedMatch={hasCreatedMatch}
     />
   );
 }

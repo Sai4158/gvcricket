@@ -2,20 +2,17 @@ import { NextResponse } from "next/server";
 import { connectDB } from "../../../../lib/db";
 import { jsonError, jsonRateLimit } from "../../../../lib/api-response";
 import { writeAuditLog } from "../../../../lib/audit-log";
-import { getMatchAccessCookie } from "../../../../lib/match-access";
-import { serializePublicMatch } from "../../../../lib/public-data";
+import { serializePublicSession } from "../../../../lib/public-data";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../../lib/request-security";
 import { buildTeamUpdate } from "../../../../lib/team-utils";
 import { setupMatchSchema } from "../../../../lib/validators";
-import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 
 export async function POST(req, { params }) {
   const { id: sessionId } = await params;
   const meta = getRequestMeta(req);
-  let transactionSession;
 
   const setupLimit = enforceRateLimit({
     key: `setup-match:${sessionId}:${meta.ip}`,
@@ -55,69 +52,35 @@ export async function POST(req, { params }) {
       parsedRequest.value;
     const normalizedTeamA = buildTeamUpdate(teamAName, teamAPlayers);
     const normalizedTeamB = buildTeamUpdate(teamBName, teamBPlayers);
-
-    let createdMatch = null;
-    transactionSession = await Match.startSession();
-
-    await transactionSession.withTransaction(async () => {
-      const existingSession = await Session.findById(sessionId).session(
-        transactionSession
-      );
-
-      if (!existingSession) {
-        throw new Error("SESSION_NOT_FOUND");
-      }
-
-      [createdMatch] = await Match.create(
-        [
-          {
-            teamA: normalizedTeamA.players,
-            teamB: normalizedTeamB.players,
-            teamAName: normalizedTeamA.name,
-            teamBName: normalizedTeamB.name,
-            overs,
-            sessionId,
-            isOngoing: true,
-            innings1: { score: 0, history: [] },
-            innings2: { score: 0, history: [] },
-          },
-        ],
-        { session: transactionSession }
-      );
-
-      await Session.findByIdAndUpdate(
-        sessionId,
-        {
-          $set: {
-            match: createdMatch._id,
-            teamA: normalizedTeamA.players,
-            teamB: normalizedTeamB.players,
-            teamAName: normalizedTeamA.name,
-            teamBName: normalizedTeamB.name,
-            overs,
-            isLive: true,
-          },
+    const updatedSession = await Session.findByIdAndUpdate(
+      sessionId,
+      {
+        $set: {
+          teamA: normalizedTeamA.players,
+          teamB: normalizedTeamB.players,
+          teamAName: normalizedTeamA.name,
+          teamBName: normalizedTeamB.name,
+          overs,
         },
-        { session: transactionSession }
-      );
-    });
+      },
+      { new: true }
+    );
 
-    const response = NextResponse.json(serializePublicMatch(createdMatch), {
+    if (!updatedSession) {
+      throw new Error("SESSION_NOT_FOUND");
+    }
+
+    const response = NextResponse.json(serializePublicSession(updatedSession), {
       status: 201,
       headers: {
         "Cache-Control": "no-store",
       },
     });
-    const matchCookie = getMatchAccessCookie(
-      createdMatch._id,
-      Number(createdMatch.adminAccessVersion || 1)
-    );
-    response.cookies.set(matchCookie.name, matchCookie.value, matchCookie.options);
 
     await writeAuditLog({
-      action: "match_setup",
-      targetType: "match",
-      targetId: String(createdMatch._id),
+      action: "session_setup_draft",
+      targetType: "session",
+      targetId: String(updatedSession._id),
       status: "success",
       ip: meta.ip,
       userAgent: meta.userAgent,
@@ -130,10 +93,6 @@ export async function POST(req, { params }) {
       return jsonError("Session not found.", 404);
     }
 
-    return jsonError("Could not set up the match.", 500);
-  } finally {
-    if (transactionSession) {
-      await transactionSession.endSession();
-    }
+    return jsonError("Could not save the match setup.", 500);
   }
 }

@@ -20,26 +20,31 @@ const updateCards = [
     icon: FaImage,
     title: "Session cover image",
     copy: "One uploaded image now carries across live, spectator, result, and stats screens.",
+    accent: "amber",
   },
   {
     icon: FaVolumeUp,
     title: "Score speech",
     copy: "Live score announcements now read the ball and total clearly with smarter timing.",
+    accent: "cyan",
   },
   {
     icon: FaBroadcastTower,
     title: "Walkietalkie",
     copy: "Live talk between spectator, umpire, and now the director console with shared channel control.",
+    accent: "emerald",
   },
   {
     icon: FaMicrophoneAlt,
     title: "Speaker mic",
     copy: "Phone-to-speaker commentary mode makes quick announcements and live atmosphere easier.",
+    accent: "yellow",
   },
   {
     icon: FaBullhorn,
     title: "Director mode",
     copy: "A new control room page for PA mic, music, effects, and walkie with the umpire.",
+    accent: "violet",
   },
 ];
 
@@ -112,15 +117,15 @@ export default function HowItWorksSection() {
       className="mx-auto w-full max-w-6xl scroll-mt-28 overflow-hidden"
     >
       <div className="space-y-8">
-        <div className="rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(32,7,7,0.94),rgba(8,8,12,0.98))] p-7 shadow-[0_28px_80px_rgba(0,0,0,0.45)] ring-1 ring-amber-300/10 md:p-10">
+        <div className="liquid-glass rounded-[32px] p-7 md:p-10">
           <div className="mx-auto max-w-3xl text-center">
-            <span className="inline-flex rounded-full border border-amber-400/20 bg-amber-500/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-amber-200">
+            <span className="liquid-pill inline-flex rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-amber-50">
               Latest update
             </span>
             <h2 className="mt-5 text-4xl font-semibold tracking-[-0.04em] text-white md:text-5xl">
               New live audio and session tools
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-zinc-300 md:text-lg">
+            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-white/78 md:text-lg">
               Cleaner scoring. Better voice. Stronger session identity.
             </p>
           </div>
@@ -129,15 +134,19 @@ export default function HowItWorksSection() {
             {updateCards.map((card) => (
               <div
                 key={card.title}
-                className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                className="liquid-glass-soft rounded-[26px] p-5"
               >
-                <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.06] text-2xl text-amber-200 shadow-[0_12px_30px_rgba(245,158,11,0.1)]">
+                <span
+                  className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-2xl text-2xl ${getAccentClasses(
+                    card.accent
+                  )}`}
+                >
                   <card.icon />
                 </span>
                 <h3 className="mt-5 text-lg font-semibold text-white">
                   {card.title}
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-zinc-400">
+                <p className="mt-2 text-sm leading-6 text-white/72">
                   {card.copy}
                 </p>
               </div>
@@ -145,15 +154,15 @@ export default function HowItWorksSection() {
           </div>
         </div>
 
-        <div className="rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(14,14,18,0.98),rgba(8,8,12,0.98))] p-7 shadow-[0_28px_80px_rgba(0,0,0,0.4)] ring-1 ring-white/8 md:p-10">
+        <div className="liquid-glass rounded-[32px] p-7 md:p-10">
           <div className="mx-auto max-w-3xl text-center">
-            <span className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-500/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-cyan-200">
+            <span className="liquid-pill inline-flex rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-cyan-50">
               How this app works
             </span>
             <h2 className="mt-5 text-4xl font-semibold tracking-[-0.04em] text-white md:text-5xl">
               Built for fast, simple scoring
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-zinc-300 md:text-lg">
+            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-white/78 md:text-lg">
               Say goodbye to memorizing. GV Cricket keeps match control, live scoring,
               spectator updates, toss, and results in one smooth flow.
             </p>
@@ -163,10 +172,10 @@ export default function HowItWorksSection() {
             {coreCards.map((card) => (
               <div
                 key={card.title}
-                className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                className="liquid-glass-soft rounded-[26px] p-5"
               >
                 <span
-                  className={`inline-flex h-14 w-14 items-center justify-center rounded-2xl text-2xl ${getAccentClasses(
+                  className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-2xl text-2xl ${getAccentClasses(
                     card.accent
                   )}`}
                 >
@@ -175,7 +184,7 @@ export default function HowItWorksSection() {
                 <h3 className="mt-5 text-xl font-semibold text-white">
                   {card.title}
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-zinc-400">{card.copy}</p>
+                <p className="mt-2 text-sm leading-6 text-white/72">{card.copy}</p>
               </div>
             ))}
           </div>

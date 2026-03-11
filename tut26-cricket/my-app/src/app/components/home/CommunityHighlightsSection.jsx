@@ -19,7 +19,7 @@ export default function CommunityHighlightsSection() {
       <h2 className="text-5xl md:text-7xl font-bold tracking-tight mb-16 text-center text-white">
         From the Community
       </h2>
-      <p className="text-lg text-zinc-300 leading-relaxed text-center max-w-3xl mx-auto -mt-8 mb-16">
+      <p className="text-lg text-white/78 leading-relaxed text-center max-w-3xl mx-auto -mt-8 mb-16">
         It all started in 2022 with a few friends who loved the game. Today,
         it&apos;s a friendly league of over{" "}
         <strong className="text-white">50+ members</strong> who meet for fun,

@@ -121,7 +121,7 @@ function HelpButton({ title, body }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
@@ -131,7 +131,7 @@ function HelpButton({ title, body }) {
         <FaInfoCircle />
       </button>
       {open ? (
-        <div className="absolute right-0 top-12 z-20 w-72 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(26,26,32,0.98),rgba(11,11,16,0.98))] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+        <div className="absolute right-0 top-12 z-20 w-[min(18rem,calc(100vw-3rem))] max-w-[18rem] rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(26,26,32,0.98),rgba(11,11,16,0.98))] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.45)] max-sm:left-0 max-sm:right-auto">
           <p className="text-sm font-semibold text-white">{title}</p>
           <p className="mt-2 text-sm leading-6 text-zinc-300">{body}</p>
         </div>
@@ -194,8 +194,8 @@ function SessionHeader({
       priority
     >
       <div className="space-y-6 px-5 py-6 sm:px-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 text-center sm:text-left">
             <div className="mb-3 flex items-center gap-2">
               <span className="inline-flex rounded-full bg-emerald-500/14 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-200">
                 Live console
@@ -213,10 +213,10 @@ function SessionHeader({
             <p className="mt-2 text-sm text-zinc-200/90">{teams}</p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center gap-2 sm:justify-end">
             <HelpButton
               title="Director console"
-              body="Pick the live session, use the PA mic, run music and effects, and request walkie with the umpire from this screen."
+              body="Use this screen to manage the live session, PA mic, music, effects, and walkie."
             />
             <button
               type="button"
@@ -229,7 +229,7 @@ function SessionHeader({
             <button
               type="button"
               onClick={onChangeSession}
-              className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/[0.1]"
+              className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/[0.1] max-sm:text-xs"
             >
               Change
             </button>
@@ -765,7 +765,7 @@ export default function DirectorConsoleClient({
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6">
-      <div className="mb-4 flex items-center justify-between gap-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/"
           className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-white"
@@ -773,7 +773,7 @@ export default function DirectorConsoleClient({
           <FaArrowLeft />
           Home
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
             onClick={() => setShowPicker(true)}

@@ -26,34 +26,28 @@ export default function PrimaryActionsSection() {
       <div className="grid w-full max-w-3xl gap-4 sm:grid-cols-2">
         <Link
           href="/session/new"
-          className="group relative overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(145deg,rgba(20,20,26,0.98),rgba(8,8,12,0.98))] p-5 text-left shadow-[0_20px_48px_rgba(0,0,0,0.32)] transition duration-300 hover:-translate-y-1 hover:border-amber-200/16"
+          className="liquid-glass group rounded-[30px] p-5 text-left transition duration-300 hover:-translate-y-1 hover:border-white/28"
         >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.1),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(245,158,11,0.06),transparent_30%)] opacity-90" />
-          <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/35 to-transparent" />
-          <div className="pointer-events-none absolute -right-3 bottom-0 text-amber-200/[0.06] transition duration-300 group-hover:scale-105 group-hover:text-amber-200/[0.1]">
-            <FaClipboardList className="text-[86px]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(250,204,21,0.12),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_30%)] opacity-90" />
+          <div className="pointer-events-none absolute right-5 top-5 text-amber-100/15 transition duration-300 group-hover:scale-105 group-hover:text-amber-50/20">
+            <FaClipboardList className="text-[64px]" />
           </div>
-          <div className="relative z-10 flex h-full min-h-[144px] flex-col justify-between gap-5">
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/14 bg-amber-300/8 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-amber-100/90">
-                Quick start
+          <div className="relative z-10 flex h-full min-h-[152px] flex-col justify-between gap-6">
+            <div className="space-y-4">
+              <div className="liquid-icon inline-flex h-11 w-11 items-center justify-center rounded-2xl text-amber-50">
+                <FaClipboardList />
               </div>
-              <h3 className="max-w-[14rem] text-[27px] font-semibold leading-[1.05] tracking-tight text-white">
-                Open umpire view
+              <h3 className="max-w-[14rem] text-[28px] font-semibold leading-[1.02] tracking-tight text-white">
+                Start a game
               </h3>
-              <p className="max-w-[16rem] text-sm leading-6 text-zinc-300/90">
-                Start a session and score the match live.
+              <p className="max-w-[16rem] text-sm leading-6 text-white/78">
+                Open umpire mode and score the match live.
               </p>
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-xs uppercase tracking-[0.22em] text-zinc-500">
-                Umpire flow
-              </span>
-              <span className="inline-flex items-center gap-2 text-sm font-medium text-zinc-100">
-                <span>Start now</span>
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] transition duration-300 group-hover:border-amber-200/20 group-hover:bg-white/[0.08]">
-                  <FaArrowRight className="transition-transform duration-300 group-hover:translate-x-0.5" />
-                </span>
+            <div className="flex items-center justify-end gap-3 border-t border-white/10 pt-4">
+              <span className="text-sm font-medium text-white/88">Start now</span>
+              <span className="liquid-pill inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition duration-300 group-hover:border-white/30">
+                <FaArrowRight className="transition-transform duration-300 group-hover:translate-x-0.5" />
               </span>
             </div>
           </div>
@@ -61,34 +55,28 @@ export default function PrimaryActionsSection() {
 
         <Link
           href="/session"
-          className="group relative overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(145deg,rgba(20,20,26,0.98),rgba(8,8,12,0.98))] p-5 text-left shadow-[0_20px_48px_rgba(0,0,0,0.32)] transition duration-300 hover:-translate-y-1 hover:border-sky-200/16"
+          className="liquid-glass group rounded-[30px] p-5 text-left transition duration-300 hover:-translate-y-1 hover:border-white/28"
         >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.1),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.05),transparent_30%)] opacity-90" />
-          <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-sky-200/35 to-transparent" />
-          <div className="pointer-events-none absolute -right-2 bottom-1 text-sky-200/[0.07] transition duration-300 group-hover:scale-105 group-hover:text-sky-200/[0.11]">
-            <FaChartLine className="text-[76px]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.14),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_28%)] opacity-90" />
+          <div className="pointer-events-none absolute right-5 top-5 text-sky-100/15 transition duration-300 group-hover:scale-105 group-hover:text-sky-50/20">
+            <FaChartLine className="text-[60px]" />
           </div>
-          <div className="relative z-10 flex h-full min-h-[144px] flex-col justify-between gap-5">
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-sky-300/14 bg-sky-300/8 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-100/90">
-                Browse
+          <div className="relative z-10 flex h-full min-h-[152px] flex-col justify-between gap-6">
+            <div className="space-y-4">
+              <div className="liquid-icon inline-flex h-11 w-11 items-center justify-center rounded-2xl text-sky-50">
+                <FaChartLine />
               </div>
-              <h3 className="max-w-[14rem] text-[27px] font-semibold leading-[1.05] tracking-tight text-white">
+              <h3 className="max-w-[14rem] text-[28px] font-semibold leading-[1.02] tracking-tight text-white">
                 View sessions
               </h3>
-              <p className="max-w-[16rem] text-sm leading-6 text-zinc-300/90">
+              <p className="max-w-[16rem] text-sm leading-6 text-white/78">
                 Open live games, finished results, and match history.
               </p>
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-xs uppercase tracking-[0.22em] text-zinc-500">
-                Sessions
-              </span>
-              <span className="inline-flex items-center gap-2 text-sm font-medium text-zinc-100">
-                <span>Browse all</span>
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] transition duration-300 group-hover:border-sky-200/20 group-hover:bg-white/[0.08]">
-                  <FaArrowRight className="transition-transform duration-300 group-hover:translate-x-0.5" />
-                </span>
+            <div className="flex items-center justify-end gap-3 border-t border-white/10 pt-4">
+              <span className="text-sm font-medium text-white/88">Browse all</span>
+              <span className="liquid-pill inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition duration-300 group-hover:border-white/30">
+                <FaArrowRight className="transition-transform duration-300 group-hover:translate-x-0.5" />
               </span>
             </div>
           </div>
@@ -97,22 +85,22 @@ export default function PrimaryActionsSection() {
 
       <Link
         href="/director"
-        className="group inline-flex w-full max-w-3xl items-center justify-between rounded-[26px] border border-white/10 bg-[linear-gradient(135deg,rgba(20,20,24,0.96),rgba(9,9,12,0.96))] px-5 py-4 text-left shadow-[0_18px_40px_rgba(0,0,0,0.28)] transition duration-300 hover:-translate-y-0.5 hover:border-white/16"
+        className="liquid-glass group inline-flex w-full max-w-3xl items-center justify-between rounded-[26px] px-5 py-4 text-left transition duration-300 hover:-translate-y-0.5 hover:border-white/28"
       >
         <span className="flex items-center gap-4">
-          <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/12 text-lg text-emerald-200 shadow-[0_10px_24px_rgba(16,185,129,0.12)]">
+          <span className="liquid-icon inline-flex h-12 w-12 items-center justify-center rounded-2xl text-lg text-emerald-50">
             <FaBroadcastTower />
           </span>
           <span>
             <span className="block text-lg font-semibold text-white">
               Director mode
             </span>
-            <span className="mt-1 block text-sm text-zinc-400">
+            <span className="mt-1 block text-sm text-white/76">
               Manage PA mic, music, effects, and umpire walkie from your phone.
             </span>
           </span>
         </span>
-        <span className="text-emerald-200 transition-transform duration-300 group-hover:translate-x-1">
+        <span className="text-emerald-50 transition-transform duration-300 group-hover:translate-x-1">
           <FaArrowRight />
         </span>
       </Link>

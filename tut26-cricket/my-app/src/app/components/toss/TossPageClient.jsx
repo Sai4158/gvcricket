@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FaArrowLeft, FaHandSparkles, FaRedo } from "react-icons/fa";
+import { FaArrowLeft, FaRedo } from "react-icons/fa";
 import { AccessGate, Splash } from "../match/MatchStatusShell";
 import useMatchAccess from "../match/useMatchAccess";
 import TossStatePanels from "./TossStatePanels";
 import { getTeamBundle } from "../../lib/team-utils";
+import StepFlow from "../shared/StepFlow";
 
 const PENDING_SESSION_IMAGE_KEY = "gv-pending-session-image";
 
@@ -20,8 +21,10 @@ function createActionId(prefix) {
 
 export default function TossPageClient({
   matchId,
+  sessionId,
   initialMatch,
   initialAuthStatus = "checking",
+  hasCreatedMatch = false,
 }) {
   const router = useRouter();
   const { authStatus, authError, authSubmitting, submitPin } = useMatchAccess(
@@ -95,15 +98,32 @@ export default function TossPageClient({
     setError("");
 
     try {
-      const res = await fetch(`/api/matches/${matchId}/actions`, {
+      const teamA = getTeamBundle(matchDetails, "teamA");
+      const teamB = getTeamBundle(matchDetails, "teamB");
+      const requestUrl = hasCreatedMatch
+        ? `/api/matches/${matchId}/actions`
+        : `/api/sessions/${sessionId}/start-match`;
+      const requestBody = hasCreatedMatch
+        ? {
+            actionId: createActionId("toss"),
+            type: "set_toss",
+            tossWinner: tossResult.winnerName,
+            tossDecision: decision,
+          }
+        : {
+            teamAName: teamA.name,
+            teamAPlayers: teamA.players,
+            teamBName: teamB.name,
+            teamBPlayers: teamB.players,
+            overs: Number(matchDetails.overs || 6),
+            tossWinner: tossResult.winnerName,
+            tossDecision: decision,
+          };
+
+      const res = await fetch(requestUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          actionId: createActionId("toss"),
-          type: "set_toss",
-          tossWinner: tossResult.winnerName,
-          tossDecision: decision,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const payload = await res.json().catch(() => ({}));
@@ -112,6 +132,13 @@ export default function TossPageClient({
       }
 
       setMatchDetails(payload.match);
+      const finalMatchId = String(payload.match?._id || matchId || "");
+
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(`session_${sessionId}_teamA_v2`);
+        window.sessionStorage.removeItem(`session_${sessionId}_teamB_v2`);
+        window.sessionStorage.removeItem(`session_${sessionId}_overs_v2`);
+      }
 
       if (typeof window !== "undefined") {
         const rawPendingImage = window.sessionStorage.getItem(
@@ -121,7 +148,7 @@ export default function TossPageClient({
         if (rawPendingImage) {
           try {
             const pendingImage = JSON.parse(rawPendingImage);
-            if (pendingImage?.dataUrl) {
+            if (pendingImage?.dataUrl && finalMatchId) {
               const imageResponse = await fetch(pendingImage.dataUrl);
               const imageBlob = await imageResponse.blob();
               const uploadForm = new FormData();
@@ -136,7 +163,7 @@ export default function TossPageClient({
                 )
               );
 
-              await fetch(`/api/matches/${matchId}/image`, {
+              await fetch(`/api/matches/${finalMatchId}/image`, {
                 method: "POST",
                 body: uploadForm,
               });
@@ -149,7 +176,7 @@ export default function TossPageClient({
         }
       }
 
-      router.push(`/match/${matchId}`);
+      router.push(`/match/${finalMatchId}`);
     } catch (caughtError) {
       setError(caughtError.message || "Failed to update toss.");
     } finally {
@@ -164,6 +191,15 @@ export default function TossPageClient({
     setTossResult({ side: null, winnerName: null, call: null });
     setIsSubmitting(false);
     setError("");
+  };
+
+  const handleBack = () => {
+    if (status === "finished") {
+      redoToss();
+      return;
+    }
+
+    router.back();
   };
 
   if (error) {
@@ -194,10 +230,10 @@ export default function TossPageClient({
   const teamB = getTeamBundle(matchDetails, "teamB");
   const titleText = "Match Toss";
   const subtitleText = `${teamA.name} vs ${teamB.name}`;
-  const stageLabel = status === "finished" ? "Step 4" : "Step 3";
+  const currentStep = status === "finished" ? 4 : 3;
 
   return (
-    authStatus !== "granted" ? (
+    hasCreatedMatch && authStatus !== "granted" ? (
       authStatus === "checking" ? (
         <Splash>Checking toss access...</Splash>
       ) : (
@@ -216,23 +252,12 @@ export default function TossPageClient({
           <div className="relative">
             <div className="mb-6 flex items-start justify-between gap-4">
               <button
-                onClick={() => router.back()}
+                onClick={handleBack}
                 className="mt-1 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
                 aria-label="Go back"
               >
                 <FaArrowLeft />
               </button>
-
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-300">
-                  <FaHandSparkles className="text-[10px]" />
-                  {stageLabel}
-                </div>
-                <h1 className="mt-4 text-4xl font-black tracking-tight text-amber-300">
-                  {titleText}
-                </h1>
-                <p className="mt-2 text-sm text-zinc-400">{subtitleText}</p>
-              </div>
 
               <button
                 onClick={redoToss}
@@ -241,6 +266,17 @@ export default function TossPageClient({
               >
                 <FaRedo />
               </button>
+            </div>
+
+            <div className="mb-6 text-center">
+              <StepFlow currentStep={currentStep} />
+            </div>
+
+            <div className="mb-6 text-center">
+              <h1 className="text-4xl font-black tracking-tight text-white">
+                {titleText}
+              </h1>
+              <p className="mt-2 text-sm text-zinc-400">{subtitleText}</p>
             </div>
 
             <TossStatePanels
