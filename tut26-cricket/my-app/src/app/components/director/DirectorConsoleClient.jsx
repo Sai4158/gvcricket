@@ -1,7 +1,6 @@
 "use client";
 
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
-import { Howl } from "howler";
 import Link from "next/link";
 import {
   FaArrowLeft,
@@ -35,17 +34,6 @@ import { buildCurrentScoreAnnouncement } from "../../lib/live-announcements";
 import { getBattingTeamBundle } from "../../lib/team-utils";
 import { playUiTone } from "../../lib/page-audio";
 
-const SOUND_EFFECTS = [
-  { id: "horn", label: "Stadium horn", accent: "emerald", src: "/audio/effects/stadium-horn.wav" },
-  { id: "cheer", label: "Crowd cheer", accent: "sky", src: "/audio/effects/crowd-cheer.wav" },
-  { id: "wicket", label: "Wicket hit", accent: "rose", src: "/audio/effects/wicket-hit.wav" },
-  { id: "six", label: "Six burst", accent: "amber", src: "/audio/effects/six-burst.wav" },
-  { id: "boundary", label: "Boundary clap", accent: "violet", src: "/audio/effects/boundary-clap.wav" },
-  { id: "drum", label: "Drum roll", accent: "orange", src: "/audio/effects/drum-roll.wav" },
-  { id: "start", label: "Match start", accent: "teal", src: "/audio/effects/match-start.wav" },
-  { id: "break", label: "Break stinger", accent: "fuchsia", src: "/audio/effects/break-stinger.wav" },
-];
-
 function createSpeechSettings() {
   return {
     enabled: true,
@@ -53,27 +41,6 @@ function createSpeechSettings() {
     mode: "full",
     volume: 1,
   };
-}
-
-function getColorClasses(accent) {
-  switch (accent) {
-    case "sky":
-      return "bg-sky-500/12 text-sky-200 border-sky-400/20";
-    case "rose":
-      return "bg-rose-500/12 text-rose-200 border-rose-400/20";
-    case "amber":
-      return "bg-amber-500/12 text-amber-200 border-amber-400/20";
-    case "violet":
-      return "bg-violet-500/12 text-violet-200 border-violet-400/20";
-    case "orange":
-      return "bg-orange-500/12 text-orange-200 border-orange-400/20";
-    case "teal":
-      return "bg-teal-500/12 text-teal-200 border-teal-400/20";
-    case "fuchsia":
-      return "bg-fuchsia-500/12 text-fuchsia-200 border-fuchsia-400/20";
-    default:
-      return "bg-emerald-500/12 text-emerald-200 border-emerald-400/20";
-  }
 }
 
 function buildDirectorScoreLine(match) {
@@ -284,12 +251,15 @@ export default function DirectorConsoleClient({
   const [speakerDeviceId, setSpeakerDeviceId] = useState("default");
   const [speakerDevices, setSpeakerDevices] = useState([]);
   const [speakerMessage, setSpeakerMessage] = useState("");
-  const [soundboardLive, setSoundboardLive] = useState("");
   const [consoleError, setConsoleError] = useState("");
   const [musicMessage, setMusicMessage] = useState("");
   const [directorHoldLive, setDirectorHoldLive] = useState(false);
+  const [libraryFiles, setLibraryFiles] = useState([]);
+  const [libraryMessage, setLibraryMessage] = useState("");
+  const [libraryLiveId, setLibraryLiveId] = useState("");
+  const [libraryState, setLibraryState] = useState("idle");
   const audioRef = useRef(null);
-  const effectPlayersRef = useRef(new Map());
+  const effectsAudioRef = useRef(null);
   const musicUrlsRef = useRef([]);
   const speech = useSpeechAnnouncer(createSpeechSettings());
   const micMonitor = useLocalMicMonitor();
@@ -313,14 +283,14 @@ export default function DirectorConsoleClient({
   }, [selectedSession]);
 
   useEffect(() => {
-    const effectPlayers = effectPlayersRef.current;
+    const effectsAudio = effectsAudioRef.current;
+
     return () => {
       musicUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-      effectPlayers.forEach((player) => {
-        try {
-          player.unload();
-        } catch {}
-      });
+      if (effectsAudio) {
+        effectsAudio.pause();
+        effectsAudio.src = "";
+      }
     };
   }, []);
 
@@ -355,6 +325,41 @@ export default function DirectorConsoleClient({
       cancelled = true;
     };
   }, [authorized, sessions.length]);
+
+  useEffect(() => {
+    if (!authorized) {
+      setLibraryFiles([]);
+      setLibraryLiveId("");
+      setLibraryState("idle");
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      const response = await fetch("/api/director/audio-library", {
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => ({ files: [] }));
+
+      if (cancelled) {
+        return;
+      }
+
+      if (!response.ok) {
+        setLibraryFiles([]);
+        setLibraryMessage("Could not load audio files.");
+        return;
+      }
+
+      setLibraryFiles(payload.files || []);
+      setLibraryMessage("");
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authorized]);
 
   useEventSource({
     url:
@@ -475,55 +480,60 @@ export default function DirectorConsoleClient({
     audio.volume = musicVolume * masterVolume;
   }, [masterVolume, musicVolume]);
 
-  const ensureEffectPlayer = (effectId) => {
-    const existing = effectPlayersRef.current.get(effectId);
-    const nextVolume = Math.max(
-      0,
-      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * effectsVolume * masterVolume)
-    );
-
-    if (existing) {
-      existing.volume(nextVolume);
-      return existing;
-    }
-
-    const config = SOUND_EFFECTS.find((effect) => effect.id === effectId);
-    if (!config) {
-      return null;
-    }
-
-    const player = new Howl({
-      src: [config.src],
-      html5: true,
-      preload: true,
-      volume: nextVolume,
-      onend: () => {
-        setSoundboardLive((current) => (current === effectId ? "" : current));
-      },
-      onstop: () => {
-        setSoundboardLive((current) => (current === effectId ? "" : current));
-      },
-      onloaderror: () => {
-        setMusicMessage("Could not load that effect.");
-      },
-      onplayerror: () => {
-        setMusicMessage("Tap again to allow effect playback.");
-      },
-    });
-
-    effectPlayersRef.current.set(effectId, player);
-    return player;
-  };
-
   useEffect(() => {
     const nextVolume = Math.max(
       0,
       Math.min(1, (micMonitor.isActive ? 0.24 : 1) * effectsVolume * masterVolume)
     );
-    effectPlayersRef.current.forEach((player) => {
-      player.volume(nextVolume);
-    });
+    if (effectsAudioRef.current) {
+      effectsAudioRef.current.volume = nextVolume;
+    }
   }, [effectsVolume, masterVolume, micMonitor.isActive]);
+
+  useEffect(() => {
+    const audio = effectsAudioRef.current;
+    if (!audio) {
+      return undefined;
+    }
+
+    const handleEnded = () => {
+      setLibraryLiveId("");
+      setLibraryState("idle");
+    };
+    const handlePause = () => {
+      setLibraryState((current) => (current === "loading" ? current : "paused"));
+    };
+    const handlePlay = () => {
+      setLibraryState("playing");
+    };
+    const handleWaiting = () => {
+      setLibraryState("loading");
+    };
+    const handleCanPlay = () => {
+      setLibraryState((current) => (current === "loading" ? "paused" : current));
+    };
+    const handleError = () => {
+      setLibraryMessage("This audio file could not be played here.");
+      setLibraryLiveId("");
+      setLibraryState("idle");
+    };
+
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("waiting", handleWaiting);
+    audio.addEventListener("canplay", handleCanPlay);
+    audio.addEventListener("error", handleError);
+
+    return () => {
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("waiting", handleWaiting);
+      audio.removeEventListener("canplay", handleCanPlay);
+      audio.removeEventListener("error", handleError);
+    };
+  }, []);
 
   useEffect(() => {
     if (!navigator?.mediaDevices?.enumerateDevices) {
@@ -561,31 +571,57 @@ export default function DirectorConsoleClient({
   }, []);
 
   const stopAllEffects = () => {
-    effectPlayersRef.current.forEach((player) => {
-      try {
-        player.stop();
-      } catch {}
-    });
-    setSoundboardLive("");
+    const audio = effectsAudioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    audio.pause();
+    audio.currentTime = 0;
+    audio.src = "";
+    setLibraryLiveId("");
+    setLibraryState("idle");
   };
 
-  const playEffect = async (effectId) => {
-    const player = ensureEffectPlayer(effectId);
-    if (!player) {
+  const playEffect = async (file) => {
+    const audio = effectsAudioRef.current;
+    if (!audio || !file?.src) {
+      return;
+    }
+
+    setLibraryMessage("");
+
+    if (libraryLiveId === file.id && libraryState === "playing") {
+      audio.pause();
+      return;
+    }
+
+    if (libraryLiveId === file.id && libraryState === "paused") {
+      try {
+        await audio.play();
+      } catch {
+        setLibraryMessage("Tap again to allow audio playback.");
+      }
       return;
     }
 
     stopAllEffects();
-    setSoundboardLive(effectId);
-    player.stop();
-    player.seek(0);
-    player.volume(
-      Math.max(
-        0,
-        Math.min(1, (micMonitor.isActive ? 0.24 : 1) * effectsVolume * masterVolume)
-      )
+    setLibraryLiveId(file.id);
+    setLibraryState("loading");
+    audio.preload = "none";
+    audio.src = file.src;
+    audio.volume = Math.max(
+      0,
+      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * effectsVolume * masterVolume)
     );
-    player.play();
+
+    try {
+      await audio.play();
+    } catch {
+      setLibraryMessage("Tap again to allow audio playback.");
+      setLibraryState("idle");
+      setLibraryLiveId("");
+    }
   };
 
   const stopAllAudio = async () => {
@@ -1017,12 +1053,12 @@ export default function DirectorConsoleClient({
           </Card>
 
           <Card
-            title="Soundboard"
-            subtitle="Stadium cues"
+            title="Audio library"
+            subtitle="Files from public/audio/effects"
             icon={<FaBullhorn />}
             help={{
-              title: "Soundboard",
-              body: "Play quick stadium effects like horn, cheer, wicket, or break stingers. Use Stop effects to cut every cue immediately.",
+              title: "Audio library",
+              body: "Drop audio files into public/audio/effects and they will show here automatically. Files only load when you tap them.",
             }}
             action={
               <button
@@ -1030,16 +1066,23 @@ export default function DirectorConsoleClient({
                 onClick={stopAllEffects}
                 className="rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-zinc-200"
               >
-                Stop effects
+                Stop audio
               </button>
             }
           >
+            <audio ref={effectsAudioRef} hidden preload="none" />
             <div className="mb-4 flex items-center justify-between gap-3">
               <p className="text-sm text-zinc-400">
-                {soundboardLive ? `${soundboardLive} live` : "Ready for cues"}
+                {libraryLiveId
+                  ? libraryState === "paused"
+                    ? "Paused"
+                    : libraryState === "loading"
+                    ? "Loading"
+                    : "Playing now"
+                  : "Tap to play or pause"}
               </p>
               <label className="flex items-center gap-3 text-sm text-zinc-300">
-                Effects
+                Audio
                 <input
                   type="range"
                   min="0"
@@ -1052,22 +1095,67 @@ export default function DirectorConsoleClient({
                 />
               </label>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {SOUND_EFFECTS.map((effect) => (
+            {libraryMessage ? (
+              <div className="mb-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-300">
+                {libraryMessage}
+              </div>
+            ) : null}
+            <div className="grid grid-cols-2 gap-3">
+              {libraryFiles.length ? (
+                libraryFiles.map((file) => (
+                  <button
+                    key={file.id}
+                    type="button"
+                    onClick={() => {
+                      void playEffect(file);
+                    }}
+                    className={`group relative aspect-square overflow-hidden rounded-[24px] border px-4 py-4 text-left transition hover:-translate-y-0.5 ${
+                      libraryLiveId === file.id
+                        ? "border-emerald-300/30 bg-[linear-gradient(180deg,rgba(18,40,34,0.9),rgba(10,16,18,0.94))] shadow-[0_18px_40px_rgba(16,185,129,0.16)]"
+                        : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                    }`}
+                  >
+                    <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
+                    <div className="flex h-full flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-white/90">
+                          <FaMusic className="text-sm" />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="line-clamp-2 text-sm font-semibold leading-5 text-white">
+                            {file.label}
+                          </div>
+                          <div className="truncate text-xs text-zinc-400">{file.fileName}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-end justify-between gap-2">
+                        <div className="text-xs text-zinc-400">
+                          {libraryLiveId === file.id
+                            ? libraryState === "paused"
+                              ? "Paused"
+                              : libraryState === "loading"
+                              ? "Loading..."
+                              : "Playing"
+                            : "Tap to play"}
+                        </div>
+                        {libraryLiveId === file.id ? (
+                          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.08] text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)]">
+                            {libraryState === "paused" ? <FaPlay className="text-xs" /> : <FaPause className="text-xs" />}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </button>
+                ))
+              ) : (
                 <button
-                  key={effect.id}
                   type="button"
-                  onClick={() => {
-                    void playEffect(effect.id);
-                  }}
-                  className={`rounded-[22px] border px-4 py-4 text-left transition hover:-translate-y-0.5 ${getColorClasses(effect.accent)}`}
+                  disabled
+                  className="col-span-full rounded-[22px] border border-white/10 bg-black/20 px-4 py-5 text-left text-sm text-zinc-400"
                 >
-                  <div className="text-sm font-semibold">{effect.label}</div>
-                  <div className="mt-1 text-xs opacity-75">
-                    {soundboardLive === effect.id ? "Playing now" : "Tap to play"}
-                  </div>
+                  Drop audio files into <span className="font-semibold text-zinc-200">public/audio/effects</span> and they will appear here.
                 </button>
-              ))}
+              )}
             </div>
           </Card>
         </div>
