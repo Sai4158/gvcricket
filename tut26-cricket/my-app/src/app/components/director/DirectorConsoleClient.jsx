@@ -10,7 +10,6 @@ import {
   FaForward,
   FaHeadphones,
   FaInfoCircle,
-  FaLock,
   FaMicrophone,
   FaMusic,
   FaPause,
@@ -22,10 +21,8 @@ import {
 } from "react-icons/fa";
 import SessionCoverHero from "../shared/SessionCoverHero";
 import DarkSelect from "../shared/DarkSelect";
-import DirectorPinGate from "./DirectorPinGate";
 import DirectorSessionPicker from "./DirectorSessionPicker";
 import useEventSource from "../live/useEventSource";
-import useLiveRelativeTime from "../live/useLiveRelativeTime";
 import useLocalMicMonitor from "../live/useLocalMicMonitor";
 import useSpeechAnnouncer from "../live/useSpeechAnnouncer";
 import useWalkieTalkie from "../live/useWalkieTalkie";
@@ -47,17 +44,6 @@ function buildDirectorScoreLine(match) {
   if (!match) return "";
   const battingTeam = getBattingTeamBundle(match);
   return `${battingTeam.name} ${match.score || 0}/${match.outs || 0}`;
-}
-
-function formatUpdatedText(value) {
-  const date = new Date(value || 0).getTime();
-  if (!date) return "Updated just now";
-  const diffMs = Math.max(0, Date.now() - date);
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 1) return "Updated just now";
-  if (minutes < 60) return `Updated ${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  return `Updated ${hours}h ago`;
 }
 
 function IosSwitch({ checked, onChange, label, disabled = false }) {
@@ -160,13 +146,10 @@ function SessionHeader({
       className="mb-5"
       priority
     >
-      <div className="space-y-6 px-5 py-6 sm:px-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="space-y-4 px-5 py-5 sm:px-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 text-center sm:text-left">
-            <div className="mb-3 flex items-center gap-2">
-              <span className="inline-flex rounded-full bg-emerald-500/14 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-200">
-                Live console
-              </span>
+            <div className="mb-2 flex items-center justify-center gap-2 sm:justify-start">
               {match?.isOngoing && !match?.result ? (
                 <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.08] px-3 py-1 text-xs font-medium text-white">
                   <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
@@ -174,10 +157,10 @@ function SessionHeader({
                 </span>
               ) : null}
             </div>
-            <h1 className="text-3xl font-semibold tracking-[-0.03em] text-white">
+            <h1 className="text-2xl font-semibold tracking-[-0.03em] text-white sm:text-[2rem]">
               {session?.name || "Director Console"}
             </h1>
-            <p className="mt-2 text-sm text-zinc-200/90">{teams}</p>
+            <p className="mt-1 text-sm text-zinc-200/90">{teams}</p>
           </div>
 
           <div className="flex items-center justify-center gap-2 sm:justify-end">
@@ -203,25 +186,14 @@ function SessionHeader({
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-[24px] border border-white/10 bg-black/30 px-4 py-4">
-            <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">Score</p>
-            <p className="mt-2 text-2xl font-semibold text-white">
-              {buildDirectorScoreLine(match)}
-            </p>
-          </div>
-          <div className="rounded-[24px] border border-white/10 bg-black/30 px-4 py-4">
-            <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">Status</p>
-            <p className="mt-2 text-lg font-semibold text-emerald-200">
-              {match?.result ? "Finished" : match?.isOngoing ? "Managing live" : "Waiting"}
-            </p>
-          </div>
-          <div className="rounded-[24px] border border-white/10 bg-black/30 px-4 py-4">
-            <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">Updated</p>
-            <p className="mt-2 text-lg font-semibold text-white">
-              {formatUpdatedText(match?.updatedAt || selectedSession?.updatedAt)}
-            </p>
-          </div>
+        <div className="rounded-[24px] border border-white/10 bg-black/30 px-4 py-4">
+          <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">Score</p>
+          <p className="mt-2 text-xl font-semibold text-white sm:text-2xl">
+            {buildDirectorScoreLine(match)}
+          </p>
+          <p className="mt-1 text-sm text-emerald-200">
+            {match?.result ? "Match finished" : "Managing live"}
+          </p>
         </div>
       </div>
     </SessionCoverHero>
@@ -241,12 +213,16 @@ export default function DirectorConsoleClient({
     const firstLive = (initialSessions || []).find((item) => item.isLive);
     return firstLive?.session?._id || "";
   });
-  const [showPicker, setShowPicker] = useState(!(initialSessions || []).length);
+  const [managedSessionId, setManagedSessionId] = useState(
+    initialAuthorized
+      ? (initialSessions || []).find((item) => item.isLive)?.session?._id || ""
+      : ""
+  );
+  const [showPicker, setShowPicker] = useState(false);
   const [musicTracks, setMusicTracks] = useState([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [musicState, setMusicState] = useState("idle");
   const [musicVolume, setMusicVolume] = useState(0.8);
-  const [effectsVolume, setEffectsVolume] = useState(0.85);
   const [masterVolume, setMasterVolume] = useState(1);
   const [speakerDeviceId, setSpeakerDeviceId] = useState("default");
   const [speakerDevices, setSpeakerDevices] = useState([]);
@@ -273,14 +249,17 @@ export default function DirectorConsoleClient({
     );
   }, [selectedSessionId, sessions]);
 
-  const [liveMatch, setLiveMatch] = useState(selectedSession?.match || null);
-  const liveUpdatedLabel = useLiveRelativeTime(
-    liveMatch?.updatedAt || selectedSession?.updatedAt
-  );
+  const managedSession = useMemo(() => {
+    if (!managedSessionId) {
+      return null;
+    }
+    return sessions.find((item) => item.session?._id === managedSessionId) || null;
+  }, [managedSessionId, sessions]);
 
+  const [liveMatch, setLiveMatch] = useState(managedSession?.match || null);
   useEffect(() => {
-    setLiveMatch(selectedSession?.match || null);
-  }, [selectedSession]);
+    setLiveMatch(managedSession?.match || null);
+  }, [managedSession]);
 
   useEffect(() => {
     const effectsAudio = effectsAudioRef.current;
@@ -300,6 +279,15 @@ export default function DirectorConsoleClient({
       setSelectedSessionId(firstLive.session._id);
     }
   }, [selectedSessionId, sessions]);
+
+  useEffect(() => {
+    if (
+      managedSessionId &&
+      !sessions.some((item) => item.session?._id === managedSessionId)
+    ) {
+      setManagedSessionId("");
+    }
+  }, [managedSessionId, sessions]);
 
   useEffect(() => {
     if (!authorized || sessions.length) {
@@ -363,11 +351,11 @@ export default function DirectorConsoleClient({
 
   useEventSource({
     url:
-      authorized && selectedSession?.match?._id
-        ? `/api/live/matches/${selectedSession.match._id}`
+      authorized && managedSession?.match?._id
+        ? `/api/live/matches/${managedSession.match._id}`
         : null,
     event: "match",
-    enabled: Boolean(authorized && selectedSession?.match?._id),
+    enabled: Boolean(authorized && managedSession?.match?._id),
     onMessage: (payload) => {
       startTransition(() => {
         setLiveMatch(payload);
@@ -382,17 +370,17 @@ export default function DirectorConsoleClient({
   });
 
   const walkie = useWalkieTalkie({
-    matchId: selectedSession?.match?._id || "",
-    enabled: Boolean(authorized && selectedSession?.match?._id && liveMatch?.isOngoing),
+    matchId: managedSession?.match?._id || "",
+    enabled: Boolean(authorized && managedSession?.match?._id && liveMatch?.isOngoing),
     role: "director",
     displayName:
-      selectedSession?.session?.name
-        ? `${selectedSession.session.name} Director`
+      managedSession?.session?.name
+        ? `${managedSession.session.name} Director`
         : "Director",
   });
 
   const readCurrentScore = () => {
-    const targetMatch = liveMatch || selectedSession?.match;
+    const targetMatch = liveMatch || managedSession?.match;
     if (!targetMatch) {
       return;
     }
@@ -440,7 +428,8 @@ export default function DirectorConsoleClient({
             sessionPayload.sessions?.[0]?.session?._id ||
             ""
         );
-        setShowPicker(!(sessionPayload.sessions || []).length);
+        setManagedSessionId("");
+        setShowPicker(false);
       }
     } catch {
       setAuthError("Could not verify PIN.");
@@ -454,6 +443,7 @@ export default function DirectorConsoleClient({
       method: "DELETE",
     }).catch(() => {});
     setAuthorized(false);
+    setManagedSessionId("");
     setShowPicker(false);
   };
 
@@ -483,12 +473,12 @@ export default function DirectorConsoleClient({
   useEffect(() => {
     const nextVolume = Math.max(
       0,
-      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * effectsVolume * masterVolume)
+      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume)
     );
     if (effectsAudioRef.current) {
       effectsAudioRef.current.volume = nextVolume;
     }
-  }, [effectsVolume, masterVolume, micMonitor.isActive]);
+  }, [masterVolume, micMonitor.isActive]);
 
   useEffect(() => {
     const audio = effectsAudioRef.current;
@@ -591,17 +581,8 @@ export default function DirectorConsoleClient({
 
     setLibraryMessage("");
 
-    if (libraryLiveId === file.id && libraryState === "playing") {
-      audio.pause();
-      return;
-    }
-
-    if (libraryLiveId === file.id && libraryState === "paused") {
-      try {
-        await audio.play();
-      } catch {
-        setLibraryMessage("Tap again to allow audio playback.");
-      }
+    if (libraryLiveId === file.id) {
+      stopAllEffects();
       return;
     }
 
@@ -612,7 +593,7 @@ export default function DirectorConsoleClient({
     audio.src = file.src;
     audio.volume = Math.max(
       0,
-      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * effectsVolume * masterVolume)
+      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume)
     );
 
     try {
@@ -751,43 +732,6 @@ export default function DirectorConsoleClient({
     );
   };
 
-  if (showPicker || !selectedSession) {
-    return (
-      <div className="mx-auto w-full max-w-5xl px-4 py-8">
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-white"
-          >
-            <FaArrowLeft />
-            Home
-          </Link>
-          {authorized ? (
-            <button
-              type="button"
-              onClick={logout}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-zinc-200"
-            >
-              <FaPowerOff />
-              Exit
-            </button>
-          ) : null}
-        </div>
-        <DirectorSessionPicker
-          sessions={sessions}
-          onSelect={(item) => {
-            setSelectedSessionId(item.session._id);
-            setShowPicker(false);
-          }}
-          onQuickStart={(item) => {
-            setSelectedSessionId(item.session._id);
-            setShowPicker(false);
-          }}
-        />
-      </div>
-    );
-  }
-
   const currentTrack = musicTracks[currentTrackIndex];
   const walkieStatus = !walkie.snapshot?.enabled
     ? "Off"
@@ -800,6 +744,7 @@ export default function DirectorConsoleClient({
     : walkie.snapshot?.activeSpeakerRole === "spectator"
     ? "Spectator Live"
     : "Ready";
+  const canManageSession = Boolean(authorized && managedSession?.match?._id);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6">
@@ -812,13 +757,18 @@ export default function DirectorConsoleClient({
           Home
         </Link>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setShowPicker(true)}
-            className="rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-white"
-          >
-            Change session
-          </button>
+          {authorized ? (
+            <button
+              type="button"
+              onClick={() => {
+                setManagedSessionId("");
+                setShowPicker(true);
+              }}
+              className="rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-white"
+            >
+              Change session
+            </button>
+          ) : null}
           {authorized ? (
             <button
               type="button"
@@ -832,37 +782,157 @@ export default function DirectorConsoleClient({
         </div>
       </div>
 
-      <SessionHeader
-        selectedSession={selectedSession}
-        liveMatch={liveMatch}
-        onChangeSession={() => setShowPicker(true)}
-        readCurrentScore={authorized ? readCurrentScore : () => {}}
-      />
+      {managedSession ? (
+        <SessionHeader
+          selectedSession={managedSession}
+          liveMatch={liveMatch}
+          onChangeSession={() => {
+            setManagedSessionId("");
+            setShowPicker(true);
+          }}
+          readCurrentScore={authorized ? readCurrentScore : () => {}}
+        />
+      ) : (
+        <SessionCoverHero
+          imageUrl={
+            selectedSession?.match?.matchImageUrl ||
+            selectedSession?.session?.matchImageUrl ||
+            ""
+          }
+          alt="Director console cover"
+          className="mb-5"
+          priority
+        >
+          <div className="space-y-4 px-5 py-5 sm:px-6">
+            {!authorized ? (
+              <>
+                <div className="space-y-2 text-center sm:text-left">
+                  <div className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-emerald-400/20 bg-emerald-500/12 text-emerald-300 shadow-[0_0_30px_rgba(16,185,129,0.15)]">
+                    <FaBroadcastTower className="text-xl" />
+                  </div>
+                  <h1 className="text-2xl font-semibold tracking-[-0.03em] text-white sm:text-[2rem]">
+                    Enter Director Mode
+                  </h1>
+                  <p className="text-sm leading-6 text-zinc-300">
+                    Enter the 4-digit PIN to choose a live session to manage.
+                  </p>
+                </div>
+                {authError ? (
+                  <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                    {authError}
+                  </div>
+                ) : null}
+                <div className="rounded-[24px] border border-white/10 bg-black/30 px-4 py-4">
+                  <label
+                    htmlFor="director-inline-pin"
+                    className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500"
+                  >
+                    Director PIN
+                  </label>
+                  <input
+                    id="director-inline-pin"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={4}
+                    value={pin}
+                    onChange={(event) =>
+                      setPin(event.target.value.replace(/\D/g, "").slice(0, 4))
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void submitDirectorPin();
+                      }
+                    }}
+                    placeholder="0000"
+                    className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-emerald-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(16,185,129,0.08)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void submitDirectorPin()}
+                    disabled={isSubmittingPin || pin.length !== 4}
+                    className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(90deg,#10b981_0%,#22c55e_58%,#34d399_100%)] px-5 py-3.5 font-bold text-black shadow-[0_16px_36px_rgba(16,185,129,0.2)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isSubmittingPin ? "Checking..." : "Enter Director Mode"}
+                  </button>
+                </div>
+              </>
+            ) : showPicker || !selectedSession ? (
+              <div className="space-y-4">
+                <div className="text-center sm:text-left">
+                  <h1 className="text-2xl font-semibold tracking-[-0.03em] text-white sm:text-[2rem]">
+                    Choose a live session
+                  </h1>
+                  <p className="mt-1 text-sm text-zinc-300">
+                    Pick the session you want to manage.
+                  </p>
+                </div>
+                <DirectorSessionPicker
+                  sessions={sessions}
+                  onSelect={(item) => {
+                    setSelectedSessionId(item.session._id);
+                    setShowPicker(false);
+                    setAuthError("");
+                  }}
+                  onQuickStart={(item) => {
+                    setSelectedSessionId(item.session._id);
+                    setShowPicker(false);
+                    setAuthError("");
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-center sm:text-left">
+                  <h1 className="text-2xl font-semibold tracking-[-0.03em] text-white sm:text-[2rem]">
+                    Manage this session?
+                  </h1>
+                  <p className="mt-1 text-sm text-zinc-200">
+                    {selectedSession.session?.name || "Live session"}
+                  </p>
+                  <p className="mt-1 text-sm text-zinc-400">
+                    {selectedSession.match?.teamAName && selectedSession.match?.teamBName
+                      ? `${selectedSession.match.teamAName} vs ${selectedSession.match.teamBName}`
+                      : "Teams pending"}
+                  </p>
+                </div>
+                <div className="rounded-[24px] border border-white/10 bg-black/30 px-4 py-4">
+                  <p className="text-sm text-zinc-300">
+                    Is this the session you want to manage?
+                  </p>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setManagedSessionId(selectedSession.session?._id || "");
+                        setShowPicker(false);
+                      }}
+                      className="inline-flex flex-1 items-center justify-center rounded-2xl bg-[linear-gradient(90deg,#10b981_0%,#22c55e_58%,#34d399_100%)] px-5 py-3.5 font-bold text-black shadow-[0_16px_36px_rgba(16,185,129,0.2)]"
+                    >
+                      Yes, manage
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPicker(true)}
+                      className="inline-flex flex-1 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] px-5 py-3.5 font-semibold text-white"
+                    >
+                      Choose another
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </SessionCoverHero>
+      )}
 
-      {!authorized ? (
-        <div className="mt-6">
-          <DirectorPinGate
-            pin={pin}
-            onPinChange={setPin}
-            onSubmit={submitDirectorPin}
-            isSubmitting={isSubmittingPin}
-            error={authError}
-          />
-        </div>
-      ) : null}
-
-      {authorized ? (
-        <div className="mb-5 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
-            <FaWifi className="text-emerald-300" />
-            {liveUpdatedLabel}
-          </span>
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
-            <FaHeadphones className="text-zinc-200" />
-            {speakerMessage || "Using phone speaker output."}
-          </span>
-        </div>
-      ) : null}
+      <div className="mb-5 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
+        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
+          <FaHeadphones className="text-zinc-200" />
+          {speakerMessage || "Using phone speaker output."}
+        </span>
+      </div>
 
       {authorized ? <WalkieNotice notice={walkie.notice} onDismiss={walkie.dismissNotice} /> : null}
 
@@ -872,24 +942,6 @@ export default function DirectorConsoleClient({
         </div>
       ) : null}
 
-      {!authorized ? (
-        <div className="mt-6 rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.96),rgba(10,10,14,0.98))] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.35)]">
-          <div className="flex items-start gap-3">
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-white">
-              <FaLock />
-            </span>
-            <div>
-              <h2 className="text-lg font-semibold text-white">Enter PIN to manage session</h2>
-              <p className="mt-1 text-sm text-zinc-400">
-                Browse first, then enter the 4-digit PIN to use PA mic, music, effects,
-                and walkie controls.
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {authorized ? (
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-5">
           <Card
@@ -1000,7 +1052,9 @@ export default function DirectorConsoleClient({
                   </span>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-300">
-                  {walkie.snapshot?.enabled
+                  {!canManageSession
+                    ? "Enter director mode and choose a live session to use walkie."
+                    : walkie.snapshot?.enabled
                     ? "Hold to talk with the live channel."
                     : walkie.requestState === "pending"
                     ? "Request sent. Waiting for umpire."
@@ -1023,7 +1077,7 @@ export default function DirectorConsoleClient({
                       void walkie.requestEnable();
                     }
                   }}
-                  disabled={Boolean(walkie.snapshot?.enabled)}
+                  disabled={!canManageSession || Boolean(walkie.snapshot?.enabled)}
                 />
                 {walkie.snapshot?.enabled ? (
                   <WalkieTalkButton
@@ -1040,10 +1094,12 @@ export default function DirectorConsoleClient({
                   <button
                     type="button"
                     onClick={() => void walkie.requestEnable()}
-                    disabled={!walkie.canRequestEnable}
+                    disabled={!canManageSession || !walkie.canRequestEnable}
                     className="rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-black shadow-[0_12px_30px_rgba(16,185,129,0.22)] transition disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
                   >
-                    {walkie.requestState === "pending"
+                    {!canManageSession
+                      ? "Choose session first"
+                      : walkie.requestState === "pending"
                       ? "Request sent"
                       : "Request walkie"}
                   </button>
@@ -1054,7 +1110,7 @@ export default function DirectorConsoleClient({
 
           <Card
             title="Audio library"
-            subtitle="Files from public/audio/effects"
+            subtitle="Tap to play audio."
             icon={<FaBullhorn />}
             help={{
               title: "Audio library",
@@ -1072,28 +1128,7 @@ export default function DirectorConsoleClient({
           >
             <audio ref={effectsAudioRef} hidden preload="none" />
             <div className="mb-4 flex items-center justify-between gap-3">
-              <p className="text-sm text-zinc-400">
-                {libraryLiveId
-                  ? libraryState === "paused"
-                    ? "Paused"
-                    : libraryState === "loading"
-                    ? "Loading"
-                    : "Playing now"
-                  : "Tap to play or pause"}
-              </p>
-              <label className="flex items-center gap-3 text-sm text-zinc-300">
-                Audio
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={effectsVolume}
-                  onChange={(event) => setEffectsVolume(Number(event.target.value))}
-                  className="w-28 accent-emerald-400"
-                  aria-label="Effects volume"
-                />
-              </label>
+              <p className="text-sm text-zinc-400">Tap to play audio.</p>
             </div>
             {libraryMessage ? (
               <div className="mb-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-300">
@@ -1131,16 +1166,14 @@ export default function DirectorConsoleClient({
                       <div className="flex items-end justify-between gap-2">
                         <div className="text-xs text-zinc-400">
                           {libraryLiveId === file.id
-                            ? libraryState === "paused"
-                              ? "Paused"
-                              : libraryState === "loading"
+                            ? libraryState === "loading"
                               ? "Loading..."
                               : "Playing"
                             : "Tap to play"}
                         </div>
                         {libraryLiveId === file.id ? (
                           <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.08] text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)]">
-                            {libraryState === "paused" ? <FaPlay className="text-xs" /> : <FaPause className="text-xs" />}
+                            {libraryState === "loading" ? <FaMusic className="text-xs" /> : <FaPause className="text-xs" />}
                           </span>
                         ) : null}
                       </div>
@@ -1357,9 +1390,10 @@ export default function DirectorConsoleClient({
               <button
                 type="button"
                 onClick={readCurrentScore}
-                className="rounded-[22px] border border-amber-400/20 bg-amber-500/10 px-4 py-4 text-left text-sm font-semibold text-amber-100 transition hover:-translate-y-0.5"
+                disabled={!canManageSession}
+                className="rounded-[22px] border border-amber-400/20 bg-amber-500/10 px-4 py-4 text-left text-sm font-semibold text-amber-100 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-zinc-500 disabled:hover:translate-y-0"
               >
-                Read current score
+                {canManageSession ? "Read current score" : "Choose session first"}
               </button>
               <button
                 type="button"
@@ -1374,7 +1408,6 @@ export default function DirectorConsoleClient({
           </Card>
         </div>
       </div>
-      ) : null}
     </div>
   );
 }
