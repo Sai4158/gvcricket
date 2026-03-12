@@ -21,11 +21,7 @@ export default async function MatchPage({ params }) {
   const { id } = await params;
   const { authStatus, match } = await loadMatchAccessData(id);
 
-  if (
-    authStatus === "granted" &&
-    match &&
-    (!match.tossWinner || !match.tossDecision)
-  ) {
+  if (authStatus === "granted" && match && !match.tossReady) {
     redirect(`/toss/${id}`);
   }
 

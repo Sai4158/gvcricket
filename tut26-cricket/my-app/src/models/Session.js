@@ -14,6 +14,7 @@ const SessionSchema = new mongoose.Schema(
       default: null,
     },
     tossWinner: { type: String, default: "" },
+    tossDecision: { type: String, enum: ["bat", "bowl", ""], default: "" },
     teamAName: { type: String, default: "", trim: true },
     teamBName: { type: String, default: "", trim: true },
     teamA: { type: [String], default: [] },

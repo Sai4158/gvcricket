@@ -16,6 +16,7 @@ import {
 } from "../src/app/lib/director-access.js";
 import {
   applyMatchAction,
+  applySafeMatchPatch,
   MatchEngineError,
 } from "../src/app/lib/match-engine.js";
 import { validateMatchImageBuffer } from "../src/app/lib/match-image.js";
@@ -34,6 +35,14 @@ import {
   buildSpectatorScoreAnnouncement,
   createScoreLiveEvent,
 } from "../src/app/lib/live-announcements.js";
+import {
+  getStartedMatchId,
+  getStartedMatchFromPayload,
+} from "../src/app/lib/match-start.js";
+import {
+  hasCompleteTossState,
+  normalizeLegacyTossState,
+} from "../src/app/lib/match-toss.js";
 import {
   getWalkieSnapshot,
   hydrateWalkieEnabled,
@@ -329,6 +338,180 @@ test("full match flow stays accurate across innings change and target chase", ()
   );
 });
 
+test("umpire scoring combinations undo extras and over completion cleanly", () => {
+  let match = applyMatchAction(
+    {
+      ...buildBaseMatch(),
+      overs: 1,
+    },
+    {
+    actionId: "toss:combo",
+    type: "set_toss",
+    tossWinner: "Falcons",
+    tossDecision: "bat",
+    }
+  );
+
+  match = applyMatchAction(match, {
+    actionId: "score:one",
+    type: "score_ball",
+    runs: 1,
+    isOut: false,
+    extraType: null,
+  });
+  match = applyMatchAction(match, {
+    actionId: "score:wide",
+    type: "score_ball",
+    runs: 1,
+    isOut: false,
+    extraType: "wide",
+  });
+  match = applyMatchAction(match, {
+    actionId: "score:noball",
+    type: "score_ball",
+    runs: 2,
+    isOut: false,
+    extraType: "noball",
+  });
+  match = applyMatchAction(match, {
+    actionId: "score:wicket",
+    type: "score_ball",
+    runs: 0,
+    isOut: true,
+    extraType: null,
+  });
+
+  assert.equal(match.score, 4);
+  assert.equal(match.outs, 1);
+  assert.equal(countLegalBalls(match.innings1.history), 2);
+
+  match = applyMatchAction(match, {
+    actionId: "undo:wicket",
+    type: "undo_last",
+  });
+  assert.equal(match.score, 4);
+  assert.equal(match.outs, 0);
+  assert.equal(countLegalBalls(match.innings1.history), 1);
+
+  for (let index = 0; index < 5; index += 1) {
+    match = applyMatchAction(match, {
+      actionId: `score:legal-${index}`,
+      type: "score_ball",
+      runs: 1,
+      isOut: false,
+      extraType: null,
+    });
+  }
+
+  assert.equal(countLegalBalls(match.innings1.history), 6);
+
+  const advanced = applyMatchAction(match, {
+    actionId: "advance:after-over",
+    type: "complete_innings",
+  });
+  assert.equal(advanced.innings, "second");
+
+  const rewound = applyMatchAction(advanced, {
+    actionId: "undo:after-advance",
+    type: "undo_last",
+  });
+  assert.equal(rewound.innings, "first");
+  assert.equal(countLegalBalls(rewound.innings1.history), 6);
+  assert.equal(rewound.score, 9);
+
+  const fixedBall = applyMatchAction(
+    applyMatchAction(rewound, {
+      actionId: "undo:last-ball",
+      type: "undo_last",
+    }),
+    {
+      actionId: "score:replace-last-ball",
+      type: "score_ball",
+      runs: 4,
+      isOut: false,
+      extraType: null,
+    }
+  );
+
+  assert.equal(countLegalBalls(fixedBall.innings1.history), 6);
+  assert.equal(fixedBall.score, 12);
+});
+
+test("umpire match patching blocks impossible over changes and unsafe roster edits", () => {
+  let match = applyMatchAction(buildBaseMatch(), {
+    actionId: "toss:patch",
+    type: "set_toss",
+    tossWinner: "Falcons",
+    tossDecision: "bat",
+  });
+
+  for (let index = 0; index < 12; index += 1) {
+    match = applyMatchAction(match, {
+      actionId: `score:patch-first-${index}`,
+      type: "score_ball",
+      runs: 1,
+      isOut: false,
+      extraType: null,
+    });
+  }
+
+  match = applyMatchAction(match, {
+    actionId: "advance:patch-second",
+    type: "complete_innings",
+  });
+
+  assert.throws(
+    () => applySafeMatchPatch(match, { overs: 1 }),
+    (error) => error instanceof MatchEngineError && error.status === 400
+  );
+
+  const oversRaised = applySafeMatchPatch(match, { overs: 3 });
+  assert.equal(oversRaised.overs, 3);
+
+  const renamedLockedTeam = applySafeMatchPatch(match, {
+    teamAName: "Falcons Prime",
+    teamA: ["Alice", "Bea", "Cara"],
+  });
+  assert.equal(renamedLockedTeam.teamAName, "Falcons Prime");
+  assert.equal(renamedLockedTeam.teamA.length, 3);
+
+  assert.throws(
+    () =>
+      applySafeMatchPatch(match, {
+        teamA: ["Alice", "Bea", "Cara", "Dana"],
+      }),
+    (error) => error instanceof MatchEngineError && error.status === 409
+  );
+
+  const expandedBattingTeam = applySafeMatchPatch(match, {
+    teamB: ["Dina", "Esha", "Farah", "Gia"],
+  });
+  assert.equal(expandedBattingTeam.teamB.length, 4);
+
+  const afterSecondInningsWicket = applyMatchAction(match, {
+    actionId: "score:patch-second-wicket",
+    type: "score_ball",
+    runs: 0,
+    isOut: true,
+    extraType: null,
+  });
+  const afterSecondInningsSecondWicket = applyMatchAction(afterSecondInningsWicket, {
+    actionId: "score:patch-second-wicket-2",
+    type: "score_ball",
+    runs: 0,
+    isOut: true,
+    extraType: null,
+  });
+
+  assert.throws(
+    () =>
+      applySafeMatchPatch(afterSecondInningsSecondWicket, {
+        teamB: ["Dina", "Esha"],
+      }),
+    (error) => error instanceof MatchEngineError && error.status === 409
+  );
+});
+
 test("legacy rosters still resolve and public serializers hide sensitive fields", () => {
   const legacySession = {
     _id: "507f1f77bcf86cd799439013",
@@ -364,6 +547,72 @@ test("legacy rosters still resolve and public serializers hide sensitive fields"
     match: { _id: "507f1f77bcf86cd799439099" },
   });
   assert.equal(populatedSession.match, "507f1f77bcf86cd799439099");
+});
+
+test("legacy toss-complete matches normalize innings teams and expose tossReady", () => {
+  const legacyMatch = {
+    ...buildBaseMatch(),
+    tossWinner: "Titans",
+    tossDecision: "bat",
+    innings1: { team: "", score: 0, history: [] },
+    innings2: { team: "", score: 0, history: [] },
+  };
+
+  const normalized = normalizeLegacyTossState(legacyMatch);
+  assert.equal(normalized.innings1.team, "Titans");
+  assert.equal(normalized.innings2.team, "Falcons");
+  assert.equal(hasCompleteTossState(normalized), true);
+
+  const publicMatch = serializePublicMatch(legacyMatch);
+  assert.equal(publicMatch.innings1.team, "Titans");
+  assert.equal(publicMatch.innings2.team, "Falcons");
+  assert.equal(publicMatch.tossReady, true);
+});
+
+test("legacy matches can inherit toss state from the linked session safely", () => {
+  const legacyMatch = {
+    ...buildBaseMatch(),
+    tossWinner: "",
+    tossDecision: "",
+    innings1: { team: "", score: 0, history: [] },
+    innings2: { team: "", score: 0, history: [] },
+  };
+  const sessionFallback = {
+    tossWinner: "Titans",
+    tossDecision: "bowl",
+  };
+
+  const normalized = normalizeLegacyTossState(legacyMatch, sessionFallback);
+  assert.equal(normalized.tossWinner, "Titans");
+  assert.equal(normalized.tossDecision, "bowl");
+  assert.equal(normalized.innings1.team, "Falcons");
+  assert.equal(normalized.innings2.team, "Titans");
+  assert.equal(hasCompleteTossState(legacyMatch, sessionFallback), true);
+});
+
+test("started match payload helpers only accept real match ids", () => {
+  const nestedPayload = {
+    match: {
+      _id: "507f1f77bcf86cd799439031",
+      teamAName: "Falcons",
+    },
+  };
+  const legacyPayload = {
+    _id: "507f1f77bcf86cd799439032",
+    teamAName: "Titans",
+  };
+  const badPayload = {
+    match: {
+      _id: "session-id-not-a-match",
+    },
+  };
+
+  assert.equal(getStartedMatchFromPayload(nestedPayload)._id, nestedPayload.match._id);
+  assert.equal(getStartedMatchFromPayload(legacyPayload)._id, legacyPayload._id);
+  assert.equal(getStartedMatchId(nestedPayload), "507f1f77bcf86cd799439031");
+  assert.equal(getStartedMatchId(legacyPayload), "507f1f77bcf86cd799439032");
+  assert.equal(getStartedMatchId(badPayload), "");
+  assert.equal(getStartedMatchId({}), "");
 });
 
 test("image validation rejects invalid binary payloads", () => {

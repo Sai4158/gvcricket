@@ -32,6 +32,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState("");
   const lastStreamUpdateRef = useRef(initialMatch?.updatedAt || "");
+  const updateInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!matchId || !hasAccess) {
@@ -75,11 +76,12 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     () => new Array(Number(match?.undoCount || 0)).fill(null),
     [match?.undoCount]
   );
-  const tossPending = !match?.tossWinner || !match?.tossDecision;
+  const tossPending = Boolean(match && !match.tossReady);
 
   const sendAction = async (action) => {
-    if (!matchId || !hasAccess || isUpdating) return null;
+    if (!matchId || !hasAccess || updateInFlightRef.current) return null;
 
+    updateInFlightRef.current = true;
     setIsUpdating(true);
 
     try {
@@ -94,6 +96,11 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
         .catch(() => ({ message: "Failed to update match." }));
 
       if (!response.ok) {
+        if (body.message === "Set the toss before scoring starts.") {
+          setError(null);
+          router.replace(`/toss/${matchId}`);
+          return null;
+        }
         throw new Error(body.message || "Failed to update match.");
       }
 
@@ -112,13 +119,15 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       setError(caughtError);
       return null;
     } finally {
+      updateInFlightRef.current = false;
       setIsUpdating(false);
     }
   };
 
   const patchAndUpdate = async (payload) => {
-    if (!matchId || !hasAccess || isUpdating) return null;
+    if (!matchId || !hasAccess || updateInFlightRef.current) return null;
 
+    updateInFlightRef.current = true;
     setIsUpdating(true);
 
     try {
@@ -147,6 +156,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       setError(caughtError);
       return null;
     } finally {
+      updateInFlightRef.current = false;
       setIsUpdating(false);
     }
   };

@@ -44,21 +44,41 @@ export default function TeamInningsDetail({ title, inningsData }) {
   if (!inningsData) return null;
 
   const runRate = calculateRunRate(inningsData.score, inningsData.history);
+  const isRedSide = /red|team b/i.test(title || "");
+  const accentStripClass = isRedSide
+    ? "from-rose-500 via-red-500 to-orange-400"
+    : "from-cyan-400 via-sky-500 to-blue-500";
+  const glowClass = isRedSide
+    ? "shadow-[0_0_0_1px_rgba(244,63,94,0.16),0_16px_44px_rgba(127,29,29,0.3)]"
+    : "shadow-[0_0_0_1px_rgba(56,189,248,0.14),0_16px_44px_rgba(30,58,138,0.28)]";
+  const panelGlowClass = isRedSide
+    ? "before:from-rose-500/18 before:via-red-500/8 before:to-transparent"
+    : "before:from-cyan-400/18 before:via-sky-500/8 before:to-transparent";
 
   return (
-    <div className="bg-zinc-900/50 p-6 rounded-2xl ring-1 ring-zinc-800">
+    <div
+      className={`relative overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(12,14,22,0.96),rgba(8,9,15,0.98))] p-6 ${glowClass} before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-gradient-to-br before:blur-2xl before:content-['']`}
+    >
+      <div
+        className={`absolute inset-x-0 top-0 h-[4px] bg-gradient-to-r ${accentStripClass}`}
+        aria-hidden="true"
+      />
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold text-white">{title}</h2>
-        <span className="text-2xl font-mono font-bold text-amber-300">
+        <h2 className="relative text-2xl font-bold tracking-tight text-white">
+          {title}
+        </h2>
+        <span className="relative text-[2rem] font-black tracking-tight text-amber-300">
           {inningsData.score ?? 0} Runs
         </span>
       </div>
-      <div className="text-sm text-zinc-100 mb-4">Run Rate: {runRate}</div>
+      <div className="relative mb-5 text-sm font-medium text-zinc-200">
+        Run Rate: {runRate}
+      </div>
       <div className="space-y-4 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
         {inningsData.history.length > 0 ? (
           [...inningsData.history].reverse().map((over) => (
-            <div key={over.overNumber}>
-              <p className="font-semibold text-zinc-300 mb-2">
+            <div key={over.overNumber} className="relative rounded-2xl border border-white/6 bg-white/[0.02] px-4 py-3">
+              <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-zinc-300">
                 Over {over.overNumber}
               </p>
               <div className="flex gap-2 flex-wrap">
@@ -69,7 +89,9 @@ export default function TeamInningsDetail({ title, inningsData }) {
             </div>
           ))
         ) : (
-          <p className="text-sm text-yellow-200 font-bold">No overs bowled yet.</p>
+          <p className="relative text-sm font-bold text-yellow-200">
+            No overs bowled yet.
+          </p>
         )}
       </div>
     </div>

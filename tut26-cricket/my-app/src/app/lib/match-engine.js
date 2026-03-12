@@ -103,6 +103,12 @@ function getActiveHistory(match) {
   return match?.[getActiveInningsKey(match)]?.history || [];
 }
 
+function countDismissalsInHistory(history) {
+  return (history || [])
+    .flatMap((over) => over?.balls || [])
+    .filter((ball) => ball?.isOut).length;
+}
+
 function getLegalBallsInActiveInnings(match) {
   return countLegalBalls(getActiveHistory(match));
 }
@@ -128,6 +134,46 @@ function hasScoreActivity(match) {
     countLegalBalls(match?.innings1?.history || []) > 0 ||
     countLegalBalls(match?.innings2?.history || []) > 0
   );
+}
+
+function validateRosterDismissalState(match) {
+  const teamAName = match?.teamAName || "Team A";
+  const teamBName = match?.teamBName || "Team B";
+  const teamASize = Array.isArray(match?.teamA) ? match.teamA.length : 0;
+  const teamBSize = Array.isArray(match?.teamB) ? match.teamB.length : 0;
+  const inningsChecks = [
+    {
+      inningsKey: "innings1",
+      team: match?.innings1?.team || "",
+      dismissals: countDismissalsInHistory(match?.innings1?.history || []),
+    },
+    {
+      inningsKey: "innings2",
+      team: match?.innings2?.team || "",
+      dismissals: countDismissalsInHistory(match?.innings2?.history || []),
+    },
+  ];
+
+  for (const inningsCheck of inningsChecks) {
+    const rosterSize =
+      inningsCheck.team === teamAName
+        ? teamASize
+        : inningsCheck.team === teamBName
+          ? teamBSize
+          : 0;
+
+    if (!rosterSize) {
+      continue;
+    }
+
+    const dismissalLimit = Math.max(1, rosterSize - 1);
+    if (inningsCheck.dismissals > dismissalLimit) {
+      throw new MatchEngineError(
+        `${inningsCheck.team} cannot be reduced below the wickets already recorded in ${inningsCheck.inningsKey === "innings1" ? "the first innings" : "the second innings"}.`,
+        409
+      );
+    }
+  }
 }
 
 function getRosterEditPermissions(match) {
@@ -468,6 +514,8 @@ export function applySafeMatchPatch(matchDocument, patch) {
     nextMatch.innings2 = syncedMatch.innings2;
   }
 
+  validateRosterDismissalState(nextMatch);
+
   return nextMatch;
 }
 
@@ -481,6 +529,7 @@ export function buildSessionMirrorUpdate(matchDocument) {
     teamBName: match?.teamBName || "",
     overs: match?.overs ?? null,
     tossWinner: match?.tossWinner || "",
+    tossDecision: match?.tossDecision || "",
     matchImageUrl: match?.matchImageUrl || "",
     matchImagePublicId: match?.matchImagePublicId || "",
     matchImageUploadedAt: match?.matchImageUploadedAt || null,

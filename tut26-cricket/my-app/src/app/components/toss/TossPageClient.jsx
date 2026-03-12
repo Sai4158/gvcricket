@@ -7,6 +7,7 @@ import { AccessGate, Splash } from "../match/MatchStatusShell";
 import useMatchAccess from "../match/useMatchAccess";
 import TossStatePanels from "./TossStatePanels";
 import { getTeamBundle } from "../../lib/team-utils";
+import { getStartedMatchFromPayload, getStartedMatchId } from "../../lib/match-start";
 import StepFlow from "../shared/StepFlow";
 
 const PENDING_SESSION_IMAGE_KEY = "gv-pending-session-image";
@@ -136,8 +137,14 @@ export default function TossPageClient({
         throw new Error(payload.message || "Failed to update toss.");
       }
 
-      setMatchDetails(payload.match);
-      const finalMatchId = String(payload.match?._id || matchId || "");
+      const nextMatch = getStartedMatchFromPayload(payload);
+      const finalMatchId = getStartedMatchId(payload);
+
+      if (!nextMatch || !finalMatchId) {
+        throw new Error("Could not start the match.");
+      }
+
+      setMatchDetails(nextMatch);
 
       if (typeof window !== "undefined") {
         window.sessionStorage.removeItem(`session_${sessionId}_teamA_v2`);

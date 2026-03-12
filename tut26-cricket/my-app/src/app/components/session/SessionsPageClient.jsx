@@ -197,7 +197,7 @@ export default function SessionsPageClient({ initialSessions }) {
         throw new Error(payload.message || "Incorrect PIN.");
       }
 
-      const needsToss = !selectedSession.tossWinner || !selectedSession.tossDecision;
+      const needsToss = !selectedSession.tossReady;
       router.push(needsToss ? `/toss/${selectedSession.match}` : `/match/${selectedSession.match}`);
       setSelectedSession(null);
     } catch (error) {

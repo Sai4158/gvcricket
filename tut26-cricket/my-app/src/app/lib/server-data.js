@@ -8,6 +8,7 @@ import {
 } from "./director-access";
 import { getMatchAccessCookieName, hasValidMatchAccess } from "./match-access";
 import { serializePublicMatch, serializePublicSession } from "./public-data";
+import { hasCompleteTossState, hydrateLegacyTossState, normalizeLegacyTossState } from "./match-toss";
 
 async function resolveSessionMatches(sessions) {
   const resolvedBySessionId = new Map();
@@ -57,7 +58,7 @@ export async function loadSessionsIndexData() {
     .populate({
       path: "match",
       select:
-        "teamA teamB teamAName teamBName score outs innings innings1 innings2 isOngoing result _id updatedAt",
+        "teamA teamB teamAName teamBName tossWinner tossDecision score outs innings innings1 innings2 isOngoing result _id updatedAt",
     })
     .sort({ createdAt: -1 }))
     .filter((session) => !session?.isDraft);
@@ -65,8 +66,12 @@ export async function loadSessionsIndexData() {
   const fallbackMatchesBySessionId = await resolveSessionMatches(sessions);
 
   return sessions.map((session) => {
-    const resolvedMatch =
+    let resolvedMatch =
       session.match || fallbackMatchesBySessionId.get(String(session._id)) || null;
+    if (resolvedMatch && !hasCompleteTossState(resolvedMatch, session)) {
+      resolvedMatch = normalizeLegacyTossState(resolvedMatch, session);
+    }
+    const publicMatch = serializePublicMatch(resolvedMatch);
 
     return {
       ...serializePublicSession({
@@ -78,6 +83,12 @@ export async function loadSessionsIndexData() {
       updatedAt: resolvedMatch?.updatedAt || session.updatedAt,
       isLive: resolvedMatch ? Boolean(resolvedMatch.isOngoing) : Boolean(session.isLive),
       result: resolvedMatch?.result || session.result || "",
+      tossReady:
+        publicMatch?.tossReady ||
+        Boolean(
+          (resolvedMatch?.tossWinner || session.tossWinner) &&
+            (resolvedMatch?.tossDecision || session.tossDecision)
+        ),
     };
   });
 }
@@ -195,7 +206,7 @@ export async function loadMatchAccessData(matchId) {
   await connectDB();
   const match = await Match.findById(matchId)
     .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
-    .lean();
+    ;
 
   if (!match) {
     return { authStatus: "locked", match: null };
@@ -208,6 +219,15 @@ export async function loadMatchAccessData(matchId) {
     token,
     Number(match.adminAccessVersion || 1)
   );
+
+  const fallbackSession =
+    match && (!match.tossWinner || !match.tossDecision)
+      ? await Session.findById(match.sessionId).select("tossWinner tossDecision")
+      : null;
+
+  if (authorized && hydrateLegacyTossState(match, fallbackSession)) {
+    await match.save();
+  }
 
   return {
     authStatus: authorized ? "granted" : "locked",

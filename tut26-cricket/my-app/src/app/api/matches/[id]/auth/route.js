@@ -4,21 +4,45 @@ import { jsonError, jsonRateLimit } from "../../../../lib/api-response";
 import { writeAuditLog } from "../../../../lib/audit-log";
 import { connectDB } from "../../../../lib/db";
 import {
+  buildSessionMirrorUpdate,
+} from "../../../../lib/match-engine";
+import {
   getClearedMatchAccessCookie,
   getMatchAccessCookie,
   getMatchAccessCookieName,
   hasValidMatchAccess,
   isValidUmpirePin,
 } from "../../../../lib/match-access";
+import { hydrateLegacyTossState } from "../../../../lib/match-toss";
 import { pinPayloadSchema } from "../../../../lib/validators";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { ensureSameOrigin, parseJsonRequest } from "../../../../lib/request-security";
 import Match from "../../../../../models/Match";
+import Session from "../../../../../models/Session";
 
 async function loadMatchAccessState(matchId) {
   await connectDB();
-  return Match.findById(matchId).select("_id adminAccessVersion");
+  const match = await Match.findById(matchId).select(
+    "_id adminAccessVersion teamA teamB teamAName teamBName sessionId tossWinner tossDecision innings1 innings2"
+  );
+
+  if (!match) {
+    return match;
+  }
+
+  const fallbackSession = !match.tossWinner || !match.tossDecision
+    ? await Session.findById(match.sessionId).select("tossWinner tossDecision")
+    : null;
+
+  if (hydrateLegacyTossState(match, fallbackSession)) {
+    await match.save();
+    await Session.findByIdAndUpdate(match.sessionId, {
+      $set: buildSessionMirrorUpdate(match),
+    });
+  }
+
+  return match;
 }
 
 async function hasAuthorizedCookie(matchId, accessVersion) {

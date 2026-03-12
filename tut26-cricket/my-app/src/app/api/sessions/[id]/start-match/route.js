@@ -58,6 +58,13 @@ export async function POST(req, { params }) {
       tossWinner,
       tossDecision,
     } = parsedRequest.value;
+    const battingFirst =
+      tossDecision === "bat"
+        ? tossWinner
+        : tossWinner === teamAName
+          ? teamBName
+          : teamAName;
+    const bowlingFirst = battingFirst === teamAName ? teamBName : teamAName;
 
     let finalMatch = null;
     transactionSession = await Match.startSession();
@@ -84,7 +91,27 @@ export async function POST(req, { params }) {
         existingMatch.overs = overs;
         existingMatch.tossWinner = tossWinner;
         existingMatch.tossDecision = tossDecision;
+        existingMatch.score = 0;
+        existingMatch.outs = 0;
         existingMatch.isOngoing = true;
+        existingMatch.innings = "first";
+        existingMatch.result = "";
+        existingMatch.balls = [];
+        existingMatch.innings1 = {
+          team: battingFirst,
+          score: 0,
+          history: [],
+        };
+        existingMatch.innings2 = {
+          team: bowlingFirst,
+          score: 0,
+          history: [],
+        };
+        existingMatch.processedActionIds = [];
+        existingMatch.actionHistory = [];
+        existingMatch.lastLiveEvent = null;
+        existingMatch.lastEventType = "";
+        existingMatch.lastEventText = "";
         await existingMatch.save({ session: transactionSession });
         finalMatch = existingMatch;
       } else {
@@ -100,8 +127,13 @@ export async function POST(req, { params }) {
               tossWinner,
               tossDecision,
               isOngoing: true,
-              innings1: { score: 0, history: [] },
-              innings2: { score: 0, history: [] },
+              innings: "first",
+              score: 0,
+              outs: 0,
+              result: "",
+              balls: [],
+              innings1: { team: battingFirst, score: 0, history: [] },
+              innings2: { team: bowlingFirst, score: 0, history: [] },
             },
           ],
           { session: transactionSession }
@@ -114,6 +146,7 @@ export async function POST(req, { params }) {
       session.teamBName = teamBName;
       session.overs = overs;
       session.tossWinner = tossWinner;
+      session.tossDecision = tossDecision;
       session.match = finalMatch._id;
       session.isLive = true;
       session.isDraft = false;
@@ -121,7 +154,9 @@ export async function POST(req, { params }) {
       await session.save({ session: transactionSession });
     });
 
-    const response = NextResponse.json(serializePublicMatch(finalMatch), {
+    const response = NextResponse.json(
+      { match: serializePublicMatch(finalMatch) },
+      {
       status: 201,
       headers: {
         "Cache-Control": "no-store",

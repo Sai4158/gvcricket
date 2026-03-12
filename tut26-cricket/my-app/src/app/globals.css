@@ -169,19 +169,19 @@ body {
 
 .btn-ui-glass-dark {
   background:
-    linear-gradient(180deg, rgba(114, 82, 16, 0.58), rgba(33, 24, 10, 0.54)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0)),
-    radial-gradient(circle at 18% 0%, rgba(255, 241, 199, 0.34), transparent 38%),
-    radial-gradient(circle at 82% 100%, rgba(251, 191, 36, 0.18), transparent 46%);
-  border-color: rgba(255, 227, 154, 0.34);
-  color: #fffaf0;
+    linear-gradient(180deg, rgba(196, 48, 72, 0.92), rgba(122, 23, 42, 0.88)),
+    linear-gradient(135deg, rgba(255, 132, 76, 0.26), rgba(255, 82, 82, 0)),
+    radial-gradient(circle at 16% 0%, rgba(255, 213, 197, 0.44), transparent 38%),
+    radial-gradient(circle at 84% 100%, rgba(255, 102, 102, 0.24), transparent 44%);
+  border-color: rgba(255, 173, 173, 0.4);
+  color: #fff7f7;
   box-shadow:
-    0 16px 36px rgba(0, 0, 0, 0.18),
-    0 0 28px rgba(251, 191, 36, 0.12),
+    0 18px 40px rgba(69, 10, 10, 0.24),
+    0 0 34px rgba(248, 113, 113, 0.2),
     inset 0 1.5px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -1px 0 rgba(140, 92, 22, 0.18);
-  backdrop-filter: blur(20px) saturate(165%);
-  -webkit-backdrop-filter: blur(20px) saturate(165%);
+    inset 0 -1px 0 rgba(127, 29, 29, 0.24);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   position: relative;
   overflow: hidden;
 }
@@ -203,37 +203,40 @@ body {
 }
 
 .btn-ui-glass-dark:hover {
-  border-color: rgba(255, 233, 174, 0.46);
+  border-color: rgba(255, 196, 196, 0.52);
   background:
-    linear-gradient(180deg, rgba(128, 91, 18, 0.64), rgba(40, 28, 10, 0.6)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)),
-    radial-gradient(circle at 18% 0%, rgba(255, 246, 214, 0.42), transparent 38%),
-    radial-gradient(circle at 82% 100%, rgba(251, 191, 36, 0.22), transparent 46%);
+    linear-gradient(180deg, rgba(220, 56, 83, 0.96), rgba(136, 28, 49, 0.92)),
+    linear-gradient(135deg, rgba(255, 151, 94, 0.3), rgba(255, 82, 82, 0)),
+    radial-gradient(circle at 16% 0%, rgba(255, 226, 214, 0.5), transparent 38%),
+    radial-gradient(circle at 84% 100%, rgba(255, 120, 120, 0.3), transparent 44%);
   box-shadow:
-    0 18px 40px rgba(0, 0, 0, 0.2),
-    0 0 34px rgba(251, 191, 36, 0.16),
+    0 20px 44px rgba(69, 10, 10, 0.28),
+    0 0 38px rgba(248, 113, 113, 0.24),
     inset 0 1.5px 0 rgba(255, 255, 255, 0.24),
-    inset 0 -1px 0 rgba(140, 92, 22, 0.2);
+    inset 0 -1px 0 rgba(127, 29, 29, 0.28);
 }
 
 .btn-ui-glass-dark-alt {
   background:
-    linear-gradient(180deg, rgba(28, 30, 42, 0.95), rgba(12, 12, 18, 0.98)),
-    radial-gradient(circle at top left, rgba(96, 165, 250, 0.12), transparent 42%);
-  border-color: rgba(255, 255, 255, 0.12);
+    linear-gradient(180deg, rgba(45, 74, 196, 0.9), rgba(22, 36, 108, 0.94)),
+    linear-gradient(135deg, rgba(125, 211, 252, 0.18), rgba(96, 165, 250, 0)),
+    radial-gradient(circle at top left, rgba(191, 219, 254, 0.26), transparent 42%);
+  border-color: rgba(191, 219, 254, 0.24);
   color: #f4f7fb;
   box-shadow:
-    0 16px 36px rgba(0, 0, 0, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
+    0 16px 38px rgba(15, 23, 42, 0.28),
+    0 0 30px rgba(96, 165, 250, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(18px) saturate(155%);
+  -webkit-backdrop-filter: blur(18px) saturate(155%);
 }
 
 .btn-ui-glass-dark-alt:hover {
-  border-color: rgba(96, 165, 250, 0.24);
+  border-color: rgba(191, 219, 254, 0.34);
   background:
-    linear-gradient(180deg, rgba(32, 34, 48, 0.98), rgba(14, 14, 22, 1)),
-    radial-gradient(circle at top left, rgba(96, 165, 250, 0.16), transparent 42%);
+    linear-gradient(180deg, rgba(51, 85, 224, 0.94), rgba(28, 47, 140, 0.98)),
+    linear-gradient(135deg, rgba(147, 223, 255, 0.22), rgba(96, 165, 250, 0)),
+    radial-gradient(circle at top left, rgba(219, 234, 254, 0.3), transparent 42%);
 }
 
 .btn-ui-neutral {

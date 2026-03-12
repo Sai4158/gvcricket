@@ -20,6 +20,7 @@ import {
   ensureSameOrigin,
   parseJsonRequest,
 } from "../../../lib/request-security";
+import { hydrateLegacyTossState } from "../../../lib/match-toss";
 import { matchPatchSchema } from "../../../lib/validators";
 import Match from "../../../../models/Match";
 import Session from "../../../../models/Session";
@@ -38,6 +39,18 @@ export async function GET(_req, { params }) {
 
     if (!match) {
       return jsonError("Match not found.", 404);
+    }
+
+    const fallbackSession =
+      !match.tossWinner || !match.tossDecision
+        ? await Session.findById(match.sessionId).select("tossWinner tossDecision")
+        : null;
+
+    if (hydrateLegacyTossState(match, fallbackSession)) {
+      await match.save();
+      await Session.findByIdAndUpdate(match.sessionId, {
+        $set: buildSessionMirrorUpdate(match),
+      });
     }
 
     return Response.json(serializePublicMatch(match), {
@@ -106,6 +119,18 @@ export async function PATCH(req, { params }) {
       });
 
       return jsonError("Umpire access required.", 403);
+    }
+
+    const fallbackSession =
+      !match.tossWinner || !match.tossDecision
+        ? await Session.findById(match.sessionId).select("tossWinner tossDecision")
+        : null;
+
+    if (hydrateLegacyTossState(match, fallbackSession)) {
+      await match.save();
+      await Session.findByIdAndUpdate(match.sessionId, {
+        $set: buildSessionMirrorUpdate(match),
+      });
     }
 
     const nextState = applySafeMatchPatch(match, parsedRequest.value);

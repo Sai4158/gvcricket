@@ -1,13 +1,15 @@
 "use client";
 
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Reorder } from "framer-motion";
 import {
   FaArrowLeft,
   FaBroadcastTower,
   FaBullhorn,
   FaCompactDisc,
   FaForward,
+  FaGripVertical,
   FaHeadphones,
   FaInfoCircle,
   FaMicrophone,
@@ -20,7 +22,6 @@ import {
   FaWifi,
 } from "react-icons/fa";
 import SessionCoverHero from "../shared/SessionCoverHero";
-import DarkSelect from "../shared/DarkSelect";
 import DirectorSessionPicker from "./DirectorSessionPicker";
 import useEventSource from "../live/useEventSource";
 import useLocalMicMonitor from "../live/useLocalMicMonitor";
@@ -30,6 +31,14 @@ import { WalkieNotice, WalkieTalkButton } from "../live/WalkiePanel";
 import { buildCurrentScoreAnnouncement } from "../../lib/live-announcements";
 import { getBattingTeamBundle } from "../../lib/team-utils";
 import { playUiTone } from "../../lib/page-audio";
+
+const DIRECTOR_AUDIO_LIBRARY_CACHE_KEY = "gv-director-audio-library-v1";
+const DIRECTOR_FORCE_REAUTH_KEY = "gv-director-force-reauth";
+let directorAudioLibraryMemoryCache = null;
+
+function getDirectorAudioOrderStorageKey(sessionId) {
+  return `gv-director-audio-order:${sessionId || "default"}`;
+}
 
 function createSpeechSettings() {
   return {
@@ -204,7 +213,8 @@ export default function DirectorConsoleClient({
   initialAuthorized = false,
   initialSessions = [],
 }) {
-  const [authorized, setAuthorized] = useState(Boolean(initialAuthorized));
+  const router = useRouter();
+  const [authorized, setAuthorized] = useState(false);
   const [sessions, setSessions] = useState(initialSessions || []);
   const [pin, setPin] = useState("");
   const [authError, setAuthError] = useState("");
@@ -213,11 +223,7 @@ export default function DirectorConsoleClient({
     const firstLive = (initialSessions || []).find((item) => item.isLive);
     return firstLive?.session?._id || "";
   });
-  const [managedSessionId, setManagedSessionId] = useState(
-    initialAuthorized
-      ? (initialSessions || []).find((item) => item.isLive)?.session?._id || ""
-      : ""
-  );
+  const [managedSessionId, setManagedSessionId] = useState("");
   const [showPicker, setShowPicker] = useState(false);
   const [musicTracks, setMusicTracks] = useState([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
@@ -231,14 +237,39 @@ export default function DirectorConsoleClient({
   const [musicMessage, setMusicMessage] = useState("");
   const [directorHoldLive, setDirectorHoldLive] = useState(false);
   const [libraryFiles, setLibraryFiles] = useState([]);
-  const [libraryMessage, setLibraryMessage] = useState("");
+  const [libraryOrder, setLibraryOrder] = useState([]);
   const [libraryLiveId, setLibraryLiveId] = useState("");
   const [libraryState, setLibraryState] = useState("idle");
   const audioRef = useRef(null);
   const effectsAudioRef = useRef(null);
   const musicUrlsRef = useRef([]);
-  const speech = useSpeechAnnouncer(createSpeechSettings());
+  const [speechSettings, setSpeechSettings] = useState(createSpeechSettings);
+  const speech = useSpeechAnnouncer(speechSettings);
   const micMonitor = useLocalMicMonitor();
+
+  const markDirectorReauthRequired = () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(DIRECTOR_FORCE_REAUTH_KEY, "1");
+    } catch {
+      // Ignore storage failures and fall back to in-memory state reset.
+    }
+  };
+
+  const clearDirectorReauthRequired = () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      window.localStorage.removeItem(DIRECTOR_FORCE_REAUTH_KEY);
+    } catch {
+      // Ignore storage failures.
+    }
+  };
 
   const selectedSession = useMemo(() => {
     return (
@@ -255,6 +286,11 @@ export default function DirectorConsoleClient({
     }
     return sessions.find((item) => item.session?._id === managedSessionId) || null;
   }, [managedSessionId, sessions]);
+
+  const audioOrderStorageKey = useMemo(
+    () => getDirectorAudioOrderStorageKey(managedSession?.session?._id || selectedSession?.session?._id || ""),
+    [managedSession?.session?._id, selectedSession?.session?._id]
+  );
 
   const [liveMatch, setLiveMatch] = useState(managedSession?.match || null);
   useEffect(() => {
@@ -279,6 +315,52 @@ export default function DirectorConsoleClient({
       setSelectedSessionId(firstLive.session._id);
     }
   }, [selectedSessionId, sessions]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const resetDirectorMode = () => {
+      let shouldReset = false;
+
+      try {
+        shouldReset =
+          window.localStorage.getItem(DIRECTOR_FORCE_REAUTH_KEY) === "1";
+      } catch {
+        shouldReset = false;
+      }
+
+      if (!shouldReset) {
+        return;
+      }
+
+      clearDirectorReauthRequired();
+      setAuthorized(false);
+      setManagedSessionId("");
+      setShowPicker(false);
+      setPin("");
+      setAuthError("");
+    };
+
+    resetDirectorMode();
+
+    const handlePageShow = () => {
+      resetDirectorMode();
+    };
+
+    const handlePageHide = () => {
+      markDirectorReauthRequired();
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, []);
 
   useEffect(() => {
     if (
@@ -315,18 +397,34 @@ export default function DirectorConsoleClient({
   }, [authorized, sessions.length]);
 
   useEffect(() => {
-    if (!authorized) {
-      setLibraryFiles([]);
-      setLibraryLiveId("");
-      setLibraryState("idle");
+    if (directorAudioLibraryMemoryCache?.length) {
+      setLibraryFiles(directorAudioLibraryMemoryCache);
       return;
+    }
+
+    if (typeof window !== "undefined") {
+      try {
+        const cachedValue = window.sessionStorage.getItem(
+          DIRECTOR_AUDIO_LIBRARY_CACHE_KEY
+        );
+        if (cachedValue) {
+          const parsed = JSON.parse(cachedValue);
+          if (Array.isArray(parsed) && parsed.length) {
+            directorAudioLibraryMemoryCache = parsed;
+            setLibraryFiles(parsed);
+            return;
+          }
+        }
+      } catch {
+        // Ignore broken cache and fall through to network.
+      }
     }
 
     let cancelled = false;
 
     void (async () => {
       const response = await fetch("/api/director/audio-library", {
-        cache: "no-store",
+        cache: "force-cache",
       });
       const payload = await response.json().catch(() => ({ files: [] }));
 
@@ -334,20 +432,83 @@ export default function DirectorConsoleClient({
         return;
       }
 
-      if (!response.ok) {
-        setLibraryFiles([]);
-        setLibraryMessage("Could not load audio files.");
-        return;
-      }
+        if (!response.ok) {
+          setLibraryFiles([]);
+          return;
+        }
 
-      setLibraryFiles(payload.files || []);
-      setLibraryMessage("");
+      const nextFiles = payload.files || [];
+      directorAudioLibraryMemoryCache = nextFiles;
+      if (typeof window !== "undefined") {
+        try {
+          window.sessionStorage.setItem(
+            DIRECTOR_AUDIO_LIBRARY_CACHE_KEY,
+            JSON.stringify(nextFiles)
+          );
+        } catch {
+          // Ignore storage failures and keep in-memory cache.
+        }
+      }
+      setLibraryFiles(nextFiles);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [authorized]);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const rawValue = window.localStorage.getItem(audioOrderStorageKey);
+      if (!rawValue) {
+        setLibraryOrder([]);
+        return;
+      }
+
+      const parsed = JSON.parse(rawValue);
+      setLibraryOrder(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setLibraryOrder([]);
+    }
+  }, [audioOrderStorageKey]);
+
+  const orderedLibraryFiles = useMemo(() => {
+    if (!libraryFiles.length) {
+      return [];
+    }
+
+    if (!libraryOrder.length) {
+      return libraryFiles;
+    }
+
+    const orderMap = new Map(libraryOrder.map((id, index) => [id, index]));
+    return [...libraryFiles].sort((left, right) => {
+      const leftIndex = orderMap.has(left.id) ? orderMap.get(left.id) : Number.MAX_SAFE_INTEGER;
+      const rightIndex = orderMap.has(right.id) ? orderMap.get(right.id) : Number.MAX_SAFE_INTEGER;
+      if (leftIndex !== rightIndex) {
+        return leftIndex - rightIndex;
+      }
+      return left.label.localeCompare(right.label);
+    });
+  }, [libraryFiles, libraryOrder]);
+
+  const handleLibraryReorder = (nextFiles) => {
+    setLibraryFiles(nextFiles);
+    const nextOrder = nextFiles.map((file) => file.id);
+    setLibraryOrder(nextOrder);
+
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(audioOrderStorageKey, JSON.stringify(nextOrder));
+      } catch {
+        // Ignore storage failures and keep the in-memory order.
+      }
+    }
+  };
 
   useEventSource({
     url:
@@ -381,7 +542,7 @@ export default function DirectorConsoleClient({
 
   const readCurrentScore = () => {
     const targetMatch = liveMatch || managedSession?.match;
-    if (!targetMatch) {
+    if (!targetMatch || !speechSettings.enabled) {
       return;
     }
 
@@ -411,6 +572,7 @@ export default function DirectorConsoleClient({
         return;
       }
 
+      clearDirectorReauthRequired();
       setAuthorized(true);
       setPin("");
 
@@ -439,12 +601,20 @@ export default function DirectorConsoleClient({
   };
 
   const logout = async () => {
+    markDirectorReauthRequired();
     await fetch("/api/director/auth", {
       method: "DELETE",
     }).catch(() => {});
     setAuthorized(false);
     setManagedSessionId("");
     setShowPicker(false);
+    setPin("");
+    setAuthError("");
+  };
+
+  const leaveDirectorMode = async () => {
+    await logout();
+    router.push("/");
   };
 
   const syncSinkId = async (deviceId) => {
@@ -467,8 +637,9 @@ export default function DirectorConsoleClient({
       return;
     }
 
-    audio.volume = musicVolume * masterVolume;
-  }, [masterVolume, musicVolume]);
+    const duckFactor = micMonitor.isActive ? 0.24 : libraryLiveId ? 0.3 : 1;
+    audio.volume = musicVolume * masterVolume * duckFactor;
+  }, [libraryLiveId, masterVolume, micMonitor.isActive, musicVolume]);
 
   useEffect(() => {
     const nextVolume = Math.max(
@@ -503,7 +674,7 @@ export default function DirectorConsoleClient({
       setLibraryState((current) => (current === "loading" ? "paused" : current));
     };
     const handleError = () => {
-      setLibraryMessage("This audio file could not be played here.");
+      setConsoleError("This audio file could not be played in this browser.");
       setLibraryLiveId("");
       setLibraryState("idle");
     };
@@ -579,8 +750,6 @@ export default function DirectorConsoleClient({
       return;
     }
 
-    setLibraryMessage("");
-
     if (libraryLiveId === file.id) {
       stopAllEffects();
       return;
@@ -599,7 +768,7 @@ export default function DirectorConsoleClient({
     try {
       await audio.play();
     } catch {
-      setLibraryMessage("Tap again to allow audio playback.");
+      setConsoleError("This audio file could not be played in this browser.");
       setLibraryState("idle");
       setLibraryLiveId("");
     }
@@ -733,6 +902,75 @@ export default function DirectorConsoleClient({
   };
 
   const currentTrack = musicTracks[currentTrackIndex];
+
+  useEffect(() => {
+    if (
+      typeof navigator === "undefined" ||
+      typeof MediaMetadata === "undefined" ||
+      !("mediaSession" in navigator)
+    ) {
+      return;
+    }
+
+    if (!currentTrack) {
+      navigator.mediaSession.metadata = null;
+      navigator.mediaSession.playbackState = "none";
+      return;
+    }
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentTrack.name,
+      artist: "Local phone audio",
+      album: "GV Cricket Music Deck",
+    });
+    navigator.mediaSession.playbackState =
+      musicState === "playing" ? "playing" : "paused";
+
+    try {
+      navigator.mediaSession.setActionHandler("play", () => {
+        const audio = audioRef.current;
+        if (!audio || !currentTrack) {
+          return;
+        }
+        audio
+          .play()
+          .then(() => {
+            setMusicState("playing");
+          })
+          .catch(() => {});
+      });
+      navigator.mediaSession.setActionHandler("pause", () => {
+        audioRef.current?.pause();
+        setMusicState("paused");
+      });
+      navigator.mediaSession.setActionHandler("nexttrack", () => {
+        if (musicTracks.length > 1) {
+          setCurrentTrackIndex((index) => (index + 1) % musicTracks.length);
+        }
+      });
+      navigator.mediaSession.setActionHandler("stop", () => {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+        }
+        setMusicState("stopped");
+      });
+    } catch {
+      // Some browsers only support a subset of media session actions.
+    }
+
+    return () => {
+      try {
+        navigator.mediaSession.setActionHandler("play", null);
+        navigator.mediaSession.setActionHandler("pause", null);
+        navigator.mediaSession.setActionHandler("nexttrack", null);
+        navigator.mediaSession.setActionHandler("stop", null);
+      } catch {
+        // Ignore unsupported action cleanup.
+      }
+    };
+  }, [currentTrack, musicState, musicTracks.length]);
+
   const walkieStatus = !walkie.snapshot?.enabled
     ? "Off"
     : walkie.isFinishing
@@ -749,13 +987,16 @@ export default function DirectorConsoleClient({
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <Link
-          href="/"
+        <button
+          type="button"
+          onClick={() => {
+            void leaveDirectorMode();
+          }}
           className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-white"
         >
           <FaArrowLeft />
           Home
-        </Link>
+        </button>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {authorized ? (
             <button
@@ -1069,16 +1310,14 @@ export default function DirectorConsoleClient({
                 ) : null}
               </div>
               <div className="flex flex-col items-center gap-4">
-                <IosSwitch
-                  checked={Boolean(walkie.snapshot?.enabled)}
-                  label="Walkie state"
-                  onChange={() => {
-                    if (!walkie.snapshot?.enabled) {
-                      void walkie.requestEnable();
-                    }
-                  }}
-                  disabled={!canManageSession || Boolean(walkie.snapshot?.enabled)}
-                />
+                {walkie.snapshot?.enabled ? (
+                  <IosSwitch
+                    checked
+                    label="Walkie state"
+                    onChange={() => {}}
+                    disabled
+                  />
+                ) : null}
                 {walkie.snapshot?.enabled ? (
                   <WalkieTalkButton
                     active={walkie.isSelfTalking}
@@ -1130,61 +1369,91 @@ export default function DirectorConsoleClient({
             <div className="mb-4 flex items-center justify-between gap-3">
               <p className="text-sm text-zinc-400">Tap to play audio.</p>
             </div>
-            {libraryMessage ? (
-              <div className="mb-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-300">
-                {libraryMessage}
-              </div>
-            ) : null}
-            <div className="grid grid-cols-2 gap-3">
-              {libraryFiles.length ? (
-                libraryFiles.map((file) => (
-                  <button
-                    key={file.id}
-                    type="button"
-                    onClick={() => {
-                      void playEffect(file);
-                    }}
-                    className={`group relative aspect-square overflow-hidden rounded-[24px] border px-4 py-4 text-left transition hover:-translate-y-0.5 ${
-                      libraryLiveId === file.id
-                        ? "border-emerald-300/30 bg-[linear-gradient(180deg,rgba(18,40,34,0.9),rgba(10,16,18,0.94))] shadow-[0_18px_40px_rgba(16,185,129,0.16)]"
-                        : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
-                    }`}
-                  >
-                    <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
-                    <div className="flex h-full flex-col justify-between">
-                      <div className="space-y-2">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-white/90">
-                          <FaMusic className="text-sm" />
-                        </div>
-                        <div className="space-y-1">
-                          <div className="line-clamp-2 text-sm font-semibold leading-5 text-white">
-                            {file.label}
+            <div className="rounded-[28px] border border-white/10 bg-black/15 p-2">
+              {orderedLibraryFiles.length ? (
+                <Reorder.Group
+                  axis="y"
+                  values={orderedLibraryFiles}
+                  onReorder={handleLibraryReorder}
+                  className="grid grid-cols-2 gap-3"
+                >
+                  {orderedLibraryFiles.map((file) => (
+                    <Reorder.Item
+                      key={file.id}
+                      value={file}
+                      whileDrag={{
+                        scale: 1.03,
+                        zIndex: 20,
+                        boxShadow: "0 20px 50px rgba(0,0,0,0.35)",
+                      }}
+                      className={`group relative aspect-square overflow-hidden rounded-[24px] border px-4 py-4 text-left transition ${
+                        libraryLiveId === file.id
+                          ? "border-emerald-300/30 bg-[linear-gradient(180deg,rgba(18,40,34,0.9),rgba(10,16,18,0.94))] shadow-[0_18px_40px_rgba(16,185,129,0.16)]"
+                          : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                      }`}
+                    >
+                      <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
+                      <div className="flex h-full flex-col justify-between">
+                        <div className="space-y-2">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-white/90">
+                              <FaMusic className="text-sm" />
+                            </div>
+                            <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-400">
+                              <FaGripVertical className="text-sm" />
+                            </span>
                           </div>
-                          <div className="truncate text-xs text-zinc-400">{file.fileName}</div>
+                          <div className="space-y-1">
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void playEffect(file);
+                              }}
+                              className="block w-full text-left"
+                            >
+                              <div className="line-clamp-2 text-sm font-semibold leading-5 text-white">
+                                {file.label}
+                              </div>
+                              <div className="truncate text-xs text-zinc-400">{file.fileName}</div>
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-end justify-between gap-2">
+                          <div className="text-xs text-zinc-400">
+                            {libraryLiveId === file.id
+                              ? libraryState === "loading"
+                                ? "Loading..."
+                                : "Playing"
+                              : "Tap to play"}
+                          </div>
+                          {libraryLiveId === file.id ? (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                stopAllEffects();
+                              }}
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.08] text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)]"
+                              aria-label={`Stop ${file.label}`}
+                            >
+                              {libraryState === "loading" ? (
+                                <FaMusic className="text-xs" />
+                              ) : (
+                                <FaPause className="text-xs" />
+                              )}
+                            </button>
+                          ) : null}
                         </div>
                       </div>
-                      <div className="flex items-end justify-between gap-2">
-                        <div className="text-xs text-zinc-400">
-                          {libraryLiveId === file.id
-                            ? libraryState === "loading"
-                              ? "Loading..."
-                              : "Playing"
-                            : "Tap to play"}
-                        </div>
-                        {libraryLiveId === file.id ? (
-                          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.08] text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)]">
-                            {libraryState === "loading" ? <FaMusic className="text-xs" /> : <FaPause className="text-xs" />}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </button>
-                ))
+                    </Reorder.Item>
+                  ))}
+                </Reorder.Group>
               ) : (
                 <button
                   type="button"
                   disabled
-                  className="col-span-full rounded-[22px] border border-white/10 bg-black/20 px-4 py-5 text-left text-sm text-zinc-400"
+                  className="w-full rounded-[22px] border border-white/10 bg-black/20 px-4 py-5 text-left text-sm text-zinc-400"
                 >
                   Drop audio files into <span className="font-semibold text-zinc-200">public/audio/effects</span> and they will appear here.
                 </button>
@@ -1195,74 +1464,62 @@ export default function DirectorConsoleClient({
 
         <div className="space-y-5">
           <Card
-            title="Speaker Output"
-            subtitle="Phone, browser, or Bluetooth speaker"
-            icon={<FaHeadphones />}
+            title="Score announcer"
+            subtitle="Live score readout"
+            icon={<FaVolumeUp />}
             help={{
-              title: "Speaker output",
-              body: "Choose the current phone speaker or another available audio output. On some mobile browsers the app uses the current device output automatically.",
+              title: "Score announcer",
+              body: "Keep score announcements on for the managed session. Use read current score any time for a quick update.",
             }}
             action={
-              <span className="inline-flex rounded-full bg-emerald-500/14 px-3 py-1 text-xs font-semibold text-emerald-200">
-                {speakerDevices.length ? "Selectable" : "Auto"}
-              </span>
+              <IosSwitch
+                checked={speechSettings.enabled}
+                label="Score announcer"
+                onChange={(nextChecked) =>
+                  setSpeechSettings((current) => ({
+                    ...current,
+                    enabled: nextChecked,
+                  }))
+                }
+              />
             }
           >
             <div className="space-y-4">
               <div className="rounded-[24px] border border-white/10 bg-black/20 px-4 py-4">
                 <p className="text-sm text-zinc-300">
-                  Connect phone to Bluetooth speaker to use phone as a mic and PA source.
+                  {speechSettings.enabled
+                    ? "Score announcer is on."
+                    : "Score announcer is off."}
                 </p>
               </div>
-              <label className="space-y-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                  Output device
-                </span>
-                <DarkSelect
-                  value={speakerDeviceId}
-                  ariaLabel="Output device"
-                  options={[
-                    { value: "default", label: "Phone / current output" },
-                    ...speakerDevices.map((device) => ({
-                      value: device.deviceId,
-                      label: device.label || "External speaker",
-                    })),
-                  ]}
-                  onChange={(nextValue) => {
-                    void handleSpeakerOutputChange(nextValue);
-                  }}
-                />
-              </label>
-              <label className="space-y-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                  Master volume
-                </span>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={masterVolume}
-                  onChange={(event) => setMasterVolume(Number(event.target.value))}
-                  className="w-full accent-emerald-400"
-                />
-              </label>
+              <button
+                type="button"
+                onClick={readCurrentScore}
+                disabled={!canManageSession || !speechSettings.enabled}
+                className="w-full rounded-[22px] border border-amber-400/20 bg-amber-500/10 px-4 py-4 text-left text-sm font-semibold text-amber-100 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-zinc-500 disabled:hover:translate-y-0"
+              >
+                {canManageSession
+                  ? speechSettings.enabled
+                    ? "Read current score"
+                    : "Turn announcer on first"
+                  : "Choose session first"}
+              </button>
             </div>
           </Card>
 
           <Card
             title="Music Deck"
-            subtitle="Local tracks from this phone"
+            subtitle="Files on this phone"
             icon={<FaMusic />}
             help={{
               title: "Music deck",
-              body: "Load local audio files from the phone, then play, pause, stop, or skip them during the session. The deck stays local to this browser.",
+              body: "Use audio files from Files, Downloads, or this phone. Connect a Bluetooth speaker first for louder playback. External apps like Spotify or Apple Music cannot be controlled here.",
             }}
             action={
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black shadow-[0_10px_30px_rgba(16,185,129,0.2)]">
                 <FaCompactDisc />
-                Add tracks
-                <input
+                  Add tracks
+                  <input
                   type="file"
                   accept="audio/*"
                   multiple
@@ -1371,39 +1628,43 @@ export default function DirectorConsoleClient({
                 </div>
               ) : (
                 <div className="rounded-[24px] border border-white/10 bg-black/20 px-4 py-4 text-sm text-zinc-400">
-                  Add local audio files to build a simple match playlist.
+                  Add audio files from Files, Downloads, or this phone.
                 </div>
               )}
             </div>
           </Card>
 
           <Card
-            title="Quick actions"
-            subtitle="Fast control"
-            icon={<FaBroadcastTower />}
+            title="Audio output"
+            subtitle="Current playback route"
+            icon={<FaHeadphones />}
             help={{
-              title: "Quick actions",
-              body: "Read the current score aloud or stop every audio source instantly if you need a clean reset.",
+              title: "Audio output",
+              body: "This shows where your audio is playing. Connect the phone to a Bluetooth speaker first for louder PA playback.",
             }}
           >
-            <div className="grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={readCurrentScore}
-                disabled={!canManageSession}
-                className="rounded-[22px] border border-amber-400/20 bg-amber-500/10 px-4 py-4 text-left text-sm font-semibold text-amber-100 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-zinc-500 disabled:hover:translate-y-0"
-              >
-                {canManageSession ? "Read current score" : "Choose session first"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void stopAllAudio();
-                }}
-                className="rounded-[22px] border border-rose-400/20 bg-rose-500/10 px-4 py-4 text-left text-sm font-semibold text-rose-100 transition hover:-translate-y-0.5"
-              >
-                Stop all audio
-              </button>
+            <div className="space-y-4">
+              <div className="rounded-[24px] border border-white/10 bg-black/20 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                  Current output
+                </p>
+                <p className="mt-2 text-lg font-semibold text-white">
+                  {speakerDevices.length
+                    ? "Phone / selected speaker output"
+                    : "Phone speaker output"}
+                </p>
+                <p className="mt-1 text-sm text-zinc-400">
+                  {speakerMessage || "Using your phone or current browser output."}
+                </p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-black/20 px-4 py-4">
+                <p className="text-sm font-semibold text-white">How to use it</p>
+                <ul className="mt-3 space-y-2 text-sm leading-6 text-zinc-300">
+                  <li>1. Connect your phone to a Bluetooth speaker.</li>
+                  <li>2. Keep the speaker volume up.</li>
+                  <li>3. Use PA mic, music, or sound effects from this page.</li>
+                </ul>
+              </div>
             </div>
           </Card>
         </div>

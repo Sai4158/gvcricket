@@ -1,7 +1,10 @@
 import { connectDB } from "../../../../lib/db";
 import { ensureLiveUpdates, subscribeToMatch } from "../../../../lib/live-updates";
+import { buildSessionMirrorUpdate } from "../../../../lib/match-engine";
+import { hydrateLegacyTossState } from "../../../../lib/match-toss";
 import { serializePublicMatch } from "../../../../lib/public-data";
 import Match from "../../../../../models/Match";
+import Session from "../../../../../models/Session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +41,14 @@ export async function GET(request, { params }) {
         await ensureLiveUpdates();
 
         const pushMatch = async () => {
-          const match = await Match.findById(id).lean();
+          const match = await Match.findById(id);
+          if (match && hydrateLegacyTossState(match)) {
+            await match.save();
+            await Session.findByIdAndUpdate(match.sessionId, {
+              $set: buildSessionMirrorUpdate(match),
+            });
+          }
+
           send("match", {
             match: serializePublicMatch(match),
             updatedAt: new Date().toISOString(),

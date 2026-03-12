@@ -37,8 +37,7 @@ export default function MatchPageClient({
   const router = useRouter();
   const [modal, setModal] = useState({ type: null });
   const [infoText, setInfoText] = useState(null);
-  const [announceCooldownLeft, setAnnounceCooldownLeft] = useState(0);
-  const lastLocalActionRef = useRef("");
+  const localAnnouncementIdRef = useRef(0);
   const { authStatus, authError, authSubmitting, submitPin } = useMatchAccess(
     matchId,
     initialAuthStatus
@@ -63,7 +62,7 @@ export default function MatchPageClient({
   } = useMatch(matchId, authStatus === "granted", initialMatch);
   const liveUpdatedLabel = useLiveRelativeTime(lastUpdatedAt);
   const isLiveMatch = Boolean(match?.isOngoing && !match?.result);
-  const tossPending = !match?.tossWinner || !match?.tossDecision;
+  const tossPending = Boolean(match && !match.tossReady);
   const walkie = useWalkieTalkie({
     matchId,
     enabled: Boolean(authStatus === "granted" && isLiveMatch),
@@ -72,10 +71,6 @@ export default function MatchPageClient({
     displayName: "Umpire",
   });
   const hasPendingWalkieRequests = Boolean(isLiveMatch && walkie.pendingRequests?.length);
-
-  useEffect(() => {
-    lastLocalActionRef.current = "";
-  }, [match?.lastLiveEvent?.id]);
 
   useEffect(() => {
     if (authStatus === "granted" && match && tossPending) {
@@ -88,18 +83,6 @@ export default function MatchPageClient({
       stop();
     }
   }, [isLiveMatch, stop]);
-
-  useEffect(() => {
-    if (announceCooldownLeft <= 0) {
-      return undefined;
-    }
-
-    const timer = window.setTimeout(() => {
-      setAnnounceCooldownLeft((current) => Math.max(0, current - 1));
-    }, 1000);
-
-    return () => window.clearTimeout(timer);
-  }, [announceCooldownLeft]);
 
   const announceUmpireAction = (runs, isOut = false, extraType = null) => {
     const nextMatch = match
@@ -116,13 +99,14 @@ export default function MatchPageClient({
     });
     const text = buildUmpireAnnouncement(event, umpireSettings.mode);
 
-    if (!text || lastLocalActionRef.current === text) return;
-    lastLocalActionRef.current = text;
+    if (!text) return;
+    localAnnouncementIdRef.current += 1;
     speak(text, {
-      key: `umpire-${text}`,
+      key: `umpire-${localAnnouncementIdRef.current}`,
       rate: 0.92,
-      minGapMs: 250,
+      minGapMs: 0,
       userGesture: true,
+      interrupt: false,
     });
   };
 
@@ -132,17 +116,18 @@ export default function MatchPageClient({
   };
 
   const handleManualScoreAnnouncement = () => {
-    if (!match || announceCooldownLeft > 0) {
+    if (!match) {
       return;
     }
 
-    setAnnounceCooldownLeft(3);
+    localAnnouncementIdRef.current += 1;
     speak(buildCurrentScoreAnnouncement(match), {
-      key: `umpire-current-score-${match._id}`,
+      key: `umpire-current-score-${localAnnouncementIdRef.current}`,
       rate: 0.9,
-      minGapMs: 2500,
+      minGapMs: 0,
       userGesture: true,
       ignoreEnabled: true,
+      interrupt: true,
     });
   };
 
@@ -219,6 +204,7 @@ export default function MatchPageClient({
   if (isLoading) return <Splash>Loading Match...</Splash>;
   if (error && !match) return <Splash>Error: Could not load match data.</Splash>;
   if (!match) return <Splash>Match not found.</Splash>;
+  if (tossPending) return <Splash>Opening toss...</Splash>;
 
   const activeInningsKey = match.innings === "first" ? "innings1" : "innings2";
   const oversHistory = match[activeInningsKey]?.history ?? [];
@@ -352,11 +338,8 @@ export default function MatchPageClient({
                     : ""
                   : "",
                 onAnnounceNow: handleManualScoreAnnouncement,
-                announceLabel:
-                  announceCooldownLeft > 0
-                    ? `Read Score (${announceCooldownLeft}s)`
-                    : "Read Score",
-                announceDisabled: announceCooldownLeft > 0,
+                announceLabel: "Read Score",
+                announceDisabled: false,
               }
             : null
         }

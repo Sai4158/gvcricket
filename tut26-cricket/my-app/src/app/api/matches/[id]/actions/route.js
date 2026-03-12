@@ -16,6 +16,7 @@ import { serializePublicMatch } from "../../../../lib/public-data";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../../lib/request-security";
+import { hydrateLegacyTossState } from "../../../../lib/match-toss";
 import { matchActionSchema } from "../../../../lib/validators";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
@@ -101,6 +102,18 @@ export async function POST(req, { params }) {
       });
 
       return jsonError("Umpire access required.", 403);
+    }
+
+    const fallbackSession =
+      !match.tossWinner || !match.tossDecision
+        ? await Session.findById(match.sessionId).select("tossWinner tossDecision")
+        : null;
+
+    if (hydrateLegacyTossState(match, fallbackSession)) {
+      await match.save();
+      await Session.findByIdAndUpdate(match.sessionId, {
+        $set: buildSessionMirrorUpdate(match),
+      });
     }
 
     if (isProcessedAction(match, parsedRequest.value.actionId)) {
