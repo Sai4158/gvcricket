@@ -258,7 +258,7 @@ export default function MatchActionGrid({
             onHoldEnd={onMicHoldEnd}
             onPressFeedback={onPressFeedback}
             icon={<CommentaryIcon />}
-            label="Speaker Mic"
+            label="Loudspeaker"
             colorClass="text-amber-300"
             active={isCommentaryActive}
             talking={isCommentaryTalking}

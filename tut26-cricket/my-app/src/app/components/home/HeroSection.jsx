@@ -163,7 +163,7 @@ export default function HeroSection({ liveMatch = null }) {
             <motion.span
               aria-hidden="true"
               style={{ scale: headingScrollScale, y: headingScrollY }}
-              className="pointer-events-none absolute inset-0 z-0 block text-center text-5xl font-semibold tracking-tight text-white/12 blur-[10px] md:text-7xl"
+              className="pointer-events-none absolute inset-0 z-0 block text-center text-5xl font-semibold tracking-tight text-white/16 blur-[14px] md:text-7xl"
             >
               End-to-end cricket scoring, made simple.
             </motion.span>
@@ -174,18 +174,24 @@ export default function HeroSection({ liveMatch = null }) {
               }}
               className="
                 relative z-10 block
-                text-white/88
-                text-5xl md:text-7xl font-semibold tracking-tight will-change-transform
-                drop-shadow-[0_10px_30px_rgba(0,0,0,0.62)]
+                text-white/78
+                text-5xl md:text-7xl font-semibold tracking-[-0.035em] will-change-transform
+                drop-shadow-[0_12px_34px_rgba(0,0,0,0.68)]
               "
             >
               <span className="relative inline-block">
-                <span className="relative z-10">
+                <span className="relative z-10 [text-rendering:geometricPrecision]">
                   End-to-end cricket scoring, made simple.
                 </span>
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 z-20 animate-[animate-gradient_3.8s_linear_infinite] bg-[linear-gradient(110deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.12)_24%,rgba(255,247,214,0.55)_38%,rgba(255,255,255,0.16)_54%,rgba(255,255,255,0)_72%)] bg-[length:240%_auto] bg-clip-text text-transparent mix-blend-screen"
+                  className="pointer-events-none absolute inset-0 z-20 animate-[animate-gradient_4.2s_linear_infinite] bg-[linear-gradient(110deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.1)_22%,rgba(255,248,224,0.4)_38%,rgba(255,255,255,0.12)_52%,rgba(255,255,255,0)_74%)] bg-[length:240%_auto] bg-clip-text text-transparent mix-blend-screen"
+                >
+                  End-to-end cricket scoring, made simple.
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 z-0 text-white/24 blur-[2px]"
                 >
                   End-to-end cricket scoring, made simple.
                 </span>

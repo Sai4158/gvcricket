@@ -44,8 +44,8 @@ const updateCards = [
   },
   {
     icon: FaMicrophoneAlt,
-    title: "Speaker Mic",
-    copy: "Use your phone as a speaker mic for quick commentary and live atmosphere.",
+    title: "Loudspeaker",
+    copy: "Use your phone as a loudspeaker for quick commentary and live atmosphere.",
     accent: "yellow",
   },
   {
@@ -236,7 +236,7 @@ export default function HowItWorksSection() {
               Built for faster live scoring
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-white/78 md:text-lg">
-              Walkie-talkie, speaker mic, director controls, score announcements, session cover images, and cleaner result insights in one scoring flow.
+              Walkie-talkie, loudspeaker, director controls, score announcements, session cover images, and cleaner result insights in one scoring flow.
             </p>
           </div>
 

@@ -603,6 +603,21 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const speakerCardTalking = quickSpeakerTalking || micMonitor.isActive;
   const speakerSwitchOn = Boolean(speakerMicOn || activePanel === "mic");
   const announceSwitchOn = Boolean(settings.enabled);
+  const walkieCardDescription = walkieCardFinishing
+    ? "Finishing..."
+    : walkieCardTalking
+    ? "You are live."
+    : walkie.snapshot?.enabled
+    ? "Hold the mic to talk."
+    : "Turn it on to open.";
+  const speakerCardDescription = speakerCardTalking
+    ? "You are live."
+    : speakerMicOn
+    ? "Hold the mic to talk."
+    : "Use your phone as a mic.";
+  const announcerCardDescription = announceSwitchOn
+    ? "Reads every score update."
+    : "Turn it on to hear scores.";
   const activeInningsHistory =
     match?.innings === "second"
       ? match?.innings2?.history || []
@@ -627,7 +642,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     trackerHistory = reconstructedMatch[inningsKey]?.history || activeInningsHistory;
   }
   const launcherCardClass =
-    "flex min-h-[92px] w-full items-center gap-3 rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-4 text-left shadow-[0_18px_50px_rgba(0,0,0,0.32)] backdrop-blur-sm transition-transform hover:-translate-y-0.5";
+    "w-full rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] text-left shadow-[0_18px_50px_rgba(0,0,0,0.32)] backdrop-blur-sm transition-transform hover:-translate-y-0.5";
 
   return (
     <main className="min-h-screen bg-zinc-950 text-white font-sans p-4 pb-10 flex flex-col items-center">
@@ -720,36 +735,25 @@ export default function SessionViewClient({ sessionId, initialData }) {
             onPointerLeave={() => {
               void handleWalkieLauncherPressEnd();
             }}
-            className={`${launcherCardClass} mb-4`}
-            aria-label="Open walkietalkie"
+            className={`${launcherCardClass} mb-4 px-5 py-4`}
+            aria-label="Open walkie-talkie"
           >
-            <span className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xl shadow-[0_12px_26px_rgba(16,185,129,0.16)] ${
-              walkieCardTalking
-                ? "bg-emerald-500 text-black"
-                : "bg-emerald-500/14 text-emerald-300"
-            }`}>
-              {walkieCardTalking ? <FaMicrophone /> : <DualWalkieIcon />}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-base font-semibold text-white">
-                Walkie-Talkie
+            <div className="flex w-full items-start gap-3">
+              <span className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xl shadow-[0_12px_26px_rgba(16,185,129,0.16)] ${
+                walkieCardTalking
+                  ? "bg-emerald-500 text-black"
+                  : "bg-emerald-500/14 text-emerald-300"
+              }`}>
+                {walkieCardTalking ? <FaMicrophone /> : <DualWalkieIcon />}
               </span>
-              <span className="mt-1 block text-xs text-zinc-400">
-                {walkieCardFinishing
-                  ? "Finishing message."
-                  : walkieCardTalking
-                  ? "You are speaking."
-                  : walkie.snapshot?.enabled
-                  ? "Hold mic to talk to others."
-                  : "Turn it on to open."}
-              </span>
-            </span>
-            <span className="flex flex-col items-end gap-2">
-              <IosGlassSwitch
-                checked={walkieSwitchOn}
-                onChange={handleWalkieSwitchChange}
-                label="Toggle walkie-talkie panel"
-              />
+              <span className="min-w-0 flex-1">
+                <span className="block text-lg font-semibold text-white">
+                  Walkie-Talkie
+                </span>
+                <span className="mt-1 block text-sm leading-5 text-zinc-400">
+                    {walkieCardDescription}
+                  </span>
+                </span>
               {walkie.snapshot?.enabled ? (
                 <button
                   type="button"
@@ -771,7 +775,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                     event.stopPropagation();
                     void handleWalkieLauncherPressEnd();
                   }}
-                    className={`inline-flex h-12 w-12 items-center justify-center rounded-full border transition ${
+                  className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border transition ${
                     walkieCardTalking
                       ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_24px_rgba(16,185,129,0.35)]"
                       : walkieCardFinishing
@@ -779,130 +783,137 @@ export default function SessionViewClient({ sessionId, initialData }) {
                       : "border-white/12 bg-white/[0.05] text-white"
                   }`}
                 >
-                  {walkieCardTalking ? <FaMicrophone /> : walkieCardFinishing ? <FaMicrophoneSlash /> : <FaMicrophoneSlash />}
+                  {walkieCardTalking ? <FaMicrophone /> : <FaMicrophoneSlash />}
                 </button>
               ) : null}
-            </span>
+            </div>
+            <div className="mt-4 flex w-full justify-center">
+              <IosGlassSwitch
+                checked={walkieSwitchOn}
+                onChange={handleWalkieSwitchChange}
+                label="Toggle walkie-talkie panel"
+              />
+            </div>
           </div>
         ) : null}
 
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setActivePanel("mic")}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              setActivePanel("mic");
-            }
-          }}
-          className={launcherCardClass}
-          aria-label="Open speaker mic"
-        >
-          <span
-            className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-xl text-black shadow-[0_12px_26px_rgba(16,185,129,0.28)]"
-            aria-hidden="true"
-          >
-            <LoudspeakerIcon />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-base font-semibold text-white">
-              Speaker Mic
-            </span>
-            <span className="mt-1 inline-flex items-center gap-2 text-xs text-zinc-400">
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/[0.04]">
-                <FaBluetoothB />
-              </span>
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/[0.04]">
-                <FaVolumeUp />
-              </span>
-              <span>
-                {speakerCardTalking
-                  ? "You are speaking."
-                  : speakerMicOn
-                  ? "Hold mic to talk."
-                  : "Use phone as a mic."}
-              </span>
-            </span>
-          </span>
-          <span className="flex flex-col items-end gap-2">
-            <IosGlassSwitch
-              checked={speakerSwitchOn}
-              onChange={(nextChecked) => {
-                void handleSpeakerSwitchChange(nextChecked);
-              }}
-              label="Toggle speaker mic"
-            />
-            {speakerMicOn ? (
-              <button
-                type="button"
-                aria-label="Hold speaker mic"
-                onClick={(event) => event.stopPropagation()}
-                onPointerDown={(event) => {
-                  event.stopPropagation();
-                  handleSpeakerLauncherPressStart();
-                }}
-                onPointerUp={(event) => {
-                  event.stopPropagation();
-                  void handleSpeakerLauncherPressEnd();
-                }}
-                onPointerCancel={(event) => {
-                  event.stopPropagation();
-                  void handleSpeakerLauncherPressEnd();
-                }}
-                onPointerLeave={(event) => {
-                  event.stopPropagation();
-                  void handleSpeakerLauncherPressEnd();
-                }}
-                className={`inline-flex h-12 w-12 items-center justify-center rounded-full border transition ${
-                  speakerCardTalking
-                    ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_24px_rgba(16,185,129,0.35)]"
-                    : "border-white/12 bg-white/[0.05] text-white"
-                }`}
-              >
-                {speakerCardTalking ? <FaMicrophone /> : <FaMicrophoneSlash />}
-              </button>
-            ) : null}
-          </span>
-        </div>
-
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setActivePanel("announce")}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              setActivePanel("announce");
-            }
-          }}
-          className={`${launcherCardClass} mt-4`}
-          aria-label="Open score announcer"
-        >
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              handleQuickAnnounce();
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setActivePanel("mic")}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setActivePanel("mic");
+              }
             }}
-            aria-label="Announce current score"
-            className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-amber-400/14 text-lg text-amber-200 transition hover:bg-amber-400/20"
+            className={`${launcherCardClass} min-h-[160px] px-4 py-4`}
+            aria-label="Open loudspeaker"
           >
-            <FaVolumeUp />
-          </button>
-          <span className="min-w-0 flex-1">
-            <span className="block text-base font-semibold text-white">
-              Score Announcer
-            </span>
-            <span className="mt-1 block text-xs text-zinc-400">
-              Read the live score.
-            </span>
-          </span>
-          <IosGlassSwitch
-            checked={announceSwitchOn}
-            onChange={handleAnnounceSwitchChange}
-            label="Toggle score announcer"
-          />
+            <div className="flex h-full flex-col">
+              <div className="flex items-start gap-3">
+                <span
+                  className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-lg text-black shadow-[0_12px_26px_rgba(16,185,129,0.28)]"
+                  aria-hidden="true"
+                >
+                  <LoudspeakerIcon />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-base font-semibold text-white">
+                    Loudspeaker
+                  </span>
+                  <span className="mt-1 block text-sm leading-5 text-zinc-400">
+                    {speakerCardDescription}
+                  </span>
+                </span>
+                {speakerMicOn ? (
+                  <button
+                    type="button"
+                    aria-label="Hold loudspeaker"
+                    onClick={(event) => event.stopPropagation()}
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
+                      handleSpeakerLauncherPressStart();
+                    }}
+                    onPointerUp={(event) => {
+                      event.stopPropagation();
+                      void handleSpeakerLauncherPressEnd();
+                    }}
+                    onPointerCancel={(event) => {
+                      event.stopPropagation();
+                      void handleSpeakerLauncherPressEnd();
+                    }}
+                    onPointerLeave={(event) => {
+                      event.stopPropagation();
+                      void handleSpeakerLauncherPressEnd();
+                    }}
+                    className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition ${
+                      speakerCardTalking
+                        ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_24px_rgba(16,185,129,0.35)]"
+                        : "border-white/12 bg-white/[0.05] text-white"
+                    }`}
+                  >
+                    {speakerCardTalking ? <FaMicrophone /> : <FaMicrophoneSlash />}
+                  </button>
+                ) : null}
+              </div>
+              <div className="mt-auto flex justify-center pt-4">
+                <IosGlassSwitch
+                  checked={speakerSwitchOn}
+                  onChange={(nextChecked) => {
+                    void handleSpeakerSwitchChange(nextChecked);
+                  }}
+                  label="Toggle loudspeaker"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setActivePanel("announce")}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setActivePanel("announce");
+              }
+            }}
+            className={`${launcherCardClass} min-h-[160px] px-4 py-4`}
+            aria-label="Open score announcer"
+          >
+            <div className="flex h-full flex-col">
+              <div className="flex items-start gap-3">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleQuickAnnounce();
+                  }}
+                  aria-label="Announce current score"
+                  className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-400/14 text-base text-amber-200 transition hover:bg-amber-400/20"
+                >
+                  <FaVolumeUp />
+                </button>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-base font-semibold text-white">
+                    Score Announcer
+                  </span>
+                  <span className="mt-1 block text-sm leading-5 text-zinc-400">
+                    {announcerCardDescription}
+                  </span>
+                </span>
+              </div>
+              <div className="mt-auto flex justify-center pt-4">
+                <IosGlassSwitch
+                  checked={announceSwitchOn}
+                  onChange={handleAnnounceSwitchChange}
+                  label="Toggle score announcer"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

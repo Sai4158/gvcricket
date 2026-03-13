@@ -1,6 +1,13 @@
 "use client";
 
-import { startTransition, useEffect, useMemo, useRef, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   FaArrowLeft,
@@ -32,10 +39,12 @@ import { getBattingTeamBundle } from "../../lib/team-utils";
 import { playUiTone } from "../../lib/page-audio";
 
 const DIRECTOR_AUDIO_LIBRARY_CACHE_KEY = "gv-director-audio-library-v1";
+const DIRECTOR_AUDIO_METADATA_CACHE_KEY = "gv-director-audio-metadata-v1";
 const DIRECTOR_SESSIONS_CACHE_KEY = "gv-director-sessions-v1";
 const DIRECTOR_FORCE_REAUTH_KEY = "gv-director-force-reauth";
 let directorAudioLibraryMemoryCache = null;
 let directorSessionsMemoryCache = null;
+let directorAudioMetadataMemoryCache = {};
 
 function getDirectorAudioOrderStorageKey(sessionId) {
   return `gv-director-audio-order:${sessionId || "default"}`;
@@ -100,6 +109,17 @@ function buildDirectorScoreLine(match) {
   if (!match) return "";
   const battingTeam = getBattingTeamBundle(match);
   return `${battingTeam.name} ${match.score || 0}/${match.outs || 0}`;
+}
+
+function formatAudioTime(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return "--:--";
+  }
+
+  const totalSeconds = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainder = totalSeconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, "0")}`;
 }
 
 function IosSwitch({ checked, onChange, label, disabled = false }) {
@@ -303,6 +323,8 @@ export default function DirectorConsoleClient({
   const [directorHoldLive, setDirectorHoldLive] = useState(false);
   const [libraryFiles, setLibraryFiles] = useState([]);
   const [libraryOrder, setLibraryOrder] = useState([]);
+  const [libraryDurations, setLibraryDurations] = useState({});
+  const [libraryCurrentTime, setLibraryCurrentTime] = useState(0);
   const [libraryLiveId, setLibraryLiveId] = useState("");
   const [libraryState, setLibraryState] = useState("idle");
   const [draggingLibraryId, setDraggingLibraryId] = useState("");
@@ -481,13 +503,36 @@ export default function DirectorConsoleClient({
     };
   }, [authorized, sessions.length]);
 
-  useEffect(() => {
-    if (directorAudioLibraryMemoryCache?.length) {
-      setLibraryFiles(directorAudioLibraryMemoryCache);
+  const fetchAudioLibrary = useCallback(async () => {
+    const response = await fetch("/api/director/audio-library", {
+      cache: "no-store",
+    });
+    const payload = await response.json().catch(() => ({ files: [] }));
+
+    if (!response.ok) {
+      setLibraryFiles([]);
       return;
     }
 
+    const nextFiles = payload.files || [];
+    directorAudioLibraryMemoryCache = nextFiles;
     if (typeof window !== "undefined") {
+      try {
+        window.sessionStorage.setItem(
+          DIRECTOR_AUDIO_LIBRARY_CACHE_KEY,
+          JSON.stringify(nextFiles)
+        );
+      } catch {
+        // Ignore storage failures and keep in-memory cache.
+      }
+    }
+    setLibraryFiles(nextFiles);
+  }, []);
+
+  useEffect(() => {
+    if (directorAudioLibraryMemoryCache?.length) {
+      setLibraryFiles(directorAudioLibraryMemoryCache);
+    } else if (typeof window !== "undefined") {
       try {
         const cachedValue = window.sessionStorage.getItem(
           DIRECTOR_AUDIO_LIBRARY_CACHE_KEY
@@ -497,49 +542,70 @@ export default function DirectorConsoleClient({
           if (Array.isArray(parsed) && parsed.length) {
             directorAudioLibraryMemoryCache = parsed;
             setLibraryFiles(parsed);
-            return;
           }
         }
       } catch {
-        // Ignore broken cache and fall through to network.
+        // Ignore broken cache and refresh from network below.
       }
     }
 
     let cancelled = false;
 
-    void (async () => {
-      const response = await fetch("/api/director/audio-library", {
-        cache: "force-cache",
-      });
-      const payload = await response.json().catch(() => ({ files: [] }));
-
-      if (cancelled) {
-        return;
-      }
-
-        if (!response.ok) {
-          setLibraryFiles([]);
-          return;
-        }
-
-      const nextFiles = payload.files || [];
-      directorAudioLibraryMemoryCache = nextFiles;
-      if (typeof window !== "undefined") {
-        try {
-          window.sessionStorage.setItem(
-            DIRECTOR_AUDIO_LIBRARY_CACHE_KEY,
-            JSON.stringify(nextFiles)
-          );
-        } catch {
-          // Ignore storage failures and keep in-memory cache.
+    const refreshLibrary = async () => {
+      try {
+        await fetchAudioLibrary();
+      } catch {
+        if (!cancelled) {
+          setLibraryFiles((current) => current);
         }
       }
-      setLibraryFiles(nextFiles);
-    })();
+    };
+
+    void refreshLibrary();
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void refreshLibrary();
+      }
+    }, 20000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshLibrary();
+      }
+    };
+
+    window.addEventListener("focus", handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
+  }, [fetchAudioLibrary]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const cachedValue = window.sessionStorage.getItem(
+        DIRECTOR_AUDIO_METADATA_CACHE_KEY
+      );
+      if (!cachedValue) {
+        return;
+      }
+      const parsed = JSON.parse(cachedValue);
+      if (parsed && typeof parsed === "object") {
+        directorAudioMetadataMemoryCache = parsed;
+        setLibraryDurations(parsed);
+      }
+    } catch {
+      // Ignore broken cache.
+    }
   }, []);
 
   useEffect(() => {
@@ -561,6 +627,66 @@ export default function DirectorConsoleClient({
     }
   }, [audioOrderStorageKey]);
 
+  useEffect(() => {
+    if (!libraryFiles.length) {
+      return;
+    }
+
+    const missingFiles = libraryFiles.filter(
+      (file) => !Number.isFinite(libraryDurations[file.id])
+    );
+
+    if (!missingFiles.length) {
+      return;
+    }
+
+    let cancelled = false;
+
+    missingFiles.forEach((file) => {
+      const audio = new Audio();
+      audio.preload = "metadata";
+      audio.src = file.src;
+
+      const finalize = () => {
+        audio.src = "";
+      };
+
+      audio.onloadedmetadata = () => {
+        if (cancelled) {
+          finalize();
+          return;
+        }
+
+        const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+        setLibraryDurations((current) => {
+          if (Number.isFinite(current[file.id])) {
+            return current;
+          }
+          const next = { ...current, [file.id]: duration };
+          directorAudioMetadataMemoryCache = next;
+          if (typeof window !== "undefined") {
+            try {
+              window.sessionStorage.setItem(
+                DIRECTOR_AUDIO_METADATA_CACHE_KEY,
+                JSON.stringify(next)
+              );
+            } catch {
+              // Ignore storage failures.
+            }
+          }
+          return next;
+        });
+        finalize();
+      };
+
+      audio.onerror = finalize;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [libraryDurations, libraryFiles]);
+
   const orderedLibraryFiles = useMemo(() => {
     if (!libraryFiles.length) {
       return [];
@@ -577,9 +703,14 @@ export default function DirectorConsoleClient({
       if (leftIndex !== rightIndex) {
         return leftIndex - rightIndex;
       }
+      const leftDuration = libraryDurations[left.id] || 0;
+      const rightDuration = libraryDurations[right.id] || 0;
+      if (leftDuration !== rightDuration) {
+        return rightDuration - leftDuration;
+      }
       return left.label.localeCompare(right.label);
     });
-  }, [libraryFiles, libraryOrder]);
+  }, [libraryDurations, libraryFiles, libraryOrder]);
 
   const handleLibraryReorder = (nextFiles) => {
     setLibraryFiles(nextFiles);
@@ -790,9 +921,13 @@ export default function DirectorConsoleClient({
     const handleEnded = () => {
       setLibraryLiveId("");
       setLibraryState("idle");
+      setLibraryCurrentTime(0);
     };
     const handlePause = () => {
       setLibraryState((current) => (current === "loading" ? current : "paused"));
+      if (!audio.ended) {
+        setLibraryCurrentTime(audio.currentTime || 0);
+      }
     };
     const handlePlay = () => {
       setLibraryState("playing");
@@ -807,6 +942,10 @@ export default function DirectorConsoleClient({
       setConsoleError("This audio file could not be played in this browser.");
       setLibraryLiveId("");
       setLibraryState("idle");
+      setLibraryCurrentTime(0);
+    };
+    const handleTimeUpdate = () => {
+      setLibraryCurrentTime(audio.currentTime || 0);
     };
 
     audio.addEventListener("ended", handleEnded);
@@ -815,6 +954,7 @@ export default function DirectorConsoleClient({
     audio.addEventListener("waiting", handleWaiting);
     audio.addEventListener("canplay", handleCanPlay);
     audio.addEventListener("error", handleError);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
 
     return () => {
       audio.removeEventListener("ended", handleEnded);
@@ -823,6 +963,7 @@ export default function DirectorConsoleClient({
       audio.removeEventListener("waiting", handleWaiting);
       audio.removeEventListener("canplay", handleCanPlay);
       audio.removeEventListener("error", handleError);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
     };
   }, []);
 
@@ -872,6 +1013,7 @@ export default function DirectorConsoleClient({
     audio.src = "";
     setLibraryLiveId("");
     setLibraryState("idle");
+    setLibraryCurrentTime(0);
   };
 
   const playEffect = async (file) => {
@@ -888,6 +1030,7 @@ export default function DirectorConsoleClient({
     stopAllEffects();
     setLibraryLiveId(file.id);
     setLibraryState("loading");
+    setLibraryCurrentTime(0);
     audio.preload = "none";
     audio.src = file.src;
     audio.volume = Math.max(
@@ -1496,9 +1639,6 @@ export default function DirectorConsoleClient({
             }
           >
             <audio ref={effectsAudioRef} hidden preload="none" />
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <p className="text-sm text-zinc-400">Tap to play audio.</p>
-            </div>
             <div className="rounded-[28px] border border-white/10 bg-black/15 p-2">
               {orderedLibraryFiles.length ? (
                 <div className="grid grid-cols-2 gap-3">
@@ -1509,7 +1649,16 @@ export default function DirectorConsoleClient({
                       onDragOver={(event) => handleLibraryDragOver(event, file.id)}
                       onDrop={(event) => handleLibraryDrop(event, file.id)}
                       onDragEnd={clearLibraryDragState}
-                      className={`group relative aspect-square overflow-hidden rounded-[24px] border px-4 py-4 text-left transition ${
+                      onClick={() => void playEffect(file)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          void playEffect(file);
+                        }
+                      }}
+                      className={`group relative aspect-square overflow-hidden rounded-[24px] border px-4 py-4 text-left transition cursor-pointer ${
                         libraryLiveId === file.id
                           ? "border-emerald-300/30 bg-[linear-gradient(180deg,rgba(18,40,34,0.9),rgba(10,16,18,0.94))] shadow-[0_18px_40px_rgba(16,185,129,0.16)]"
                           : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
@@ -1541,28 +1690,26 @@ export default function DirectorConsoleClient({
                             </span>
                           </div>
                           <div className="space-y-1">
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                void playEffect(file);
-                              }}
-                              className="block w-full text-left"
-                            >
-                              <div className="line-clamp-2 text-sm font-semibold leading-5 text-white">
-                                {file.label}
-                              </div>
-                              <div className="truncate text-xs text-zinc-400">{file.fileName}</div>
-                            </button>
+                            <div className="line-clamp-2 text-sm font-semibold leading-5 text-white">
+                              {file.label}
+                            </div>
+                            <div className="truncate text-xs text-zinc-400">{file.fileName}</div>
                           </div>
                         </div>
                         <div className="flex items-end justify-between gap-2">
-                          <div className="text-xs text-zinc-400">
+                          <div className="space-y-1 text-xs text-zinc-400">
                             {libraryLiveId === file.id
                               ? libraryState === "loading"
                                 ? "Loading..."
                                 : "Playing"
                               : "Tap to play"}
+                            <div className="text-[11px] text-zinc-500">
+                              {libraryLiveId === file.id
+                                ? `${formatAudioTime(libraryCurrentTime)} / ${formatAudioTime(
+                                    libraryDurations[file.id] || 0
+                                  )}`
+                                : formatAudioTime(libraryDurations[file.id] || 0)}
+                            </div>
                           </div>
                           {libraryLiveId === file.id ? (
                             <button

@@ -13,6 +13,7 @@ export default function DarkSelect({
   leadingIcon: LeadingIcon = null,
   leadingLabel = "",
   compact = false,
+  iconOnly = false,
 }) {
   const [open, setOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState(null);
@@ -54,7 +55,8 @@ export default function DarkSelect({
       140,
       Math.min(280, shouldOpenUpward ? spaceAbove : spaceBelow, viewportHeight - 24)
     );
-    const width = Math.min(rect.width, viewportWidth - 16);
+    const desiredWidth = iconOnly ? Math.max(220, rect.width) : rect.width;
+    const width = Math.min(desiredWidth, viewportWidth - 16);
     const left = Math.min(Math.max(8, rect.left), viewportWidth - width - 8);
 
     setMenuStyle({
@@ -65,7 +67,7 @@ export default function DarkSelect({
       width,
       maxHeight,
     });
-  }, [options.length]);
+  }, [iconOnly, options.length]);
 
   const scheduleMenuPosition = useCallback(() => {
     if (positionFrameRef.current || typeof window === "undefined") {
@@ -132,30 +134,45 @@ export default function DarkSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={toggleOpen}
-        className={`inline-flex w-full items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.04] text-left text-sm text-white outline-none transition hover:bg-white/[0.06] focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-400/20 ${
-          compact ? "px-4 py-3" : "px-4 py-3.5"
+        className={`inline-flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.04] text-left text-sm text-white outline-none transition hover:bg-white/[0.06] focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-400/20 ${
+          iconOnly
+            ? "h-12 w-12 justify-center px-0 py-0"
+            : `w-full ${compact ? "px-4 py-3" : "px-4 py-3.5"}`
         }`}
       >
-        <span className="flex min-w-0 items-center gap-2.5">
-          {LeadingIcon ? (
-            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/8 bg-white/[0.05] text-zinc-300">
-              <LeadingIcon className="text-[12px]" />
-            </span>
-          ) : null}
-          <span className="min-w-0">
-            {leadingLabel ? (
-              <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                {leadingLabel}
-              </span>
-            ) : null}
-            <span className="block truncate">{selectedOption?.label || placeholder}</span>
+        {iconOnly ? (
+          <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/8 bg-white/[0.05] text-zinc-200">
+            {LeadingIcon ? <LeadingIcon className="text-[13px]" /> : null}
+            <FaChevronDown
+              className={`absolute -bottom-0.5 -right-0.5 text-[9px] text-zinc-400 transition-transform ${
+                open ? "rotate-180" : ""
+              }`}
+            />
           </span>
-        </span>
-        <FaChevronDown
-          className={`shrink-0 text-xs text-zinc-400 transition-transform ${
-            open ? "rotate-180" : ""
-          }`}
-        />
+        ) : (
+          <>
+            <span className="flex min-w-0 items-center gap-2.5">
+              {LeadingIcon ? (
+                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/8 bg-white/[0.05] text-zinc-300">
+                  <LeadingIcon className="text-[12px]" />
+                </span>
+              ) : null}
+              <span className="min-w-0">
+                {leadingLabel ? (
+                  <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                    {leadingLabel}
+                  </span>
+                ) : null}
+                <span className="block truncate">{selectedOption?.label || placeholder}</span>
+              </span>
+            </span>
+            <FaChevronDown
+              className={`shrink-0 text-xs text-zinc-400 transition-transform ${
+                open ? "rotate-180" : ""
+              }`}
+            />
+          </>
+        )}
       </button>
       {typeof document !== "undefined" && open && menuStyle
         ? createPortal(
@@ -192,7 +209,7 @@ export default function DarkSelect({
                           : "text-zinc-200 hover:bg-white/[0.05]"
                       }`}
                     >
-                      <span className="block truncate">{option.label}</span>
+                      <span className="block whitespace-nowrap">{option.label}</span>
                     </button>
                   );
                 })}

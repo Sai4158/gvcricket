@@ -1,91 +1,69 @@
 # GV Cricket 2.0
 
-GV Cricket 2.0 is a modern cricket scoring app built for fast live match control, simple umpire scoring, spectator live updates, and polished result pages.
+GV Cricket 2.0 is a modern cricket scoring app for running a match from setup to result in one clean flow.
 
-## Highlights
+It is built for:
+- umpires who need fast live scoring
+- spectators who want instant score updates
+- directors who want audio, walkie-talkie, and match control tools
 
-- live umpire scoring with fast ball-by-ball controls
-- spectator live score view with score announcer
-- walkie-talkie and speaker mic tools
-- director console for match audio control
-- optional match images and shareable match pages
-- result insights, scorecards, and saved sessions
-- MongoDB + Mongoose persistence with live SSE updates
+## Features
 
-## Local development
+- 🏏 Fast ball-by-ball umpire scoring
+- 📣 Live spectator score announcer
+- 🎙️ Loudspeaker and commentary tools
+- 📻 Walkie-Talkie for live match communication
+- 🎛️ Director Console for audio and session control
+- 🪙 Toss flow with batting and bowling selection
+- 👥 Team setup with editable player lists
+- 🖼️ Match cover image and branded match pages
+- 📊 Result insights, scorecards, and saved match history
+- 🔄 Live updates across umpire, spectator, and result views
 
-```bash
-npm install
-npm run dev
-```
+## How it works
 
-Open `http://localhost:3000`.
+1. Create a session
+2. Add team names, players, and overs
+3. Complete the toss
+4. Start the real live match
+5. Score each ball in umpire mode
+6. Share the live score with spectators
+7. Finish the match and view the result page
 
-## Required environment variables
+## Main views
 
-Use `.env`.
+- **Home**  
+  Product overview, live match entry points, and highlight sections.
 
-Required:
+- **Session setup**  
+  Create the session, define teams, players, and overs.
 
-- `MONGODB_URI`
-- `MATCH_ACCESS_SECRET`
-- `UMPIRE_ADMIN_PIN`
-- `MATCH_MEDIA_PIN`
-- `IMGBB_API_KEY`
+- **Toss**  
+  Decide the toss winner and choose bat or bowl.
 
-Optional director-specific secrets:
+- **Umpire mode**  
+  Score runs, wickets, wides, no balls, undo actions, and manage the match live.
 
-- `DIRECTOR_ACCESS_SECRET`
-- `DIRECTOR_CONSOLE_PIN`
-- `DIRECTOR_CONSOLE_PIN_HASH`
+- **Spectator view**  
+  Follow the live score, hear score announcements, and use walkie-talkie when enabled.
 
-## Vercel deployment
+- **Director Console**  
+  Manage music, sound effects, audio playback, walkie, and session-level control tools.
 
-GV Cricket 2.0 is configured for Vercel deployment.
+- **Results**  
+  View final scores, winner summary, charts, insights, and saved match details.
 
-### Recommended project settings
+## Stack
 
-- Framework preset: `Next.js`
-- Node.js version: `20.x`
-- Region: `iad1`
+- **Next.js** for the app framework
+- **React** for the UI
+- **MongoDB + Mongoose** for persistence
+- **Server-Sent Events (SSE)** for live updates
+- **Framer Motion** for motion and UI polish
+- **Tailwind CSS** for styling
 
-### Required Vercel environment variables
+## Notes
 
-Add these in the Vercel dashboard:
-
-- `MONGODB_URI`
-- `MATCH_ACCESS_SECRET`
-- `UMPIRE_ADMIN_PIN`
-- `MATCH_MEDIA_PIN`
-- `IMGBB_API_KEY`
-
-### Important live runtime requirements
-
-- MongoDB must support change streams
-- Use MongoDB Atlas or another replica set deployment
-- Live SSE routes run on the Node runtime with longer execution windows
-
-## Production notes
-
-- `gvLogo.png` is used for app branding and icons
-- security headers are applied through middleware
-- MongoDB connections are reused server-side
-- walkie-talkie state is live-only and not persisted to MongoDB
-- spectator, umpire, and director flows are protected with server-side checks
-
-## Build and test
-
-```bash
-npm run lint
-npm run test
-npm run build
-npm run typecheck
-```
-
-## Deploy checklist
-
-- set all required Vercel env vars
-- verify MongoDB replica set / Atlas change streams
-- verify live routes connect in production
-- verify `gvLogo.png` is used for favicon/app branding
-- verify umpire, media, and director PIN settings
+- Built to be simple, fast, and mobile-friendly
+- Designed for live cricket scoring with synced match views
+- Keeps umpire, spectator, result, and director flows connected in one system

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import {
@@ -160,61 +161,92 @@ export default function ResultInsightsSections({ match }) {
       inningsLabel: insights.innings2.team || "Innings 2",
     })),
   ];
+  const topPerformerCards = [
+    insights.topPerformers.topScorer
+      ? {
+          label: "Top scorer",
+          primary: insights.topPerformers.topScorer.name,
+          secondary: `${insights.topPerformers.topScorer.runs} runs`,
+          accent: "text-amber-300",
+        }
+      : null,
+    insights.topPerformers.bestBowler
+      ? {
+          label: "Best bowler",
+          primary: insights.topPerformers.bestBowler.name,
+          secondary: `${insights.topPerformers.bestBowler.wickets} wickets`,
+          accent: "text-sky-300",
+        }
+      : null,
+    insights.topPerformers.bestStrikeRate
+      ? {
+          label: "Best strike rate",
+          primary: insights.topPerformers.bestStrikeRate.name,
+          secondary: `SR ${insights.topPerformers.bestStrikeRate.strikeRate}`,
+          accent: "text-emerald-300",
+        }
+      : null,
+    insights.topPerformers.bestEconomy
+      ? {
+          label: "Best economy",
+          primary: insights.topPerformers.bestEconomy.name,
+          secondary: `Econ ${insights.topPerformers.bestEconomy.economy}`,
+          accent: "text-violet-300",
+        }
+      : null,
+    {
+      label: "Player of the match",
+      primary: insights.topPerformers.playerOfMatch,
+      secondary:
+        match?.result ||
+        (insights.tracked ? "Key impact across the match." : "Picked from the final result."),
+      accent: "text-rose-300",
+    },
+  ].filter(Boolean);
+  const matchAwardCards = [
+    {
+      label: "Player of the match",
+      primary: insights.awards.playerOfMatch,
+      secondary: match?.result || "",
+      accent: "text-amber-300",
+    },
+    insights.topPerformers.topScorer
+      ? {
+          label: "Best batter",
+          primary: insights.awards.bestBatter,
+          secondary: `${insights.topPerformers.topScorer.runs} runs`,
+          accent: "text-sky-300",
+        }
+      : null,
+    insights.topPerformers.bestBowler
+      ? {
+          label: "Best bowler",
+          primary: insights.awards.bestBowler,
+          secondary: `${insights.topPerformers.bestBowler.wickets} wickets`,
+          accent: "text-emerald-300",
+        }
+      : null,
+    {
+      label: "Best moment",
+      primary: insights.awards.bestMoment,
+      secondary: "Match-defining highlight",
+      accent: "text-rose-300",
+    },
+  ].filter(Boolean);
 
   return (
     <div className="space-y-8">
       <SectionShell title="Top Performers" icon={<FaStar />}>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <PerformerCard
-            label="Top scorer"
-            primary={insights.topPerformers.topScorer?.name || "Not tracked"}
-            secondary={
-              insights.topPerformers.topScorer
-                ? `${insights.topPerformers.topScorer.runs} runs`
-                : statsFallback
-            }
-            accent="text-amber-300"
-          />
-          <PerformerCard
-            label="Best bowler"
-            primary={insights.topPerformers.bestBowler?.name || "Not tracked"}
-            secondary={
-              insights.topPerformers.bestBowler
-                ? `${insights.topPerformers.bestBowler.wickets} wickets`
-                : statsFallback
-            }
-            accent="text-sky-300"
-          />
-          <PerformerCard
-            label="Best strike rate"
-            primary={insights.topPerformers.bestStrikeRate?.name || "Not tracked"}
-            secondary={
-              insights.topPerformers.bestStrikeRate
-                ? `SR ${insights.topPerformers.bestStrikeRate.strikeRate}`
-                : "Strike rate is unavailable for this match."
-            }
-            accent="text-emerald-300"
-          />
-          <PerformerCard
-            label="Best economy"
-            primary={insights.topPerformers.bestEconomy?.name || "Not tracked"}
-            secondary={
-              insights.topPerformers.bestEconomy
-                ? `Econ ${insights.topPerformers.bestEconomy.economy}`
-                : "Economy is unavailable for this match."
-            }
-            accent="text-violet-300"
-          />
-          <PerformerCard
-            label="Player of the match"
-            primary={insights.topPerformers.playerOfMatch}
-            secondary={
-              insights.tracked
-                ? match?.result || "Key impact across the match."
-                : match?.result || "Picked from the final result."
-            }
-            accent="text-rose-300"
-          />
+          {topPerformerCards.map((card) => (
+            <PerformerCard
+              key={card.label}
+              label={card.label}
+              primary={card.primary}
+              secondary={card.secondary}
+              accent={card.accent}
+            />
+          ))}
         </div>
       </SectionShell>
 
@@ -242,22 +274,22 @@ export default function ResultInsightsSections({ match }) {
       </SectionShell>
 
       <SectionShell title="Over Summary" icon={<FaChartBar />}>
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid max-h-[420px] gap-3 overflow-y-auto pr-1 md:grid-cols-2">
           {allOverSummaries.length ? (
             allOverSummaries.map((over) => (
               <div
                 key={`${over.inningsLabel}-${over.over}`}
-                className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4"
+                className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-base font-bold text-white">
+                  <p className="text-sm font-bold text-white">
                     {over.label}
                   </p>
                   <span className="rounded-full bg-white/[0.05] px-3 py-1 text-xs text-zinc-300">
                     {over.inningsLabel}
                   </span>
                 </div>
-                <p className="mt-3 text-sm text-zinc-300">{over.summary}</p>
+                <p className="mt-2 text-sm text-zinc-300">{over.summary}</p>
               </div>
             ))
           ) : (
@@ -268,11 +300,11 @@ export default function ResultInsightsSections({ match }) {
 
       {allWickets.length ? (
         <SectionShell title="Wicket Timeline" icon={<FaBolt />}>
-          <div className="space-y-3">
+          <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
             {allWickets.map((wicket) => (
               <div
                 key={`${wicket.inningsLabel}-${wicket.overBall}`}
-                className="flex items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4"
+                className="flex items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
               >
                 <div>
                   <p className="text-sm font-semibold text-white">{wicket.detail}</p>
@@ -316,38 +348,15 @@ export default function ResultInsightsSections({ match }) {
 
       <SectionShell title="Match Awards" icon={<FaMedal />}>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <PerformerCard
-            label="Player of the match"
-            primary={insights.awards.playerOfMatch}
-            secondary={match?.result || ""}
-            accent="text-amber-300"
-          />
-          <PerformerCard
-            label="Best batter"
-            primary={insights.awards.bestBatter}
-            secondary={
-              insights.topPerformers.topScorer
-                ? `${insights.topPerformers.topScorer.runs} runs`
-                : statsFallback
-            }
-            accent="text-sky-300"
-          />
-          <PerformerCard
-            label="Best bowler"
-            primary={insights.awards.bestBowler}
-            secondary={
-              insights.topPerformers.bestBowler
-                ? `${insights.topPerformers.bestBowler.wickets} wickets`
-                : statsFallback
-            }
-            accent="text-emerald-300"
-          />
-          <PerformerCard
-            label="Best moment"
-            primary={insights.awards.bestMoment}
-            secondary="Match-defining highlight"
-            accent="text-rose-300"
-          />
+          {matchAwardCards.map((card) => (
+            <PerformerCard
+              key={card.label}
+              label={card.label}
+              primary={card.primary}
+              secondary={card.secondary}
+              accent={card.accent}
+            />
+          ))}
         </div>
       </SectionShell>
 
@@ -363,6 +372,15 @@ export default function ResultInsightsSections({ match }) {
             ref={exportRef}
             className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,8,12,0.98))] p-5"
           >
+            <div className="flex justify-center">
+              <Image
+                src="/gvLogo.png"
+                alt="GV Cricket logo"
+                width={168}
+                height={168}
+                className="h-auto w-28 object-contain sm:w-36"
+              />
+            </div>
             <p className="text-[11px] uppercase tracking-[0.28em] text-amber-300/85">
               Share Card
             </p>
