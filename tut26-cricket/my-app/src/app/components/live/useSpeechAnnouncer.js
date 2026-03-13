@@ -95,6 +95,14 @@ function canUseSpeechSynthesis() {
   return typeof window !== "undefined" && Boolean(window.speechSynthesis);
 }
 
+function normalizeSpeechError(error) {
+  const value = String(error || "").toLowerCase();
+  if (value.includes("not-allowed")) return "not-allowed";
+  if (value.includes("interrupted")) return "interrupted";
+  if (value.includes("canceled") || value.includes("cancelled")) return "canceled";
+  return value;
+}
+
 export default function useSpeechAnnouncer(settings) {
   const [voice, setVoice] = useState(null);
   const [status, setStatus] = useState(() => {
@@ -190,7 +198,9 @@ export default function useSpeechAnnouncer(settings) {
 
       const utterance = new SpeechSynthesisUtterance(normalizeSpeechText(nextItem.text));
       const profile = getSpeechProfile(voice, nextItem);
-      utterance.voice = voice;
+      if (voice && !sequence.useSystemVoice) {
+        utterance.voice = voice;
+      }
       utterance.lang = voice?.lang || "en-US";
       utterance.rate = profile.rate;
       utterance.pitch = profile.pitch;
@@ -225,10 +235,44 @@ export default function useSpeechAnnouncer(settings) {
         }, pauseAfterMs);
       };
 
-      utterance.onerror = () => {
+      utterance.onerror = (event) => {
         if (token !== sequenceTokenRef.current) {
           return;
         }
+
+        const errorType = normalizeSpeechError(event?.error);
+
+        if (errorType === "interrupted" || errorType === "canceled") {
+          utteranceRef.current = null;
+          currentSequenceRef.current = null;
+          queuedSequencesRef.current = [];
+          setStatus((current) => (current === "unsupported" ? current : "ready"));
+          return;
+        }
+
+        if (errorType === "not-allowed") {
+          utteranceRef.current = null;
+          currentSequenceRef.current = null;
+          queuedSequencesRef.current = [];
+          setStatus("waiting_for_gesture");
+          return;
+        }
+
+        if (voice && !sequence.useSystemVoice && !sequence.fallbackTried) {
+          utteranceRef.current = null;
+          currentSequenceRef.current = null;
+          clearStepTimer();
+          sequenceTokenRef.current += 1;
+          return runSequence(
+            {
+              ...sequence,
+              useSystemVoice: true,
+              fallbackTried: true,
+            },
+            sequenceTokenRef.current
+          );
+        }
+
         utteranceRef.current = null;
         currentSequenceRef.current = null;
         queuedSequencesRef.current = [];
@@ -292,6 +336,7 @@ export default function useSpeechAnnouncer(settings) {
         index: 0,
         pauseAfterMs: options.pauseAfterMs ?? 0,
         priority: options.priority ?? 1,
+        fallbackTried: options.fallbackTried ?? false,
       };
 
       if (!isPrimedRef.current && !options.userGesture) {
@@ -456,6 +501,7 @@ export default function useSpeechAnnouncer(settings) {
     stop,
     isSupported: status !== "unsupported",
     isSpeaking: status === "speaking",
+    needsGesture: status === "waiting_for_gesture",
     status,
     voiceName: voice?.name || "",
   };

@@ -10,6 +10,9 @@ export default function DarkSelect({
   onChange,
   ariaLabel,
   placeholder = "Select",
+  leadingIcon: LeadingIcon = null,
+  leadingLabel = "",
+  compact = false,
 }) {
   const [open, setOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState(null);
@@ -129,9 +132,25 @@ export default function DarkSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={toggleOpen}
-        className="inline-flex w-full items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3 text-left text-sm text-white outline-none transition hover:bg-white/[0.06] focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-400/20"
+        className={`inline-flex w-full items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.04] text-left text-sm text-white outline-none transition hover:bg-white/[0.06] focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-400/20 ${
+          compact ? "px-4 py-3" : "px-4 py-3.5"
+        }`}
       >
-        <span className="truncate">{selectedOption?.label || placeholder}</span>
+        <span className="flex min-w-0 items-center gap-2.5">
+          {LeadingIcon ? (
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/8 bg-white/[0.05] text-zinc-300">
+              <LeadingIcon className="text-[12px]" />
+            </span>
+          ) : null}
+          <span className="min-w-0">
+            {leadingLabel ? (
+              <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                {leadingLabel}
+              </span>
+            ) : null}
+            <span className="block truncate">{selectedOption?.label || placeholder}</span>
+          </span>
+        </span>
         <FaChevronDown
           className={`shrink-0 text-xs text-zinc-400 transition-transform ${
             open ? "rotate-180" : ""

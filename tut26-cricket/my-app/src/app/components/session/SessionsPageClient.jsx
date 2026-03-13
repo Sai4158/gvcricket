@@ -4,7 +4,13 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "rea
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
-import { FaArrowLeft, FaInfoCircle, FaPlus, FaSearch } from "react-icons/fa";
+import {
+  FaArrowLeft,
+  FaInfoCircle,
+  FaPlus,
+  FaSearch,
+  FaSlidersH,
+} from "react-icons/fa";
 import DarkSelect from "../shared/DarkSelect";
 import InfoModal from "./InfoModal";
 import PinModal from "./PinModal";
@@ -254,10 +260,10 @@ export default function SessionsPageClient({ initialSessions }) {
                 </h1>
                 <button
                   onClick={() => setIsInfoModalOpen(true)}
-                  className="text-zinc-500 transition-colors hover:text-sky-300"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-400 transition hover:bg-white/[0.08] hover:text-sky-300"
                   aria-label="Session status help"
                 >
-                  <FaInfoCircle size={22} />
+                  <FaInfoCircle size={18} />
                 </button>
               </div>
               <p className="mt-3 text-sm text-zinc-400">
@@ -267,7 +273,7 @@ export default function SessionsPageClient({ initialSessions }) {
           </div>
 
           <div className="sticky top-4 z-10 mt-6 rounded-[26px] border border-white/10 bg-zinc-950/85 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_250px]">
               <label className="relative flex items-center">
                 <FaSearch className="pointer-events-none absolute left-4 text-zinc-500" />
                 <input
@@ -289,6 +295,9 @@ export default function SessionsPageClient({ initialSessions }) {
                 }}
                 options={SORT_OPTIONS}
                 ariaLabel="Sort sessions"
+                leadingIcon={FaSlidersH}
+                leadingLabel="Sort"
+                compact
               />
             </div>
 

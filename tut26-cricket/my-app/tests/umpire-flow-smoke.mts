@@ -317,7 +317,7 @@ async function main() {
   assert.equal(matchDataResult.body.teamAName, "Red Rockets", "mid-match team A rename should persist");
   assert.equal(matchDataResult.body.teamBName, "Blue Blazers", "mid-match team B rename should persist");
   assert.equal(matchDataResult.body.overs, 2, "overs change should persist");
-  assert.equal(matchDataResult.body.result, "Blue Blazers won by 1 wicket.", "winner should be correct");
+  assert.equal(matchDataResult.body.result, "Blue Blazers won by 2 wickets.", "winner should be correct");
   assert.equal(matchDataResult.body.isOngoing, false, "match should end after chase");
 
   const sessionIndexResult = await json("/api/sessions", {}, anonymous);

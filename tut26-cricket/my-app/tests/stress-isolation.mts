@@ -65,11 +65,13 @@ async function api(
     body,
     jar,
     origin = true,
+    headers: extraHeaders = {},
   }: {
     method?: string;
     body?: unknown;
     jar?: CookieJar | null;
     origin?: boolean;
+    headers?: Record<string, string>;
   } = {}
 ) {
   const response = await fetch(`${base}${route}`, {
@@ -78,6 +80,7 @@ async function api(
       ...(body ? { "Content-Type": "application/json" } : {}),
       ...(origin && method !== "GET" ? { Origin: base, Referer: `${base}/` } : {}),
       ...(jar?.store?.size ? { Cookie: jar.header() } : {}),
+      ...extraHeaders,
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -179,9 +182,11 @@ function assert(condition: unknown, message: string) {
 }
 
 async function createLiveSession(index: number) {
+  const clientIp = `10.0.0.${index + 10}`;
   const create = await api("/api/sessions", {
     method: "POST",
     body: { name: `Stress Match ${index}` },
+    headers: { "x-forwarded-for": clientIp },
   });
   assert(create.response.status === 201, `Session create failed for ${index}: ${create.response.status}`);
   const sessionId = create.json?._id;
@@ -201,6 +206,7 @@ async function createLiveSession(index: number) {
       overs: 2,
       draftToken,
     },
+    headers: { "x-forwarded-for": clientIp },
   });
   assert(setup.response.status === 201, `Setup failed for ${index}: ${setup.response.status}`);
 
@@ -218,6 +224,7 @@ async function createLiveSession(index: number) {
       tossDecision,
       draftToken,
     },
+    headers: { "x-forwarded-for": clientIp },
   });
   assert(start.response.status === 201, `Start failed for ${index}: ${start.response.status}`);
   const matchId = start.json?.match?._id;
@@ -229,6 +236,7 @@ async function createLiveSession(index: number) {
     method: "POST",
     body: { pin: "0000" },
     jar: authJar,
+    headers: { "x-forwarded-for": clientIp },
   });
   assert(auth.response.status === 200, `Umpire auth failed for ${matchId}: ${auth.response.status}`);
 

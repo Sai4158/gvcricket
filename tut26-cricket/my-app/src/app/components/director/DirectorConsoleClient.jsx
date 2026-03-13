@@ -32,11 +32,59 @@ import { getBattingTeamBundle } from "../../lib/team-utils";
 import { playUiTone } from "../../lib/page-audio";
 
 const DIRECTOR_AUDIO_LIBRARY_CACHE_KEY = "gv-director-audio-library-v1";
+const DIRECTOR_SESSIONS_CACHE_KEY = "gv-director-sessions-v1";
 const DIRECTOR_FORCE_REAUTH_KEY = "gv-director-force-reauth";
 let directorAudioLibraryMemoryCache = null;
+let directorSessionsMemoryCache = null;
 
 function getDirectorAudioOrderStorageKey(sessionId) {
   return `gv-director-audio-order:${sessionId || "default"}`;
+}
+
+function readCachedDirectorSessions() {
+  if (directorSessionsMemoryCache?.length) {
+    return directorSessionsMemoryCache;
+  }
+
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const cachedValue = window.sessionStorage.getItem(DIRECTOR_SESSIONS_CACHE_KEY);
+    if (!cachedValue) {
+      return [];
+    }
+    const parsed = JSON.parse(cachedValue);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    directorSessionsMemoryCache = parsed;
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+
+function writeCachedDirectorSessions(sessions) {
+  if (!Array.isArray(sessions)) {
+    return;
+  }
+
+  directorSessionsMemoryCache = sessions;
+
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(
+      DIRECTOR_SESSIONS_CACHE_KEY,
+      JSON.stringify(sessions)
+    );
+  } catch {
+    // Ignore storage failures and keep the in-memory cache.
+  }
 }
 
 function createSpeechSettings() {
@@ -266,6 +314,12 @@ export default function DirectorConsoleClient({
   const speech = useSpeechAnnouncer(speechSettings);
   const micMonitor = useLocalMicMonitor();
 
+  useEffect(() => {
+    if (initialSessions?.length) {
+      writeCachedDirectorSessions(initialSessions);
+    }
+  }, [initialSessions]);
+
   const markDirectorReauthRequired = () => {
     if (typeof window === "undefined") {
       return;
@@ -395,6 +449,16 @@ export default function DirectorConsoleClient({
       return;
     }
 
+    const cachedSessions = readCachedDirectorSessions();
+    if (cachedSessions.length) {
+      setSessions(cachedSessions);
+      const nextLive = cachedSessions.find((item) => item.isLive);
+      if (nextLive) {
+        setSelectedSessionId(nextLive.session._id);
+      }
+      return;
+    }
+
     let cancelled = false;
 
     void (async () => {
@@ -403,8 +467,10 @@ export default function DirectorConsoleClient({
       if (!response.ok || cancelled) {
         return;
       }
-      setSessions(payload.sessions || []);
-      const nextLive = (payload.sessions || []).find((item) => item.isLive);
+      const nextSessions = payload.sessions || [];
+      writeCachedDirectorSessions(nextSessions);
+      setSessions(nextSessions);
+      const nextLive = nextSessions.find((item) => item.isLive);
       if (nextLive) {
         setSelectedSessionId(nextLive.session._id);
       }
@@ -646,24 +712,17 @@ export default function DirectorConsoleClient({
       clearDirectorReauthRequired();
       setAuthorized(true);
       setPin("");
-
-      const sessionResponse = await fetch("/api/director/sessions", {
-        cache: "no-store",
-      });
-      const sessionPayload = await sessionResponse
-        .json()
-        .catch(() => ({ sessions: [] }));
-      if (sessionResponse.ok) {
-        setSessions(sessionPayload.sessions || []);
-        const nextLive = (sessionPayload.sessions || []).find((item) => item.isLive);
+      const nextSessions = sessions.length ? sessions : readCachedDirectorSessions();
+      if (nextSessions.length) {
+        writeCachedDirectorSessions(nextSessions);
+        setSessions(nextSessions);
+        const nextLive = nextSessions.find((item) => item.isLive);
         setSelectedSessionId(
-          nextLive?.session?._id ||
-            sessionPayload.sessions?.[0]?.session?._id ||
-            ""
+          nextLive?.session?._id || nextSessions?.[0]?.session?._id || ""
         );
-        setManagedSessionId("");
-        setShowPicker(false);
       }
+      setManagedSessionId("");
+      setShowPicker(false);
     } catch {
       setAuthError("Could not verify PIN.");
     } finally {

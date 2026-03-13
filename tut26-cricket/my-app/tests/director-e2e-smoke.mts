@@ -4,7 +4,11 @@ import mongoose from "mongoose";
 import Match from "../src/models/Match.js";
 import Session from "../src/models/Session.js";
 
-const base = process.env.DIRECTOR_E2E_BASE_URL || "http://127.0.0.1:3024";
+const base =
+  process.env.DIRECTOR_E2E_BASE_URL ||
+  process.env.TEST_BASE_URL ||
+  process.env.STRESS_BASE_URL ||
+  "http://127.0.0.1:3024";
 const jar = new Map<string, string>();
 const created = { sessionId: "", matchId: "" };
 
@@ -205,10 +209,11 @@ async function main() {
 
   const sessionCreate = await api("/api/sessions", {
     method: "POST",
-    body: { name: "Director E2E", date: "2026-03-10" },
+    body: { name: "Director E2E" },
     useCookies: false,
   });
   created.sessionId = sessionCreate.json?._id || "";
+  const draftToken = sessionCreate.json?.draftToken || "";
   results.push(`SESSION_CREATE=${sessionCreate.response.status}`);
 
   const setup = await api(`/api/sessions/${created.sessionId}/setup-match`, {
@@ -219,11 +224,28 @@ async function main() {
       teamBName: "Beta",
       teamBPlayers: ["B1", "B2", "B3"],
       overs: 2,
+      draftToken,
     },
     useCookies: false,
   });
-  created.matchId = setup.json?._id || "";
   results.push(`MATCH_SETUP=${setup.response.status}`);
+
+  const start = await api(`/api/sessions/${created.sessionId}/start-match`, {
+    method: "POST",
+    body: {
+      teamAName: "Alpha",
+      teamAPlayers: ["A1", "A2", "A3"],
+      teamBName: "Beta",
+      teamBPlayers: ["B1", "B2", "B3"],
+      overs: 2,
+      tossWinner: "Alpha",
+      tossDecision: "bat",
+      draftToken,
+    },
+    useCookies: false,
+  });
+  created.matchId = start.json?.match?._id || "";
+  results.push(`MATCH_START=${start.response.status}`);
   const umpireCookie = cookieHeader();
 
   const directorOk = await api("/api/director/auth", {
