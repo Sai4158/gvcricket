@@ -260,8 +260,8 @@ export function buildResultInsights(match) {
     },
     awards: {
       playerOfMatch: playerOfMatch || winnerName || "Not available",
-      bestBatter: topScorer?.name || "Quick scoring mode",
-      bestBowler: bestBowler?.name || "Quick scoring mode",
+      bestBatter: topScorer?.name || "Not tracked",
+      bestBowler: bestBowler?.name || "Not tracked",
       bestMoment,
     },
     turningPoint,

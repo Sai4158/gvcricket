@@ -167,7 +167,7 @@ function validateRosterDismissalState(match) {
       continue;
     }
 
-    const dismissalLimit = Math.max(1, rosterSize - 1);
+    const dismissalLimit = Math.max(1, rosterSize);
     if (inningsCheck.dismissals > dismissalLimit) {
       throw new MatchEngineError(
         `${inningsCheck.team} cannot be reduced below the wickets already recorded in ${inningsCheck.inningsKey === "innings1" ? "the first innings" : "the second innings"}.`,

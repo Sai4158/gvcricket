@@ -80,6 +80,7 @@ export default function ResultInsightsSections({ match }) {
   const [shareStatus, setShareStatus] = useState("");
   const exportRef = useRef(null);
   const insights = useMemo(() => buildResultInsights(match), [match]);
+  const statsFallback = "Detailed player stats were not recorded for this match.";
 
   const handleCopyLink = async () => {
     try {
@@ -166,48 +167,52 @@ export default function ResultInsightsSections({ match }) {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <PerformerCard
             label="Top scorer"
-            primary={insights.topPerformers.topScorer?.name || "Quick mode"}
+            primary={insights.topPerformers.topScorer?.name || "Not tracked"}
             secondary={
               insights.topPerformers.topScorer
                 ? `${insights.topPerformers.topScorer.runs} runs`
-                : "Player stats not fully tracked."
+                : statsFallback
             }
             accent="text-amber-300"
           />
           <PerformerCard
             label="Best bowler"
-            primary={insights.topPerformers.bestBowler?.name || "Quick mode"}
+            primary={insights.topPerformers.bestBowler?.name || "Not tracked"}
             secondary={
               insights.topPerformers.bestBowler
                 ? `${insights.topPerformers.bestBowler.wickets} wickets`
-                : "Bowling figures not fully tracked."
+                : statsFallback
             }
             accent="text-sky-300"
           />
           <PerformerCard
             label="Best strike rate"
-            primary={insights.topPerformers.bestStrikeRate?.name || "Quick mode"}
+            primary={insights.topPerformers.bestStrikeRate?.name || "Not tracked"}
             secondary={
               insights.topPerformers.bestStrikeRate
                 ? `SR ${insights.topPerformers.bestStrikeRate.strikeRate}`
-                : "Strike rate not available."
+                : "Strike rate is unavailable for this match."
             }
             accent="text-emerald-300"
           />
           <PerformerCard
             label="Best economy"
-            primary={insights.topPerformers.bestEconomy?.name || "Quick mode"}
+            primary={insights.topPerformers.bestEconomy?.name || "Not tracked"}
             secondary={
               insights.topPerformers.bestEconomy
                 ? `Econ ${insights.topPerformers.bestEconomy.economy}`
-                : "Economy not available."
+                : "Economy is unavailable for this match."
             }
             accent="text-violet-300"
           />
           <PerformerCard
             label="Player of the match"
             primary={insights.topPerformers.playerOfMatch}
-            secondary={match?.result || "Key impact across the match."}
+            secondary={
+              insights.tracked
+                ? match?.result || "Key impact across the match."
+                : match?.result || "Picked from the final result."
+            }
             accent="text-rose-300"
           />
         </div>
@@ -323,7 +328,7 @@ export default function ResultInsightsSections({ match }) {
             secondary={
               insights.topPerformers.topScorer
                 ? `${insights.topPerformers.topScorer.runs} runs`
-                : "Quick scoring mode"
+                : statsFallback
             }
             accent="text-sky-300"
           />
@@ -333,7 +338,7 @@ export default function ResultInsightsSections({ match }) {
             secondary={
               insights.topPerformers.bestBowler
                 ? `${insights.topPerformers.bestBowler.wickets} wickets`
-                : "Quick scoring mode"
+                : statsFallback
             }
             accent="text-emerald-300"
           />

@@ -243,12 +243,12 @@ export default function SessionViewClient({ sessionId, initialData }) {
           {
             text: "Score announcer is now on.",
             pauseAfterMs: 420,
-            rate: 0.9,
+            rate: 0.82,
           },
           {
             text: "I will announce the next update.",
             pauseAfterMs: 0,
-            rate: 0.88,
+            rate: 0.8,
           },
         ],
         {
@@ -282,7 +282,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       {
         text: line,
         pauseAfterMs: scoreLine || overSummary ? 650 : 0,
-        rate: 0.9,
+        rate: 0.82,
       },
     ];
 
@@ -290,7 +290,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       items.push({
         text: scoreLine,
         pauseAfterMs: overSummary ? 900 : 0,
-        rate: 0.88,
+        rate: 0.8,
       });
     }
 
@@ -298,7 +298,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       items.push({
         text: overSummary,
         pauseAfterMs: 0,
-        rate: 0.9,
+        rate: 0.81,
       });
     }
 
@@ -950,12 +950,12 @@ export default function SessionViewClient({ sessionId, initialData }) {
                     {
                       text: "Score announcer is now on.",
                       pauseAfterMs: 420,
-                      rate: 0.9,
+                      rate: 0.82,
                     },
                     {
                       text: "I will announce the next update.",
                       pauseAfterMs: 0,
-                      rate: 0.88,
+                      rate: 0.8,
                     },
                   ],
                   {
@@ -978,7 +978,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                   {
                     text: buildCurrentScoreAnnouncement(match),
                     pauseAfterMs: 0,
-                    rate: 0.9,
+                    rate: 0.81,
                   },
                 ],
                 {

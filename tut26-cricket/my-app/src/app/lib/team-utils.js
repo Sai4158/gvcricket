@@ -78,5 +78,5 @@ export function getPlayerCount(entity, key) {
 
 export function getTotalDismissalsAllowed(match) {
   const playerCount = getBattingTeamBundle(match).players.length;
-  return Math.max(1, playerCount - 1);
+  return Math.max(1, playerCount);
 }

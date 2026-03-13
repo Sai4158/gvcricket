@@ -106,7 +106,7 @@ export function getSpectatorAnnouncementPriority(event) {
 }
 
 function buildRunsCall(runs) {
-  return `${pluralizeRuns(runs)}.`;
+  return `Umpire has given ${pluralizeRuns(runs)}.`;
 }
 
 function buildBallEventLine(ball) {
@@ -209,13 +209,11 @@ export function buildSpectatorScoreAnnouncement(event, match) {
   }
 
   if (event.overCompleted) {
-    return buildProgressReminder(event, match);
+    return "";
   }
 
   const parts = [];
-  if (isImportantEvent(event.ball)) {
-    parts.push(buildScoreSentence(event.score, event.outs));
-  }
+  parts.push(buildScoreSentence(event.score, event.outs));
 
   const reminder = buildProgressReminder(event, match);
   if (reminder) {

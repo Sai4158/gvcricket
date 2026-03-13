@@ -191,37 +191,20 @@ export default function ResultPageClient({ matchId, initialMatch }) {
 
         {match?.matchImageUrl ? (
           <section className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.32em] text-amber-300/85">
-                  Match Photo
-                </p>
-                <h2 className="mt-2 text-3xl font-bold text-white">Session Cover</h2>
-              </div>
+            <div className="flex justify-end">
               <button
                 type="button"
                 onClick={() => {
                   setRemoveError("");
                   setIsRemoveModalOpen(true);
                 }}
-                className="inline-flex items-center gap-2 rounded-full border border-rose-400/20 bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/15"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-rose-400/20 bg-rose-500/10 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/15"
+                aria-label="Remove match photo"
               >
                 <FaTrashAlt />
-                <span>Remove</span>
               </button>
             </div>
             <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.94),rgba(10,10,14,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
-              <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
-                <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400/12 text-amber-300">
-                  <FaImage />
-                </span>
-                <div>
-                  <h3 className="text-lg font-semibold text-white">Shared match image</h3>
-                  <p className="text-sm text-zinc-400">
-                    This cover stays with the whole session.
-                  </p>
-                </div>
-              </div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={match.matchImageUrl}

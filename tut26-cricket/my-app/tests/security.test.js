@@ -265,7 +265,7 @@ test("extras stay legal, do not consume legal balls, and wicket margin stays acc
     innings1: { team: "Falcons", score: 10, history: [] },
     innings2: { team: "Titans", score: 11, history: [] },
   };
-  assert.equal(buildWinByWicketsText(chaseMatch, 1), "Titans won by 1 wicket.");
+  assert.equal(buildWinByWicketsText(chaseMatch, 1), "Titans won by 2 wickets.");
 });
 
 test("full match flow stays accurate across innings change and target chase", () => {
@@ -325,12 +325,74 @@ test("full match flow stays accurate across innings change and target chase", ()
   assert.equal(match.score, 13);
   assert.equal(match.innings2.score, 13);
   assert.equal(match.isOngoing, false);
-  assert.equal(match.result, "Titans won by 2 wickets.");
+  assert.equal(match.result, "Titans won by 3 wickets.");
 
   assert.throws(
     () =>
       applyMatchAction(match, {
         actionId: "score:after-finish",
+        type: "score_ball",
+        runs: 1,
+        isOut: false,
+        extraType: null,
+      }),
+    (error) => error instanceof MatchEngineError && error.status === 409
+  );
+});
+
+test("the last remaining batter can continue until the final wicket falls", () => {
+  let match = applyMatchAction(buildBaseMatch(), {
+    actionId: "toss:last-batter",
+    type: "set_toss",
+    tossWinner: "Falcons",
+    tossDecision: "bat",
+  });
+
+  match = applyMatchAction(match, {
+    actionId: "score:last-batter-wicket-1",
+    type: "score_ball",
+    runs: 0,
+    isOut: true,
+    extraType: null,
+  });
+
+  match = applyMatchAction(match, {
+    actionId: "score:last-batter-wicket-2",
+    type: "score_ball",
+    runs: 0,
+    isOut: true,
+    extraType: null,
+  });
+
+  assert.equal(match.outs, 2);
+  assert.equal(match.isOngoing, true);
+
+  match = applyMatchAction(match, {
+    actionId: "score:last-batter-run",
+    type: "score_ball",
+    runs: 1,
+    isOut: false,
+    extraType: null,
+  });
+
+  assert.equal(match.score, 1);
+  assert.equal(match.isOngoing, true);
+
+  match = applyMatchAction(match, {
+    actionId: "score:last-batter-final-wicket",
+    type: "score_ball",
+    runs: 0,
+    isOut: true,
+    extraType: null,
+  });
+
+  assert.equal(match.outs, 3);
+  assert.equal(match.isOngoing, true);
+
+  assert.throws(
+    () =>
+      applyMatchAction(match, {
+        actionId: "score:after-all-out",
         type: "score_ball",
         runs: 1,
         isOut: false,
@@ -533,7 +595,7 @@ test("umpire match patching blocks impossible over changes and unsafe roster edi
   assert.throws(
     () =>
       applySafeMatchPatch(afterSecondInningsSecondWicket, {
-        teamB: ["Dina", "Esha"],
+        teamB: ["Dina"],
       }),
     (error) => error instanceof MatchEngineError && error.status === 409
   );
@@ -727,10 +789,10 @@ test("spectator commentary uses simple ball-first wording and separate score lin
   });
 
   const fullLine = buildSpectatorAnnouncement(event, after, "full");
-  assert.equal(fullLine, "1 run.");
+  assert.equal(fullLine, "Umpire has given 1 run.");
 
   const scoreLine = buildSpectatorScoreAnnouncement(event, after);
-  assert.equal(scoreLine, "");
+  assert.equal(scoreLine, "Score is 8 for 1.");
 
   const currentScoreLine = buildCurrentScoreAnnouncement(after);
   assert.match(currentScoreLine, /Score is 8 for 1\./);
@@ -852,10 +914,10 @@ test("spectator commentary handles last-ball warnings and over summaries", () =>
   });
 
   const fullLine = buildSpectatorAnnouncement(event, after, "full");
-  assert.equal(fullLine, "1 run.");
+  assert.equal(fullLine, "Umpire has given 1 run.");
 
   const scoreLine = buildSpectatorScoreAnnouncement(event, after);
-  assert.equal(scoreLine, "This is the last ball of the over.");
+  assert.equal(scoreLine, "Score is 5 for 2. This is the last ball of the over.");
 
   const overLine = buildSpectatorOverCompleteAnnouncement({
     ...after,
@@ -942,7 +1004,7 @@ test("target chased announcements congratulate the winner without duplicate scor
   });
 
   const line = buildSpectatorAnnouncement(event, after, "full");
-  assert.equal(line, "2 runs.");
+  assert.equal(line, "Umpire has given 2 runs.");
 
   const scoreLine = buildSpectatorScoreAnnouncement(event, after);
   assert.match(scoreLine, /Score is 13 for 0\./);
@@ -1011,10 +1073,13 @@ test("spectator commentary gives progress reminders and clean undo lines", () =>
         ],
       },
     }),
-    "This is ball 2."
+    "Score is 2 for 0. This is ball 2."
   );
 
-  assert.equal(buildSpectatorScoreAnnouncement(ballFourEvent, match), "This is ball 4.");
+  assert.equal(
+    buildSpectatorScoreAnnouncement(ballFourEvent, match),
+    "Score is 4 for 0. This is ball 4."
+  );
   assert.equal(buildSpectatorAnnouncement(undoEvent, match, "full"), "Umpire has undone the last ball.");
 });
 
