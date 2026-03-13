@@ -297,7 +297,7 @@ export default function ResultInsightsSections({ match }) {
             tone="text-rose-300"
           />
           <StatMiniCard
-            label="Wide / No ball"
+            label="Wides / No-balls"
             value={`${insights.innings1.wideRuns + insights.innings2.wideRuns} / ${insights.innings1.noBallRuns + insights.innings2.noBallRuns}`}
             tone="text-amber-300"
           />

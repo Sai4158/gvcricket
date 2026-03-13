@@ -58,7 +58,7 @@ function SessionCard({ item, onSelect }) {
               : "bg-white/[0.06] text-zinc-300"
           }`}
         >
-          {item.isLive ? "Live" : "Done"}
+              {item.isLive ? "Live" : "Completed"}
         </span>
       </div>
       <div className="mt-4 flex items-center justify-between gap-3 text-sm">
@@ -107,7 +107,7 @@ export default function DirectorSessionPicker({
               Director Mode
             </p>
             <h2 className="mt-2 text-2xl font-semibold text-white">
-              Choose a session
+              Choose a live session
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -134,14 +134,14 @@ export default function DirectorSessionPicker({
 
         {showHelp ? (
           <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-6 text-zinc-300">
-            Pick the newest live session to manage. If there is only one live match, use Latest live for a faster jump into the audio console.
+            Pick the newest live session to manage. If there is only one live match, use Latest live for a faster way into the audio console.
           </div>
         ) : null}
 
         {liveSessions.length ? (
           <div className="mt-6 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
-              Live sessions
+              Live Sessions
             </p>
             <div className="space-y-3">
               {liveSessions.map((item) => (
@@ -158,7 +158,7 @@ export default function DirectorSessionPicker({
         {recentSessions.length ? (
           <div className="mt-6 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
-              Recent sessions
+              Recent Sessions
             </p>
             <div className="space-y-3">
               {recentSessions.map((item) => (

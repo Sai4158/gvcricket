@@ -222,8 +222,8 @@ export default function MatchPageClient({
     );
   }
 
-  if (isLoading) return <Splash>Loading Match...</Splash>;
-  if (error && !match) return <Splash>Error: Could not load match data.</Splash>;
+  if (isLoading) return <Splash>Loading match...</Splash>;
+  if (error && !match) return <Splash>Error: Could not load the match data.</Splash>;
   if (!match) return <Splash>Match not found.</Splash>;
   if (tossPending) return <Splash>Opening toss...</Splash>;
 

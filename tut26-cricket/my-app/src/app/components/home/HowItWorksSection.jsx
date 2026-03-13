@@ -38,73 +38,73 @@ function getCardMotionProps(index) {
 const updateCards = [
   {
     icon: FaBroadcastTower,
-    title: "Walkietalkie",
-    copy: "Live talk between spectator, umpire, and now the director console with shared channel control.",
+    title: "Walkie-Talkie",
+    copy: "Live talk between spectators, the umpire, and the director console on one shared channel.",
     accent: "emerald",
   },
   {
     icon: FaMicrophoneAlt,
-    title: "Speaker mic",
-    copy: "Phone-to-speaker commentary mode makes quick announcements and live atmosphere easier.",
+    title: "Speaker Mic",
+    copy: "Use your phone as a speaker mic for quick commentary and live atmosphere.",
     accent: "yellow",
   },
   {
     icon: FaBullhorn,
     title: "Director mode",
-    copy: "A new control room page for PA mic, music, effects, and walkie with the umpire.",
+    copy: "A control room view for the PA mic, music, sound effects, and walkie-talkie with the umpire.",
     accent: "violet",
   },
   {
     icon: FaDrum,
     title: "Sound effects",
-    copy: "Trigger horns, crowd cheer, wicket hits, six bursts, and other match atmosphere sounds from one panel.",
+    copy: "Trigger horns, crowd cheers, wicket hits, six bursts, and other match-day sounds from one panel.",
     accent: "rose",
   },
   {
     icon: FaWaveSquare,
-    title: "Audio library",
-    copy: "Drop audio files into the app folder and play them on demand inside the director audio grid.",
+    title: "Audio Library",
+    copy: "Drop audio files into the app folder and play them on demand from the director audio grid.",
     accent: "emerald",
   },
   {
     icon: FaMusic,
-    title: "Music deck",
-    copy: "Load tracks from your phone or local files, then play them on demand without leaving the director screen.",
+    title: "Music Deck",
+    copy: "Load tracks from your phone or local files and play them without leaving the director screen.",
     accent: "violet",
   },
   {
     icon: FaVolumeUp,
-    title: "Score speech",
-    copy: "Live score announcements now read the ball and score clearly with smarter timing.",
+    title: "Score Announcer",
+    copy: "Live score announcements now speak each ball and score more clearly with smarter timing.",
     accent: "cyan",
   },
   {
     icon: FaImage,
-    title: "Session cover image",
+    title: "Session Cover Image",
     copy: "One uploaded image now carries across live, spectator, result, and stats screens.",
     accent: "amber",
   },
   {
     icon: FaPenSquare,
-    title: "Live result insights",
+    title: "Live Result Insights",
     copy: "Final results now include richer match insights, over summaries, and cleaner stats.",
     accent: "rose",
   },
   {
     icon: FaCoins,
-    title: "Step-by-step setup",
-    copy: "Session, teams, toss, and start now follow one cleaner 4-step match flow.",
+    title: "Step-by-Step Setup",
+    copy: "Session setup, teams, toss, and match start now follow one cleaner 4-step flow.",
     accent: "yellow",
   },
   {
     icon: FaShareAlt,
-    title: "Quick sharing",
+    title: "Quick Sharing",
     copy: "Share live score links, result pages, and spectator views faster with cleaner mobile actions.",
     accent: "cyan",
   },
   {
     icon: FaSlidersH,
-    title: "Live over tracker",
+    title: "Live Over Tracker",
     copy: "Current over cards now stay synced between umpire and spectator screens during live scoring.",
     accent: "amber",
   },
@@ -115,14 +115,14 @@ const coreCards = [
     icon: FaListAlt,
     title: "Session Dashboard",
     copy:
-      "See past games, create new ones, or jump back into a saved match with the umpire PIN.",
+      "See past matches, create new ones, or jump back into a saved match with the umpire PIN.",
     accent: "cyan",
   },
   {
     icon: FaPenSquare,
     title: "Live Umpire Scoring",
     copy:
-      "Score every ball with simple color-coded controls for runs, wides, dots, and outs.",
+      "Score every ball with simple color-coded controls for runs, wides, dot balls, and outs.",
     accent: "amber",
   },
   {
@@ -136,7 +136,7 @@ const coreCards = [
     icon: FaPlusCircle,
     title: "New Match Setup",
     copy:
-      "Start fast with match name, teams, players, and overs in one quick setup flow.",
+      "Start quickly with a match name, teams, players, and overs in one simple setup flow.",
     accent: "rose",
   },
   {
@@ -150,21 +150,21 @@ const coreCards = [
     icon: FaCheckCircle,
     title: "Final Results",
     copy:
-      "See winner, final score, and key stats instantly, with match history saved for later review.",
+      "See the winner, final score, and key stats instantly, with match history saved for later review.",
     accent: "violet",
   },
   {
     icon: FaSlidersH,
     title: "Flexible Match Control",
     copy:
-      "Adjust teams, players, overs, and live match details without breaking the score flow.",
+      "Adjust teams, players, overs, and live match details without breaking the scoring flow.",
     accent: "amber",
   },
   {
     icon: FaBroadcastTower,
     title: "Live Communication",
     copy:
-      "Use walkietalkie, score feedback, and director controls to keep everyone in sync during the match.",
+      "Use walkie-talkie, score feedback, and director controls to keep everyone in sync during the match.",
     accent: "emerald",
   },
   {
@@ -186,17 +186,17 @@ const coreCards = [
 function getAccentClasses(accent) {
   switch (accent) {
     case "amber":
-      return "bg-amber-500/12 text-amber-200 shadow-[0_12px_30px_rgba(245,158,11,0.1)]";
+      return "bg-amber-500/12 shadow-[0_12px_30px_rgba(245,158,11,0.1)]";
     case "emerald":
-      return "bg-emerald-500/12 text-emerald-200 shadow-[0_12px_30px_rgba(16,185,129,0.12)]";
+      return "bg-emerald-500/12 shadow-[0_12px_30px_rgba(16,185,129,0.12)]";
     case "rose":
-      return "bg-rose-500/12 text-rose-200 shadow-[0_12px_30px_rgba(244,63,94,0.12)]";
+      return "bg-rose-500/12 shadow-[0_12px_30px_rgba(244,63,94,0.12)]";
     case "yellow":
-      return "bg-yellow-500/12 text-yellow-200 shadow-[0_12px_30px_rgba(250,204,21,0.12)]";
+      return "bg-yellow-500/12 shadow-[0_12px_30px_rgba(250,204,21,0.12)]";
     case "violet":
-      return "bg-violet-500/12 text-violet-200 shadow-[0_12px_30px_rgba(139,92,246,0.12)]";
+      return "bg-violet-500/12 shadow-[0_12px_30px_rgba(139,92,246,0.12)]";
     default:
-      return "bg-cyan-500/12 text-cyan-200 shadow-[0_12px_30px_rgba(34,211,238,0.12)]";
+      return "bg-cyan-500/12 shadow-[0_12px_30px_rgba(34,211,238,0.12)]";
   }
 }
 
@@ -236,7 +236,7 @@ export default function HowItWorksSection() {
               Built for faster live scoring
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-white/78 md:text-lg">
-              Walkie, speaker mic, director controls, score speech, session cover images, and cleaner result insights in one scoring flow.
+              Walkie-talkie, speaker mic, director controls, score announcements, session cover images, and cleaner result insights in one scoring flow.
             </p>
           </div>
 
@@ -262,7 +262,7 @@ export default function HowItWorksSection() {
                   transition={{ duration: 0.38, ease: "easeOut", delay: 0.08 }}
                   whileHover={{ y: -3, scale: 1.05, rotate: -4 }}
                   whileTap={{ scale: 0.98 }}
-                  className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/10 text-2xl ${getAccentClasses(
+                  className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/10 text-2xl !text-white ${getAccentClasses(
                     card.accent
                   )}`}
                 >
@@ -297,7 +297,7 @@ export default function HowItWorksSection() {
               From toss to final result
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-white/78 md:text-lg">
-              GV Cricket keeps setup, live scoring, spectator updates, announcer calls, and final stats in one simple cricket scoring app.
+              GV Cricket keeps setup, live scoring, spectator updates, score announcements, and final stats in one simple cricket scoring app.
             </p>
           </div>
 
@@ -323,7 +323,7 @@ export default function HowItWorksSection() {
                   transition={{ duration: 0.38, ease: "easeOut", delay: 0.08 }}
                   whileHover={{ y: -3, scale: 1.05, rotate: 4 }}
                   whileTap={{ scale: 0.98 }}
-                  className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/10 text-2xl ${getAccentClasses(
+                  className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/10 text-2xl !text-white ${getAccentClasses(
                     card.accent
                   )}`}
                 >

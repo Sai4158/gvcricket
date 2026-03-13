@@ -37,9 +37,7 @@ export default function LearnCricketCard() {
             <div className="flex items-center gap-3 pt-1">
               <span className="liquid-pill inline-flex items-center gap-3 rounded-full px-4 py-3 text-sm font-medium text-white">
                 Open guide
-                <span className="liquid-icon flex h-9 w-9 items-center justify-center rounded-full text-sm text-white">
-                  <FaArrowUpRightFromSquare />
-                </span>
+                <FaArrowUpRightFromSquare className="text-sm text-white/90" />
               </span>
             </div>
           </div>

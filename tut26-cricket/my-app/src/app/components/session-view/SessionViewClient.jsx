@@ -178,7 +178,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     },
     onError: () => {
       if (!data) {
-        setStreamError("Could not load session data.");
+        setStreamError("Could not load the session data.");
       }
     },
   });
@@ -344,7 +344,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       !previousWalkieEnabledRef.current
     ) {
       const noticeTimer = window.setTimeout(() => {
-        setLocalWalkieNotice("Walkietalkie is on.");
+        setLocalWalkieNotice("Walkie-talkie is on.");
       }, 0);
       if (typeof window !== "undefined") {
         try {
@@ -582,7 +582,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   );
 
   if (!sessionId) return <SplashMsg>No Session ID provided.</SplashMsg>;
-  if (streamError) return <SplashMsg>Could not load session data.</SplashMsg>;
+  if (streamError) return <SplashMsg>Could not load the session data.</SplashMsg>;
   if (!sessionData) return <SplashMsg loading>Loading Session...</SplashMsg>;
   if (!match) {
     return <SplashMsg>The match for this session has not started yet.</SplashMsg>;
@@ -726,7 +726,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-base font-semibold text-white">
-                Walkietalkie
+                Walkie-Talkie
               </span>
               <span className="mt-1 block text-xs text-zinc-400">
                 {walkieCardFinishing
@@ -735,19 +735,19 @@ export default function SessionViewClient({ sessionId, initialData }) {
                   ? "You are speaking."
                   : walkieLauncherEnabled && walkie.snapshot?.enabled
                   ? "Hold mic to talk to others."
-                  : "Turn on to open."}
+                  : "Turn it on to open."}
               </span>
             </span>
             <span className="flex flex-col items-end gap-2">
               <IosGlassSwitch
                 checked={walkieLauncherEnabled}
                 onChange={handleWalkieSwitchChange}
-                label="Toggle walkietalkie panel"
+                label="Toggle walkie-talkie panel"
               />
               {walkie.snapshot?.enabled && walkieLauncherEnabled ? (
                 <button
                   type="button"
-                  aria-label="Hold walkietalkie mic"
+                  aria-label="Hold walkie-talkie mic"
                   onClick={(event) => event.stopPropagation()}
                   onPointerDown={(event) => {
                     event.stopPropagation();
@@ -801,7 +801,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-base font-semibold text-white">
-              Speaker mic
+              Speaker Mic
             </span>
             <span className="mt-1 inline-flex items-center gap-2 text-xs text-zinc-400">
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/[0.04]">
@@ -871,7 +871,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
             }
           }}
           className={`${launcherCardClass} mt-4`}
-          aria-label="Open announce score"
+          aria-label="Open score announcer"
         >
           <button
             type="button"
@@ -886,10 +886,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
           </button>
           <span className="min-w-0 flex-1">
             <span className="block text-base font-semibold text-white">
-              Announce score
+              Score Announcer
             </span>
             <span className="mt-1 block text-xs text-zinc-400">
-              Read live score.
+              Read the live score.
             </span>
           </span>
           <IosGlassSwitch

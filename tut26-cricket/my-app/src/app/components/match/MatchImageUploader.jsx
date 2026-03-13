@@ -11,9 +11,9 @@ export default function MatchImageUploader({
   onUploaded,
   onSkip,
   title = "Add Match Image",
-  description = "Upload a team photo, ground shot, or poster. JPG, PNG, or WEBP only.",
+  description = "Upload a team photo, ground shot, or poster. JPG, PNG, or WebP only.",
   primaryLabel = "Upload Image",
-  secondaryLabel = "Skip For Now",
+  secondaryLabel = "Skip for Now",
 }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
@@ -42,7 +42,7 @@ export default function MatchImageUploader({
     if (!file) return;
 
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setError("Please choose a JPG, PNG, or WEBP image.");
+      setError("Please choose a JPG, PNG, or WebP image.");
       return;
     }
 
@@ -59,7 +59,7 @@ export default function MatchImageUploader({
 
   const handleConfirmPin = async (nextPin) => {
     if (!pendingPinFile) {
-      throw new Error("Choose a picture first.");
+      throw new Error("Choose an image first.");
     }
 
     const response = await fetch("/api/media/pin-check", {
@@ -211,9 +211,9 @@ export default function MatchImageUploader({
       </div>
       <ImagePinModal
         isOpen={isPinModalOpen}
-        title={existingImageUrl ? "Replace picture" : "Add picture"}
+        title={existingImageUrl ? "Replace Image" : "Add Image"}
         subtitle="Enter the 4-digit PIN before using this match image."
-        confirmLabel="Use this picture"
+        confirmLabel="Use this image"
         showContinueWithout={true}
         onConfirm={handleConfirmPin}
         onContinueWithout={handleContinueWithout}

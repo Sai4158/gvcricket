@@ -378,7 +378,7 @@ export function requestWalkieEnable(matchId, { participantId, role }) {
     return {
       ok: false,
       status: 409,
-      message: "Request already sent. Waiting for umpire.",
+      message: "Request already sent. Waiting for the umpire.",
     };
   }
 

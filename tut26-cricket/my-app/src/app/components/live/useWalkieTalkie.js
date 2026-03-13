@@ -481,7 +481,7 @@ export default function useWalkieTalkie({
 
       if (payload?.type === "request-sent") {
         setRequestState("pending");
-        setNotice("Request sent. Waiting for umpire.");
+        setNotice("Request sent. Waiting for the umpire.");
         return;
       }
 
@@ -793,7 +793,7 @@ export default function useWalkieTalkie({
       primeRemoteAudio();
       setRequestCooldownLeft(30);
       setRequestState("pending");
-      setNotice("Request sent. Waiting for umpire.");
+      setNotice("Request sent. Waiting for the umpire.");
       return true;
     } catch (nextError) {
       setError(nextError.message || "Could not send walkie request.");

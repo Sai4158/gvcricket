@@ -55,7 +55,7 @@ export function WalkieRequestQueue({
                 </span>
               </div>
               <p className="text-sm font-medium text-white">
-                {request.name} wants walkie-talkie.
+                {request.name} wants to use walkie-talkie.
               </p>
             </div>
           </div>
@@ -242,17 +242,17 @@ export default function WalkiePanel({
   const isUmpire = role === "umpire";
   const canShowRequestAction = !snapshot?.enabled && !isUmpire;
   const statusText = !snapshot?.enabled
-    ? "Walkie-talkie off"
+    ? "Walkie-talkie is off"
     : isFinishing
     ? "Finishing"
     : isSelfTalking
     ? "You are live"
     : snapshot?.activeSpeakerRole === "umpire"
-    ? "Umpire is live"
+    ? "Umpire is speaking"
     : snapshot?.activeSpeakerRole === "director"
-    ? "Director is live"
+    ? "Director is speaking"
     : snapshot?.activeSpeakerRole === "spectator"
-    ? "Spectator is live"
+    ? "Spectator is speaking"
     : "Ready";
 
   const handleToggle = (checked) => {
@@ -279,10 +279,10 @@ export default function WalkiePanel({
 
   const helperText =
     requestState === "pending"
-      ? "Waiting for umpire."
+      ? "Waiting for the umpire."
       : requestState === "dismissed"
-      ? "Umpire dismissed the request."
-      : "Ask the umpire to enable walkie-talkie.";
+      ? "The umpire dismissed the request."
+      : "Ask the umpire to turn on walkie-talkie.";
 
   return (
     <div className="space-y-4">
@@ -301,10 +301,10 @@ export default function WalkiePanel({
               <p className="mt-1 text-sm text-zinc-400">{statusText}</p>
               <p className="mt-1 text-xs text-zinc-500">
                 {isUmpire
-                  ? "Talk with spectators and director."
+                  ? "Talk with spectators and the director."
                   : role === "director"
-                  ? "Talk with umpire or spectators."
-                  : "Talk with umpire or spectators."}
+                  ? "Talk with the umpire or spectators."
+                  : "Talk with the umpire or spectators."}
               </p>
             </div>
           </div>
@@ -314,7 +314,7 @@ export default function WalkiePanel({
               disabled={false}
               label={
                 snapshot?.enabled
-                  ? "Walkie-talkie on"
+                  ? "Walkie-talkie is on"
                   : "Turn walkie-talkie on"
               }
               onChange={handleToggle}
@@ -383,7 +383,7 @@ export default function WalkiePanel({
               <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-center text-sm text-zinc-400">
                 {requestState === "pending" ? (
                   <div className="flex items-center justify-center gap-2 text-zinc-300">
-                    <LiquidLoader size="sm" label="Waiting for umpire" />
+                    <LiquidLoader size="sm" label="Waiting for the umpire" />
                     <span>{helperText}</span>
                   </div>
                 ) : (
@@ -393,7 +393,7 @@ export default function WalkiePanel({
             </div>
           ) : (
             <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-center text-sm text-zinc-400">
-              Walkie is unavailable right now.
+              Walkie-talkie is unavailable right now.
             </div>
           )}
         </div>

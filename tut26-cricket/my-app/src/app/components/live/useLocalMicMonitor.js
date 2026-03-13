@@ -18,7 +18,7 @@ function getMicErrorMessage(error) {
     return "The microphone is busy in another app or tab.";
   }
 
-  return "Could not start the live microphone on this browser.";
+  return "Could not start the live microphone in this browser.";
 }
 
 export default function useLocalMicMonitor() {
@@ -92,7 +92,7 @@ export default function useLocalMicMonitor() {
       typeof window === "undefined" ||
       !navigator?.mediaDevices?.getUserMedia
     ) {
-      setError("Live microphone monitor is not supported on this browser.");
+      setError("Live microphone monitoring is not supported in this browser.");
       return false;
     }
 
@@ -100,7 +100,7 @@ export default function useLocalMicMonitor() {
       window.AudioContext || window.webkitAudioContext;
 
     if (!AudioContextClass) {
-      setError("Live microphone monitor is not supported on this browser.");
+      setError("Live microphone monitoring is not supported in this browser.");
       return false;
     }
 

@@ -52,7 +52,7 @@ export default function DirectorPinGate({
 
         {showHelp ? (
           <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-6 text-zinc-300">
-            Enter the 4-digit PIN to open the console. Inside, you can pick a live session, talk on the PA mic, run music and effects, and request walkie with the umpire.
+            Enter the 4-digit PIN to open the console. Then choose a live session, use the PA mic, play music and sound effects, and request walkie-talkie with the umpire.
           </div>
         ) : null}
 

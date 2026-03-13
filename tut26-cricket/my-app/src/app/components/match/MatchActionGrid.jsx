@@ -229,7 +229,7 @@ export default function MatchActionGrid({
             onHoldEnd={onWalkieHoldEnd}
             onPressFeedback={onPressFeedback}
             icon={<WalkieIcon />}
-            label="Walkietalkie"
+            label="Walkie-Talkie"
             colorClass="text-emerald-300"
             active={isWalkieActive}
             talking={isWalkieTalking}
@@ -258,7 +258,7 @@ export default function MatchActionGrid({
             onHoldEnd={onMicHoldEnd}
             onPressFeedback={onPressFeedback}
             icon={<CommentaryIcon />}
-            label="Speaker mic"
+            label="Speaker Mic"
             colorClass="text-amber-300"
             active={isCommentaryActive}
             talking={isCommentaryTalking}

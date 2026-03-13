@@ -45,7 +45,7 @@ export default function HomeHeader() {
     { href: "/rules", text: "GV Community Custom Rule Sheet" },
     {
       href: "/#product-demo",
-      text: "See It In Action",
+      text: "See It in Action",
       onClick: handleDemoClick,
     },
     { type: "divider" },

@@ -118,7 +118,7 @@ export default function LiveMicModal({
 
             <div className="space-y-2">
               <p className="text-2xl font-black tracking-[-0.03em] text-white">
-                Speaker mic
+                Speaker Mic
               </p>
               <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-zinc-300">
                 {statusLabel}

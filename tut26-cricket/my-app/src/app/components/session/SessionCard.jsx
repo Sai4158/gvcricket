@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { FaArrowUpRightFromSquare, FaEye, FaLock, FaRadio } from "react-icons/fa6";
 import { formatRelativeTime } from "./formatRelativeTime";
@@ -14,7 +15,7 @@ function buildStatusMeta(session) {
     return {
       badge: "Live now",
       tone: "live",
-      summary: "Live scoreboard active",
+      summary: "Live score available",
     };
   }
 
@@ -33,6 +34,7 @@ function buildStatusMeta(session) {
 function SessionCard({ session, onUmpireClick }) {
   const isLive = session.isLive;
   const statusMeta = buildStatusMeta(session);
+  const cardImage = session.matchImageUrl || "/gvLogo.png";
   const scoreHref =
     session.match && !isLive
       ? `/result/${session.match}`
@@ -57,6 +59,16 @@ function SessionCard({ session, onUmpireClick }) {
         containIntrinsicSize: "320px",
       }}
     >
+      <div className="pointer-events-none absolute inset-0 opacity-[0.16]">
+        <Image
+          src={cardImage}
+          alt=""
+          fill
+          sizes="(max-width: 768px) 100vw, 33vw"
+          className="object-cover object-center"
+        />
+      </div>
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),transparent_30%),linear-gradient(180deg,rgba(7,7,10,0.28),rgba(7,7,10,0.86))]" />
       <div
         className={`pointer-events-none absolute inset-x-0 top-0 h-28 opacity-70 blur-3xl ${
           isLive ? "bg-emerald-500/12" : "bg-rose-500/8"
@@ -65,16 +77,27 @@ function SessionCard({ session, onUmpireClick }) {
 
       <div className="relative flex h-full flex-col">
         <div className="flex flex-col gap-3">
-          <div className="min-w-0">
-            <h2 className="text-[1.8rem] leading-tight font-semibold tracking-[-0.03em] text-white break-words">
-              {session.name || "Untitled Session"}
-            </h2>
-            <p className="mt-2 text-sm text-zinc-400">{dateLabel}</p>
-            {teamLine ? (
-              <p className="mt-2 text-lg leading-snug font-semibold tracking-[-0.02em] text-white break-words">
-                {teamLine}
-              </p>
-            ) : null}
+          <div className="flex items-start gap-4">
+            <div className="relative mt-1 h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-white/12 bg-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+              <Image
+                src={cardImage}
+                alt={`${session.name || "Session"} logo`}
+                fill
+                sizes="56px"
+                className="object-cover object-center p-1.5"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-[1.8rem] leading-tight font-semibold tracking-[-0.03em] text-white break-words">
+                {session.name || "Untitled Session"}
+              </h2>
+              <p className="mt-2 text-sm text-zinc-300">{dateLabel}</p>
+              {teamLine ? (
+                <p className="mt-2 text-lg leading-snug font-semibold tracking-[-0.02em] text-white break-words">
+                  {teamLine}
+                </p>
+              ) : null}
+            </div>
           </div>
           <span
             className={`inline-flex w-fit shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] ${
@@ -98,7 +121,7 @@ function SessionCard({ session, onUmpireClick }) {
           </p>
           <p className="mt-2 text-sm text-zinc-200">
             {statusMeta.summary}
-            {isLive && session.match ? " Jump in now or open umpire mode." : ""}
+            {isLive && session.match ? " Open it now or switch to Umpire Mode." : ""}
           </p>
         </div>
 

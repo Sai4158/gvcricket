@@ -38,7 +38,7 @@ export default function NewSessionPage() {
     }
 
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setError("Please choose a JPG, PNG, or WEBP image.");
+      setError("Please choose a JPG, PNG, or WebP image.");
       return;
     }
 
@@ -50,7 +50,7 @@ export default function NewSessionPage() {
 
   const handleConfirmImagePin = async (pin) => {
     if (!pendingImageFile) {
-      throw new Error("Choose a picture first.");
+      throw new Error("Choose an image first.");
     }
 
     const response = await fetch("/api/media/pin-check", {
@@ -123,8 +123,8 @@ export default function NewSessionPage() {
       if (!res.ok) {
         const errData = await res
           .json()
-          .catch(() => ({ message: "An unknown error occurred." }));
-        throw new Error(errData.message || "Failed to create session.");
+          .catch(() => ({ message: "Something went wrong." }));
+        throw new Error(errData.message || "Could not create the session.");
       }
 
       const session = await res.json();
@@ -207,7 +207,7 @@ export default function NewSessionPage() {
                       className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.08]"
                     >
                       <FaImage className="text-zinc-400" />
-                      Upload picture
+                      Upload image
                     </label>
                     {selectedFileName ? (
                       <div className="w-full min-w-0">
@@ -257,9 +257,9 @@ export default function NewSessionPage() {
       </div>
       <ImagePinModal
         isOpen={isPinModalOpen}
-        title="Upload picture"
+        title="Upload image"
         subtitle="Enter the 4-digit PIN before adding a session cover image."
-        confirmLabel="Use this picture"
+        confirmLabel="Use this image"
         showContinueWithout={true}
         onConfirm={handleConfirmImagePin}
         onContinueWithout={handleContinueWithoutImage}

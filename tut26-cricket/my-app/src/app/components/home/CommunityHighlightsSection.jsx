@@ -4,9 +4,9 @@ import AnimatedSection from "./AnimatedSection";
 import YouTubeVideoPlayer from "./YouTubeVideoPlayer";
 
 const demoVideos = [
-  { videoId: "FztXLCMn0SQ", title: "Live scoring demo" },
-  { videoId: "foHic_QfJuU", title: "Spectator view demo" },
-  { videoId: "xEeLV0M78b4", title: "Match flow demo" },
+  { videoId: "FztXLCMn0SQ", title: "GV Community Highlight 1" },
+  { videoId: "foHic_QfJuU", title: "GV Community Highlight 2" },
+  { videoId: "xEeLV0M78b4", title: "GV Community Highlight 3" },
   { videoId: "LlJZ0WJteSU", title: "Quick clip" },
 ];
 

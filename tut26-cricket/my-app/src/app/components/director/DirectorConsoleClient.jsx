@@ -784,7 +784,7 @@ export default function DirectorConsoleClient({
           setSpeakerMessage(
             typeof HTMLMediaElement !== "undefined" &&
               "setSinkId" in HTMLMediaElement.prototype
-              ? "Speaker selection supported on this browser."
+              ? "Speaker selection is supported in this browser."
               : "Using your phone or Bluetooth output."
           );
         } else {
@@ -903,7 +903,7 @@ export default function DirectorConsoleClient({
     audio.volume = musicVolume * masterVolume;
     const sinkApplied = await syncSinkId(speakerDeviceId);
     if (!sinkApplied && speakerDeviceId !== "default") {
-      setSpeakerMessage("Output routing is not supported on this browser.");
+      setSpeakerMessage("Output routing is not supported in this browser.");
     }
 
     try {
@@ -1369,7 +1369,7 @@ export default function DirectorConsoleClient({
                     : walkie.snapshot?.enabled
                     ? "Hold to talk with the live channel."
                     : walkie.requestState === "pending"
-                    ? "Request sent. Waiting for umpire."
+                    ? "Request sent. Waiting for the umpire."
                     : walkie.requestState === "dismissed"
                     ? "Umpire dismissed the request."
                     : "Ask the umpire to enable walkie."}
@@ -1419,11 +1419,11 @@ export default function DirectorConsoleClient({
           </Card>
 
           <Card
-            title="Audio library"
+            title="Audio Library"
             subtitle="Tap to play audio."
             icon={<FaBullhorn />}
             help={{
-              title: "Audio library",
+              title: "Audio Library",
               body: "Drop audio files into public/audio/effects and they will show here automatically. Files only load when you tap them.",
             }}
             action={
@@ -1590,7 +1590,7 @@ export default function DirectorConsoleClient({
             subtitle="Files on this phone"
             icon={<FaMusic />}
             help={{
-              title: "Music deck",
+              title: "Music Deck",
               body: "Use audio files from Files, Downloads, or this phone. Connect a Bluetooth speaker first for louder playback. External apps like Spotify or Apple Music cannot be controlled here.",
             }}
             action={
