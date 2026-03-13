@@ -3,14 +3,14 @@ import { getPublicMatchImagePath } from "./match-image-secure";
 import { isSafeMatchImageUrl } from "./match-image";
 import { hasCompleteTossState, normalizeLegacyTossState } from "./match-toss";
 
-export function serializePublicMatch(matchDocument) {
+export function serializePublicMatch(matchDocument, fallbackState = null) {
   if (!matchDocument) return null;
 
   const rawMatch =
     typeof matchDocument.toObject === "function"
       ? matchDocument.toObject()
       : matchDocument;
-  const match = normalizeLegacyTossState(rawMatch);
+  const match = normalizeLegacyTossState(rawMatch, fallbackState);
 
   return {
     _id: String(match._id),
@@ -31,7 +31,7 @@ export function serializePublicMatch(matchDocument) {
     result: match.result || "",
     innings1: match.innings1 || { team: "", score: 0, history: [] },
     innings2: match.innings2 || { team: "", score: 0, history: [] },
-    tossReady: hasCompleteTossState(match),
+    tossReady: hasCompleteTossState(match, fallbackState),
     balls: Array.isArray(match.balls) ? match.balls : [],
     matchImageUrl: getPublicMatchImagePath(match),
     announcerEnabled: Boolean(match.announcerEnabled),

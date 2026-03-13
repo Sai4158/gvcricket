@@ -42,7 +42,14 @@ export async function GET(request, { params }) {
 
         const pushMatch = async () => {
           const match = await Match.findById(id);
-          if (match && hydrateLegacyTossState(match)) {
+          const fallbackSession =
+            match && match.sessionId
+              ? await Session.findById(match.sessionId).select(
+                  "tossWinner tossDecision teamAName teamBName teamA teamB"
+                )
+              : null;
+
+          if (match && hydrateLegacyTossState(match, fallbackSession)) {
             await match.save();
             await Session.findByIdAndUpdate(match.sessionId, {
               $set: buildSessionMirrorUpdate(match),
@@ -50,7 +57,7 @@ export async function GET(request, { params }) {
           }
 
           send("match", {
-            match: serializePublicMatch(match),
+            match: serializePublicMatch(match, fallbackSession),
             updatedAt: new Date().toISOString(),
           });
         };

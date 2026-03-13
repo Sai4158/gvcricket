@@ -4,6 +4,7 @@ import {
   countLegalBalls,
   syncTeamNamesAcrossMatch,
 } from "./match-scoring";
+import { normalizeLegacyTossState } from "./match-toss";
 import {
   createMatchEndLiveEvent,
   createScoreLiveEvent,
@@ -410,7 +411,7 @@ export function isProcessedAction(match, actionId) {
 }
 
 export function applyMatchAction(matchDocument, action) {
-  const match = toPlainMatch(matchDocument);
+  const match = normalizeLegacyTossState(toPlainMatch(matchDocument));
 
   if (!match?._id) {
     throw new MatchEngineError("Match not found.", 404);

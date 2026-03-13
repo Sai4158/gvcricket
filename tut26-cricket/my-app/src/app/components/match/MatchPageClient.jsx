@@ -12,6 +12,7 @@ import {
   buildCurrentScoreAnnouncement,
   buildUmpireAnnouncement,
   createScoreLiveEvent,
+  createUndoLiveEvent,
 } from "../../lib/live-announcements";
 import { getTotalDismissalsAllowed } from "../../lib/team-utils";
 import {
@@ -54,6 +55,7 @@ export default function MatchPageClient({
     isUpdating,
     lastUpdatedAt,
     historyStack,
+    currentInningsHasHistory,
     replaceMatch,
     handleScoreEvent,
     handleUndo,
@@ -106,7 +108,7 @@ export default function MatchPageClient({
       rate: 0.92,
       minGapMs: 0,
       userGesture: true,
-      interrupt: false,
+      interrupt: true,
     });
   };
 
@@ -129,6 +131,25 @@ export default function MatchPageClient({
       ignoreEnabled: true,
       interrupt: true,
     });
+  };
+
+  const handleAnnouncedUndo = async () => {
+    localAnnouncementIdRef.current += 1;
+    const undoEvent = createUndoLiveEvent(match);
+    const undoText =
+      buildUmpireAnnouncement(undoEvent, umpireSettings.mode) ||
+      "Umpire has undone the last ball.";
+
+    speak(undoText, {
+      key: `umpire-undo-${localAnnouncementIdRef.current}`,
+      rate: 0.92,
+      minGapMs: 0,
+      userGesture: true,
+      interrupt: true,
+      ignoreEnabled: true,
+    });
+
+    await handleUndo();
   };
 
   const handleUmpirePressFeedback = () => {
@@ -217,8 +238,11 @@ export default function MatchPageClient({
   const oversDone = legalBalls >= match.overs * 6;
   const maxWickets = getTotalDismissalsAllowed(match);
   const isAllOut = maxWickets > 0 && match.outs >= maxWickets;
-  const showInningsEnd =
-    !match.isOngoing || Boolean(match.result) || oversDone || isAllOut;
+  const firstInningsComplete =
+    match.innings === "first" && (oversDone || isAllOut);
+  const matchFinished =
+    Boolean(match.result) || (match.innings === "second" && !match.isOngoing);
+  const showInningsEnd = firstInningsComplete || matchFinished;
   const controlsDisabled =
     isUpdating || showInningsEnd || Boolean(match.result) || tossPending;
 
@@ -274,10 +298,10 @@ export default function MatchPageClient({
           />
           <MatchActionGrid
             isUpdating={isUpdating}
-            historyStackLength={historyStack.length}
+            historyStackLength={currentInningsHasHistory ? historyStack.length : 0}
             onEditTeams={() => setModal({ type: "editTeams" })}
             onEditOvers={() => setModal({ type: "editOvers" })}
-            onUndo={handleUndo}
+            onUndo={handleAnnouncedUndo}
             onHistory={() => setModal({ type: "history" })}
             onImage={() => setModal({ type: "image" })}
             onCommentary={() => setModal({ type: "commentary" })}

@@ -207,7 +207,7 @@ export function WalkieTalkButton({
           {finishing ? "Finishing" : active || holding ? "Live" : "Hold to talk"}
         </p>
         {finishing ? (
-          <p className="mt-1 text-[11px] text-zinc-500">{finishDelayLeft || 2}s</p>
+          <p className="mt-1 text-[11px] text-zinc-500">{finishDelayLeft || 1}s</p>
         ) : active || holding ? (
           <p className="mt-1 text-[11px] text-zinc-500">{countdown}s</p>
         ) : null}

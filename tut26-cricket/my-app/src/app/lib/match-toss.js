@@ -20,9 +20,17 @@ function buildEmptyInnings(existing) {
   };
 }
 
-export function getMatchTeamNames(match) {
-  const teamA = getTeamBundle(match, "teamA");
-  const teamB = getTeamBundle(match, "teamB");
+export function getMatchTeamNames(match, fallbackState = null) {
+  const fallbackMatch = fallbackState
+    ? {
+        teamA: fallbackState.teamA,
+        teamB: fallbackState.teamB,
+        teamAName: fallbackState.teamAName,
+        teamBName: fallbackState.teamBName,
+      }
+    : null;
+  const teamA = getTeamBundle(match?.teamAName || match?.teamA ? match : fallbackMatch, "teamA");
+  const teamB = getTeamBundle(match?.teamBName || match?.teamB ? match : fallbackMatch, "teamB");
 
   return {
     teamAName: sanitizeName(teamA.name) || "Team A",
@@ -33,7 +41,7 @@ export function getMatchTeamNames(match) {
 export function getBattingFirstTeamName(match, fallbackState) {
   const tossWinner = getResolvedTossWinner(match, fallbackState);
   const tossDecision = getResolvedTossDecision(match, fallbackState);
-  const { teamAName, teamBName } = getMatchTeamNames(match);
+  const { teamAName, teamBName } = getMatchTeamNames(match, fallbackState);
 
   if (!tossWinner || !tossDecision) {
     return "";
@@ -55,7 +63,7 @@ export function getBattingFirstTeamName(match, fallbackState) {
 }
 
 export function getBowlingFirstTeamName(match, fallbackState) {
-  const { teamAName, teamBName } = getMatchTeamNames(match);
+  const { teamAName, teamBName } = getMatchTeamNames(match, fallbackState);
   const battingFirst = getBattingFirstTeamName(match, fallbackState);
 
   if (!battingFirst) {

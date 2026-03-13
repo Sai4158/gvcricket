@@ -31,8 +31,10 @@ async function loadMatchAccessState(matchId) {
     return match;
   }
 
-  const fallbackSession = !match.tossWinner || !match.tossDecision
-    ? await Session.findById(match.sessionId).select("tossWinner tossDecision")
+  const fallbackSession = match.sessionId
+    ? await Session.findById(match.sessionId).select(
+        "tossWinner tossDecision teamAName teamBName teamA teamB"
+      )
     : null;
 
   if (hydrateLegacyTossState(match, fallbackSession)) {

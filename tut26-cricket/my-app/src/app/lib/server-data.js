@@ -71,7 +71,7 @@ export async function loadSessionsIndexData() {
     if (resolvedMatch && !hasCompleteTossState(resolvedMatch, session)) {
       resolvedMatch = normalizeLegacyTossState(resolvedMatch, session);
     }
-    const publicMatch = serializePublicMatch(resolvedMatch);
+    const publicMatch = serializePublicMatch(resolvedMatch, session);
 
     return {
       ...serializePublicSession({
@@ -105,7 +105,7 @@ export async function loadSessionViewData(sessionId) {
 
   return {
     session: serializePublicSession(session),
-    match: serializePublicMatch(match),
+    match: serializePublicMatch(match, session),
     updatedAt: new Date(match?.updatedAt || session.updatedAt || Date.now()).toISOString(),
   };
 }
@@ -113,7 +113,13 @@ export async function loadSessionViewData(sessionId) {
 export async function loadPublicMatchData(matchId) {
   await connectDB();
   const match = await Match.findById(matchId).lean();
-  return serializePublicMatch(match);
+  const fallbackSession =
+    match && match.sessionId
+      ? await Session.findById(match.sessionId)
+          .select("tossWinner tossDecision teamAName teamBName teamA teamB")
+          .lean()
+      : null;
+  return serializePublicMatch(match, fallbackSession);
 }
 
 export async function loadTossPageData(matchId) {
@@ -164,7 +170,7 @@ export async function loadTossPageData(matchId) {
 
       return {
         authStatus: authorized ? "granted" : "locked",
-        match: serializePublicMatch(linkedMatch),
+        match: serializePublicMatch(linkedMatch, session),
         sessionId: String(session._id),
         hasCreatedMatch: true,
         actualMatchId: String(linkedMatch._id),
@@ -221,8 +227,10 @@ export async function loadMatchAccessData(matchId) {
   );
 
   const fallbackSession =
-    match && (!match.tossWinner || !match.tossDecision)
-      ? await Session.findById(match.sessionId).select("tossWinner tossDecision")
+    match && match.sessionId
+      ? await Session.findById(match.sessionId).select(
+          "tossWinner tossDecision teamAName teamBName teamA teamB"
+        )
       : null;
 
   if (authorized && hydrateLegacyTossState(match, fallbackSession)) {
@@ -231,7 +239,7 @@ export async function loadMatchAccessData(matchId) {
 
   return {
     authStatus: authorized ? "granted" : "locked",
-    match: authorized ? serializePublicMatch(match) : null,
+    match: authorized ? serializePublicMatch(match, fallbackSession) : null,
   };
 }
 
@@ -280,7 +288,7 @@ export async function loadHomeLiveBannerData() {
     (Array.isArray(match.teamB) ? match.teamB[0] : "") ||
     "Team B";
 
-  const publicMatch = serializePublicMatch(match);
+  const publicMatch = serializePublicMatch(match, session);
   const publicSession = serializePublicSession(session);
 
   return {
@@ -318,7 +326,7 @@ export async function loadDirectorSessionsList() {
         ...(typeof session.toObject === "function" ? session.toObject() : session),
         match: resolvedMatch?._id || session.match,
       });
-      const publicMatch = serializePublicMatch(resolvedMatch);
+      const publicMatch = serializePublicMatch(resolvedMatch, session);
 
       return {
         session: publicSession,

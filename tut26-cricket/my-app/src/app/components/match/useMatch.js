@@ -34,6 +34,35 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
   const lastStreamUpdateRef = useRef(initialMatch?.updatedAt || "");
   const updateInFlightRef = useRef(false);
 
+  const refreshMatch = async () => {
+    if (!matchId || !hasAccess) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(`/api/matches/${matchId}`, {
+        cache: "no-store",
+      });
+      const body = await response
+        .json()
+        .catch(() => null);
+
+      if (!response.ok || !body) {
+        return null;
+      }
+
+      startTransition(() => {
+        setMatch(body);
+        setLastUpdatedAt(new Date().toISOString());
+        setError(null);
+      });
+
+      return body;
+    } catch {
+      return null;
+    }
+  };
+
   useEffect(() => {
     if (!matchId || !hasAccess) {
       setMatch(initialMatch);
@@ -77,8 +106,12 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     [match?.undoCount]
   );
   const tossPending = Boolean(match && !match.tossReady);
+  const activeInningsKey = match?.innings === "second" ? "innings2" : "innings1";
+  const currentInningsHasHistory = Boolean(
+    match?.[activeInningsKey]?.history?.some((over) => Array.isArray(over?.balls) && over.balls.length > 0)
+  );
 
-  const sendAction = async (action) => {
+  const sendAction = async (action, allowOneRetry = true) => {
     if (!matchId || !hasAccess || updateInFlightRef.current) return null;
 
     updateInFlightRef.current = true;
@@ -97,8 +130,21 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
       if (!response.ok) {
         if (body.message === "Set the toss before scoring starts.") {
+          const refreshedMatch = await refreshMatch();
+
+          if (refreshedMatch?.tossReady && allowOneRetry) {
+            updateInFlightRef.current = false;
+            setIsUpdating(false);
+            return sendAction(action, false);
+          }
+
           setError(null);
           router.replace(`/toss/${matchId}`);
+          return null;
+        }
+        if (body.message === "The current innings is not complete yet.") {
+          await refreshMatch();
+          setError(null);
           return null;
         }
         throw new Error(body.message || "Failed to update match.");
@@ -186,7 +232,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       router.replace(`/toss/${matchId}`);
       return;
     }
-    if (!match?.undoCount) return;
+    if (!match?.undoCount || !currentInningsHasHistory) return;
 
     await sendAction({
       actionId: createActionId("undo"),
@@ -224,6 +270,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     isUpdating,
     lastUpdatedAt,
     historyStack,
+    currentInningsHasHistory,
     replaceMatch: (nextMatch) => {
       startTransition(() => {
         setMatch(nextMatch);

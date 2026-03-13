@@ -41,10 +41,11 @@ export async function GET(_req, { params }) {
       return jsonError("Match not found.", 404);
     }
 
-    const fallbackSession =
-      !match.tossWinner || !match.tossDecision
-        ? await Session.findById(match.sessionId).select("tossWinner tossDecision")
-        : null;
+    const fallbackSession = match.sessionId
+      ? await Session.findById(match.sessionId).select(
+          "tossWinner tossDecision teamAName teamBName teamA teamB"
+        )
+      : null;
 
     if (hydrateLegacyTossState(match, fallbackSession)) {
       await match.save();
@@ -121,10 +122,11 @@ export async function PATCH(req, { params }) {
       return jsonError("Umpire access required.", 403);
     }
 
-    const fallbackSession =
-      !match.tossWinner || !match.tossDecision
-        ? await Session.findById(match.sessionId).select("tossWinner tossDecision")
-        : null;
+    const fallbackSession = match.sessionId
+      ? await Session.findById(match.sessionId).select(
+          "tossWinner tossDecision teamAName teamBName teamA teamB"
+        )
+      : null;
 
     if (hydrateLegacyTossState(match, fallbackSession)) {
       await match.save();

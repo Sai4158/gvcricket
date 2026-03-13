@@ -18,6 +18,7 @@ import useLocalMicMonitor from "../live/useLocalMicMonitor";
 import useAnnouncementSettings from "../live/useAnnouncementSettings";
 import useWalkieTalkie from "../live/useWalkieTalkie";
 import MatchHeroBackdrop from "../match/MatchHeroBackdrop";
+import { BallTracker } from "../match/MatchBallHistory";
 import useEventSource from "../live/useEventSource";
 import useSpeechAnnouncer from "../live/useSpeechAnnouncer";
 import LiveScoreCard from "./LiveScoreCard";
@@ -636,6 +637,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
           <div className="mt-8 flex justify-center">
             <LiveScoreCard match={match} />
+          </div>
+          <div className="mt-5 flex justify-center">
+            <div className="w-full max-w-xl">
+              <BallTracker history={match.history || []} />
+            </div>
           </div>
         </div>
       </MatchHeroBackdrop>

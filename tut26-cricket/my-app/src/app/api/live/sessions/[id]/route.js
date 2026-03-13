@@ -73,7 +73,7 @@ export async function GET(request, { params }) {
 
           send("session", {
             session: serializePublicSession(session),
-            match: serializePublicMatch(match),
+            match: serializePublicMatch(match, session),
             updatedAt: new Date().toISOString(),
           });
           return { session, match };

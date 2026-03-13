@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { duckPageMedia, playUiTone, restorePageMedia } from "../../lib/page-audio";
 
-const WALKIE_FINISH_DELAY_MS = 2000;
+const WALKIE_FINISH_DELAY_MS = 1000;
 
 export function shouldReceiveWalkieAudio({ participantId, snapshot }) {
   if (!snapshot?.enabled) {

@@ -48,6 +48,11 @@ export default function HomeHeader() {
     },
     { type: "divider" },
     { href: "/rules", text: "GV Community Custom Rule Sheet" },
+    {
+      href: "https://usacricket.org/what-is-cricket/",
+      text: "Learn Cricket",
+      external: true,
+    },
   ];
 
   const linkStyles =
@@ -139,6 +144,18 @@ export default function HomeHeader() {
                         }}
                       >
                         {link.href ? (
+                          link.external ? (
+                            <a
+                              href={link.href}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(event) => handleNavClick(event, link.onClick)}
+                              className={linkStyles}
+                            >
+                              <span>{link.text}</span>
+                              {link.icon && <link.icon className="h-5 w-5" />}
+                            </a>
+                          ) : (
                           <Link
                             href={link.href}
                             onClick={(event) => handleNavClick(event, link.onClick)}
@@ -147,6 +164,7 @@ export default function HomeHeader() {
                             <span>{link.text}</span>
                             {link.icon && <link.icon className="h-5 w-5" />}
                           </Link>
+                          )
                         ) : (
                           <button
                             onClick={(event) => handleNavClick(event, link.onClick)}

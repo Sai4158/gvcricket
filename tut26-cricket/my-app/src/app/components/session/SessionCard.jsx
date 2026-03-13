@@ -64,20 +64,20 @@ function SessionCard({ session, onUmpireClick }) {
       />
 
       <div className="relative flex h-full flex-col">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-3">
           <div className="min-w-0">
-            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-white [overflow-wrap:anywhere]">
+            <h2 className="text-[1.8rem] leading-tight font-semibold tracking-[-0.03em] text-white break-words">
               {session.name || "Untitled Session"}
             </h2>
             <p className="mt-2 text-sm text-zinc-400">{dateLabel}</p>
             {teamLine ? (
-              <p className="mt-2 text-lg font-semibold tracking-[-0.02em] text-white [overflow-wrap:anywhere]">
+              <p className="mt-2 text-lg leading-snug font-semibold tracking-[-0.02em] text-white break-words">
                 {teamLine}
               </p>
             ) : null}
           </div>
           <span
-            className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] ${
+            className={`inline-flex w-fit shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] ${
               statusMeta.tone === "live"
                 ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
                 : "border-rose-400/15 bg-rose-500/10 text-rose-200"

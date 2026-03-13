@@ -104,10 +104,11 @@ export async function POST(req, { params }) {
       return jsonError("Umpire access required.", 403);
     }
 
-    const fallbackSession =
-      !match.tossWinner || !match.tossDecision
-        ? await Session.findById(match.sessionId).select("tossWinner tossDecision")
-        : null;
+    const fallbackSession = match.sessionId
+      ? await Session.findById(match.sessionId).select(
+          "tossWinner tossDecision teamAName teamBName teamA teamB"
+        )
+      : null;
 
     if (hydrateLegacyTossState(match, fallbackSession)) {
       await match.save();

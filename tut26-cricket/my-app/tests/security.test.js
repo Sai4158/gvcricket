@@ -30,10 +30,12 @@ import { middleware } from "../middleware.js";
 import { countLegalBalls, buildWinByWicketsText } from "../src/app/lib/match-scoring.js";
 import {
   buildCurrentScoreAnnouncement,
+  buildUmpireAnnouncement,
   buildSpectatorAnnouncement,
   buildSpectatorOverCompleteAnnouncement,
   buildSpectatorScoreAnnouncement,
   createScoreLiveEvent,
+  createUndoLiveEvent,
 } from "../src/app/lib/live-announcements.js";
 import {
   getStartedMatchId,
@@ -338,6 +340,31 @@ test("full match flow stays accurate across innings change and target chase", ()
   );
 });
 
+test("legacy toss state can be recovered from linked session fallback data", () => {
+  const legacyMatch = {
+    ...buildBaseMatch(),
+    tossWinner: "",
+    tossDecision: "",
+    innings1: { team: "", score: 0, history: [] },
+    innings2: { team: "", score: 0, history: [] },
+  };
+
+  const normalized = normalizeLegacyTossState(legacyMatch, {
+    tossWinner: "Falcons",
+    tossDecision: "bat",
+    teamAName: "Falcons",
+    teamBName: "Titans",
+    teamA: ["Alice", "Bea", "Cara"],
+    teamB: ["Dina", "Esha", "Farah"],
+  });
+
+  assert.equal(normalized.tossWinner, "Falcons");
+  assert.equal(normalized.tossDecision, "bat");
+  assert.equal(normalized.innings1.team, "Falcons");
+  assert.equal(normalized.innings2.team, "Titans");
+  assert.equal(normalized.tossReady, true);
+});
+
 test("umpire scoring combinations undo extras and over completion cleanly", () => {
   let match = applyMatchAction(
     {
@@ -588,6 +615,29 @@ test("legacy matches can inherit toss state from the linked session safely", () 
   assert.equal(normalized.innings1.team, "Falcons");
   assert.equal(normalized.innings2.team, "Titans");
   assert.equal(hasCompleteTossState(legacyMatch, sessionFallback), true);
+});
+
+test("scoring self-heals legacy toss-complete matches with missing innings teams", () => {
+  const legacyMatch = {
+    ...buildBaseMatch(),
+    tossWinner: "Titans",
+    tossDecision: "bat",
+    innings1: { team: "", score: 0, history: [] },
+    innings2: { team: "", score: 0, history: [] },
+  };
+
+  const nextMatch = applyMatchAction(legacyMatch, {
+    actionId: "score:legacy-self-heal",
+    type: "score_ball",
+    runs: 1,
+    isOut: false,
+    extraType: null,
+  });
+
+  assert.equal(nextMatch.innings1.team, "Titans");
+  assert.equal(nextMatch.innings2.team, "Falcons");
+  assert.equal(nextMatch.score, 1);
+  assert.equal(nextMatch.innings1.score, 1);
 });
 
 test("started match payload helpers only accept real match ids", () => {
@@ -966,6 +1016,35 @@ test("spectator commentary gives progress reminders and clean undo lines", () =>
 
   assert.equal(buildSpectatorScoreAnnouncement(ballFourEvent, match), "This is ball 4.");
   assert.equal(buildSpectatorAnnouncement(undoEvent, match, "full"), "Umpire has undone the last ball.");
+});
+
+test("umpire commentary speaks score buttons and undo with clean wording", () => {
+  const matchBefore = applyMatchAction(buildBaseMatch(), {
+    actionId: "toss:umpire-audio",
+    type: "set_toss",
+    tossWinner: "Falcons",
+    tossDecision: "bat",
+  });
+  const matchAfter = applyMatchAction(matchBefore, {
+    actionId: "score:umpire-audio",
+    type: "score_ball",
+    runs: 2,
+    isOut: false,
+    extraType: null,
+  });
+
+  const scoreEvent = createScoreLiveEvent(matchBefore, matchAfter, {
+    runs: 2,
+    isOut: false,
+    extraType: null,
+  });
+  const undoEvent = createUndoLiveEvent(matchAfter);
+
+  assert.equal(buildUmpireAnnouncement(scoreEvent, "simple"), "2 runs");
+  assert.equal(
+    buildUmpireAnnouncement(undoEvent, "simple"),
+    "Umpire has undone the last ball."
+  );
 });
 
 test("walkie snapshot tracks director presence and spectator requests stay live-only", () => {

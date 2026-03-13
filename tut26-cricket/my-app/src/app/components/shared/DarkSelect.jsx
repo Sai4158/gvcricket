@@ -14,11 +14,15 @@ export default function DarkSelect({
   const [open, setOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState(null);
   const rootRef = useRef(null);
+  const menuRef = useRef(null);
   const positionFrameRef = useRef(0);
 
   useEffect(() => {
     const handlePointerDown = (event) => {
-      if (!rootRef.current?.contains(event.target)) {
+      if (
+        !rootRef.current?.contains(event.target) &&
+        !menuRef.current?.contains(event.target)
+      ) {
         setOpen(false);
       }
     };
@@ -137,6 +141,7 @@ export default function DarkSelect({
       {typeof document !== "undefined" && open && menuStyle
         ? createPortal(
             <div
+              ref={menuRef}
               role="listbox"
               className="fixed z-[80] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/98 p-2 shadow-[0_22px_70px_rgba(0,0,0,0.48)] backdrop-blur-xl"
               style={{

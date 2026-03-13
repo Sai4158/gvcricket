@@ -16,12 +16,19 @@ import {
 } from "react-icons/fa";
 import AnimatedSection from "./AnimatedSection";
 
-const cardMotionProps = {
-  initial: { opacity: 0, y: 26, scale: 0.985 },
-  whileInView: { opacity: 1, y: 0, scale: 1 },
-  viewport: { once: true, amount: 0.1, margin: "0px 0px -8% 0px" },
-  transition: { duration: 0.42, ease: "easeOut" },
-};
+function getCardMotionProps(index) {
+  const fromLeft = index % 2 === 0;
+  return {
+    initial: { opacity: 0, x: fromLeft ? -34 : 34, y: 18, scale: 0.985 },
+    whileInView: { opacity: 1, x: 0, y: 0, scale: 1 },
+    viewport: { once: true, amount: 0.08, margin: "0px 0px -10% 0px" },
+    transition: {
+      duration: 0.46,
+      ease: [0.22, 1, 0.36, 1],
+      delay: Math.min(index * 0.03, 0.18),
+    },
+  };
+}
 
 const updateCards = [
   {
@@ -151,10 +158,10 @@ export default function HowItWorksSection() {
           </div>
 
           <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {updateCards.map((card) => (
+            {updateCards.map((card, index) => (
               <motion.div
                 key={card.title}
-                {...cardMotionProps}
+                {...getCardMotionProps(index)}
                 className="liquid-glass-soft rounded-[26px] p-5"
               >
                 <motion.span
@@ -204,10 +211,10 @@ export default function HowItWorksSection() {
           </div>
 
           <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {coreCards.map((card) => (
+            {coreCards.map((card, index) => (
               <motion.div
                 key={card.title}
-                {...cardMotionProps}
+                {...getCardMotionProps(index)}
                 className="liquid-glass-soft rounded-[26px] p-5"
               >
                 <motion.span
