@@ -30,12 +30,12 @@ export async function generateMetadata({ params }) {
       title: `${pageLabel} | GV Cricket`,
       description: `Final score, winner, over summary, and match stats for ${matchup}.`,
       url: absoluteUrl(`/result/${id}`),
-      images: [absoluteUrl(siteConfig.ogImagePath)],
+      images: [absoluteUrl(`/result/${id}/opengraph-image`)],
     },
     twitter: {
       title: `${pageLabel} | GV Cricket`,
       description: `Final score and match stats for ${matchup}.`,
-      images: [absoluteUrl(siteConfig.twitterImagePath)],
+      images: [absoluteUrl(`/result/${id}/twitter-image`)],
     },
   };
 }

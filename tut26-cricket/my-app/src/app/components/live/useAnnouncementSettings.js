@@ -7,7 +7,7 @@ const SETTINGS_VERSION = 4;
 const DEFAULTS = {
   spectator: {
     version: SETTINGS_VERSION,
-    enabled: false,
+    enabled: true,
     muted: false,
     volume: 0.85,
     mode: "full",
@@ -27,6 +27,10 @@ function getStorageKey(role) {
   return `gv-announcer-${role}`;
 }
 
+function getEnabledStorageKey(role, scopeKey = "") {
+  return `gv-announcer-enabled-${role}${scopeKey ? `-${scopeKey}` : ""}`;
+}
+
 function readRawValue(role) {
   if (typeof window === "undefined") {
     return "";
@@ -35,7 +39,15 @@ function readRawValue(role) {
   return window.localStorage.getItem(getStorageKey(role)) || "";
 }
 
-export default function useAnnouncementSettings(role) {
+function readEnabledValue(role, scopeKey) {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return window.sessionStorage.getItem(getEnabledStorageKey(role, scopeKey)) || "";
+}
+
+export default function useAnnouncementSettings(role, scopeKey = "") {
   const subscribe = useMemo(
     () => (onStoreChange) => {
       if (typeof window === "undefined") {
@@ -43,13 +55,20 @@ export default function useAnnouncementSettings(role) {
       }
 
       const handleStorage = (event) => {
-        if (!event.key || event.key === getStorageKey(role)) {
+        if (
+          !event.key ||
+          event.key === getStorageKey(role) ||
+          event.key === getEnabledStorageKey(role, scopeKey)
+        ) {
           onStoreChange();
         }
       };
 
       const handleCustom = (event) => {
-        if (event.detail?.role === role) {
+        if (
+          event.detail?.role === role &&
+          event.detail?.scopeKey === scopeKey
+        ) {
           onStoreChange();
         }
       };
@@ -62,7 +81,7 @@ export default function useAnnouncementSettings(role) {
         window.removeEventListener("gv-announcer-change", handleCustom);
       };
     },
-    [role]
+    [role, scopeKey]
   );
 
   const rawValue = useSyncExternalStore(
@@ -70,22 +89,23 @@ export default function useAnnouncementSettings(role) {
     () => readRawValue(role),
     () => ""
   );
+  const enabledValue = useSyncExternalStore(
+    subscribe,
+    () => readEnabledValue(role, scopeKey),
+    () => ""
+  );
 
-  const settings = useMemo(() => {
+  const persistedSettings = useMemo(() => {
     try {
       if (!rawValue) {
         return DEFAULTS[role];
       }
 
       const parsed = JSON.parse(rawValue);
-      const isLegacyUmpireSetting =
-        role === "umpire" &&
-        (!parsed.version || parsed.version < SETTINGS_VERSION);
 
       return {
         ...DEFAULTS[role],
         ...parsed,
-        ...(isLegacyUmpireSetting ? { enabled: true } : {}),
         version: SETTINGS_VERSION,
       };
     } catch (error) {
@@ -93,6 +113,22 @@ export default function useAnnouncementSettings(role) {
       return DEFAULTS[role];
     }
   }, [rawValue, role]);
+
+  const enabled = useMemo(() => {
+    if (!enabledValue) {
+      return true;
+    }
+
+    return enabledValue === "true";
+  }, [enabledValue]);
+
+  const settings = useMemo(
+    () => ({
+      ...persistedSettings,
+      enabled,
+    }),
+    [persistedSettings, enabled]
+  );
 
   useEffect(() => {
     if (typeof window === "undefined" || !rawValue) {
@@ -115,8 +151,21 @@ export default function useAnnouncementSettings(role) {
     }
 
     try {
+      if (key === "enabled") {
+        window.sessionStorage.setItem(
+          getEnabledStorageKey(role, scopeKey),
+          value ? "true" : "false"
+        );
+        window.dispatchEvent(
+          new CustomEvent("gv-announcer-change", {
+            detail: { role, scopeKey },
+          })
+        );
+        return;
+      }
+
       const nextSettings = {
-        ...settings,
+        ...persistedSettings,
         [key]: value,
       };
       window.localStorage.setItem(
@@ -125,7 +174,7 @@ export default function useAnnouncementSettings(role) {
       );
       window.dispatchEvent(
         new CustomEvent("gv-announcer-change", {
-          detail: { role },
+          detail: { role, scopeKey },
         })
       );
     } catch (error) {

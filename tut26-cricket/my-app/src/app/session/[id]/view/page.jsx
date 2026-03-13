@@ -32,13 +32,13 @@ export async function generateMetadata({ params }) {
       description:
         "Live cricket score, overs, wickets, and spectator updates in one clean match view.",
       url: absoluteUrl(`/session/${id}/view`),
-      images: [absoluteUrl(siteConfig.ogImagePath)],
+      images: [absoluteUrl(`/session/${id}/view/opengraph-image`)],
     },
     twitter: {
       title: `${matchup} Live Score | GV Cricket`,
       description:
         "Watch the live score and match updates in the spectator view.",
-      images: [absoluteUrl(siteConfig.twitterImagePath)],
+      images: [absoluteUrl(`/session/${id}/view/twitter-image`)],
     },
   };
 }

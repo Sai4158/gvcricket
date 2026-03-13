@@ -4,6 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { duckPageMedia, playUiTone, restorePageMedia } from "../../lib/page-audio";
 
 const WALKIE_FINISH_DELAY_MS = 1000;
+const WALKIE_SIGNAL_RACE_MESSAGES = new Set([
+  "No active walkie transmission.",
+  "Active speaker not found.",
+  "Participant not found.",
+]);
 
 export function shouldReceiveWalkieAudio({ participantId, snapshot }) {
   if (!snapshot?.enabled) {
@@ -262,13 +267,24 @@ export default function useWalkieTalkie({
       return;
     }
 
-    await sendJson(`/api/matches/${matchId}/walkie/signal`, {
-      participantId,
-      role,
-      token: activeToken,
-      toId,
-      payload,
-    });
+    try {
+      await sendJson(`/api/matches/${matchId}/walkie/signal`, {
+        participantId,
+        role,
+        token: activeToken,
+        toId,
+        payload,
+      });
+    } catch (nextError) {
+      const message =
+        nextError instanceof Error ? nextError.message : "Request failed.";
+
+      if (WALKIE_SIGNAL_RACE_MESSAGES.has(message)) {
+        return;
+      }
+
+      throw nextError;
+    }
   }, [matchId, participantId, role, sendJson]);
 
   const respondToRequest = useCallback(

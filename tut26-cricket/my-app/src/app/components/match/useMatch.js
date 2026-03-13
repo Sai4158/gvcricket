@@ -33,6 +33,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
   const [lastUpdatedAt, setLastUpdatedAt] = useState("");
   const lastStreamUpdateRef = useRef(initialMatch?.updatedAt || "");
   const updateInFlightRef = useRef(false);
+  const previousMatchIdRef = useRef(matchId);
 
   const refreshMatch = async () => {
     if (!matchId || !hasAccess) {
@@ -64,6 +65,18 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
   };
 
   useEffect(() => {
+    const matchChanged = previousMatchIdRef.current !== matchId;
+    previousMatchIdRef.current = matchId;
+
+    if (matchChanged) {
+      updateInFlightRef.current = false;
+      lastStreamUpdateRef.current = initialMatch?.updatedAt || "";
+      setMatch(initialMatch || null);
+      setError(null);
+      setLastUpdatedAt(initialMatch?.updatedAt || "");
+      setIsUpdating(false);
+    }
+
     if (!matchId || !hasAccess) {
       setMatch(initialMatch);
       setError(null);

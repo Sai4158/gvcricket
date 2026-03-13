@@ -273,8 +273,8 @@ export default function SessionsPageClient({ initialSessions }) {
           </div>
 
           <div className="sticky top-4 z-10 mt-6 rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,12,14,0.9),rgba(8,8,12,0.9))] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-            <div className="grid grid-cols-[minmax(0,1fr)_56px] gap-3">
-              <label className="relative flex items-center">
+            <div className="flex items-center gap-3">
+              <label className="relative flex min-w-0 flex-1 items-center">
                 <FaSearch className="pointer-events-none absolute left-4 text-zinc-500" />
                 <input
                   type="search"
@@ -287,18 +287,20 @@ export default function SessionsPageClient({ initialSessions }) {
                 />
               </label>
 
-              <DarkSelect
-                value={sortBy}
-                onChange={(value) => {
-                  setSortBy(value);
-                  setPage(1);
-                }}
-                options={SORT_OPTIONS}
-                ariaLabel="Sort sessions"
-                leadingIcon={FaSlidersH}
-                compact
-                iconOnly
-              />
+              <div className="shrink-0">
+                <DarkSelect
+                  value={sortBy}
+                  onChange={(value) => {
+                    setSortBy(value);
+                    setPage(1);
+                  }}
+                  options={SORT_OPTIONS}
+                  ariaLabel="Sort sessions"
+                  leadingIcon={FaSlidersH}
+                  compact
+                  iconOnly
+                />
+              </div>
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-2">

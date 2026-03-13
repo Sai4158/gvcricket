@@ -532,7 +532,10 @@ export default function DirectorConsoleClient({
   useEffect(() => {
     if (directorAudioLibraryMemoryCache?.length) {
       setLibraryFiles(directorAudioLibraryMemoryCache);
-    } else if (typeof window !== "undefined") {
+      return;
+    }
+
+    if (typeof window !== "undefined") {
       try {
         const cachedValue = window.sessionStorage.getItem(
           DIRECTOR_AUDIO_LIBRARY_CACHE_KEY
@@ -542,6 +545,7 @@ export default function DirectorConsoleClient({
           if (Array.isArray(parsed) && parsed.length) {
             directorAudioLibraryMemoryCache = parsed;
             setLibraryFiles(parsed);
+            return;
           }
         }
       } catch {
@@ -551,7 +555,7 @@ export default function DirectorConsoleClient({
 
     let cancelled = false;
 
-    const refreshLibrary = async () => {
+    const loadLibraryOnce = async () => {
       try {
         await fetchAudioLibrary();
       } catch {
@@ -561,28 +565,10 @@ export default function DirectorConsoleClient({
       }
     };
 
-    void refreshLibrary();
-
-    const intervalId = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void refreshLibrary();
-      }
-    }, 20000);
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void refreshLibrary();
-      }
-    };
-
-    window.addEventListener("focus", handleVisibilityChange);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    void loadLibraryOnce();
 
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", handleVisibilityChange);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [fetchAudioLibrary]);
 
@@ -1057,6 +1043,31 @@ export default function DirectorConsoleClient({
     await walkie.stopTalking();
     stopAllEffects();
   };
+
+  useEffect(() => {
+    setConsoleError("");
+    setMusicMessage("");
+    setAuthError("");
+    setDirectorHoldLive(false);
+    setLibraryCurrentTime(0);
+    setLibraryLiveId("");
+    setLibraryState("idle");
+    setDraggingLibraryId("");
+    setLibraryDropTargetId("");
+
+    if (effectsAudioRef.current) {
+      effectsAudioRef.current.pause();
+      effectsAudioRef.current.currentTime = 0;
+      effectsAudioRef.current.src = "";
+    }
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+
+    setMusicState("idle");
+  }, [managedSessionId]);
 
   const handleMusicSelection = (event) => {
     const files = Array.from(event.target.files || []);

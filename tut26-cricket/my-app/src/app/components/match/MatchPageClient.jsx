@@ -44,7 +44,7 @@ export default function MatchPageClient({
     initialAuthStatus
   );
   const { settings: umpireSettings, updateSetting: updateUmpireSetting } =
-    useAnnouncementSettings("umpire");
+    useAnnouncementSettings("umpire", matchId);
   const micMonitor = useLocalMicMonitor();
   const { speak, prime, stop, status, voiceName } =
     useSpeechAnnouncer(umpireSettings);
