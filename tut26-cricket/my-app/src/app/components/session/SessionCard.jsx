@@ -77,46 +77,35 @@ function SessionCard({ session, onUmpireClick }) {
 
       <div className="relative flex h-full flex-col">
         <div className="flex flex-col gap-3">
-          <div className="flex items-start gap-4">
-            <div className="relative mt-0.5 h-16 w-16 shrink-0 overflow-hidden sm:h-20 sm:w-20 md:h-24 md:w-24">
-              <Image
-                src={cardImage}
-                alt={`${session.name || "Session"} logo`}
-                fill
-                sizes="(max-width: 640px) 64px, (max-width: 768px) 80px, 96px"
-                className="object-contain object-center"
-              />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-[1.3rem] leading-[1.08] font-medium tracking-[-0.04em] text-white break-words sm:text-[1.5rem] md:text-[1.65rem]">
-                    {session.name || "Untitled Session"}
-                  </h2>
-                  <p className="mt-2 text-[13px] font-medium tracking-[0.01em] text-zinc-400">
-                    {dateLabel}
+          <div className="min-w-0">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <h2 className="text-[1.3rem] leading-[1.08] font-medium tracking-[-0.04em] text-white break-words sm:text-[1.5rem] md:text-[1.65rem]">
+                  {session.name || "Untitled Session"}
+                </h2>
+                <p className="mt-2 text-[13px] font-medium tracking-[0.01em] text-zinc-400">
+                  {dateLabel}
+                </p>
+                {teamLine ? (
+                  <p className="mt-2 text-[0.98rem] leading-snug font-medium tracking-[-0.02em] text-zinc-100 break-words sm:text-[1.02rem]">
+                    {teamLine}
                   </p>
-                  {teamLine ? (
-                    <p className="mt-2 text-[0.98rem] leading-snug font-medium tracking-[-0.02em] text-zinc-100 break-words sm:text-[1.02rem]">
-                      {teamLine}
-                    </p>
-                  ) : null}
-                </div>
-                <span
-                  className={`inline-flex w-fit shrink-0 items-center gap-2 self-start rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] sm:ml-4 ${
-                    statusMeta.tone === "live"
-                      ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
-                      : "border-rose-400/15 bg-rose-500/10 text-rose-200"
-                  }`}
-                >
-                  <span
-                    className={`h-2.5 w-2.5 rounded-full ${
-                      isLive ? "animate-pulse bg-emerald-400" : "bg-rose-400"
-                    }`}
-                  />
-                  {statusMeta.badge}
-                </span>
+                ) : null}
               </div>
+              <span
+                className={`inline-flex w-fit shrink-0 items-center gap-2 self-start rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] sm:ml-4 ${
+                  statusMeta.tone === "live"
+                    ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
+                    : "border-rose-400/15 bg-rose-500/10 text-rose-200"
+                }`}
+              >
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${
+                    isLive ? "animate-pulse bg-emerald-400" : "bg-rose-400"
+                  }`}
+                />
+                {statusMeta.badge}
+              </span>
             </div>
           </div>
         </div>

@@ -21,6 +21,52 @@ function createActionId(prefix) {
   return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function getPendingSessionImage() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const rawPendingImage = window.sessionStorage.getItem(PENDING_SESSION_IMAGE_KEY);
+    return rawPendingImage ? JSON.parse(rawPendingImage) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function uploadPendingSessionImage(matchId, pendingImage) {
+  if (!pendingImage?.dataUrl || !matchId || typeof window === "undefined") {
+    return;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 12000);
+
+  try {
+    const imageResponse = await fetch(pendingImage.dataUrl, {
+      signal: controller.signal,
+    });
+    const imageBlob = await imageResponse.blob();
+    const uploadForm = new FormData();
+    uploadForm.append(
+      "image",
+      new File([imageBlob], pendingImage.fileName || "session-cover.jpg", {
+        type: pendingImage.type || imageBlob.type || "image/jpeg",
+      })
+    );
+
+    await fetch(`/api/matches/${matchId}/image`, {
+      method: "POST",
+      body: uploadForm,
+      signal: controller.signal,
+    });
+  } catch {
+    // Optional image upload should never block match start.
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 export default function TossPageClient({
   matchId,
   sessionId,
@@ -153,40 +199,13 @@ export default function TossPageClient({
         window.sessionStorage.removeItem(getDraftTokenKey(sessionId));
       }
 
+      const pendingImage = getPendingSessionImage();
       if (typeof window !== "undefined") {
-        const rawPendingImage = window.sessionStorage.getItem(
-          PENDING_SESSION_IMAGE_KEY
-        );
+        window.sessionStorage.removeItem(PENDING_SESSION_IMAGE_KEY);
+      }
 
-        if (rawPendingImage) {
-          try {
-            const pendingImage = JSON.parse(rawPendingImage);
-            if (pendingImage?.dataUrl && finalMatchId) {
-              const imageResponse = await fetch(pendingImage.dataUrl);
-              const imageBlob = await imageResponse.blob();
-              const uploadForm = new FormData();
-              uploadForm.append(
-                "image",
-                new File(
-                  [imageBlob],
-                  pendingImage.fileName || "session-cover.jpg",
-                  {
-                    type: pendingImage.type || imageBlob.type || "image/jpeg",
-                  }
-                )
-              );
-
-              await fetch(`/api/matches/${finalMatchId}/image`, {
-                method: "POST",
-                body: uploadForm,
-              });
-            }
-          } catch {
-            // Continue to the match even if the optional image fails.
-          } finally {
-            window.sessionStorage.removeItem(PENDING_SESSION_IMAGE_KEY);
-          }
-        }
+      if (pendingImage && finalMatchId) {
+        void uploadPendingSessionImage(finalMatchId, pendingImage);
       }
 
       router.push(`/match/${finalMatchId}`);

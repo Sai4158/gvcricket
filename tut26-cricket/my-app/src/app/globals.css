@@ -188,16 +188,17 @@ body {
 .btn-ui-glass-dark::before {
   content: "";
   position: absolute;
-  left: 12px;
-  right: 12px;
-  top: 8px;
-  height: 5px;
+  left: 2px;
+  right: 2px;
+  top: 4px;
+  height: 10px;
   border-radius: 999px;
   background:
-    linear-gradient(90deg, rgba(244, 63, 94, 0.98), rgba(251, 146, 60, 0.92), rgba(251, 113, 133, 0.98));
+    linear-gradient(90deg, rgba(244, 63, 94, 0.18), rgba(244, 63, 94, 0.9) 18%, rgba(251, 146, 60, 0.82) 50%, rgba(251, 113, 133, 0.9) 82%, rgba(251, 113, 133, 0.18));
   box-shadow:
-    0 0 12px rgba(244, 63, 94, 0.46),
-    0 0 24px rgba(251, 146, 60, 0.28);
+    0 0 14px rgba(244, 63, 94, 0.34),
+    0 0 28px rgba(251, 146, 60, 0.2);
+  filter: blur(0.2px);
   pointer-events: none;
 }
 
@@ -250,16 +251,17 @@ body {
 .btn-ui-glass-dark-alt::before {
   content: "";
   position: absolute;
-  left: 12px;
-  right: 12px;
-  top: 8px;
-  height: 5px;
+  left: 2px;
+  right: 2px;
+  top: 4px;
+  height: 10px;
   border-radius: 999px;
   background:
-    linear-gradient(90deg, rgba(56, 189, 248, 0.96), rgba(59, 130, 246, 0.94), rgba(37, 99, 235, 0.98));
+    linear-gradient(90deg, rgba(56, 189, 248, 0.16), rgba(56, 189, 248, 0.9) 18%, rgba(59, 130, 246, 0.82) 50%, rgba(37, 99, 235, 0.9) 82%, rgba(37, 99, 235, 0.16));
   box-shadow:
-    0 0 12px rgba(56, 189, 248, 0.38),
-    0 0 24px rgba(59, 130, 246, 0.24);
+    0 0 14px rgba(56, 189, 248, 0.3),
+    0 0 28px rgba(59, 130, 246, 0.2);
+  filter: blur(0.2px);
   pointer-events: none;
 }
 

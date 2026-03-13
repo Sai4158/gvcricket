@@ -111,10 +111,10 @@ export default function HeroSection({ liveMatch = null }) {
           >
             <motion.div
               aria-hidden="true"
-              className="absolute inset-0 scale-[1.08] rounded-full bg-[radial-gradient(circle,rgba(255,78,106,0.26)_0%,rgba(255,78,106,0.14)_28%,rgba(251,191,36,0.1)_48%,transparent_72%)] blur-2xl"
+              className="absolute inset-0 scale-[1.14] rounded-full bg-[radial-gradient(circle,rgba(255,52,90,0.42)_0%,rgba(255,52,90,0.24)_24%,rgba(255,96,96,0.16)_42%,rgba(251,191,36,0.08)_58%,transparent_76%)] blur-2xl"
               animate={{
-                opacity: [0.5, 0.82, 0.58],
-                scale: [1, 1.05, 1.01],
+                opacity: [0.66, 1, 0.74],
+                scale: [1, 1.08, 1.02],
               }}
               transition={{
                 duration: 3.4,
@@ -157,13 +157,13 @@ export default function HeroSection({ liveMatch = null }) {
           >
             <motion.span
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 top-1/2 z-0 h-28 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.18)_0%,rgba(251,191,36,0.14)_28%,rgba(244,114,182,0.12)_52%,transparent_78%)] blur-3xl"
+              className="pointer-events-none absolute inset-x-0 top-1/2 z-0 h-24 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.12)_0%,rgba(251,191,36,0.08)_30%,rgba(244,114,182,0.06)_54%,transparent_78%)] blur-3xl"
               style={{ opacity: headingGlowOpacity }}
             />
             <motion.span
               aria-hidden="true"
               style={{ scale: headingScrollScale, y: headingScrollY }}
-              className="pointer-events-none absolute inset-0 z-0 block text-center text-5xl font-semibold tracking-tight text-white/18 blur-[10px] md:text-7xl"
+              className="pointer-events-none absolute inset-0 z-0 block text-center text-5xl font-semibold tracking-tight text-white/12 blur-[10px] md:text-7xl"
             >
               End-to-end cricket scoring, made simple.
             </motion.span>
@@ -174,7 +174,7 @@ export default function HeroSection({ liveMatch = null }) {
               }}
               className="
                 relative z-10 block
-                text-white
+                text-white/88
                 text-5xl md:text-7xl font-semibold tracking-tight will-change-transform
                 drop-shadow-[0_10px_30px_rgba(0,0,0,0.62)]
               "
@@ -185,7 +185,7 @@ export default function HeroSection({ liveMatch = null }) {
                 </span>
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 z-20 animate-[animate-gradient_3.8s_linear_infinite] bg-[linear-gradient(110deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.18)_24%,rgba(255,247,214,0.78)_38%,rgba(255,255,255,0.22)_54%,rgba(255,255,255,0)_72%)] bg-[length:240%_auto] bg-clip-text text-transparent mix-blend-screen"
+                  className="pointer-events-none absolute inset-0 z-20 animate-[animate-gradient_3.8s_linear_infinite] bg-[linear-gradient(110deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.12)_24%,rgba(255,247,214,0.55)_38%,rgba(255,255,255,0.16)_54%,rgba(255,255,255,0)_72%)] bg-[length:240%_auto] bg-clip-text text-transparent mix-blend-screen"
                 >
                   End-to-end cricket scoring, made simple.
                 </span>
