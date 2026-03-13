@@ -6,26 +6,31 @@ import {
   FaBullhorn,
   FaCheckCircle,
   FaCoins,
+  FaDrum,
   FaEye,
   FaImage,
   FaListAlt,
+  FaMusic,
   FaPenSquare,
   FaPlusCircle,
+  FaShareAlt,
+  FaSlidersH,
   FaMicrophoneAlt,
   FaVolumeUp,
+  FaWaveSquare,
 } from "react-icons/fa";
 import AnimatedSection from "./AnimatedSection";
 
 function getCardMotionProps(index) {
   const fromLeft = index % 2 === 0;
   return {
-    initial: { opacity: 0, x: fromLeft ? -34 : 34, y: 18, scale: 0.985 },
+    initial: { opacity: 0, x: fromLeft ? -46 : 46, y: 18, scale: 0.982 },
     whileInView: { opacity: 1, x: 0, y: 0, scale: 1 },
-    viewport: { once: true, amount: 0.08, margin: "0px 0px -10% 0px" },
+    viewport: { once: true, amount: 0.05, margin: "0px 0px -16% 0px" },
     transition: {
-      duration: 0.46,
+      duration: 0.5,
       ease: [0.22, 1, 0.36, 1],
-      delay: Math.min(index * 0.03, 0.18),
+      delay: Math.min(index * 0.04, 0.2),
     },
   };
 }
@@ -47,6 +52,24 @@ const updateCards = [
     icon: FaBullhorn,
     title: "Director mode",
     copy: "A new control room page for PA mic, music, effects, and walkie with the umpire.",
+    accent: "violet",
+  },
+  {
+    icon: FaDrum,
+    title: "Sound effects",
+    copy: "Trigger horns, crowd cheer, wicket hits, six bursts, and other match atmosphere sounds from one panel.",
+    accent: "rose",
+  },
+  {
+    icon: FaWaveSquare,
+    title: "Audio library",
+    copy: "Drop audio files into the app folder and play them on demand inside the director audio grid.",
+    accent: "emerald",
+  },
+  {
+    icon: FaMusic,
+    title: "Music deck",
+    copy: "Load tracks from your phone or local files, then play them on demand without leaving the director screen.",
     accent: "violet",
   },
   {
@@ -72,6 +95,18 @@ const updateCards = [
     title: "Step-by-step setup",
     copy: "Session, teams, toss, and start now follow one cleaner 4-step match flow.",
     accent: "yellow",
+  },
+  {
+    icon: FaShareAlt,
+    title: "Quick sharing",
+    copy: "Share live score links, result pages, and spectator views faster with cleaner mobile actions.",
+    accent: "cyan",
+  },
+  {
+    icon: FaSlidersH,
+    title: "Live over tracker",
+    copy: "Current over cards now stay synced between umpire and spectator screens during live scoring.",
+    accent: "amber",
   },
 ];
 
@@ -118,6 +153,34 @@ const coreCards = [
       "See winner, final score, and key stats instantly, with match history saved for later review.",
     accent: "violet",
   },
+  {
+    icon: FaSlidersH,
+    title: "Flexible Match Control",
+    copy:
+      "Adjust teams, players, overs, and live match details without breaking the score flow.",
+    accent: "amber",
+  },
+  {
+    icon: FaBroadcastTower,
+    title: "Live Communication",
+    copy:
+      "Use walkietalkie, score feedback, and director controls to keep everyone in sync during the match.",
+    accent: "emerald",
+  },
+  {
+    icon: FaImage,
+    title: "Session Branding",
+    copy:
+      "Reuse one match image across live score, spectator view, results, and stats with a consistent identity.",
+    accent: "violet",
+  },
+  {
+    icon: FaDrum,
+    title: "Match Atmosphere",
+    copy:
+      "Bring in sound effects, mic control, and faster audio tools without slowing down the scoring flow.",
+    accent: "rose",
+  },
 ];
 
 function getAccentClasses(accent) {
@@ -137,14 +200,34 @@ function getAccentClasses(accent) {
   }
 }
 
+function getAccentLineClasses(accent) {
+  switch (accent) {
+    case "amber":
+      return "from-transparent via-amber-300/60 to-transparent";
+    case "emerald":
+      return "from-transparent via-emerald-300/60 to-transparent";
+    case "rose":
+      return "from-transparent via-rose-300/60 to-transparent";
+    case "yellow":
+      return "from-transparent via-yellow-300/60 to-transparent";
+    case "violet":
+      return "from-transparent via-violet-300/60 to-transparent";
+    default:
+      return "from-transparent via-cyan-300/60 to-transparent";
+  }
+}
+
 export default function HowItWorksSection() {
+  const modernCardClass =
+    "liquid-glass-soft group relative overflow-hidden rounded-[28px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_38%),linear-gradient(180deg,rgba(20,20,26,0.82),rgba(9,9,14,0.72))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)]";
+
   return (
     <AnimatedSection
       id="updates"
       className="mx-auto w-full max-w-6xl scroll-mt-28 overflow-hidden"
     >
       <div className="space-y-8">
-        <div className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(18,18,24,0.72),rgba(10,10,16,0.58))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.28)] md:p-10">
+        <div className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.82),rgba(8,8,14,0.72))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10">
           <div className="mx-auto max-w-3xl text-center">
             <span className="liquid-pill inline-flex rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-amber-50">
               Latest features
@@ -162,16 +245,24 @@ export default function HowItWorksSection() {
               <motion.div
                 key={card.title}
                 {...getCardMotionProps(index)}
-                className="liquid-glass-soft rounded-[26px] p-5"
+                whileHover={{ y: -4, scale: 1.01 }}
+                className={modernCardClass}
               >
+                <div
+                  className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentLineClasses(
+                    card.accent
+                  )} opacity-80`}
+                />
+                <div className="pointer-events-none absolute -right-12 top-2 h-28 w-28 rounded-full bg-white/[0.05] blur-2xl transition duration-500 group-hover:bg-white/[0.08]" />
+                <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_28%)] opacity-80" />
                 <motion.span
                   initial={{ opacity: 0, scale: 0.88, y: 10 }}
                   whileInView={{ opacity: 1, scale: 1, y: 0 }}
                   viewport={{ once: true, amount: 0.2 }}
                   transition={{ duration: 0.38, ease: "easeOut", delay: 0.08 }}
-                  whileHover={{ y: -2, scale: 1.03 }}
+                  whileHover={{ y: -3, scale: 1.05, rotate: -4 }}
                   whileTap={{ scale: 0.98 }}
-                  className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-2xl text-2xl ${getAccentClasses(
+                  className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/10 text-2xl ${getAccentClasses(
                     card.accent
                   )}`}
                 >
@@ -182,7 +273,7 @@ export default function HowItWorksSection() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, amount: 0.2 }}
                   transition={{ duration: 0.34, ease: "easeOut", delay: 0.12 }}
-                  className="mt-5 text-lg font-semibold text-white"
+                  className="mt-5 text-xl font-semibold tracking-tight text-white"
                 >
                   {card.title}
                 </motion.h3>
@@ -191,7 +282,7 @@ export default function HowItWorksSection() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, amount: 0.2 }}
                   transition={{ duration: 0.34, ease: "easeOut", delay: 0.16 }}
-                  className="mt-2 text-sm leading-6 text-white/72"
+                  className="mt-2 text-sm leading-7 text-white/72"
                 >
                   {card.copy}
                 </motion.p>
@@ -200,7 +291,7 @@ export default function HowItWorksSection() {
           </div>
         </div>
 
-        <div className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(18,18,24,0.72),rgba(10,10,16,0.58))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.28)] md:p-10">
+        <div className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.82),rgba(8,8,14,0.72))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="mt-5 text-4xl font-semibold tracking-[-0.04em] text-white md:text-5xl">
               From toss to final result
@@ -210,21 +301,29 @@ export default function HowItWorksSection() {
             </p>
           </div>
 
-          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {coreCards.map((card, index) => (
               <motion.div
                 key={card.title}
                 {...getCardMotionProps(index)}
-                className="liquid-glass-soft rounded-[26px] p-5"
+                whileHover={{ y: -4, scale: 1.01 }}
+                className={modernCardClass}
               >
+                <div
+                  className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentLineClasses(
+                    card.accent
+                  )} opacity-80`}
+                />
+                <div className="pointer-events-none absolute -right-12 top-2 h-28 w-28 rounded-full bg-white/[0.05] blur-2xl transition duration-500 group-hover:bg-white/[0.08]" />
+                <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_28%)] opacity-80" />
                 <motion.span
                   initial={{ opacity: 0, scale: 0.88, y: 10 }}
                   whileInView={{ opacity: 1, scale: 1, y: 0 }}
                   viewport={{ once: true, amount: 0.2 }}
                   transition={{ duration: 0.38, ease: "easeOut", delay: 0.08 }}
-                  whileHover={{ y: -2, scale: 1.03 }}
+                  whileHover={{ y: -3, scale: 1.05, rotate: 4 }}
                   whileTap={{ scale: 0.98 }}
-                  className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-2xl text-2xl ${getAccentClasses(
+                  className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/10 text-2xl ${getAccentClasses(
                     card.accent
                   )}`}
                 >
@@ -235,7 +334,7 @@ export default function HowItWorksSection() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, amount: 0.2 }}
                   transition={{ duration: 0.34, ease: "easeOut", delay: 0.12 }}
-                  className="mt-5 text-xl font-semibold text-white"
+                  className="mt-5 text-xl font-semibold tracking-tight text-white"
                 >
                   {card.title}
                 </motion.h3>
@@ -244,7 +343,7 @@ export default function HowItWorksSection() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, amount: 0.2 }}
                   transition={{ duration: 0.34, ease: "easeOut", delay: 0.16 }}
-                  className="mt-2 text-sm leading-6 text-white/72"
+                  className="mt-2 text-sm leading-7 text-white/72"
                 >
                   {card.copy}
                 </motion.p>

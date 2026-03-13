@@ -1,6 +1,12 @@
 "use client";
 
-import { startTransition, useCallback, useEffect, useRef, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   FaArrowLeft,
@@ -31,6 +37,7 @@ import {
   buildSpectatorOverCompleteAnnouncement,
   buildSpectatorScoreAnnouncement,
 } from "../../lib/live-announcements";
+import { addBallToHistory } from "../../lib/match-scoring";
 import { getTeamBundle } from "../../lib/team-utils";
 import { duckPageMedia, restorePageMedia } from "../../lib/page-audio";
 import { ModalBase } from "../match/MatchBaseModals";
@@ -590,6 +597,29 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const speakerCardTalking = quickSpeakerTalking || micMonitor.isActive;
   const speakerSwitchOn = Boolean(speakerMicOn || activePanel === "mic");
   const announceSwitchOn = Boolean(settings.enabled);
+  const activeInningsHistory =
+    match?.innings === "second"
+      ? match?.innings2?.history || []
+      : match?.innings1?.history || [];
+  const hasRecordedOvers = activeInningsHistory.some(
+    (over) => Array.isArray(over?.balls) && over.balls.length > 0
+  );
+  let trackerHistory = activeInningsHistory;
+
+  if (!hasRecordedOvers && Array.isArray(match?.balls) && match.balls.length > 0) {
+    const inningsKey = match?.innings === "second" ? "innings2" : "innings1";
+    const reconstructedMatch = {
+      innings: match?.innings === "second" ? "second" : "first",
+      innings1: { history: [] },
+      innings2: { history: [] },
+    };
+
+    for (const ball of match.balls) {
+      addBallToHistory(reconstructedMatch, ball);
+    }
+
+    trackerHistory = reconstructedMatch[inningsKey]?.history || activeInningsHistory;
+  }
   const launcherCardClass =
     "flex min-h-[92px] w-full items-center gap-3 rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-4 text-left shadow-[0_18px_50px_rgba(0,0,0,0.32)] backdrop-blur-sm transition-transform hover:-translate-y-0.5";
 
@@ -640,7 +670,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
           </div>
           <div className="mt-5 flex justify-center">
             <div className="w-full max-w-xl">
-              <BallTracker history={match.history || []} />
+              <BallTracker history={trackerHistory} />
             </div>
           </div>
         </div>

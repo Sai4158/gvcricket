@@ -1043,7 +1043,7 @@ test("umpire commentary speaks score buttons and undo with clean wording", () =>
   assert.equal(buildUmpireAnnouncement(scoreEvent, "simple"), "2 runs");
   assert.equal(
     buildUmpireAnnouncement(undoEvent, "simple"),
-    "Umpire has undone the last ball."
+    "Undo"
   );
 });
 

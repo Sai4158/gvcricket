@@ -105,7 +105,7 @@ export default function useSpeechAnnouncer(settings) {
   const isPrimedRef = useRef(false);
   const pendingSpeakRef = useRef(null);
   const currentSequenceRef = useRef(null);
-  const pendingSequenceRef = useRef(null);
+  const queuedSequencesRef = useRef([]);
   const utteranceRef = useRef(null);
   const stepTimerRef = useRef(null);
   const sequenceTokenRef = useRef(0);
@@ -120,7 +120,7 @@ export default function useSpeechAnnouncer(settings) {
   const hardStop = useCallback(() => {
     clearStepTimer();
     currentSequenceRef.current = null;
-    pendingSequenceRef.current = null;
+    queuedSequencesRef.current = [];
     utteranceRef.current = null;
     sequenceTokenRef.current += 1;
 
@@ -173,10 +173,9 @@ export default function useSpeechAnnouncer(settings) {
       currentSequenceRef.current = sequence;
       const nextItem = sequence.items[sequence.index] || null;
       if (!nextItem?.text) {
-        const pending = pendingSequenceRef.current;
+        const pending = queuedSequencesRef.current.shift() || null;
         currentSequenceRef.current = null;
         if (pending) {
-          pendingSequenceRef.current = null;
           return runSequence({ ...pending, index: 0 }, sequenceTokenRef.current);
         }
         setStatus((current) => (current === "unsupported" ? current : "ready"));
@@ -232,7 +231,7 @@ export default function useSpeechAnnouncer(settings) {
         }
         utteranceRef.current = null;
         currentSequenceRef.current = null;
-        pendingSequenceRef.current = null;
+        queuedSequencesRef.current = [];
         setStatus("blocked");
       };
 
@@ -322,13 +321,13 @@ export default function useSpeechAnnouncer(settings) {
       const currentPriority = currentSequenceRef.current?.priority ?? 1;
       if (options.interrupt === true || request.priority > currentPriority) {
         clearStepTimer();
-        pendingSequenceRef.current = null;
+        queuedSequencesRef.current = [];
         sequenceTokenRef.current += 1;
         window.speechSynthesis.cancel();
         return runSequence(request, sequenceTokenRef.current);
       }
 
-      pendingSequenceRef.current = request;
+      queuedSequencesRef.current.push(request);
       return true;
     },
     [

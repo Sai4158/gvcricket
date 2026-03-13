@@ -50,7 +50,7 @@ export default async function HomePage() {
       <HomeHeader />
       <main className="home-liquid-surface bg-black text-zinc-200 font-sans">
         <HeroSection liveMatch={liveMatch} />
-        <div className="relative z-10 bg-[linear-gradient(155deg,theme(colors.red.900)_0%,theme(colors.black)_40%)] py-24 md:py-32 px-5 space-y-24 md:space-y-40">
+        <div className="relative z-10 bg-[linear-gradient(155deg,theme(colors.red.900)_0%,theme(colors.black)_40%)] px-5 py-20 space-y-14 md:space-y-24 md:py-28">
           <PrimaryActionsSection />
           <HowItWorksSection />
           <CommunityHighlightsSection />

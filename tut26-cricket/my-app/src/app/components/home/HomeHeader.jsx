@@ -41,13 +41,14 @@ export default function HomeHeader() {
   const navLinks = [
     { href: "/session/new", text: "Start Match", icon: FaArrowRight },
     { href: "/session", text: "All Sessions" },
+    { type: "divider" },
+    { href: "/rules", text: "GV Community Custom Rule Sheet" },
     {
       href: "/#product-demo",
       text: "See It In Action",
       onClick: handleDemoClick,
     },
     { type: "divider" },
-    { href: "/rules", text: "GV Community Custom Rule Sheet" },
     {
       href: "https://usacricket.org/what-is-cricket/",
       text: "Learn Cricket",

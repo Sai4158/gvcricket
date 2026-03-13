@@ -394,7 +394,6 @@ export default function MatchPageClient({
               }
             : null
         }
-        oversHistory={oversHistory}
         currentOverNumber={currentOverNumber}
         firstInningsOversPlayed={firstInningsOversPlayed}
         infoText={infoText}

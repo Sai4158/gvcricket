@@ -72,6 +72,7 @@ export default function AnnouncementControls({
   const isModal = variant === "modal";
   const showTalkBlock = isModal && (onTalkStart || onTalkEnd);
   const showAdvancedControls = !simpleMode;
+  const headerIcon = simpleMode ? <FaVolumeUp /> : <FaMicrophone />;
 
   const statusTone = useMemo(() => {
     if (talkState === "busy") {
@@ -104,9 +105,23 @@ export default function AnnouncementControls({
   };
 
   return (
-    <section className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(19,19,24,0.96),rgba(8,8,12,0.98))] p-5 shadow-[0_22px_70px_rgba(0,0,0,0.4)] backdrop-blur-md">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+    <section
+      className={`rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(19,19,24,0.96),rgba(8,8,12,0.98))] p-5 shadow-[0_22px_70px_rgba(0,0,0,0.4)] backdrop-blur-md ${
+        isModal ? "mx-auto max-w-[28rem]" : ""
+      }`}
+    >
+      <div
+        className={`relative ${
+          isModal
+            ? "flex flex-col items-center gap-4 text-center"
+            : "flex items-center justify-between gap-4"
+        }`}
+      >
+        <div
+          className={`${
+            isModal ? "flex flex-col items-center gap-3" : "flex items-center gap-3"
+          }`}
+        >
           <div
             className={`inline-flex h-12 w-12 items-center justify-center rounded-full border text-lg transition-all ${
               isLiveSpeaking
@@ -114,7 +129,7 @@ export default function AnnouncementControls({
                 : "border-white/10 bg-white/[0.06] text-zinc-100"
             }`}
           >
-            <FaMicrophone />
+            {headerIcon}
           </div>
           <div>
             <h3 className="text-xl font-black tracking-[-0.02em] text-white">
@@ -126,7 +141,7 @@ export default function AnnouncementControls({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06] text-zinc-400 transition-colors hover:bg-white/[0.1] hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+            className="absolute right-0 top-0 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06] text-zinc-400 transition-colors hover:bg-white/[0.1] hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
             aria-label="Close live commentary"
           >
             <FaTimes />
@@ -214,12 +229,22 @@ export default function AnnouncementControls({
           </div>
         </div>
       ) : (
-        <div className="mt-5 flex flex-col items-start gap-2">
-          <span
-            className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] ${statusTone}`}
-          >
-            {statusLabel}
-          </span>
+        <div
+          className={`mt-5 flex flex-col gap-3 ${
+            isModal ? "items-center text-center" : "items-start"
+          }`}
+        >
+          {simpleMode ? (
+            <p className="text-xs font-medium text-zinc-400">
+              Announces each tap.
+            </p>
+          ) : (
+            <span
+              className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] ${statusTone}`}
+            >
+              {statusLabel}
+            </span>
+          )}
           {simpleMode ? (
             <IosSwitch
               checked={settings.enabled}

@@ -21,7 +21,6 @@ export default function MatchModalLayer({
   micMonitor,
   commentaryProps,
   walkieProps,
-  oversHistory,
   currentOverNumber,
   firstInningsOversPlayed,
   infoText,
@@ -36,7 +35,7 @@ export default function MatchModalLayer({
     <AnimatePresence>
       {showInningsEnd && <InningsEndModal match={match} onNext={onNext} />}
       {modalType === "history" && (
-        <HistoryModal history={oversHistory} onClose={onClose} />
+        <HistoryModal match={match} onClose={onClose} />
       )}
       {modalType === "editTeams" && (
         <EditTeamsModal match={match} onUpdate={onUpdate} onClose={onClose} />

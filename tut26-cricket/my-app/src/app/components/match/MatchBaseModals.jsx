@@ -89,21 +89,60 @@ export function RunInputModal({ title, onConfirm, onClose }) {
   );
 }
 
-export function HistoryModal({ history, onClose }) {
+function HistorySection({ title, history }) {
+  if (!history?.length) {
+    return null;
+  }
+
+  return (
+    <section>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold uppercase tracking-[0.22em] text-zinc-400">
+          {title}
+        </h3>
+        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-zinc-300">
+          {history.length} over{history.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      <div className="space-y-4">
+        {[...history].reverse().map((over) => (
+          <div
+            key={`${title}-${over.overNumber}`}
+            className="rounded-2xl border border-white/8 bg-white/[0.03] p-4"
+          >
+            <p className="font-semibold text-zinc-100">Over {over.overNumber}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {over.balls.map((ball, index) => (
+                <Ball key={index} ball={ball} ballNumber={index + 1} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function HistoryModal({ match, onClose }) {
+  const innings1History = match?.innings1?.history ?? [];
+  const innings2History = match?.innings2?.history ?? [];
+
   return (
     <ModalBase title="Over History" onExit={onClose}>
       <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-2 text-left">
-        {history.length > 0 ? (
-          [...history].reverse().map((over) => (
-            <div key={over.overNumber}>
-              <p className="font-semibold text-zinc-200">Over {over.overNumber}</p>
-              <div className="flex gap-2 flex-wrap mt-1">
-                {over.balls.map((ball, index) => (
-                  <Ball key={index} ball={ball} ballNumber={index + 1} />
-                ))}
-              </div>
-            </div>
-          ))
+        {innings1History.length > 0 || innings2History.length > 0 ? (
+          <>
+            <HistorySection
+              title={match?.innings1?.team || "Innings 1"}
+              history={innings1History}
+            />
+            {innings2History.length > 0 ? (
+              <HistorySection
+                title={match?.innings2?.team || "Innings 2"}
+                history={innings2History}
+              />
+            ) : null}
+          </>
         ) : (
           <p className="text-zinc-500 text-center">No history yet.</p>
         )}

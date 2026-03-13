@@ -4,18 +4,22 @@ import { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 export function Ball({ ball, ballNumber }) {
-  let style = "bg-zinc-700";
+  let style =
+    "border border-white/10 bg-[linear-gradient(180deg,rgba(55,60,72,0.96),rgba(36,40,50,0.98))] shadow-[0_10px_24px_rgba(0,0,0,0.24)]";
   let label = ball.runs;
 
   if (ball.isOut) {
-    style = "bg-rose-600";
+    style =
+      "border border-rose-300/20 bg-[linear-gradient(180deg,rgba(244,63,94,0.95),rgba(225,29,72,0.98))] shadow-[0_12px_28px_rgba(225,29,72,0.28)]";
     label = ball.runs > 0 ? `${ball.runs}+W` : "W";
   } else if (ball.extraType === "wide") {
-    style = "bg-green-600";
+    style =
+      "border border-emerald-300/18 bg-[linear-gradient(180deg,rgba(22,163,74,0.95),rgba(22,129,61,0.98))] shadow-[0_12px_28px_rgba(22,163,74,0.24)]";
     const extraRuns = Math.max(Number(ball.runs || 0) - 1, 0);
     label = extraRuns > 0 ? `Wd+${extraRuns}` : "Wd";
   } else if (ball.extraType === "noball") {
-    style = "bg-orange-600";
+    style =
+      "border border-orange-300/18 bg-[linear-gradient(180deg,rgba(249,115,22,0.95),rgba(234,88,12,0.98))] shadow-[0_12px_28px_rgba(249,115,22,0.26)]";
     const extraRuns = Math.max(Number(ball.runs || 0) - 1, 0);
     label = extraRuns > 0 ? `NB+${extraRuns}` : "NB";
   } else if (ball.runs === 0) {
@@ -25,7 +29,7 @@ export function Ball({ ball, ballNumber }) {
   return (
     <div className="flex flex-col items-center gap-2 w-10">
       <div
-        className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center font-bold text-sm text-white shadow-md ${style}`}
+        className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center font-bold text-sm text-white ${style}`}
       >
         {label}
       </div>

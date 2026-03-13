@@ -19,18 +19,18 @@ function EditableRoster({
   const [isEditingName, setIsEditingName] = useState(false);
   const isBlue = theme === "blue";
   const cardClass = isBlue
-    ? "border-sky-400/18 bg-[linear-gradient(180deg,rgba(28,36,56,0.92),rgba(24,24,30,0.9))]"
-    : "border-rose-300/18 bg-[linear-gradient(180deg,rgba(58,30,36,0.9),rgba(24,24,30,0.9))]";
-  const titleClass = isBlue ? "text-sky-200" : "text-rose-200";
+    ? "border-sky-400/20 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.14),transparent_32%),linear-gradient(180deg,rgba(16,24,44,0.98),rgba(10,12,20,0.98))]"
+    : "border-rose-300/20 bg-[radial-gradient(circle_at_top_right,rgba(244,63,94,0.14),transparent_32%),linear-gradient(180deg,rgba(40,18,24,0.98),rgba(12,10,16,0.98))]";
+  const titleClass = isBlue ? "text-sky-100" : "text-rose-100";
   const panelClass = isBlue
-    ? "border-sky-300/8 bg-sky-950/18"
-    : "border-rose-300/8 bg-rose-950/18";
+    ? "border-sky-300/10 bg-sky-950/25"
+    : "border-rose-300/10 bg-rose-950/25";
   const inputClass = isBlue
-    ? "border-sky-400/14 bg-zinc-900/90 focus:border-sky-300/40"
-    : "border-rose-300/14 bg-zinc-900/90 focus:border-rose-300/40";
+    ? "border-sky-400/14 bg-zinc-950/92 focus:border-sky-300/40"
+    : "border-rose-300/14 bg-zinc-950/92 focus:border-rose-300/40";
   const iconButtonClass = isBlue
-    ? "bg-sky-950/40 text-sky-100 hover:bg-sky-900/60"
-    : "bg-rose-950/35 text-rose-100 hover:bg-rose-900/55";
+    ? "border border-sky-300/12 bg-sky-950/42 text-sky-100 hover:bg-sky-900/60"
+    : "border border-rose-300/12 bg-rose-950/38 text-rose-100 hover:bg-rose-900/55";
 
   const updatePlayer = (index, nextValue) => {
     setPlayers((current) =>
@@ -68,10 +68,21 @@ function EditableRoster({
   };
 
   return (
-    <div className={`space-y-4 rounded-[22px] border p-4 shadow-[0_14px_40px_rgba(0,0,0,0.22)] ${cardClass}`}>
+    <div
+      className={`relative space-y-4 overflow-hidden rounded-[24px] border p-4 shadow-[0_18px_48px_rgba(0,0,0,0.28)] ${cardClass}`}
+    >
+      <div
+        className={`pointer-events-none absolute inset-x-5 top-0 h-px ${
+          isBlue
+            ? "bg-[linear-gradient(90deg,transparent,rgba(56,189,248,0.7),transparent)]"
+            : "bg-[linear-gradient(90deg,transparent,rgba(244,63,94,0.7),transparent)]"
+        }`}
+      />
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className={`text-sm font-semibold ${titleClass}`}>{title}</p>
+          <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${titleClass}`}>
+            {title}
+          </p>
           {isEditingName ? (
             <input
               type="text"
@@ -85,11 +96,13 @@ function EditableRoster({
               }}
               autoFocus
               placeholder="Team name"
-              className={`mt-1 w-full rounded-xl border px-3 py-2 text-lg font-bold text-white outline-none transition ${inputClass}`}
+              className={`mt-2 w-full rounded-2xl border px-3 py-2.5 text-lg font-semibold tracking-tight text-white outline-none transition ${inputClass}`}
             />
           ) : (
             <div className="mt-1 flex items-center gap-2">
-              <h3 className="text-lg font-bold text-white">{name || "Team name"}</h3>
+              <h3 className="text-[1.55rem] font-semibold tracking-tight text-white">
+                {name || "Team name"}
+              </h3>
               <button
                 type="button"
                 onClick={() => setIsEditingName(true)}
@@ -103,7 +116,7 @@ function EditableRoster({
         </div>
       </div>
 
-      <div className={`flex items-center justify-between rounded-2xl border px-3 py-3 ${panelClass}`}>
+      <div className={`flex items-center justify-between rounded-[22px] border px-3 py-3 ${panelClass}`}>
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
             Players
@@ -115,7 +128,7 @@ function EditableRoster({
             type="button"
             onClick={removeLastPlayer}
             disabled={!canEditPlayers || players.length <= 1}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.06] text-white transition hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <FaMinus />
           </button>
@@ -123,7 +136,7 @@ function EditableRoster({
             type="button"
             onClick={addPlayer}
             disabled={!canEditPlayers || players.length >= 15}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.06] text-white transition hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <FaPlus />
           </button>
@@ -131,7 +144,7 @@ function EditableRoster({
       </div>
 
       {!canEditPlayers && lockedReason ? (
-        <p className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+        <p className="rounded-[18px] border border-amber-500/20 bg-[linear-gradient(180deg,rgba(120,53,15,0.28),rgba(70,32,10,0.18))] px-3 py-2.5 text-sm text-amber-200">
           {lockedReason}
         </p>
       ) : null}
@@ -144,13 +157,13 @@ function EditableRoster({
               value={player}
               onChange={(event) => updatePlayer(index, event.target.value)}
               placeholder={`Player ${index + 1}`}
-              className={`w-full rounded-xl border px-3 py-2 text-sm text-white outline-none transition ${inputClass}`}
+              className={`w-full rounded-2xl border px-3 py-2.5 text-sm text-white outline-none transition ${inputClass}`}
             />
             <button
               type="button"
               onClick={() => removePlayerAtIndex(index)}
               disabled={!canEditPlayers || players.length <= 1}
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-xl transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40 ${iconButtonClass}`}
+              className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40 ${iconButtonClass}`}
             >
               <FaTrash size={13} />
             </button>
@@ -213,7 +226,7 @@ export function EditTeamsModal({ match, onUpdate, onClose }) {
       </div>
       <button
         onClick={handleSaveChanges}
-        className="mt-6 w-full py-3 text-lg bg-green-600 text-white font-bold rounded-xl hover:bg-green-500 transition-all active:scale-95"
+        className="mt-6 w-full rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,185,90,0.96),rgba(22,163,74,0.98))] py-3.5 text-base font-semibold tracking-tight text-white shadow-[0_18px_36px_rgba(22,163,74,0.24)] transition-all hover:brightness-105 active:scale-[0.99]"
       >
         Save Changes
       </button>

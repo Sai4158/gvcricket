@@ -2,7 +2,6 @@
 
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Reorder } from "framer-motion";
 import {
   FaArrowLeft,
   FaBroadcastTower,
@@ -81,9 +80,27 @@ function IosSwitch({ checked, onChange, label, disabled = false }) {
 
 function HelpButton({ title, body }) {
   const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event) => {
+      if (!containerRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+    };
+  }, [open]);
 
   return (
-    <div className="relative shrink-0">
+    <div ref={containerRef} className="relative shrink-0">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
@@ -93,7 +110,7 @@ function HelpButton({ title, body }) {
         <FaInfoCircle />
       </button>
       {open ? (
-        <div className="absolute right-0 top-12 z-20 w-[min(18rem,calc(100vw-3rem))] max-w-[18rem] rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(26,26,32,0.98),rgba(11,11,16,0.98))] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.45)] max-sm:left-0 max-sm:right-auto">
+        <div className="absolute right-0 top-12 z-30 w-[min(18rem,calc(100vw-3rem))] max-w-[18rem] rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(26,26,32,0.98),rgba(11,11,16,0.98))] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.45)] max-sm:right-0">
           <p className="text-sm font-semibold text-white">{title}</p>
           <p className="mt-2 text-sm leading-6 text-zinc-300">{body}</p>
         </div>
@@ -240,6 +257,8 @@ export default function DirectorConsoleClient({
   const [libraryOrder, setLibraryOrder] = useState([]);
   const [libraryLiveId, setLibraryLiveId] = useState("");
   const [libraryState, setLibraryState] = useState("idle");
+  const [draggingLibraryId, setDraggingLibraryId] = useState("");
+  const [libraryDropTargetId, setLibraryDropTargetId] = useState("");
   const audioRef = useRef(null);
   const effectsAudioRef = useRef(null);
   const musicUrlsRef = useRef([]);
@@ -508,6 +527,58 @@ export default function DirectorConsoleClient({
         // Ignore storage failures and keep the in-memory order.
       }
     }
+  };
+
+  const moveLibraryItem = (activeId, targetId) => {
+    if (!activeId || !targetId || activeId === targetId) {
+      return;
+    }
+
+    const activeIndex = orderedLibraryFiles.findIndex((file) => file.id === activeId);
+    const targetIndex = orderedLibraryFiles.findIndex((file) => file.id === targetId);
+
+    if (activeIndex < 0 || targetIndex < 0) {
+      return;
+    }
+
+    const nextFiles = [...orderedLibraryFiles];
+    const [movedItem] = nextFiles.splice(activeIndex, 1);
+    nextFiles.splice(targetIndex, 0, movedItem);
+    handleLibraryReorder(nextFiles);
+  };
+
+  const handleLibraryDragStart = (event, fileId) => {
+    setDraggingLibraryId(fileId);
+    setLibraryDropTargetId("");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", fileId);
+  };
+
+  const handleLibraryDragEnter = (fileId) => {
+    if (draggingLibraryId && draggingLibraryId !== fileId) {
+      setLibraryDropTargetId(fileId);
+    }
+  };
+
+  const handleLibraryDragOver = (event, fileId) => {
+    event.preventDefault();
+    if (draggingLibraryId && draggingLibraryId !== fileId) {
+      event.dataTransfer.dropEffect = "move";
+      setLibraryDropTargetId(fileId);
+    }
+  };
+
+  const handleLibraryDrop = (event, fileId) => {
+    event.preventDefault();
+    const activeId = event.dataTransfer.getData("text/plain") || draggingLibraryId;
+    moveLibraryItem(activeId, fileId);
+    setDraggingLibraryId("");
+    setLibraryDropTargetId("");
+  };
+
+  const clearLibraryDragState = () => {
+    setDraggingLibraryId("");
+    setLibraryDropTargetId("");
   };
 
   useEventSource({
@@ -1371,25 +1442,26 @@ export default function DirectorConsoleClient({
             </div>
             <div className="rounded-[28px] border border-white/10 bg-black/15 p-2">
               {orderedLibraryFiles.length ? (
-                <Reorder.Group
-                  axis="y"
-                  values={orderedLibraryFiles}
-                  onReorder={handleLibraryReorder}
-                  className="grid grid-cols-2 gap-3"
-                >
+                <div className="grid grid-cols-2 gap-3">
                   {orderedLibraryFiles.map((file) => (
-                    <Reorder.Item
+                    <div
                       key={file.id}
-                      value={file}
-                      whileDrag={{
-                        scale: 1.03,
-                        zIndex: 20,
-                        boxShadow: "0 20px 50px rgba(0,0,0,0.35)",
-                      }}
+                      onDragEnter={() => handleLibraryDragEnter(file.id)}
+                      onDragOver={(event) => handleLibraryDragOver(event, file.id)}
+                      onDrop={(event) => handleLibraryDrop(event, file.id)}
+                      onDragEnd={clearLibraryDragState}
                       className={`group relative aspect-square overflow-hidden rounded-[24px] border px-4 py-4 text-left transition ${
                         libraryLiveId === file.id
                           ? "border-emerald-300/30 bg-[linear-gradient(180deg,rgba(18,40,34,0.9),rgba(10,16,18,0.94))] shadow-[0_18px_40px_rgba(16,185,129,0.16)]"
                           : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                      } ${
+                        draggingLibraryId === file.id
+                          ? "scale-[0.98] opacity-70 shadow-[0_20px_50px_rgba(0,0,0,0.34)]"
+                          : ""
+                      } ${
+                        libraryDropTargetId === file.id
+                          ? "border-emerald-300/40 ring-2 ring-emerald-400/20"
+                          : ""
                       }`}
                     >
                       <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
@@ -1399,7 +1471,13 @@ export default function DirectorConsoleClient({
                             <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-white/90">
                               <FaMusic className="text-sm" />
                             </div>
-                            <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-400">
+                            <span
+                              draggable
+                              onDragStart={(event) => handleLibraryDragStart(event, file.id)}
+                              onDragEnd={clearLibraryDragState}
+                              className="inline-flex h-9 w-9 cursor-grab items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-400 active:cursor-grabbing"
+                              title="Drag to reorder"
+                            >
                               <FaGripVertical className="text-sm" />
                             </span>
                           </div>
@@ -1446,9 +1524,9 @@ export default function DirectorConsoleClient({
                           ) : null}
                         </div>
                       </div>
-                    </Reorder.Item>
+                    </div>
                   ))}
-                </Reorder.Group>
+                </div>
               ) : (
                 <button
                   type="button"

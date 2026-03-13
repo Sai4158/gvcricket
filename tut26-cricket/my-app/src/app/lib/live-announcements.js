@@ -362,7 +362,7 @@ export function buildUmpireAnnouncement(event, mode = "simple") {
   }
 
   if (event.type === "undo") {
-    return "Umpire has undone the last ball.";
+    return "Undo";
   }
 
   if (event.type === "match_end") {
