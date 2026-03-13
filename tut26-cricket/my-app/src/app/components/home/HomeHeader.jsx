@@ -38,6 +38,17 @@ export default function HomeHeader() {
     }
   };
 
+  const handleLearnCricketClick = (event) => {
+    const element = document.getElementById("learn-cricket");
+    closeMenu();
+
+    if (element) {
+      event.preventDefault();
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.history.replaceState(null, "", "/#learn-cricket");
+    }
+  };
+
   const navLinks = [
     { href: "/session/new", text: "Start Match", icon: FaArrowRight },
     { href: "/session", text: "All Sessions" },
@@ -45,14 +56,14 @@ export default function HomeHeader() {
     { href: "/rules", text: "GV Community Custom Rule Sheet" },
     {
       href: "/#product-demo",
-      text: "See It in Action",
+      text: "Watch Community Highlights",
       onClick: handleDemoClick,
     },
     { type: "divider" },
     {
-      href: "https://usacricket.org/what-is-cricket/",
+      href: "/#learn-cricket",
       text: "Learn Cricket",
-      external: true,
+      onClick: handleLearnCricketClick,
     },
   ];
 

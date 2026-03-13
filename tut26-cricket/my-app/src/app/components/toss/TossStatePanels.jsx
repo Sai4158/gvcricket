@@ -45,7 +45,9 @@ export default function TossStatePanels({
   );
 
   return (
-    <div className="relative min-h-[520px] rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,24,0.96),rgba(8,8,12,0.98))] px-5 py-6 shadow-[0_22px_60px_rgba(0,0,0,0.28)]">
+    <div className="relative min-h-[520px] overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.12),transparent_34%),linear-gradient(180deg,rgba(18,18,24,0.98),rgba(8,8,12,0.99))] px-5 py-6 shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-[linear-gradient(90deg,rgba(251,191,36,0.96),rgba(251,146,60,0.72),transparent)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),transparent_16%)]" />
       {status === "finished" ? (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[260px] overflow-hidden">
           {confettiPieces.map((piece) => (
@@ -74,7 +76,7 @@ export default function TossStatePanels({
             className="flex min-h-[468px] flex-col justify-between"
           >
             <div className="text-center">
-              <h2 className="text-[2.15rem] font-bold tracking-tight text-white">{teamName}</h2>
+              <h2 className="text-[2.15rem] font-semibold tracking-tight text-white">{teamName}</h2>
               <p className="mt-2 text-sm text-zinc-400">Choose heads or tails.</p>
             </div>
 
@@ -156,7 +158,7 @@ export default function TossStatePanels({
               <div className="mt-6 flex justify-center">
                 {side === "heads" ? <CoinHeads /> : <CoinTails />}
               </div>
-              <h2 className="mt-6 text-balance text-[1.9rem] font-bold uppercase leading-[1.05] tracking-[0.04em] text-white sm:text-[2.2rem]">
+              <h2 className="mt-6 text-balance text-[1.9rem] font-semibold uppercase leading-[1.05] tracking-[0.04em] text-white sm:text-[2.2rem]">
                 {winnerName} won
               </h2>
               <p className="mt-2 text-sm text-zinc-400">

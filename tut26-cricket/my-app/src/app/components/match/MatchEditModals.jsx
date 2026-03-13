@@ -19,8 +19,8 @@ function EditableRoster({
   const [isEditingName, setIsEditingName] = useState(false);
   const isBlue = theme === "blue";
   const cardClass = isBlue
-    ? "border-sky-400/20 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.14),transparent_32%),linear-gradient(180deg,rgba(16,24,44,0.98),rgba(10,12,20,0.98))]"
-    : "border-rose-300/20 bg-[radial-gradient(circle_at_top_right,rgba(244,63,94,0.14),transparent_32%),linear-gradient(180deg,rgba(40,18,24,0.98),rgba(12,10,16,0.98))]";
+    ? "border-sky-400/20 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.18),transparent_32%),linear-gradient(180deg,rgba(16,24,44,0.985),rgba(10,12,20,0.99))]"
+    : "border-rose-300/20 bg-[radial-gradient(circle_at_top_right,rgba(244,63,94,0.18),transparent_32%),linear-gradient(180deg,rgba(40,18,24,0.985),rgba(12,10,16,0.99))]";
   const titleClass = isBlue ? "text-sky-100" : "text-rose-100";
   const panelClass = isBlue
     ? "border-sky-300/10 bg-sky-950/25"
@@ -72,12 +72,13 @@ function EditableRoster({
       className={`relative space-y-4 overflow-hidden rounded-[24px] border p-4 shadow-[0_18px_48px_rgba(0,0,0,0.28)] ${cardClass}`}
     >
       <div
-        className={`pointer-events-none absolute inset-x-5 top-0 h-px ${
+        className={`pointer-events-none absolute inset-x-0 top-0 h-1.5 ${
           isBlue
-            ? "bg-[linear-gradient(90deg,transparent,rgba(56,189,248,0.7),transparent)]"
-            : "bg-[linear-gradient(90deg,transparent,rgba(244,63,94,0.7),transparent)]"
+            ? "bg-[linear-gradient(90deg,rgba(56,189,248,0.96),rgba(34,211,238,0.72),transparent)]"
+            : "bg-[linear-gradient(90deg,rgba(251,113,133,0.96),rgba(244,63,94,0.72),transparent)]"
         }`}
       />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),transparent_18%)]" />
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${titleClass}`}>
@@ -87,7 +88,7 @@ function EditableRoster({
             <input
               type="text"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => setName(event.target.value.toUpperCase())}
               onBlur={() => setIsEditingName(false)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -96,11 +97,11 @@ function EditableRoster({
               }}
               autoFocus
               placeholder="Team name"
-              className={`mt-2 w-full rounded-2xl border px-3 py-2.5 text-lg font-semibold tracking-tight text-white outline-none transition ${inputClass}`}
+              className={`mt-2 w-full rounded-2xl border px-3 py-2.5 text-lg font-semibold uppercase tracking-[0.08em] text-white outline-none transition ${inputClass}`}
             />
           ) : (
             <div className="mt-1 flex items-center gap-2">
-              <h3 className="text-[1.55rem] font-semibold tracking-tight text-white">
+              <h3 className="text-[1.55rem] font-semibold uppercase tracking-[0.08em] text-white">
                 {name || "Team name"}
               </h3>
               <button

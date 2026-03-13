@@ -6,8 +6,8 @@ export default function AnimatedSection({
   children,
   className,
   id,
-  viewportAmount = 0.06,
-  viewportMargin = "0px 0px -18% 0px",
+  viewportAmount = 0.035,
+  viewportMargin = "0px 0px -10% 0px",
 }) {
   return (
     <motion.section

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { motion, useScroll, useSpring, useTransform } from "framer-motion";
 import { FaAngleDown } from "react-icons/fa";
@@ -8,6 +8,7 @@ import LiveNowBanner from "./LiveNowBanner";
 
 export default function HeroSection({ liveMatch = null }) {
   const sectionRef = useRef(null);
+  const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start start", "end start"],
@@ -41,6 +42,34 @@ export default function HeroSection({ liveMatch = null }) {
     }
   };
 
+  useEffect(() => {
+    let cancelled = false;
+    let timeoutId;
+    let idleId;
+
+    const enableVideo = () => {
+      if (!cancelled) {
+        setShouldLoadVideo(true);
+      }
+    };
+
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(enableVideo, { timeout: 350 });
+    } else {
+      timeoutId = window.setTimeout(enableVideo, 160);
+    }
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      if (idleId && typeof window !== "undefined" && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      }
+    };
+  }, []);
+
   return (
     <section ref={sectionRef} className="relative h-screen overflow-hidden">
       <motion.div
@@ -50,21 +79,28 @@ export default function HeroSection({ liveMatch = null }) {
         className="sticky top-0 flex h-screen flex-col items-center justify-center text-center"
       >
         <LiveNowBanner liveMatch={liveMatch} />
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/Thumb1.png')" }}
+        <Image
+          src="/Thumb1.png"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="absolute inset-0 z-0 object-cover"
         />
-        <video
-          className="absolute inset-0 z-0 h-full w-full object-cover"
-          autoPlay
-          loop
-          muted
-          playsInline
-          poster="/Thumb1.png"
-        >
-          <source src="/videos/Cricket1.mp4" type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
+        {shouldLoadVideo ? (
+          <video
+            className="absolute inset-0 z-0 h-full w-full object-cover"
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            poster="/Thumb1.png"
+          >
+            <source src="/videos/Cricket1.mp4" type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+        ) : null}
         <div className="absolute inset-0 z-10 bg-[linear-gradient(180deg,rgba(0,0,0,0.42)_0%,rgba(0,0,0,0.56)_48%,rgba(0,0,0,0.72)_100%)]" />
         <div className="relative z-20 flex flex-col items-center px-4 pt-28 md:pt-20">
           <motion.div
@@ -117,29 +153,43 @@ export default function HeroSection({ liveMatch = null }) {
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ type: "spring", stiffness: 100, delay: 0.3 }}
-            className="relative mt-2"
+            className="relative mt-3"
           >
             <motion.span
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 top-1/2 z-0 h-24 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(249,115,22,0.28)_0%,rgba(251,191,36,0.12)_42%,transparent_72%)] blur-3xl"
+              className="pointer-events-none absolute inset-x-0 top-1/2 z-0 h-28 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.18)_0%,rgba(251,191,36,0.14)_28%,rgba(244,114,182,0.12)_52%,transparent_78%)] blur-3xl"
               style={{ opacity: headingGlowOpacity }}
             />
+            <motion.span
+              aria-hidden="true"
+              style={{ scale: headingScrollScale, y: headingScrollY }}
+              className="pointer-events-none absolute inset-0 z-0 block text-center text-5xl font-semibold tracking-tight text-white/18 blur-[10px] md:text-7xl"
+            >
+              End-to-end cricket scoring, made simple.
+            </motion.span>
             <motion.span
               style={{
                 scale: headingScrollScale,
                 y: headingScrollY,
-                backgroundSize: "200% auto",
-                backgroundImage:
-                  "linear-gradient(to right, #fde047, #fbcfe8, #fb923c, #fbcfe8, #fde047)",
               }}
               className="
                 relative z-10 block
-                animate-[animate-gradient_5s_linear_infinite]
-                bg-clip-text text-transparent
+                text-white
                 text-5xl md:text-7xl font-semibold tracking-tight will-change-transform
+                drop-shadow-[0_10px_30px_rgba(0,0,0,0.62)]
               "
             >
-              End-to-end cricket scoring, made simple.
+              <span className="relative inline-block">
+                <span className="relative z-10">
+                  End-to-end cricket scoring, made simple.
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 z-20 animate-[animate-gradient_3.8s_linear_infinite] bg-[linear-gradient(110deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.18)_24%,rgba(255,247,214,0.78)_38%,rgba(255,255,255,0.22)_54%,rgba(255,255,255,0)_72%)] bg-[length:240%_auto] bg-clip-text text-transparent mix-blend-screen"
+                >
+                  End-to-end cricket scoring, made simple.
+                </span>
+              </span>
             </motion.span>
           </motion.h1>
         </div>
@@ -150,15 +200,15 @@ export default function HeroSection({ liveMatch = null }) {
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.55, duration: 0.45, ease: "easeOut" }}
-          className="absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-2 text-white/80 outline-none transition hover:text-white focus-visible:text-white"
+          className="absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-2 text-white outline-none transition hover:text-white focus-visible:text-white"
         >
-          <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-white/58">
+          <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-white drop-shadow-[0_4px_14px_rgba(0,0,0,0.55)]">
             Explore more
           </span>
           <motion.span
             animate={{ y: [0, 5, 0], opacity: [0.8, 1, 0.8] }}
             transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/14 bg-white/5 backdrop-blur-md"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/24 bg-white/12 shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-md"
           >
             <FaAngleDown className="text-lg" />
           </motion.span>

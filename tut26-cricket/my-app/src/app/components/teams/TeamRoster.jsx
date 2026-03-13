@@ -6,7 +6,7 @@ import { FaCheck, FaMinus, FaPen, FaPlus, FaTrash } from "react-icons/fa";
 
 export function createDefaultRoster(teamLabel) {
   return {
-    name: teamLabel,
+    name: teamLabel.toUpperCase(),
     players: Array.from({ length: 3 }, (_, index) => `Player ${index + 1}`),
   };
 }
@@ -21,12 +21,20 @@ export default function TeamRoster({ color, roster, setRoster }) {
     color === "blue" ? "border-blue-400/14" : "border-rose-400/14";
   const teamGlowClass =
     color === "blue"
-      ? "shadow-[0_22px_55px_rgba(59,130,246,0.09)]"
-      : "shadow-[0_22px_55px_rgba(248,113,113,0.09)]";
+      ? "shadow-[0_24px_70px_rgba(59,130,246,0.12)]"
+      : "shadow-[0_24px_70px_rgba(248,113,113,0.12)]";
   const badgeClass =
     color === "blue"
       ? "border-blue-400/20 bg-blue-500/10 text-blue-300"
       : "border-rose-400/20 bg-rose-500/10 text-rose-300";
+  const accentStripClass =
+    color === "blue"
+      ? "bg-[linear-gradient(90deg,rgba(56,189,248,0.96),rgba(34,211,238,0.72),transparent)]"
+      : "bg-[linear-gradient(90deg,rgba(251,113,133,0.96),rgba(244,63,94,0.72),transparent)]";
+  const innerGlowClass =
+    color === "blue"
+      ? "bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.18),transparent_34%),linear-gradient(180deg,rgba(16,24,44,0.98),rgba(10,12,20,0.98))]"
+      : "bg-[radial-gradient(circle_at_top_right,rgba(244,63,94,0.16),transparent_34%),linear-gradient(180deg,rgba(38,16,24,0.98),rgba(12,10,16,0.98))]";
 
   const updatePlayer = (index, nextValue) => {
     setRoster((current) => ({
@@ -66,8 +74,10 @@ export default function TeamRoster({ color, roster, setRoster }) {
 
   return (
     <div
-      className={`rounded-[30px] border bg-[linear-gradient(180deg,rgba(20,20,24,0.96),rgba(10,10,14,0.98))] p-5 ring-1 ring-white/5 transition-all duration-300 sm:p-6 ${teamBorderClass} ${teamGlowClass}`}
+      className={`relative overflow-hidden rounded-[30px] border p-5 ring-1 ring-white/5 transition-all duration-300 sm:p-6 ${teamBorderClass} ${teamGlowClass} ${innerGlowClass}`}
     >
+      <div className={`pointer-events-none absolute inset-x-0 top-0 h-1.5 ${accentStripClass}`} />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),transparent_18%)]" />
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex min-h-[44px] items-center gap-3">
@@ -79,7 +89,7 @@ export default function TeamRoster({ color, roster, setRoster }) {
                   onChange={(event) =>
                     setRoster((current) => ({
                       ...current,
-                      name: event.target.value,
+                      name: event.target.value.toUpperCase(),
                     }))
                   }
                   onBlur={() => setIsEditingName(false)}
@@ -89,7 +99,7 @@ export default function TeamRoster({ color, roster, setRoster }) {
                     }
                   }}
                   placeholder="Team Name"
-                  className={`min-w-0 flex-1 bg-transparent text-[16px] font-extrabold text-white outline-none sm:text-[22px] ${teamRingClass}`}
+                  className={`min-w-0 flex-1 bg-transparent text-[16px] font-extrabold uppercase tracking-[0.08em] text-white outline-none sm:text-[22px] ${teamRingClass}`}
                 />
                 <button
                   onMouseDown={(event) => event.preventDefault()}
@@ -102,7 +112,9 @@ export default function TeamRoster({ color, roster, setRoster }) {
               </div>
             ) : (
               <>
-                <h2 className={`truncate text-[28px] font-black leading-none ${teamColorClass}`}>
+                <h2
+                  className={`truncate text-[28px] font-black leading-none uppercase tracking-[0.08em] ${teamColorClass}`}
+                >
                   {roster.name}
                 </h2>
                 <button

@@ -4,7 +4,7 @@ import { GiCricketBat } from "react-icons/gi";
 
 export default function LearnCricketCard() {
   return (
-    <section className="w-full max-w-5xl mx-auto">
+    <section id="learn-cricket" className="w-full max-w-5xl mx-auto scroll-mt-28">
       <a
         href="https://usacricket.org/what-is-cricket/"
         target="_blank"

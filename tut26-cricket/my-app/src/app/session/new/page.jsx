@@ -249,7 +249,7 @@ export default function NewSessionPage() {
               disabled={saving}
               className="btn-ui btn-ui-glass-dark mt-8 w-full rounded-[24px] px-6 py-4 text-lg font-semibold"
             >
-              {saving ? "Creating..." : "Next: Select Teams"}
+              {saving ? "Creating..." : "Select Teams"}
               {!saving && <FaArrowRight />}
             </button>
           </div>
