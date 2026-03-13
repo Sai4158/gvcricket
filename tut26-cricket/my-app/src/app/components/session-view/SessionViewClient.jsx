@@ -163,7 +163,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
     speakSequence,
     prime,
     stop,
-    isSpeaking,
     isSupported,
     needsGesture,
     status: announcerStatus,
@@ -294,44 +293,25 @@ export default function SessionViewClient({ sessionId, initialData }) {
       ? buildSpectatorOverCompleteAnnouncement(match)
       : "";
     const priority = getSpectatorAnnouncementPriority(event);
-    const items = [
-      {
-        text: line,
-        pauseAfterMs: scoreLine || overSummary ? 650 : 0,
-        rate: 0.74,
-      },
-    ];
-
-    if (scoreLine) {
-      items.push({
-        text: scoreLine,
-        pauseAfterMs: overSummary ? 900 : 0,
-        rate: 0.73,
-      });
-    }
-
-    if (overSummary) {
-      items.push({
-        text: overSummary,
-        pauseAfterMs: 0,
-        rate: 0.74,
-      });
-    }
-
-    const interrupt = priority >= 3 && isSpeaking;
+    const combinedText = [line, scoreLine, overSummary].filter(Boolean).join(" ");
     speakSequenceWithDuck(
-      items,
+      [
+        {
+          text: combinedText,
+          pauseAfterMs: 0,
+          rate: 0.82,
+        },
+      ],
       {
         key: event.id,
         priority,
-        interrupt,
-        minGapMs: priority >= 3 ? 900 : 450,
+        interrupt: true,
+        minGapMs: 0,
       },
-      overSummary ? 3600 : scoreLine ? 2600 : 1700
+      overSummary ? 3300 : scoreLine ? 2300 : 1500
     );
   }, [
     isLiveMatch,
-    isSpeaking,
     match,
     settings.enabled,
     settings.mode,
@@ -567,18 +547,18 @@ export default function SessionViewClient({ sessionId, initialData }) {
         setActivePanel("announce");
         prime();
         speakSequenceWithDuck(
-          [
-            {
-              text: "Score announcer is now on.",
-              pauseAfterMs: 420,
-              rate: 0.78,
-            },
-            {
-              text: "I will announce the next update.",
-              pauseAfterMs: 0,
-              rate: 0.77,
-            },
-          ],
+        [
+          {
+            text: "Score announcer is now on.",
+            pauseAfterMs: 420,
+            rate: 0.82,
+          },
+          {
+            text: "I will announce the next update.",
+            pauseAfterMs: 0,
+            rate: 0.81,
+          },
+        ],
           {
             key: "spectator-voice-enabled",
             priority: 3,
@@ -972,18 +952,18 @@ export default function SessionViewClient({ sessionId, initialData }) {
               if (nextEnabled) {
                 prime();
                 speakSequenceWithDuck(
-                  [
-          {
-            text: "Score announcer is now on.",
-            pauseAfterMs: 420,
-            rate: 0.74,
-          },
-          {
-            text: "I will announce the next update.",
-            pauseAfterMs: 0,
-            rate: 0.73,
-          },
-        ],
+                [
+                  {
+                    text: "Score announcer is now on.",
+                    pauseAfterMs: 420,
+                    rate: 0.82,
+                  },
+                  {
+                    text: "I will announce the next update.",
+                    pauseAfterMs: 0,
+                    rate: 0.81,
+                  },
+                ],
                   {
                     key: "spectator-voice-enabled",
                     priority: 3,
@@ -1004,7 +984,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                   {
                     text: buildCurrentScoreAnnouncement(match),
                     pauseAfterMs: 0,
-                    rate: 0.74,
+                    rate: 0.82,
                   },
                 ],
                 {

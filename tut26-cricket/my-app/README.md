@@ -1,12 +1,16 @@
-# GV Cricket
+# GV Cricket 2.0
 
-GV Cricket is a Next.js live cricket scoring app with:
+GV Cricket 2.0 is a modern cricket scoring app built for fast live match control, simple umpire scoring, spectator live updates, and polished result pages.
 
-- live umpire scoring
-- live spectator updates over SSE
+## Highlights
+
+- live umpire scoring with fast ball-by-ball controls
+- spectator live score view with score announcer
 - walkie-talkie and speaker mic tools
-- optional match images
-- MongoDB + Mongoose persistence
+- director console for match audio control
+- optional match images and shareable match pages
+- result insights, scorecards, and saved sessions
+- MongoDB + Mongoose persistence with live SSE updates
 
 ## Local development
 
@@ -29,9 +33,15 @@ Required:
 - `MATCH_MEDIA_PIN`
 - `IMGBB_API_KEY`
 
+Optional director-specific secrets:
+
+- `DIRECTOR_ACCESS_SECRET`
+- `DIRECTOR_CONSOLE_PIN`
+- `DIRECTOR_CONSOLE_PIN_HASH`
+
 ## Vercel deployment
 
-This app is configured for Vercel production deployment.
+GV Cricket 2.0 is configured for Vercel deployment.
 
 ### Recommended project settings
 
@@ -53,15 +63,15 @@ Add these in the Vercel dashboard:
 
 - MongoDB must support change streams
 - Use MongoDB Atlas or another replica set deployment
-- The live SSE routes are configured for Node runtime and longer execution windows
+- Live SSE routes run on the Node runtime with longer execution windows
 
 ## Production notes
 
-- Match images use `gvLogo.png` for app branding and icons
-- SSE live routes are pinned to Node runtime
-- Security headers are applied through middleware
-- MongoDB connections are cached server-side
-- Walkie-talkie state is live-only and not persisted to MongoDB
+- `gvLogo.png` is used for app branding and icons
+- security headers are applied through middleware
+- MongoDB connections are reused server-side
+- walkie-talkie state is live-only and not persisted to MongoDB
+- spectator, umpire, and director flows are protected with server-side checks
 
 ## Build and test
 
@@ -69,6 +79,7 @@ Add these in the Vercel dashboard:
 npm run lint
 npm run test
 npm run build
+npm run typecheck
 ```
 
 ## Deploy checklist
@@ -77,4 +88,4 @@ npm run build
 - verify MongoDB replica set / Atlas change streams
 - verify live routes connect in production
 - verify `gvLogo.png` is used for favicon/app branding
-- verify umpire PIN and image PIN are set correctly
+- verify umpire, media, and director PIN settings
