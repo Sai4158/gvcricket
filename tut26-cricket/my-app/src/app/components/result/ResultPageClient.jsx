@@ -7,6 +7,9 @@ import { FaArrowLeft, FaImage, FaTrashAlt } from "react-icons/fa";
 import useEventSource from "../live/useEventSource";
 import MatchHeroBackdrop from "../match/MatchHeroBackdrop";
 import ImagePinModal from "../shared/ImagePinModal";
+import SafeMatchImage, {
+  resolveSafeMatchImage,
+} from "../shared/SafeMatchImage";
 import { calculateInningsSummary } from "../../lib/match-stats";
 import CongratulationsCard from "./CongratulationsCard";
 import EnhancedScorecard from "./EnhancedScorecard";
@@ -189,9 +192,9 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           />
         </section>
 
-        {match?.matchImageUrl ? (
-          <section className="space-y-4">
-            <div className="flex justify-end">
+        <section className="space-y-4">
+          <div className="flex justify-end">
+            {resolveSafeMatchImage(match?.matchImageUrl || "") !== "/gvLogo.png" ? (
               <button
                 type="button"
                 onClick={() => {
@@ -203,23 +206,25 @@ export default function ResultPageClient({ matchId, initialMatch }) {
               >
                 <FaTrashAlt />
               </button>
-            </div>
-            <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.94),rgba(10,10,14,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={match.matchImageUrl}
-                alt={match.name || "Match cover"}
-                className="max-h-[420px] w-full object-cover"
-                loading="lazy"
-              />
-            </div>
-            {removeError ? (
-              <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                {removeError}
-              </div>
             ) : null}
-          </section>
-        ) : null}
+          </div>
+          <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.94),rgba(10,10,14,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
+            <SafeMatchImage
+              src={match?.matchImageUrl || ""}
+              alt={match.name || "Match cover"}
+              width={1600}
+              height={900}
+              className="max-h-[420px] w-full object-cover"
+              fallbackClassName="max-h-[420px] w-full object-contain bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))] p-10 sm:p-14"
+              sizes="(max-width: 768px) 100vw, 1200px"
+            />
+          </div>
+          {removeError ? (
+            <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+              {removeError}
+            </div>
+          ) : null}
+        </section>
 
         <section className="space-y-8">
           <h2 className="text-3xl font-bold text-white text-center pt-8 border-t border-white/10">

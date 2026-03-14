@@ -343,7 +343,7 @@ export default function SessionsPageClient({ initialSessions }) {
             />
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-4">
                 {paginatedSessions.map((session) => (
                   <SessionCard
                     key={session._id}

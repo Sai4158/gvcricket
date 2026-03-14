@@ -1,6 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 import { FaArrowRight } from "react-icons/fa";
+import SafeMatchImage from "../shared/SafeMatchImage";
 
 export default function LiveNowBanner({ liveMatch }) {
   if (!liveMatch) {
@@ -17,22 +17,16 @@ export default function LiveNowBanner({ liveMatch }) {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.12),transparent_40%)]" />
         <div className="relative z-10 flex min-w-0 items-center gap-3">
           <div className="liquid-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl">
-            {liveMatch.matchImageUrl ? (
-              <div className="relative h-10 w-10 overflow-hidden rounded-xl border border-white/14 shadow-[0_6px_18px_rgba(0,0,0,0.18)]">
-                <Image
-                  src={liveMatch.matchImageUrl}
-                  alt={`${liveMatch.teamAName} vs ${liveMatch.teamBName}`}
-                  fill
-                  sizes="40px"
-                  className="object-cover"
-                />
-              </div>
-            ) : (
-              <span className="relative flex h-3 w-3">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/55" />
-                <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-400" />
-              </span>
-            )}
+            <div className="relative h-10 w-10 overflow-hidden rounded-xl border border-white/14 shadow-[0_6px_18px_rgba(0,0,0,0.18)]">
+              <SafeMatchImage
+                src={liveMatch.matchImageUrl || ""}
+                alt={`${liveMatch.teamAName} vs ${liveMatch.teamBName}`}
+                fill
+                sizes="40px"
+                className="object-cover"
+                fallbackClassName="object-contain p-1.5 opacity-[0.95]"
+              />
+            </div>
           </div>
           <div className="min-w-0 text-left">
             <div className="text-[11px] font-bold uppercase tracking-[0.34em] text-emerald-300">

@@ -1,10 +1,10 @@
 "use client";
 
 import { memo } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { FaArrowUpRightFromSquare, FaEye, FaLock, FaRadio } from "react-icons/fa6";
 import { formatRelativeTime } from "./formatRelativeTime";
+import SafeMatchImage from "../shared/SafeMatchImage";
 
 function buildStatusMeta(session) {
   const isLive = Boolean(session.isLive);
@@ -34,7 +34,7 @@ function buildStatusMeta(session) {
 function SessionCard({ session, onUmpireClick }) {
   const isLive = session.isLive;
   const statusMeta = buildStatusMeta(session);
-  const cardImage = session.matchImageUrl || "/gvLogo.png";
+  const cardImage = session.matchImageUrl || "";
   const scoreHref =
     session.match && !isLive
       ? `/result/${session.match}`
@@ -60,12 +60,13 @@ function SessionCard({ session, onUmpireClick }) {
       }}
     >
       <div className="pointer-events-none absolute inset-0 opacity-[0.16]">
-        <Image
+        <SafeMatchImage
           src={cardImage}
           alt=""
           fill
           sizes="(max-width: 768px) 100vw, 33vw"
           className="object-cover object-center"
+          fallbackClassName="object-contain object-center p-8 opacity-[0.92]"
         />
       </div>
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),transparent_30%),linear-gradient(180deg,rgba(7,7,10,0.28),rgba(7,7,10,0.86))]" />

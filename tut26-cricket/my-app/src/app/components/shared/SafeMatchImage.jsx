@@ -1,0 +1,51 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { isSafeMatchImageUrl } from "../../lib/match-image";
+
+export const GV_MATCH_FALLBACK_IMAGE = "/gvLogo.png";
+
+export function resolveSafeMatchImage(src) {
+  return isSafeMatchImageUrl(src) ? src : GV_MATCH_FALLBACK_IMAGE;
+}
+
+export default function SafeMatchImage({
+  src = "",
+  alt = "",
+  className = "",
+  fallbackClassName = "",
+  onFallbackChange,
+  ...imageProps
+}) {
+  const resolvedSrc = useMemo(() => resolveSafeMatchImage(src), [src]);
+  const [imageSrc, setImageSrc] = useState(resolvedSrc);
+  const [isFallback, setIsFallback] = useState(
+    resolvedSrc === GV_MATCH_FALLBACK_IMAGE
+  );
+
+  useEffect(() => {
+    setImageSrc(resolvedSrc);
+    setIsFallback(resolvedSrc === GV_MATCH_FALLBACK_IMAGE);
+  }, [resolvedSrc]);
+
+  useEffect(() => {
+    onFallbackChange?.(isFallback);
+  }, [isFallback, onFallbackChange]);
+
+  return (
+    <Image
+      {...imageProps}
+      src={imageSrc}
+      alt={alt}
+      className={isFallback && fallbackClassName ? fallbackClassName : className}
+      onError={() => {
+        if (imageSrc === GV_MATCH_FALLBACK_IMAGE) {
+          return;
+        }
+        setImageSrc(GV_MATCH_FALLBACK_IMAGE);
+        setIsFallback(true);
+      }}
+    />
+  );
+}

@@ -22,6 +22,10 @@ import {
 import { validateMatchImageBuffer } from "../src/app/lib/match-image.js";
 import { evaluateSensitiveImagePredictions } from "../src/app/lib/match-image-moderation.js";
 import {
+  GV_MATCH_FALLBACK_IMAGE,
+  resolveSafeMatchImage,
+} from "../src/app/components/shared/SafeMatchImage.jsx";
+import {
   serializePublicMatch,
   serializePublicSession,
 } from "../src/app/lib/public-data.js";
@@ -731,6 +735,22 @@ test("image validation rejects invalid binary payloads", () => {
   const fakeExecutable = Buffer.from("MZ-not-an-image");
   const result = validateMatchImageBuffer(fakeExecutable, "image/png");
   assert.equal(result.ok, false);
+});
+
+test("match image fallback resolves unsafe or missing images to the GV logo", () => {
+  assert.equal(resolveSafeMatchImage(""), GV_MATCH_FALLBACK_IMAGE);
+  assert.equal(
+    resolveSafeMatchImage("https://example.com/not-allowed.jpg"),
+    GV_MATCH_FALLBACK_IMAGE
+  );
+  assert.equal(
+    resolveSafeMatchImage("/api/matches/507f1f77bcf86cd799439011/image/file?v=1"),
+    "/api/matches/507f1f77bcf86cd799439011/image/file?v=1"
+  );
+  assert.equal(
+    resolveSafeMatchImage("https://i.ibb.co/demo/sample.jpg"),
+    "https://i.ibb.co/demo/sample.jpg"
+  );
 });
 
 test("sensitive image moderation flags explicit predictions and allows neutral ones", () => {
