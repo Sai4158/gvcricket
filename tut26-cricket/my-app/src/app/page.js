@@ -7,6 +7,9 @@ import PrimaryActionsSection from "./components/home/PrimaryActionsSection";
 import { absoluteUrl, siteConfig } from "./lib/site-metadata";
 import { loadHomeLiveBannerData } from "./lib/server-data";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata = {
   title: "Free Cricket Scoring, Made Simple",
   description:

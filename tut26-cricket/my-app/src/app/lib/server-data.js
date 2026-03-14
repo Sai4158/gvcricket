@@ -246,30 +246,19 @@ export async function loadMatchAccessData(matchId) {
 export async function loadHomeLiveBannerData() {
   await connectDB();
 
-  const fiveHoursAgo = new Date(Date.now() - 5 * 60 * 60 * 1000);
-
-  const sessions = (await Session.find()
-    .sort({ createdAt: -1, _id: -1 })
+  const match = (await Match.find({ isOngoing: true })
+    .sort({ updatedAt: -1, _id: -1 })
     .limit(12)
     .lean())
-    .filter((session) => !session?.isDraft);
+    .find((candidate) => !candidate?.result);
 
-  let session = null;
-  let match = null;
-
-  for (const candidate of sessions) {
-    const createdAt = new Date(candidate.createdAt || 0);
-    if (Number.isNaN(createdAt.getTime()) || createdAt < fiveHoursAgo) {
-      continue;
-    }
-
-    const resolvedMatch = await findMatchForSession(candidate);
-    if (resolvedMatch?.isOngoing && !resolvedMatch?.result) {
-      session = candidate;
-      match = resolvedMatch;
-      break;
-    }
+  if (!match) {
+    return null;
   }
+
+  const session = match.sessionId
+    ? await Session.findById(match.sessionId).lean()
+    : await Session.findOne({ match: match._id }).lean();
 
   if (!session || !match) {
     return null;

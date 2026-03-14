@@ -161,7 +161,14 @@ export function WalkieTalkButton({
   }, [active, holding]);
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div
+      className="flex select-none flex-col items-center gap-3"
+      style={{
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
+      }}
+    >
       <button
         ref={buttonRef}
         type="button"
@@ -179,6 +186,7 @@ export function WalkieTalkButton({
           void endHold();
         }}
         onPointerDown={(event) => {
+          event.preventDefault();
           pointerIdRef.current = event.pointerId;
           event.currentTarget.setPointerCapture?.(event.pointerId);
           void startHold();
@@ -194,6 +202,12 @@ export function WalkieTalkButton({
         onContextMenu={(event) => {
           event.preventDefault();
         }}
+        onMouseDown={(event) => {
+          event.preventDefault();
+        }}
+        onDragStart={(event) => {
+          event.preventDefault();
+        }}
         className={`relative inline-flex h-24 w-24 touch-none select-none items-center justify-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
           disabled
             ? "cursor-not-allowed border-white/5 bg-zinc-900 text-zinc-600"
@@ -202,6 +216,12 @@ export function WalkieTalkButton({
             : "border-white/10 bg-white/[0.06] text-zinc-100 hover:-translate-y-0.5 hover:bg-white/[0.09]"
         }`}
         aria-label={active || holding || finishing ? "Release walkie talk" : label}
+        style={{
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
+          touchAction: "none",
+        }}
       >
         <span
           className={`absolute inset-[-8px] rounded-full border transition-opacity ${
@@ -214,7 +234,14 @@ export function WalkieTalkButton({
           {active || holding || finishing ? <FaMicrophone /> : <FaMicrophoneSlash />}
         </span>
       </button>
-      <div className="text-center">
+      <div
+        className="select-none text-center"
+        style={{
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
+        }}
+      >
         <p className="text-xs font-medium text-zinc-400">
           {finishing ? "Finishing" : active || holding ? "Live" : "Hold to talk"}
         </p>
