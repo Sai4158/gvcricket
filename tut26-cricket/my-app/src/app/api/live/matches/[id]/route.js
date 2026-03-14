@@ -16,6 +16,8 @@ function sseHeaders() {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+    "Content-Encoding": "none",
   };
 }
 
@@ -33,6 +35,8 @@ export async function GET(request, { params }) {
       let heartbeat = null;
       let closed = false;
       let didCleanup = false;
+      let hasChangeStreamUpdates = false;
+      let lastSerializedMatch = "";
 
       const finalize = () => {
         if (didCleanup) {
@@ -78,9 +82,20 @@ export async function GET(request, { params }) {
         }
       };
 
+      const scheduleHeartbeat = (delay) => {
+        if (closed) {
+          return;
+        }
+        if (heartbeat) {
+          clearTimeout(heartbeat);
+        }
+        heartbeat = setTimeout(() => {
+          void heartbeatLoop();
+        }, delay);
+      };
+
       try {
         await connectDB();
-        await ensureLiveUpdates();
 
         const pushMatch = async () => {
           if (closed) {
@@ -104,21 +119,66 @@ export async function GET(request, { params }) {
             });
           }
 
+          const nextMatch = serializePublicMatch(match, fallbackSession);
+          const nextSerializedMatch = JSON.stringify(nextMatch);
+          if (nextSerializedMatch === lastSerializedMatch) {
+            return;
+          }
+
+          lastSerializedMatch = nextSerializedMatch;
           send("match", {
-            match: serializePublicMatch(match, fallbackSession),
+            match: nextMatch,
             updatedAt: new Date().toISOString(),
           });
         };
 
-        await pushMatch();
+        const heartbeatLoop = async () => {
+          if (closed) {
+            return;
+          }
 
-        cleanup = subscribeToMatch(id, async () => {
-          await pushMatch();
+          try {
+            if (!hasChangeStreamUpdates) {
+              await pushMatch();
+              if (closed) {
+                return;
+              }
+            }
+
+            if (!send("ping", { ok: true, ts: Date.now() })) {
+              return;
+            }
+          } catch (error) {
+            console.error("Match SSE heartbeat failed:", error);
+            stopStream();
+            return;
+          }
+
+          scheduleHeartbeat(hasChangeStreamUpdates ? 15000 : 1000);
+        };
+
+        await pushMatch();
+        send("ping", {
+          ok: true,
+          ts: Date.now(),
+          init: true,
+          pad: "0".repeat(2048),
         });
 
-        heartbeat = setInterval(() => {
-          send("ping", { ok: true, ts: Date.now() });
-        }, 15000);
+        try {
+          await ensureLiveUpdates();
+          if (!closed) {
+            hasChangeStreamUpdates = true;
+            cleanup = subscribeToMatch(id, async () => {
+              await pushMatch();
+            });
+          }
+        } catch (error) {
+          console.warn("Match change streams unavailable, using timed fallback.", error);
+          hasChangeStreamUpdates = false;
+        }
+
+        scheduleHeartbeat(hasChangeStreamUpdates ? 15000 : 1000);
 
         request.signal.addEventListener("abort", () => {
           stopStream();

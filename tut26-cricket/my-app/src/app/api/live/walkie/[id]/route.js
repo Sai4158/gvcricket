@@ -299,14 +299,14 @@ export async function GET(request, { params }) {
                 stopStream();
               });
             });
-            scheduleHeartbeat(5000);
+        scheduleHeartbeat(3000);
           } catch (error) {
             console.warn("Walkie change streams unavailable, using timed fallback.", error);
             hasChangeStreamUpdates = false;
           }
         })();
 
-        scheduleHeartbeat(400);
+        scheduleHeartbeat(250);
 
         request.signal.addEventListener("abort", () => {
           stopStream();

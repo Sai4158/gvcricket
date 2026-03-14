@@ -8,7 +8,7 @@ import {
   restorePageMedia,
 } from "../../lib/page-audio";
 
-const WALKIE_FINISH_DELAY_MS = 1200;
+const WALKIE_FINISH_DELAY_MS = 900;
 const WALKIE_SIGNAL_RACE_MESSAGES = new Set([
   "No active walkie transmission.",
   "Active speaker not found.",
@@ -43,7 +43,7 @@ const DEFAULT_ICE_SERVERS = [
 function createPeerConnection(iceServers) {
   return new RTCPeerConnection({
     bundlePolicy: "max-bundle",
-    iceCandidatePoolSize: 2,
+    iceCandidatePoolSize: 6,
     iceServers: Array.isArray(iceServers) && iceServers.length ? iceServers : DEFAULT_ICE_SERVERS,
   });
 }
@@ -56,7 +56,7 @@ function getAudioEncodingParams(sender) {
     ...params,
     encodings: encodings.map((encoding) => ({
       ...encoding,
-      maxBitrate: 24_000,
+      maxBitrate: 32_000,
       networkPriority: "high",
     })),
   };
@@ -422,6 +422,7 @@ export default function useWalkieTalkie({
     stream.getAudioTracks().forEach((track) => {
       try {
         track.contentHint = "speech";
+        track.enabled = true;
       } catch {
         // contentHint is optional across browsers.
       }
@@ -850,14 +851,19 @@ export default function useWalkieTalkie({
     setError("");
 
     try {
-      await ensureSpeakerStream();
-      const payload = await sendJson(`/api/matches/${matchId}/walkie/claim`, {
+      primeRemoteAudio();
+      const streamPromise = ensureSpeakerStream();
+      const claimPromise = sendJson(`/api/matches/${matchId}/walkie/claim`, {
         participantId,
         role,
         token,
       });
+      const [stream, payload] = await Promise.all([streamPromise, claimPromise]);
+      if (!stream) {
+        throw new Error("Microphone is unavailable.");
+      }
 
-      await loadIceConfig();
+      void loadIceConfig();
       primeRemoteAudio();
       duckPageMedia(pageMediaDuckRef, 0.18);
       playWalkieStartTone();

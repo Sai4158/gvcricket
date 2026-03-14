@@ -14,6 +14,8 @@ function sseHeaders() {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+    "Content-Encoding": "none",
   };
 }
 
@@ -33,6 +35,8 @@ export async function GET(request, { params }) {
       let currentMatchId = "";
       let closed = false;
       let didCleanup = false;
+      let hasChangeStreamUpdates = false;
+      let lastSerializedPayload = "";
 
       const finalize = () => {
         if (didCleanup) {
@@ -80,9 +84,20 @@ export async function GET(request, { params }) {
         }
       };
 
+      const scheduleHeartbeat = (delay) => {
+        if (closed) {
+          return;
+        }
+        if (heartbeat) {
+          clearTimeout(heartbeat);
+        }
+        heartbeat = setTimeout(() => {
+          void heartbeatLoop();
+        }, delay);
+      };
+
       try {
         await connectDB();
-        await ensureLiveUpdates();
 
         const resolveLatestMatch = async (session) => {
           if (!session) {
@@ -121,11 +136,22 @@ export async function GET(request, { params }) {
             }
           }
 
-          if (
-            !send("session", {
+          const payload = {
             session: serializePublicSession(session),
             match: serializePublicMatch(match, session),
-            updatedAt: new Date().toISOString(),
+          };
+          const nextSerializedPayload = JSON.stringify(payload);
+
+          if (nextSerializedPayload === lastSerializedPayload) {
+            return { session, match };
+          }
+
+          lastSerializedPayload = nextSerializedPayload;
+
+          if (
+            !send("session", {
+              ...payload,
+              updatedAt: new Date().toISOString(),
             })
           ) {
             return null;
@@ -133,14 +159,53 @@ export async function GET(request, { params }) {
           return { session, match };
         };
 
+        const heartbeatLoop = async () => {
+          if (closed) {
+            return;
+          }
+
+          try {
+            if (!hasChangeStreamUpdates) {
+              await pushSessionPayload();
+              if (closed) {
+                return;
+              }
+            }
+
+            if (!send("ping", { ok: true, ts: Date.now() })) {
+              return;
+            }
+          } catch (error) {
+            console.error("Session SSE heartbeat failed:", error);
+            stopStream();
+            return;
+          }
+
+          scheduleHeartbeat(hasChangeStreamUpdates ? 15000 : 1000);
+        };
+
         await pushSessionPayload();
-        cleanupSession = subscribeToSession(id, async () => {
-          await pushSessionPayload();
+        send("ping", {
+          ok: true,
+          ts: Date.now(),
+          init: true,
+          pad: "0".repeat(2048),
         });
 
-        heartbeat = setInterval(() => {
-          send("ping", { ok: true, ts: Date.now() });
-        }, 15000);
+        try {
+          await ensureLiveUpdates();
+          if (!closed) {
+            hasChangeStreamUpdates = true;
+            cleanupSession = subscribeToSession(id, async () => {
+              await pushSessionPayload();
+            });
+          }
+        } catch (error) {
+          console.warn("Session change streams unavailable, using timed fallback.", error);
+          hasChangeStreamUpdates = false;
+        }
+
+        scheduleHeartbeat(hasChangeStreamUpdates ? 15000 : 1000);
 
         request.signal.addEventListener("abort", () => {
           stopStream();
