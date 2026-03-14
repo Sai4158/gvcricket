@@ -35,7 +35,6 @@ export async function GET(request, { params }) {
       let heartbeat = null;
       let closed = false;
       let didCleanup = false;
-      let hasChangeStreamUpdates = false;
       let lastSerializedMatch = "";
 
       const finalize = () => {
@@ -46,7 +45,7 @@ export async function GET(request, { params }) {
         cleanup();
         cleanup = () => {};
         if (heartbeat) {
-          clearInterval(heartbeat);
+          clearTimeout(heartbeat);
           heartbeat = null;
         }
       };
@@ -82,7 +81,7 @@ export async function GET(request, { params }) {
         }
       };
 
-      const scheduleHeartbeat = (delay) => {
+      const scheduleHeartbeat = (delay = 15000) => {
         if (closed) {
           return;
         }
@@ -138,13 +137,6 @@ export async function GET(request, { params }) {
           }
 
           try {
-            if (!hasChangeStreamUpdates) {
-              await pushMatch();
-              if (closed) {
-                return;
-              }
-            }
-
             if (!send("ping", { ok: true, ts: Date.now() })) {
               return;
             }
@@ -154,7 +146,7 @@ export async function GET(request, { params }) {
             return;
           }
 
-          scheduleHeartbeat(hasChangeStreamUpdates ? 15000 : 1000);
+          scheduleHeartbeat();
         };
 
         await pushMatch();
@@ -168,17 +160,18 @@ export async function GET(request, { params }) {
         try {
           await ensureLiveUpdates();
           if (!closed) {
-            hasChangeStreamUpdates = true;
             cleanup = subscribeToMatch(id, async () => {
               await pushMatch();
             });
           }
         } catch (error) {
-          console.warn("Match change streams unavailable, using timed fallback.", error);
-          hasChangeStreamUpdates = false;
+          console.error("Match change streams unavailable.", error);
+          send("error", { message: "Live match updates require realtime database events." });
+          stopStream();
+          return;
         }
 
-        scheduleHeartbeat(hasChangeStreamUpdates ? 15000 : 1000);
+        scheduleHeartbeat();
 
         request.signal.addEventListener("abort", () => {
           stopStream();

@@ -35,7 +35,6 @@ export async function GET(request, { params }) {
       let currentMatchId = "";
       let closed = false;
       let didCleanup = false;
-      let hasChangeStreamUpdates = false;
       let lastSerializedPayload = "";
 
       const finalize = () => {
@@ -48,7 +47,7 @@ export async function GET(request, { params }) {
         cleanupSession = () => {};
         cleanupMatch = () => {};
         if (heartbeat) {
-          clearInterval(heartbeat);
+          clearTimeout(heartbeat);
           heartbeat = null;
         }
       };
@@ -84,7 +83,7 @@ export async function GET(request, { params }) {
         }
       };
 
-      const scheduleHeartbeat = (delay) => {
+      const scheduleHeartbeat = (delay = 15000) => {
         if (closed) {
           return;
         }
@@ -165,13 +164,6 @@ export async function GET(request, { params }) {
           }
 
           try {
-            if (!hasChangeStreamUpdates) {
-              await pushSessionPayload();
-              if (closed) {
-                return;
-              }
-            }
-
             if (!send("ping", { ok: true, ts: Date.now() })) {
               return;
             }
@@ -181,7 +173,7 @@ export async function GET(request, { params }) {
             return;
           }
 
-          scheduleHeartbeat(hasChangeStreamUpdates ? 15000 : 1000);
+          scheduleHeartbeat();
         };
 
         await pushSessionPayload();
@@ -195,17 +187,18 @@ export async function GET(request, { params }) {
         try {
           await ensureLiveUpdates();
           if (!closed) {
-            hasChangeStreamUpdates = true;
             cleanupSession = subscribeToSession(id, async () => {
               await pushSessionPayload();
             });
           }
         } catch (error) {
-          console.warn("Session change streams unavailable, using timed fallback.", error);
-          hasChangeStreamUpdates = false;
+          console.error("Session change streams unavailable.", error);
+          send("error", { message: "Live session updates require realtime database events." });
+          stopStream();
+          return;
         }
 
-        scheduleHeartbeat(hasChangeStreamUpdates ? 15000 : 1000);
+        scheduleHeartbeat();
 
         request.signal.addEventListener("abort", () => {
           stopStream();

@@ -209,19 +209,11 @@ export async function GET(request, { params }) {
         }
 
         try {
-          const current = await heartbeatPersistentWalkieParticipant(
-            id,
-            participantId,
-            role,
-            name
-          );
+          const current = await heartbeatPersistentWalkieParticipant(id, participantId, role, name);
           if (closed) {
             return;
           }
-          const version = Number(current.snapshot?.version || 0);
-          const notificationId = current.notification?.id || "";
-          const shouldReplayState = pendingStateReplays > 0;
-          if (shouldReplayState || version !== lastVersion || notificationId !== lastNotificationId) {
+          if (pendingStateReplays > 0) {
             const sentState = send("state", {
               snapshot: current.snapshot,
               ...(current.notification ? { notification: current.notification } : {}),
@@ -229,11 +221,9 @@ export async function GET(request, { params }) {
             if (!sentState) {
               return;
             }
-            if (shouldReplayState) {
-              pendingStateReplays -= 1;
-            }
-            lastVersion = version;
-            lastNotificationId = notificationId;
+            pendingStateReplays -= 1;
+            lastVersion = Number(current.snapshot?.version || 0);
+            lastNotificationId = current.notification?.id || "";
           }
           if (!send("ping", { ok: true, ts: Date.now() })) {
             return;
@@ -246,7 +236,7 @@ export async function GET(request, { params }) {
 
         heartbeat = setTimeout(() => {
           void heartbeatLoop();
-        }, hasChangeStreamUpdates ? 5000 : 400);
+        }, 5000);
       };
 
       try {
@@ -299,14 +289,14 @@ export async function GET(request, { params }) {
                 stopStream();
               });
             });
-        scheduleHeartbeat(3000);
+            scheduleHeartbeat(3000);
           } catch (error) {
-            console.warn("Walkie change streams unavailable, using timed fallback.", error);
-            hasChangeStreamUpdates = false;
+            console.error("Walkie change streams unavailable.", error);
+            stopStream();
           }
         })();
 
-        scheduleHeartbeat(250);
+        scheduleHeartbeat(3000);
 
         request.signal.addEventListener("abort", () => {
           stopStream();
