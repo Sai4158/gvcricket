@@ -2,9 +2,31 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-function getVoiceScore(voice) {
+function getSpeechPlatform() {
+  if (typeof window === "undefined") {
+    return {
+      isIOS: false,
+      isSafari: false,
+      isChrome: false,
+    };
+  }
+
+  const userAgent = window.navigator?.userAgent || "";
+  const vendor = window.navigator?.vendor || "";
+  const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+  const isSafari =
+    /Safari/i.test(userAgent) &&
+    !/Chrome|CriOS|EdgiOS|FxiOS|OPiOS/i.test(userAgent) &&
+    /Apple/i.test(vendor);
+  const isChrome = /Chrome|CriOS/i.test(userAgent);
+
+  return { isIOS, isSafari, isChrome };
+}
+
+function getVoiceScore(voice, platform) {
   const name = voice?.name?.toLowerCase() || "";
   const lang = voice?.lang?.toLowerCase() || "";
+  const { isIOS, isSafari, isChrome } = platform || {};
 
   let score = 0;
 
@@ -19,6 +41,7 @@ function getVoiceScore(voice) {
   if (name.includes("enhanced")) score += 35;
   if (name.includes("neural")) score += 35;
   if (name.includes("online")) score += 25;
+  if (name.includes("compact")) score -= 20;
 
   if (name.includes("samantha")) score += 120;
   if (name.includes("ava")) score += 110;
@@ -36,10 +59,24 @@ function getVoiceScore(voice) {
   if (name.includes("david")) score -= 30;
   if (name.includes("mark")) score -= 15;
 
+  if (isIOS && isSafari) {
+    if (name.includes("samantha")) score += 260;
+    if (name.includes("ava")) score += 220;
+    if (name.includes("allison")) score += 200;
+    if (name.includes("nicky")) score += 185;
+    if (name.includes("fred")) score -= 180;
+    if (name.includes("zarvox")) score -= 180;
+    if (name.includes("bahh")) score -= 180;
+    if (name.includes("bells")) score -= 180;
+    if (name.includes("boing")) score -= 180;
+  }
+
+  if (isChrome && name.includes("google us english")) score += 80;
+
   return score;
 }
 
-function pickAmericanVoice(voices) {
+function pickAmericanVoice(voices, platform) {
   const englishVoices = voices.filter((voice) =>
     voice?.lang?.toLowerCase().startsWith("en")
   );
@@ -48,7 +85,9 @@ function pickAmericanVoice(voices) {
     return null;
   }
 
-  return [...englishVoices].sort((a, b) => getVoiceScore(b) - getVoiceScore(a))[0];
+  return [...englishVoices].sort(
+    (a, b) => getVoiceScore(b, platform) - getVoiceScore(a, platform)
+  )[0];
 }
 
 function normalizeSpeechText(text) {
@@ -59,8 +98,51 @@ function normalizeSpeechText(text) {
     .trim();
 }
 
-function getSpeechProfile(voice, options) {
+function splitSpeechText(text) {
+  const normalized = normalizeSpeechText(text);
+  if (!normalized) {
+    return [];
+  }
+
+  const sentenceChunks = normalized
+    .split(/(?<=[.!?])\s+/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean);
+
+  const finalChunks = [];
+  for (const sentence of sentenceChunks) {
+    if (sentence.length <= 110) {
+      finalChunks.push(sentence);
+      continue;
+    }
+
+    const clauses = sentence
+      .split(/(?<=[,;:])\s+/)
+      .map((chunk) => chunk.trim())
+      .filter(Boolean);
+
+    let currentChunk = "";
+    for (const clause of clauses) {
+      const nextChunk = currentChunk ? `${currentChunk} ${clause}` : clause;
+      if (nextChunk.length > 110 && currentChunk) {
+        finalChunks.push(currentChunk);
+        currentChunk = clause;
+      } else {
+        currentChunk = nextChunk;
+      }
+    }
+
+    if (currentChunk) {
+      finalChunks.push(currentChunk);
+    }
+  }
+
+  return finalChunks;
+}
+
+function getSpeechProfile(voice, options, platform) {
   const voiceName = voice?.name?.toLowerCase() || "";
+  const { isIOS, isSafari, isChrome } = platform || {};
   const isAppleNatural =
     voiceName.includes("samantha") ||
     voiceName.includes("ava") ||
@@ -72,14 +154,21 @@ function getSpeechProfile(voice, options) {
     voiceName.includes("guy");
   const isGoogleNatural = voiceName.includes("google");
   const isLegacyVoice = voiceName.includes("zira") || voiceName.includes("david");
+  const isIOSSafari = isIOS && isSafari;
 
   return {
     rate:
       options.rate ??
-      (isAppleNatural
-        ? 0.86
-        : isGoogleNatural
+      (isIOSSafari
+        ? isAppleNatural
+          ? 0.92
+          : 0.9
+        : isAppleNatural
         ? 0.88
+        : isGoogleNatural
+        ? isChrome
+          ? 0.9
+          : 0.88
         : isMicrosoftNatural
         ? 0.89
         : isLegacyVoice
@@ -87,7 +176,18 @@ function getSpeechProfile(voice, options) {
         : 0.9),
     pitch:
       options.pitch ??
-      (isAppleNatural ? 0.95 : isGoogleNatural ? 0.97 : isLegacyVoice ? 0.92 : 0.96),
+      (isIOSSafari
+        ? isAppleNatural
+          ? 1.0
+          : 0.98
+        : isAppleNatural
+        ? 0.98
+        : isGoogleNatural
+        ? 0.97
+        : isLegacyVoice
+        ? 0.92
+        : 0.96),
+    volume: options.volume ?? (isIOSSafari ? 1 : undefined),
   };
 }
 
@@ -117,6 +217,8 @@ export default function useSpeechAnnouncer(settings) {
   const utteranceRef = useRef(null);
   const stepTimerRef = useRef(null);
   const sequenceTokenRef = useRef(0);
+  const voicesReadyRef = useRef(false);
+  const platformRef = useRef(getSpeechPlatform());
 
   const clearStepTimer = useCallback(() => {
     if (stepTimerRef.current) {
@@ -148,7 +250,8 @@ export default function useSpeechAnnouncer(settings) {
     const assignVoice = () => {
       const voices = window.speechSynthesis.getVoices();
       if (voices.length > 0) {
-        setVoice(pickAmericanVoice(voices));
+        voicesReadyRef.current = true;
+        setVoice(pickAmericanVoice(voices, platformRef.current));
         setStatus((current) => (current === "unsupported" ? current : "ready"));
         return true;
       }
@@ -161,6 +264,7 @@ export default function useSpeechAnnouncer(settings) {
       return false;
     };
 
+    platformRef.current = getSpeechPlatform();
     assignVoice();
     window.speechSynthesis.addEventListener("voiceschanged", assignVoice);
     return () => {
@@ -190,21 +294,38 @@ export default function useSpeechAnnouncer(settings) {
         return true;
       }
 
+      if (!voicesReadyRef.current && !sequence.waitedForVoices) {
+        clearStepTimer();
+        stepTimerRef.current = window.setTimeout(() => {
+          if (token !== sequenceTokenRef.current) {
+            return;
+          }
+          runSequence(
+            {
+              ...sequence,
+              waitedForVoices: true,
+            },
+            token
+          );
+        }, 180);
+        return true;
+      }
+
       try {
         window.speechSynthesis.resume?.();
       } catch {
         // Ignore resume failures and keep going.
       }
 
-      const utterance = new SpeechSynthesisUtterance(normalizeSpeechText(nextItem.text));
-      const profile = getSpeechProfile(voice, nextItem);
+      const utterance = new SpeechSynthesisUtterance(nextItem.text);
+      const profile = getSpeechProfile(voice, nextItem, platformRef.current);
       if (voice && !sequence.useSystemVoice) {
         utterance.voice = voice;
       }
       utterance.lang = voice?.lang || "en-US";
       utterance.rate = profile.rate;
       utterance.pitch = profile.pitch;
-      utterance.volume = settings.volume;
+      utterance.volume = profile.volume ?? settings.volume;
       utteranceRef.current = utterance;
 
       utterance.onstart = () => {
@@ -304,14 +425,28 @@ export default function useSpeechAnnouncer(settings) {
       }
 
       const normalizedItems = items
-        .map((item) =>
-          typeof item === "string"
-            ? { text: item, pauseAfterMs: options.pauseAfterMs ?? 0 }
-            : {
-                ...item,
-                text: item?.text || "",
-              }
-        )
+        .flatMap((item) => {
+          const normalizedItem =
+            typeof item === "string"
+              ? { text: item, pauseAfterMs: options.pauseAfterMs ?? 0 }
+              : {
+                  ...item,
+                  text: item?.text || "",
+                };
+          const chunks = splitSpeechText(normalizedItem.text);
+          if (!chunks.length) {
+            return [];
+          }
+
+          return chunks.map((chunk, index) => ({
+            ...normalizedItem,
+            text: chunk,
+            pauseAfterMs:
+              index === chunks.length - 1
+                ? normalizedItem.pauseAfterMs
+                : Math.max(120, Math.min(220, normalizedItem.pauseAfterMs ?? 160)),
+          }));
+        })
         .filter((item) => item.text);
 
       if (!normalizedItems.length) {

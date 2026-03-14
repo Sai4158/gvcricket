@@ -6,10 +6,12 @@ import {
   FaBullhorn,
   FaCheckCircle,
   FaCoins,
+  FaDatabase,
   FaDrum,
   FaEye,
   FaImage,
   FaListAlt,
+  FaLock,
   FaMusic,
   FaPenSquare,
   FaPlusCircle,
@@ -32,6 +34,21 @@ function getCardMotionProps(index) {
       ease: [0.22, 1, 0.36, 1],
       delay: Math.min(index * 0.04, 0.2),
     },
+  };
+}
+
+function splitCardsForLargeGrid(cards, columns = 5) {
+  const remainder = cards.length % columns;
+  if (remainder <= 0 || remainder === columns) {
+    return {
+      regularCards: cards,
+      tailCards: [],
+    };
+  }
+
+  return {
+    regularCards: cards.slice(0, cards.length - remainder),
+    tailCards: cards.slice(cards.length - remainder),
   };
 }
 
@@ -181,6 +198,20 @@ const coreCards = [
       "Bring in sound effects, mic control, and faster audio tools without slowing down the scoring flow.",
     accent: "rose",
   },
+  {
+    icon: FaLock,
+    title: "Protected Match Access",
+    copy:
+      "Keep umpire, media, and director controls behind server-verified access without slowing down the live flow.",
+    accent: "cyan",
+  },
+  {
+    icon: FaDatabase,
+    title: "Saved Match History",
+    copy:
+      "Store completed sessions, reopen results later, and keep scorecards ready for review and sharing.",
+    accent: "yellow",
+  },
 ];
 
 function getAccentClasses(accent) {
@@ -220,11 +251,41 @@ function getAccentLineClasses(accent) {
 export default function HowItWorksSection() {
   const modernCardClass =
     "liquid-glass-soft group relative overflow-hidden rounded-[28px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_38%),linear-gradient(180deg,rgba(20,20,26,0.82),rgba(9,9,14,0.72))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)]";
+  const updateGrid = splitCardsForLargeGrid(updateCards);
+  const coreGrid = splitCardsForLargeGrid(coreCards);
+
+  const renderCard = (card, index, hoverRotateClass = "") => (
+    <motion.div
+      key={card.title}
+      {...getCardMotionProps(index)}
+      whileHover={{ y: -4 }}
+      className={`${modernCardClass} transform-gpu will-change-transform`}
+    >
+      <div
+        className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentLineClasses(
+          card.accent
+        )} opacity-80`}
+      />
+      <div className="pointer-events-none absolute -right-12 top-2 h-28 w-28 rounded-full bg-white/[0.05] blur-2xl transition duration-500 group-hover:bg-white/[0.08]" />
+      <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_28%)] opacity-80" />
+      <span
+        className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/10 text-2xl !text-white transition-transform duration-300 group-hover:-translate-y-0.5 ${hoverRotateClass} ${getAccentClasses(
+          card.accent
+        )}`}
+      >
+        <card.icon />
+      </span>
+      <h3 className="mt-5 text-xl font-semibold tracking-tight text-white">
+        {card.title}
+      </h3>
+      <p className="mt-2 text-sm leading-7 text-white/72">{card.copy}</p>
+    </motion.div>
+  );
 
   return (
     <AnimatedSection
       id="updates"
-      className="mx-auto w-full max-w-6xl scroll-mt-28 overflow-hidden"
+      className="mx-auto w-full max-w-7xl scroll-mt-28 overflow-hidden 2xl:max-w-[96rem]"
     >
       <div className="space-y-8">
         <div className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.82),rgba(8,8,14,0.72))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10">
@@ -240,35 +301,23 @@ export default function HowItWorksSection() {
             </p>
           </div>
 
-          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {updateCards.map((card, index) => (
-              <motion.div
-                key={card.title}
-                {...getCardMotionProps(index)}
-                whileHover={{ y: -4 }}
-                className={`${modernCardClass} transform-gpu will-change-transform`}
-              >
-                <div
-                  className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentLineClasses(
-                    card.accent
-                  )} opacity-80`}
-                />
-                <div className="pointer-events-none absolute -right-12 top-2 h-28 w-28 rounded-full bg-white/[0.05] blur-2xl transition duration-500 group-hover:bg-white/[0.08]" />
-                <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_28%)] opacity-80" />
-                <span className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/10 text-2xl !text-white transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:-rotate-3 ${getAccentClasses(
-                    card.accent
-                  )}`}
-                >
-                  <card.icon />
-                </span>
-                <h3 className="mt-5 text-xl font-semibold tracking-tight text-white">
-                  {card.title}
-                </h3>
-                <p className="mt-2 text-sm leading-7 text-white/72">
-                  {card.copy}
-                </p>
-              </motion.div>
-            ))}
+          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+            {updateGrid.regularCards.map((card, index) =>
+              renderCard(card, index, "group-hover:-rotate-3")
+            )}
+            {updateGrid.tailCards.length ? (
+              <div className="md:col-span-2 xl:col-span-4 2xl:col-span-5">
+                <div className="grid gap-4 md:grid-cols-2 2xl:mx-auto 2xl:max-w-[41rem]">
+                  {updateGrid.tailCards.map((card, index) =>
+                    renderCard(
+                      card,
+                      updateGrid.regularCards.length + index,
+                      "group-hover:-rotate-3"
+                    )
+                  )}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -282,35 +331,23 @@ export default function HowItWorksSection() {
             </p>
           </div>
 
-          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {coreCards.map((card, index) => (
-              <motion.div
-                key={card.title}
-                {...getCardMotionProps(index)}
-                whileHover={{ y: -4 }}
-                className={`${modernCardClass} transform-gpu will-change-transform`}
-              >
-                <div
-                  className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentLineClasses(
-                    card.accent
-                  )} opacity-80`}
-                />
-                <div className="pointer-events-none absolute -right-12 top-2 h-28 w-28 rounded-full bg-white/[0.05] blur-2xl transition duration-500 group-hover:bg-white/[0.08]" />
-                <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_28%)] opacity-80" />
-                <span className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/10 text-2xl !text-white transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:rotate-3 ${getAccentClasses(
-                    card.accent
-                  )}`}
-                >
-                  <card.icon />
-                </span>
-                <h3 className="mt-5 text-xl font-semibold tracking-tight text-white">
-                  {card.title}
-                </h3>
-                <p className="mt-2 text-sm leading-7 text-white/72">
-                  {card.copy}
-                </p>
-              </motion.div>
-            ))}
+          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+            {coreGrid.regularCards.map((card, index) =>
+              renderCard(card, index, "group-hover:rotate-3")
+            )}
+            {coreGrid.tailCards.length ? (
+              <div className="md:col-span-2 xl:col-span-4 2xl:col-span-5">
+                <div className="grid gap-4 md:grid-cols-2 2xl:mx-auto 2xl:max-w-[41rem]">
+                  {coreGrid.tailCards.map((card, index) =>
+                    renderCard(
+                      card,
+                      coreGrid.regularCards.length + index,
+                      "group-hover:rotate-3"
+                    )
+                  )}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

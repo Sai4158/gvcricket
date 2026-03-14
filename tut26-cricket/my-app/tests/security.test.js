@@ -53,6 +53,7 @@ import {
   getWalkieSnapshot,
   hydrateWalkieEnabled,
   registerWalkieParticipant,
+  registerWalkieParticipantFromToken,
   requestWalkieEnable,
   respondToWalkieRequest,
   setWalkieEnabled,
@@ -1172,4 +1173,25 @@ test("walkie snapshot tracks director presence and spectator requests stay live-
   spectator.cleanup();
   director.cleanup();
   umpire.cleanup();
+});
+
+test("walkie token-backed participant registration can recover on a fresh route instance", () => {
+  const matchId = `walkie-token-${Date.now()}`;
+  hydrateWalkieEnabled(matchId, false);
+
+  const snapshot = registerWalkieParticipantFromToken(matchId, {
+    id: "spectator-token-user",
+    role: "spectator",
+    name: "Spectator",
+  });
+
+  assert.equal(snapshot.spectatorCount, 1);
+
+  const requestResult = requestWalkieEnable(matchId, {
+    participantId: "spectator-token-user",
+    role: "spectator",
+  });
+
+  assert.equal(requestResult.ok, true);
+  assert.equal(requestResult.snapshot.pendingRequests.length, 1);
 });

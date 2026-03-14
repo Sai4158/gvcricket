@@ -316,6 +316,42 @@ export function registerWalkieParticipant(matchId, participant) {
   };
 }
 
+export function registerWalkieParticipantFromToken(matchId, participant) {
+  const nextParticipant = {
+    id: String(participant.id || ""),
+    role: participant.role,
+    name:
+      participant.name ||
+      (participant.role === "umpire"
+        ? "Umpire"
+        : participant.role === "director"
+        ? "Director"
+        : "Spectator"),
+  };
+
+  if (!nextParticipant.id || !nextParticipant.role) {
+    return buildSnapshot(matchId);
+  }
+
+  const matchState = getMatchState(matchId);
+  const existingDisconnectTimer = matchState.disconnectTimers.get(nextParticipant.id);
+  if (existingDisconnectTimer) {
+    clearTimeout(existingDisconnectTimer);
+    matchState.disconnectTimers.delete(nextParticipant.id);
+  }
+
+  matchState.participants.set(nextParticipant.id, {
+    id: nextParticipant.id,
+    role: nextParticipant.role,
+    name: nextParticipant.name,
+    connectedAt:
+      matchState.participants.get(nextParticipant.id)?.connectedAt ||
+      new Date().toISOString(),
+  });
+
+  return buildSnapshot(matchId);
+}
+
 export function hydrateWalkieEnabled(matchId, enabled) {
   const matchState = getMatchState(matchId);
   matchState.enabled = Boolean(enabled);

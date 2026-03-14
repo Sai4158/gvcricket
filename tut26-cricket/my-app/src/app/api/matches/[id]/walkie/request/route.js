@@ -5,6 +5,7 @@ import { walkieRequestSchema } from "../../../../../lib/validators";
 import { hasValidWalkieParticipantToken } from "../../../../../lib/walkie-auth";
 import {
   hasRegisteredWalkieParticipant,
+  registerWalkieParticipantFromToken,
   requestWalkieEnable,
 } from "../../../../../lib/walkie-talkie";
 import Match from "../../../../../../models/Match";
@@ -45,6 +46,13 @@ export async function POST(req, { params }) {
 
   if (!hasValidToken && !hasRegisteredParticipant) {
     return jsonError("Walkie participant token is invalid.", 403);
+  }
+
+  if (hasValidToken && !hasRegisteredParticipant) {
+    registerWalkieParticipantFromToken(id, {
+      id: parsedRequest.value.participantId,
+      role: parsedRequest.value.role,
+    });
   }
 
   const result = requestWalkieEnable(id, parsedRequest.value);
