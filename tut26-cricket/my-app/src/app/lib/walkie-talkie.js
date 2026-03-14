@@ -554,6 +554,12 @@ export function getWalkieSnapshot(matchId) {
   return buildSnapshot(matchId);
 }
 
+export function hasRegisteredWalkieParticipant(matchId, participantId, role) {
+  const matchState = getMatchState(matchId);
+  const participant = matchState.participants.get(String(participantId));
+  return Boolean(participant && participant.role === String(role));
+}
+
 export function dispatchWalkieSignal(matchId, { fromId, toId, payload }) {
   const matchState = getMatchState(matchId);
   const from = matchState.participants.get(String(fromId));

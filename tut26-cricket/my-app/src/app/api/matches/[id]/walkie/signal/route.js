@@ -12,7 +12,10 @@ import {
 import { parseJsonRequest } from "../../../../../lib/request-security";
 import { walkieSignalSchema } from "../../../../../lib/validators";
 import { hasValidWalkieParticipantToken } from "../../../../../lib/walkie-auth";
-import { dispatchWalkieSignal } from "../../../../../lib/walkie-talkie";
+import {
+  dispatchWalkieSignal,
+  hasRegisteredWalkieParticipant,
+} from "../../../../../lib/walkie-talkie";
 import Match from "../../../../../../models/Match";
 
 async function hasMatchAccess(matchId, accessVersion) {
@@ -43,14 +46,19 @@ export async function POST(req, { params }) {
     return jsonError("Match not found.", 404);
   }
 
-  if (
-    !hasValidWalkieParticipantToken(
-      parsedRequest.value.token,
-      id,
-      parsedRequest.value.participantId,
-      parsedRequest.value.role
-    )
-  ) {
+  const hasValidToken = hasValidWalkieParticipantToken(
+    parsedRequest.value.token,
+    id,
+    parsedRequest.value.participantId,
+    parsedRequest.value.role
+  );
+  const hasRegisteredParticipant = hasRegisteredWalkieParticipant(
+    id,
+    parsedRequest.value.participantId,
+    parsedRequest.value.role
+  );
+
+  if (!hasValidToken && !hasRegisteredParticipant) {
     return jsonError("Walkie participant token is invalid.", 403);
   }
 

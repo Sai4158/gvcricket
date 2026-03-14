@@ -3,7 +3,10 @@ import { connectDB } from "../../../../../lib/db";
 import { parseJsonRequest } from "../../../../../lib/request-security";
 import { walkieRequestSchema } from "../../../../../lib/validators";
 import { hasValidWalkieParticipantToken } from "../../../../../lib/walkie-auth";
-import { requestWalkieEnable } from "../../../../../lib/walkie-talkie";
+import {
+  hasRegisteredWalkieParticipant,
+  requestWalkieEnable,
+} from "../../../../../lib/walkie-talkie";
 import Match from "../../../../../../models/Match";
 
 export async function POST(req, { params }) {
@@ -28,14 +31,19 @@ export async function POST(req, { params }) {
     return jsonError("Walkie-talkie is only available during a live match.", 409);
   }
 
-  if (
-    !hasValidWalkieParticipantToken(
-      parsedRequest.value.token,
-      id,
-      parsedRequest.value.participantId,
-      parsedRequest.value.role
-    )
-  ) {
+  const hasValidToken = hasValidWalkieParticipantToken(
+    parsedRequest.value.token,
+    id,
+    parsedRequest.value.participantId,
+    parsedRequest.value.role
+  );
+  const hasRegisteredParticipant = hasRegisteredWalkieParticipant(
+    id,
+    parsedRequest.value.participantId,
+    parsedRequest.value.role
+  );
+
+  if (!hasValidToken && !hasRegisteredParticipant) {
     return jsonError("Walkie participant token is invalid.", 403);
   }
 

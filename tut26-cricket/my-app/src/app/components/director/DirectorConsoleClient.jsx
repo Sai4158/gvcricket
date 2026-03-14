@@ -827,6 +827,7 @@ export default function DirectorConsoleClient({
       }
 
       clearDirectorReauthRequired();
+      setConsoleError("");
       setAuthorized(true);
       setPin("");
       const nextSessions = sessions.length ? sessions : readCachedDirectorSessions();
@@ -846,6 +847,12 @@ export default function DirectorConsoleClient({
       setIsSubmittingPin(false);
     }
   };
+
+  useEffect(() => {
+    if (authorized) {
+      setConsoleError("");
+    }
+  }, [authorized]);
 
   const logout = async () => {
     markDirectorReauthRequired();
@@ -916,15 +923,20 @@ export default function DirectorConsoleClient({
       }
     };
     const handlePlay = () => {
+      setConsoleError("");
       setLibraryState("playing");
     };
     const handleWaiting = () => {
       setLibraryState("loading");
     };
     const handleCanPlay = () => {
+      setConsoleError("");
       setLibraryState((current) => (current === "loading" ? "paused" : current));
     };
     const handleError = () => {
+      if (!audio.src) {
+        return;
+      }
       setConsoleError("This audio file could not be played in this browser.");
       setLibraryLiveId("");
       setLibraryState("idle");
@@ -994,9 +1006,12 @@ export default function DirectorConsoleClient({
       return;
     }
 
+    setConsoleError("");
     audio.pause();
     audio.currentTime = 0;
     audio.src = "";
+    audio.removeAttribute("src");
+    audio.load();
     setLibraryLiveId("");
     setLibraryState("idle");
     setLibraryCurrentTime(0);
@@ -1014,6 +1029,7 @@ export default function DirectorConsoleClient({
     }
 
     stopAllEffects();
+    setConsoleError("");
     setLibraryLiveId(file.id);
     setLibraryState("loading");
     setLibraryCurrentTime(0);
@@ -1026,7 +1042,15 @@ export default function DirectorConsoleClient({
 
     try {
       await audio.play();
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof DOMException &&
+        (error.name === "AbortError" || error.name === "NotAllowedError")
+      ) {
+        setLibraryState("idle");
+        setLibraryLiveId("");
+        return;
+      }
       setConsoleError("This audio file could not be played in this browser.");
       setLibraryState("idle");
       setLibraryLiveId("");

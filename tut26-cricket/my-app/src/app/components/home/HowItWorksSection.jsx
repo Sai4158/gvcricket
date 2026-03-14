@@ -24,9 +24,9 @@ import AnimatedSection from "./AnimatedSection";
 function getCardMotionProps(index) {
   const fromLeft = index % 2 === 0;
   return {
-    initial: { opacity: 0, x: fromLeft ? -46 : 46, y: 18, scale: 0.982 },
-    whileInView: { opacity: 1, x: 0, y: 0, scale: 1 },
-    viewport: { once: true, amount: 0.05, margin: "0px 0px -16% 0px" },
+    initial: { opacity: 0, x: fromLeft ? -28 : 28, y: 12 },
+    whileInView: { opacity: 1, x: 0, y: 0 },
+    viewport: { once: true, amount: 0.12, margin: "0px 0px -8% 0px" },
     transition: {
       duration: 0.5,
       ease: [0.22, 1, 0.36, 1],
@@ -245,8 +245,8 @@ export default function HowItWorksSection() {
               <motion.div
                 key={card.title}
                 {...getCardMotionProps(index)}
-                whileHover={{ y: -4, scale: 1.01 }}
-                className={modernCardClass}
+                whileHover={{ y: -4 }}
+                className={`${modernCardClass} transform-gpu will-change-transform`}
               >
                 <div
                   className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentLineClasses(
@@ -255,37 +255,18 @@ export default function HowItWorksSection() {
                 />
                 <div className="pointer-events-none absolute -right-12 top-2 h-28 w-28 rounded-full bg-white/[0.05] blur-2xl transition duration-500 group-hover:bg-white/[0.08]" />
                 <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_28%)] opacity-80" />
-                <motion.span
-                  initial={{ opacity: 0, scale: 0.88, y: 10 }}
-                  whileInView={{ opacity: 1, scale: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.2 }}
-                  transition={{ duration: 0.38, ease: "easeOut", delay: 0.08 }}
-                  whileHover={{ y: -3, scale: 1.05, rotate: -4 }}
-                  whileTap={{ scale: 0.98 }}
-                  className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/10 text-2xl !text-white ${getAccentClasses(
+                <span className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/10 text-2xl !text-white transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:-rotate-3 ${getAccentClasses(
                     card.accent
                   )}`}
                 >
                   <card.icon />
-                </motion.span>
-                <motion.h3
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.2 }}
-                  transition={{ duration: 0.34, ease: "easeOut", delay: 0.12 }}
-                  className="mt-5 text-xl font-semibold tracking-tight text-white"
-                >
+                </span>
+                <h3 className="mt-5 text-xl font-semibold tracking-tight text-white">
                   {card.title}
-                </motion.h3>
-                <motion.p
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.2 }}
-                  transition={{ duration: 0.34, ease: "easeOut", delay: 0.16 }}
-                  className="mt-2 text-sm leading-7 text-white/72"
-                >
+                </h3>
+                <p className="mt-2 text-sm leading-7 text-white/72">
                   {card.copy}
-                </motion.p>
+                </p>
               </motion.div>
             ))}
           </div>
@@ -306,8 +287,8 @@ export default function HowItWorksSection() {
               <motion.div
                 key={card.title}
                 {...getCardMotionProps(index)}
-                whileHover={{ y: -4, scale: 1.01 }}
-                className={modernCardClass}
+                whileHover={{ y: -4 }}
+                className={`${modernCardClass} transform-gpu will-change-transform`}
               >
                 <div
                   className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentLineClasses(
@@ -316,37 +297,18 @@ export default function HowItWorksSection() {
                 />
                 <div className="pointer-events-none absolute -right-12 top-2 h-28 w-28 rounded-full bg-white/[0.05] blur-2xl transition duration-500 group-hover:bg-white/[0.08]" />
                 <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_28%)] opacity-80" />
-                <motion.span
-                  initial={{ opacity: 0, scale: 0.88, y: 10 }}
-                  whileInView={{ opacity: 1, scale: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.2 }}
-                  transition={{ duration: 0.38, ease: "easeOut", delay: 0.08 }}
-                  whileHover={{ y: -3, scale: 1.05, rotate: 4 }}
-                  whileTap={{ scale: 0.98 }}
-                  className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/10 text-2xl !text-white ${getAccentClasses(
+                <span className={`liquid-icon inline-flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/10 text-2xl !text-white transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:rotate-3 ${getAccentClasses(
                     card.accent
                   )}`}
                 >
                   <card.icon />
-                </motion.span>
-                <motion.h3
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.2 }}
-                  transition={{ duration: 0.34, ease: "easeOut", delay: 0.12 }}
-                  className="mt-5 text-xl font-semibold tracking-tight text-white"
-                >
+                </span>
+                <h3 className="mt-5 text-xl font-semibold tracking-tight text-white">
                   {card.title}
-                </motion.h3>
-                <motion.p
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.2 }}
-                  transition={{ duration: 0.34, ease: "easeOut", delay: 0.16 }}
-                  className="mt-2 text-sm leading-7 text-white/72"
-                >
+                </h3>
+                <p className="mt-2 text-sm leading-7 text-white/72">
                   {card.copy}
-                </motion.p>
+                </p>
               </motion.div>
             ))}
           </div>

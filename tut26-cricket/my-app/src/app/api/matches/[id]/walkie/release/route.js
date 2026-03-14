@@ -2,7 +2,10 @@ import { jsonError } from "../../../../../lib/api-response";
 import { parseJsonRequest } from "../../../../../lib/request-security";
 import { walkieReleaseSchema } from "../../../../../lib/validators";
 import { hasValidWalkieParticipantToken } from "../../../../../lib/walkie-auth";
-import { releaseWalkieSpeaker } from "../../../../../lib/walkie-talkie";
+import {
+  hasRegisteredWalkieParticipant,
+  releaseWalkieSpeaker,
+} from "../../../../../lib/walkie-talkie";
 
 export async function POST(req, { params }) {
   const { id } = await params;
@@ -14,14 +17,19 @@ export async function POST(req, { params }) {
     return jsonError(parsedRequest.message, parsedRequest.status);
   }
 
-  if (
-    !hasValidWalkieParticipantToken(
-      parsedRequest.value.token,
-      id,
-      parsedRequest.value.participantId,
-      parsedRequest.value.role
-    )
-  ) {
+  const hasValidToken = hasValidWalkieParticipantToken(
+    parsedRequest.value.token,
+    id,
+    parsedRequest.value.participantId,
+    parsedRequest.value.role
+  );
+  const hasRegisteredParticipant = hasRegisteredWalkieParticipant(
+    id,
+    parsedRequest.value.participantId,
+    parsedRequest.value.role
+  );
+
+  if (!hasValidToken && !hasRegisteredParticipant) {
     return jsonError("Walkie participant token is invalid.", 403);
   }
 

@@ -215,7 +215,7 @@ export default function SessionsPageClient({ initialSessions }) {
 
   if (!sessions.length) {
     return (
-      <main className="min-h-screen bg-[linear-gradient(155deg,theme(colors.red.900)_0%,theme(colors.black)_40%)] px-5 py-8 text-zinc-100">
+      <main className="min-h-screen bg-[linear-gradient(315deg,#003153_0%,#1B1B1B_74%)] px-5 py-8 text-zinc-100">
         <div className="mx-auto flex min-h-[80vh] max-w-4xl items-center justify-center">
           <EmptyState
             title="No sessions yet"
@@ -229,7 +229,7 @@ export default function SessionsPageClient({ initialSessions }) {
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(155deg,theme(colors.red.900)_0%,theme(colors.black)_40%)] px-4 pb-10 pt-6 text-zinc-100 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[linear-gradient(315deg,#003153_0%,#1B1B1B_74%)] px-4 pb-10 pt-6 text-zinc-100 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex items-center justify-between gap-3">
           <Link

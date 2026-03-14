@@ -50,22 +50,13 @@ export default function HeroSection({ liveMatch = null }) {
         className="sticky top-0 flex h-screen flex-col items-center justify-center text-center"
       >
         <LiveNowBanner liveMatch={liveMatch} />
-        <Image
-          src="/Thumb1.png"
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="absolute inset-0 z-0 object-cover"
-        />
         <video
-          className="absolute inset-0 z-0 h-full w-full object-cover"
+          className="absolute inset-0 z-0 h-full w-full object-cover bg-black"
           autoPlay
           loop
           muted
           playsInline
           preload="auto"
-          poster="/Thumb1.png"
         >
           <source src="/videos/Cricket1.mp4" type="video/mp4" />
           Your browser does not support the video tag.
