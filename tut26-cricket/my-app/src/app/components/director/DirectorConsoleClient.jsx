@@ -1269,7 +1269,7 @@ export default function DirectorConsoleClient({
   const canManageSession = Boolean(authorized && managedSession?.match?._id);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 lg:max-w-[1500px] lg:px-6 2xl:max-w-[1760px]">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
@@ -1467,7 +1467,7 @@ export default function DirectorConsoleClient({
         </div>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.78fr)] 2xl:grid-cols-[minmax(0,1.48fr)_minmax(380px,0.72fr)]">
         <div className="space-y-5">
           <Card
             title="PA Mic"
@@ -1652,7 +1652,7 @@ export default function DirectorConsoleClient({
             <audio ref={effectsAudioRef} hidden preload="none" />
             <div className="rounded-[28px] border border-white/10 bg-black/15 p-2">
               {orderedLibraryFiles.length ? (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
                   {orderedLibraryFiles.map((file) => (
                     <div
                       key={file.id}

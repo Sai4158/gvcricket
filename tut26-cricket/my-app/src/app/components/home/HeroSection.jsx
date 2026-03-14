@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import Image from "next/image";
 import { motion, useScroll, useSpring, useTransform } from "framer-motion";
 import { FaAngleDown } from "react-icons/fa";
@@ -8,7 +8,6 @@ import LiveNowBanner from "./LiveNowBanner";
 
 export default function HeroSection({ liveMatch = null }) {
   const sectionRef = useRef(null);
-  const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start start", "end start"],
@@ -42,34 +41,6 @@ export default function HeroSection({ liveMatch = null }) {
     }
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    let timeoutId;
-    let idleId;
-
-    const enableVideo = () => {
-      if (!cancelled) {
-        setShouldLoadVideo(true);
-      }
-    };
-
-    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      idleId = window.requestIdleCallback(enableVideo, { timeout: 350 });
-    } else {
-      timeoutId = window.setTimeout(enableVideo, 160);
-    }
-
-    return () => {
-      cancelled = true;
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
-      }
-      if (idleId && typeof window !== "undefined" && "cancelIdleCallback" in window) {
-        window.cancelIdleCallback(idleId);
-      }
-    };
-  }, []);
-
   return (
     <section ref={sectionRef} className="relative h-screen overflow-hidden">
       <motion.div
@@ -87,20 +58,18 @@ export default function HeroSection({ liveMatch = null }) {
           sizes="100vw"
           className="absolute inset-0 z-0 object-cover"
         />
-        {shouldLoadVideo ? (
-          <video
-            className="absolute inset-0 z-0 h-full w-full object-cover"
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="metadata"
-            poster="/Thumb1.png"
-          >
-            <source src="/videos/Cricket1.mp4" type="video/mp4" />
-            Your browser does not support the video tag.
-          </video>
-        ) : null}
+        <video
+          className="absolute inset-0 z-0 h-full w-full object-cover"
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          poster="/Thumb1.png"
+        >
+          <source src="/videos/Cricket1.mp4" type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
         <div className="absolute inset-0 z-10 bg-[linear-gradient(180deg,rgba(0,0,0,0.42)_0%,rgba(0,0,0,0.56)_48%,rgba(0,0,0,0.72)_100%)]" />
         <div className="relative z-20 flex flex-col items-center px-4 pt-28 md:pt-20">
           <motion.div

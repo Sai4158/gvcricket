@@ -23,6 +23,13 @@ const nextConfig = {
         pathname: "/api/matches/**",
       },
     ],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "i.ibb.co",
+        pathname: "/**",
+      },
+    ],
   },
   serverExternalPackages: ["@tensorflow/tfjs", "nsfwjs", "sharp"],
   turbopack: {

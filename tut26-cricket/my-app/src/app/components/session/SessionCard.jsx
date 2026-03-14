@@ -77,35 +77,33 @@ function SessionCard({ session, onUmpireClick }) {
 
       <div className="relative flex h-full flex-col">
         <div className="flex flex-col gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0 flex-1">
-                <h2 className="text-[1.3rem] leading-[1.08] font-medium tracking-[-0.04em] text-white break-words sm:text-[1.5rem] md:text-[1.65rem]">
-                  {session.name || "Untitled Session"}
-                </h2>
-                <p className="mt-2 text-[13px] font-medium tracking-[0.01em] text-zinc-400">
-                  {dateLabel}
-                </p>
-                {teamLine ? (
-                  <p className="mt-2 text-[0.98rem] leading-snug font-medium tracking-[-0.02em] text-zinc-100 break-words sm:text-[1.02rem]">
-                    {teamLine}
-                  </p>
-                ) : null}
-              </div>
+          <div className="relative min-w-0 pt-12">
+            <span
+              className={`absolute right-0 top-0 inline-flex w-fit max-w-full items-center gap-2 self-start rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] ${
+                statusMeta.tone === "live"
+                  ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
+                  : "border-rose-400/15 bg-rose-500/10 text-rose-200"
+              }`}
+            >
               <span
-                className={`inline-flex w-fit shrink-0 items-center gap-2 self-start rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] sm:ml-4 ${
-                  statusMeta.tone === "live"
-                    ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
-                    : "border-rose-400/15 bg-rose-500/10 text-rose-200"
+                className={`h-2.5 w-2.5 rounded-full ${
+                  isLive ? "animate-pulse bg-emerald-400" : "bg-rose-400"
                 }`}
-              >
-                <span
-                  className={`h-2.5 w-2.5 rounded-full ${
-                    isLive ? "animate-pulse bg-emerald-400" : "bg-rose-400"
-                  }`}
-                />
-                {statusMeta.badge}
-              </span>
+              />
+              {statusMeta.badge}
+            </span>
+            <div className="min-w-0 pr-0 sm:pr-2">
+              <h2 className="text-[1.25rem] leading-[1.08] font-medium tracking-[-0.035em] text-white [overflow-wrap:break-word] sm:text-[1.45rem] md:text-[1.58rem]">
+                {session.name || "Untitled Session"}
+              </h2>
+              <p className="mt-3 text-[13px] font-medium tracking-[0.01em] text-zinc-400">
+                {dateLabel}
+              </p>
+              {teamLine ? (
+                <p className="mt-2 text-[0.98rem] leading-snug font-medium tracking-[-0.015em] text-zinc-100 [overflow-wrap:break-word] sm:text-[1.02rem]">
+                  {teamLine}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>

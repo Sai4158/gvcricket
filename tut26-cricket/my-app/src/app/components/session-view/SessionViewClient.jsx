@@ -741,29 +741,33 @@ export default function SessionViewClient({ sessionId, initialData }) {
             className={`${launcherCardClass} mb-4 px-4 py-3`}
             aria-label="Open walkie-talkie"
           >
-            <div className="flex w-full items-start gap-3">
-              <span className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg shadow-[0_12px_26px_rgba(16,185,129,0.16)] ${
-                walkieCardTalking
-                  ? "bg-emerald-500 text-black"
-                  : "bg-emerald-500/14 text-emerald-300"
-              }`}>
-                {walkieCardTalking ? <FaMicrophone /> : <DualWalkieIcon />}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-base font-semibold text-white">
-                  Walkie-Talkie
+            <div className="flex w-full flex-col gap-4">
+              <div className="flex items-start gap-3">
+                <span className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg shadow-[0_12px_26px_rgba(16,185,129,0.16)] ${
+                  walkieCardTalking
+                    ? "bg-emerald-500 text-black"
+                    : "bg-emerald-500/14 text-emerald-300"
+                }`}>
+                  {walkieCardTalking ? <FaMicrophone /> : <DualWalkieIcon />}
                 </span>
-                <span className="mt-1 block text-sm leading-5 text-zinc-400">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-base font-semibold text-white">
+                    Walkie-Talkie
+                  </span>
+                  <span className="mt-1 block text-sm leading-5 text-zinc-400">
                     {walkieCardDescription}
                   </span>
                 </span>
-              <div className="flex shrink-0 flex-col items-end gap-2 pt-0.5">
-                <IosGlassSwitch
-                  checked={walkieSwitchOn}
-                  onChange={handleWalkieSwitchChange}
-                  label="Toggle walkie-talkie panel"
-                />
-                {walkie.snapshot?.enabled ? (
+                <div className="shrink-0 pt-0.5">
+                  <IosGlassSwitch
+                    checked={walkieSwitchOn}
+                    onChange={handleWalkieSwitchChange}
+                    label="Toggle walkie-talkie panel"
+                  />
+                </div>
+              </div>
+              {walkie.snapshot?.enabled ? (
+                <div className="flex flex-col items-center justify-center pt-1 pb-1">
                   <button
                     type="button"
                     aria-label="Hold walkie-talkie mic"
@@ -784,18 +788,29 @@ export default function SessionViewClient({ sessionId, initialData }) {
                       event.stopPropagation();
                       void handleWalkieLauncherPressEnd();
                     }}
-                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition ${
+                    className={`inline-flex h-20 w-20 items-center justify-center rounded-full border transition ${
                       walkieCardTalking
-                        ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_24px_rgba(16,185,129,0.35)]"
+                        ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_28px_rgba(16,185,129,0.38)]"
                         : walkieCardFinishing
                         ? "border-amber-300/40 bg-amber-500/12 text-amber-100 shadow-[0_0_22px_rgba(245,158,11,0.18)]"
                         : "border-white/12 bg-white/[0.05] text-white"
                     }`}
                   >
-                    {walkieCardTalking ? <FaMicrophone /> : <FaMicrophoneSlash />}
+                    {walkieCardTalking ? (
+                      <FaMicrophone className="text-2xl" />
+                    ) : (
+                      <FaMicrophoneSlash className="text-2xl" />
+                    )}
                   </button>
-                ) : null}
-              </div>
+                  <span className="mt-3 text-xs font-medium tracking-[0.18em] text-zinc-400 uppercase">
+                    {walkieCardTalking
+                      ? "Release to stop"
+                      : walkieCardFinishing
+                        ? "Finishing..."
+                        : "Hold to talk"}
+                  </span>
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}
