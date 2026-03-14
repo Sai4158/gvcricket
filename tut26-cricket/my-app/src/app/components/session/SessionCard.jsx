@@ -79,7 +79,7 @@ function SessionCard({ session, onUmpireClick }) {
         <div className="flex flex-col gap-3">
           <div className="relative min-w-0 pt-12">
             <span
-              className={`absolute right-0 top-0 inline-flex w-fit max-w-full items-center gap-2 self-start rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] ${
+              className={`absolute right-0 top-0 inline-flex w-fit max-w-full whitespace-nowrap items-center gap-2 self-start rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
                 statusMeta.tone === "live"
                   ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
                   : "border-rose-400/15 bg-rose-500/10 text-rose-200"
@@ -123,7 +123,7 @@ function SessionCard({ session, onUmpireClick }) {
             <>
               <button
                 onClick={() => onUmpireClick(session)}
-                className="btn-ui btn-ui-neutral inline-flex flex-1 min-w-[150px] rounded-2xl px-4 py-3 text-sm"
+                className="inline-flex min-w-[150px] flex-1 items-center justify-center gap-2 rounded-2xl border border-sky-400/20 bg-[linear-gradient(180deg,rgba(37,99,235,0.2),rgba(15,23,42,0.9))] px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_16px_38px_rgba(37,99,235,0.16)] transition hover:-translate-y-0.5 hover:border-sky-300/35 hover:bg-[linear-gradient(180deg,rgba(59,130,246,0.24),rgba(15,23,42,0.94))]"
               >
                 <FaLock />
                 <span>Umpire Mode</span>
@@ -141,7 +141,7 @@ function SessionCard({ session, onUmpireClick }) {
             <Link
               href={scoreHref}
               prefetch={false}
-              className="btn-ui btn-ui-secondary inline-flex w-full rounded-2xl px-4 py-3 text-sm"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-400/18 bg-[linear-gradient(180deg,rgba(16,185,129,0.18),rgba(7,30,22,0.92))] px-4 py-3 text-sm font-semibold text-emerald-50 shadow-[0_16px_34px_rgba(16,185,129,0.14)] transition hover:-translate-y-0.5 hover:border-emerald-300/28 hover:bg-[linear-gradient(180deg,rgba(34,197,94,0.22),rgba(7,30,22,0.95))]"
             >
               <FaArrowUpRightFromSquare />
               <span>See Final Score</span>

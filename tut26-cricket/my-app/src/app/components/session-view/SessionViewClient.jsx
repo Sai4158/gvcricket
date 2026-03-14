@@ -752,7 +752,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         </button>
       </div>
 
-      <MatchHeroBackdrop match={match} className="w-full max-w-4xl my-8">
+      <MatchHeroBackdrop match={match} className="w-full max-w-4xl mt-5 mb-4">
         <div className="px-5 py-7 sm:px-7">
           <header className="w-full text-center">
             <div>
@@ -770,10 +770,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
             </div>
           </header>
 
-          <div className="mt-8 flex justify-center">
+          <div className="mt-7 flex justify-center">
             <LiveScoreCard match={match} />
           </div>
-          <div className="mt-5 flex justify-center">
+          <div className="mt-3 flex justify-center">
             <div className="w-full max-w-xl">
               <BallTracker history={trackerHistory} />
             </div>
@@ -781,7 +781,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         </div>
       </MatchHeroBackdrop>
 
-      <div className="w-full max-w-4xl mt-4">
+      <div className="w-full max-w-4xl mt-1">
         <WalkieNotice
           notice={localWalkieNotice || walkie.notice}
           onDismiss={() => {
@@ -791,7 +791,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         />
       </div>
 
-      <div className="w-full max-w-4xl mt-4">
+      <div className="w-full max-w-4xl mt-2">
         {showWalkieLauncher ? (
           <div className={`${launcherCardClass} mb-4 px-4 py-3`}>
             <div className="flex w-full flex-col gap-4">

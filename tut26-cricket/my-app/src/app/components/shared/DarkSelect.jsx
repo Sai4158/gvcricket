@@ -141,7 +141,7 @@ export default function DarkSelect({
         }`}
       >
         {iconOnly ? (
-          <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/8 bg-white/[0.05] text-zinc-200">
+          <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-sky-400/20 bg-[linear-gradient(180deg,rgba(37,99,235,0.18),rgba(17,24,39,0.92))] text-sky-100 shadow-[0_10px_26px_rgba(37,99,235,0.14)]">
             {LeadingIcon ? <LeadingIcon className="text-[13px]" /> : null}
           </span>
         ) : (
