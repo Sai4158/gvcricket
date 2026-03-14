@@ -338,9 +338,14 @@ function scoreBall(match, action) {
   if (isTargetChased(nextMatch)) {
     nextMatch.isOngoing = false;
     nextMatch.result = buildWinByWicketsText(nextMatch, nextMatch.outs);
+    markLiveEvent(nextMatch, createMatchEndLiveEvent(nextMatch, nextMatch.result));
+  } else if (nextMatch.innings === "second" && isCurrentInningsComplete(nextMatch)) {
+    nextMatch.isOngoing = false;
+    nextMatch.result = buildMatchResult(nextMatch);
+    markLiveEvent(nextMatch, createMatchEndLiveEvent(nextMatch, nextMatch.result));
+  } else {
+    markLiveEvent(nextMatch, createScoreLiveEvent(match, nextMatch, ball));
   }
-
-  markLiveEvent(nextMatch, createScoreLiveEvent(match, nextMatch, ball));
   appendActionHistory(nextMatch, action, snapshot);
   appendProcessedActionId(nextMatch, action.actionId);
 

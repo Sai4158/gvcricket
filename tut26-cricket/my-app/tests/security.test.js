@@ -407,6 +407,106 @@ test("the last remaining batter can continue until the final wicket falls", () =
   );
 });
 
+test("second innings ends immediately when the final wicket falls short of the target", () => {
+  let match = applyMatchAction(
+    {
+      ...buildBaseMatch(),
+      overs: 1,
+    },
+    {
+      actionId: "toss:second-all-out",
+      type: "set_toss",
+      tossWinner: "Falcons",
+      tossDecision: "bat",
+    }
+  );
+
+  for (let index = 0; index < 6; index += 1) {
+    match = applyMatchAction(match, {
+      actionId: `score:first-complete-${index}`,
+      type: "score_ball",
+      runs: index < 2 ? 1 : 0,
+      isOut: false,
+      extraType: null,
+    });
+  }
+
+  match = applyMatchAction(match, {
+    actionId: "advance:all-out-second",
+    type: "complete_innings",
+  });
+
+  match = applyMatchAction(match, {
+    actionId: "score:second-out-1",
+    type: "score_ball",
+    runs: 0,
+    isOut: true,
+    extraType: null,
+  });
+  match = applyMatchAction(match, {
+    actionId: "score:second-out-2",
+    type: "score_ball",
+    runs: 0,
+    isOut: true,
+    extraType: null,
+  });
+  match = applyMatchAction(match, {
+    actionId: "score:second-out-3",
+    type: "score_ball",
+    runs: 0,
+    isOut: true,
+    extraType: null,
+  });
+
+  assert.equal(match.isOngoing, false);
+  assert.equal(match.result, "Falcons won by 2 runs.");
+  assert.equal(match.lastLiveEvent?.type, "match_end");
+});
+
+test("second innings ends immediately when the final legal ball completes the chase attempt", () => {
+  let match = applyMatchAction(
+    {
+      ...buildBaseMatch(),
+      overs: 1,
+    },
+    {
+      actionId: "toss:second-over-end",
+      type: "set_toss",
+      tossWinner: "Falcons",
+      tossDecision: "bat",
+    }
+  );
+
+  for (let index = 0; index < 6; index += 1) {
+    match = applyMatchAction(match, {
+      actionId: `score:first-over-${index}`,
+      type: "score_ball",
+      runs: 1,
+      isOut: false,
+      extraType: null,
+    });
+  }
+
+  match = applyMatchAction(match, {
+    actionId: "advance:second-over-end",
+    type: "complete_innings",
+  });
+
+  for (let index = 0; index < 6; index += 1) {
+    match = applyMatchAction(match, {
+      actionId: `score:second-over-${index}`,
+      type: "score_ball",
+      runs: index === 5 ? 0 : 1,
+      isOut: false,
+      extraType: null,
+    });
+  }
+
+  assert.equal(match.isOngoing, false);
+  assert.equal(match.result, "Falcons won by 1 run.");
+  assert.equal(match.lastLiveEvent?.type, "match_end");
+});
+
 test("legacy toss state can be recovered from linked session fallback data", () => {
   const legacyMatch = {
     ...buildBaseMatch(),

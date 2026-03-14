@@ -17,14 +17,14 @@ export default function LiveNowBanner({ liveMatch }) {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.12),transparent_40%)]" />
         <div className="relative z-10 flex min-w-0 items-center gap-3">
           <div className="liquid-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl">
-            <div className="relative h-10 w-10 overflow-hidden rounded-xl border border-white/14 shadow-[0_6px_18px_rgba(0,0,0,0.18)]">
+            <div className="relative h-10 w-10 overflow-hidden rounded-xl border border-white/14 bg-black/20 shadow-[0_6px_18px_rgba(0,0,0,0.18)]">
               <SafeMatchImage
                 src={liveMatch.matchImageUrl || ""}
                 alt={`${liveMatch.teamAName} vs ${liveMatch.teamBName}`}
                 fill
                 sizes="40px"
                 className="object-cover"
-                fallbackClassName="object-contain p-1.5 opacity-[0.95]"
+                fallbackClassName="object-contain p-0.5 opacity-100 scale-[1.06]"
               />
             </div>
           </div>
@@ -36,7 +36,7 @@ export default function LiveNowBanner({ liveMatch }) {
               {liveMatch.teamAName} vs {liveMatch.teamBName}
             </div>
             <div className="text-xs text-white/74">
-              {liveMatch.score}/{liveMatch.outs} · View score now
+              {liveMatch.score}/{liveMatch.outs} - View score now
             </div>
           </div>
         </div>
