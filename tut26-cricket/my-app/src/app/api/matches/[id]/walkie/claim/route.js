@@ -14,10 +14,9 @@ import { parseJsonRequest } from "../../../../../lib/request-security";
 import { walkieClaimSchema } from "../../../../../lib/validators";
 import { hasValidWalkieParticipantToken } from "../../../../../lib/walkie-auth";
 import {
-  claimWalkieSpeaker,
-  hasRegisteredWalkieParticipant,
-  registerWalkieParticipantFromToken,
-} from "../../../../../lib/walkie-talkie";
+  claimPersistentWalkieSpeaker,
+  registerPersistentWalkieParticipant,
+} from "../../../../../lib/walkie-store";
 import Match from "../../../../../../models/Match";
 
 async function hasMatchAccess(matchId, accessVersion) {
@@ -60,22 +59,14 @@ export async function POST(req, { params }) {
     parsedRequest.value.participantId,
     parsedRequest.value.role
   );
-  const hasRegisteredParticipant = hasRegisteredWalkieParticipant(
-    id,
-    parsedRequest.value.participantId,
-    parsedRequest.value.role
-  );
-
-  if (!hasValidToken && !hasRegisteredParticipant) {
+  if (!hasValidToken) {
     return jsonError("Walkie participant token is invalid.", 403);
   }
 
-  if (hasValidToken && !hasRegisteredParticipant) {
-    registerWalkieParticipantFromToken(id, {
-      id: parsedRequest.value.participantId,
-      role: parsedRequest.value.role,
-    });
-  }
+  await registerPersistentWalkieParticipant(id, {
+    id: parsedRequest.value.participantId,
+    role: parsedRequest.value.role,
+  });
 
   if (parsedRequest.value.role === "umpire") {
     const hasAccess = await hasMatchAccess(id, Number(match.adminAccessVersion || 1));
@@ -91,7 +82,7 @@ export async function POST(req, { params }) {
     }
   }
 
-  const result = claimWalkieSpeaker(id, parsedRequest.value);
+  const result = await claimPersistentWalkieSpeaker(id, parsedRequest.value);
   if (!result.ok) {
     return jsonError(result.message, result.status);
   }

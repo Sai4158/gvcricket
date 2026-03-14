@@ -2,7 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SmoothScroll from "./components/SmoothScroll";
 import { Analytics } from "@vercel/analytics/next";
-import { absoluteUrl, siteConfig } from "./lib/site-metadata";
+import { absoluteUrl, getSiteUrl, siteConfig } from "./lib/site-metadata";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  metadataBase: new URL(siteConfig.url),
+  metadataBase: new URL(getSiteUrl()),
   applicationName: siteConfig.name,
   title: {
     default: siteConfig.defaultTitle,
@@ -79,7 +79,7 @@ const jsonLd = [
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: siteConfig.name,
-    url: siteConfig.url,
+    url: getSiteUrl(),
     description: siteConfig.description,
   },
   {
@@ -95,7 +95,7 @@ const jsonLd = [
       priceCurrency: "USD",
     },
     description: siteConfig.description,
-    url: siteConfig.url,
+    url: getSiteUrl(),
     image: absoluteUrl(siteConfig.ogImagePath),
     featureList: [
       "Free cricket scoring",

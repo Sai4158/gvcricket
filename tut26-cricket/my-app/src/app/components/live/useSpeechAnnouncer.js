@@ -2,6 +2,22 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+const IOS_PREFERRED_VOICE_NAMES = ["samantha", "ava", "allison", "nicky"];
+const CHROME_PREFERRED_VOICE_NAMES = [
+  "google us english",
+  "google english",
+  "google uk english female",
+];
+const DESKTOP_PREFERRED_VOICE_NAMES = [
+  "microsoft aria",
+  "microsoft jenny",
+  "microsoft guy",
+  "samantha",
+  "ava",
+  "allison",
+  "nicky",
+];
+
 function getSpeechPlatform() {
   if (typeof window === "undefined") {
     return {
@@ -13,7 +29,9 @@ function getSpeechPlatform() {
 
   const userAgent = window.navigator?.userAgent || "";
   const vendor = window.navigator?.vendor || "";
-  const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+  const isIOS =
+    /iPad|iPhone|iPod/.test(userAgent) ||
+    (window.navigator?.platform === "MacIntel" && window.navigator?.maxTouchPoints > 1);
   const isSafari =
     /Safari/i.test(userAgent) &&
     !/Chrome|CriOS|EdgiOS|FxiOS|OPiOS/i.test(userAgent) &&
@@ -76,6 +94,19 @@ function getVoiceScore(voice, platform) {
   return score;
 }
 
+function pickPreferredVoiceByName(voices, preferredNames) {
+  for (const preferredName of preferredNames) {
+    const found = voices.find((voice) =>
+      (voice?.name?.toLowerCase() || "").includes(preferredName)
+    );
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
+}
+
 function pickAmericanVoice(voices, platform) {
   const englishVoices = voices.filter((voice) =>
     voice?.lang?.toLowerCase().startsWith("en")
@@ -83,6 +114,24 @@ function pickAmericanVoice(voices, platform) {
 
   if (!englishVoices.length) {
     return null;
+  }
+
+  if (platform?.isIOS && platform?.isSafari) {
+    return (
+      pickPreferredVoiceByName(englishVoices, IOS_PREFERRED_VOICE_NAMES) ||
+      [...englishVoices].sort(
+        (a, b) => getVoiceScore(b, platform) - getVoiceScore(a, platform)
+      )[0]
+    );
+  }
+
+  if (platform?.isChrome) {
+    return (
+      pickPreferredVoiceByName(englishVoices, CHROME_PREFERRED_VOICE_NAMES) ||
+      [...englishVoices].sort(
+        (a, b) => getVoiceScore(b, platform) - getVoiceScore(a, platform)
+      )[0]
+    );
   }
 
   return [...englishVoices].sort(
@@ -104,6 +153,8 @@ function splitSpeechText(text) {
     return [];
   }
 
+  const platform = getSpeechPlatform();
+  const maxChunkLength = platform.isIOS && platform.isSafari ? 84 : 110;
   const sentenceChunks = normalized
     .split(/(?<=[.!?])\s+/)
     .map((chunk) => chunk.trim())
@@ -111,7 +162,7 @@ function splitSpeechText(text) {
 
   const finalChunks = [];
   for (const sentence of sentenceChunks) {
-    if (sentence.length <= 110) {
+    if (sentence.length <= maxChunkLength) {
       finalChunks.push(sentence);
       continue;
     }
@@ -124,7 +175,7 @@ function splitSpeechText(text) {
     let currentChunk = "";
     for (const clause of clauses) {
       const nextChunk = currentChunk ? `${currentChunk} ${clause}` : clause;
-      if (nextChunk.length > 110 && currentChunk) {
+      if (nextChunk.length > maxChunkLength && currentChunk) {
         finalChunks.push(currentChunk);
         currentChunk = clause;
       } else {
@@ -133,7 +184,26 @@ function splitSpeechText(text) {
     }
 
     if (currentChunk) {
-      finalChunks.push(currentChunk);
+      if (currentChunk.length <= maxChunkLength) {
+        finalChunks.push(currentChunk);
+        continue;
+      }
+
+      const words = currentChunk.split(/\s+/).filter(Boolean);
+      let wordChunk = "";
+      for (const word of words) {
+        const nextWordChunk = wordChunk ? `${wordChunk} ${word}` : word;
+        if (nextWordChunk.length > maxChunkLength && wordChunk) {
+          finalChunks.push(wordChunk);
+          wordChunk = word;
+        } else {
+          wordChunk = nextWordChunk;
+        }
+      }
+
+      if (wordChunk) {
+        finalChunks.push(wordChunk);
+      }
     }
   }
 
@@ -161,8 +231,8 @@ function getSpeechProfile(voice, options, platform) {
       options.rate ??
       (isIOSSafari
         ? isAppleNatural
-          ? 0.92
-          : 0.9
+          ? 0.86
+          : 0.84
         : isAppleNatural
         ? 0.88
         : isGoogleNatural
@@ -178,8 +248,8 @@ function getSpeechProfile(voice, options, platform) {
       options.pitch ??
       (isIOSSafari
         ? isAppleNatural
-          ? 1.0
-          : 0.98
+          ? 0.97
+          : 0.95
         : isAppleNatural
         ? 0.98
         : isGoogleNatural
@@ -188,6 +258,7 @@ function getSpeechProfile(voice, options, platform) {
         ? 0.92
         : 0.96),
     volume: options.volume ?? (isIOSSafari ? 1 : undefined),
+    preDelayMs: options.preDelayMs ?? (isIOSSafari ? 55 : 0),
   };
 }
 
@@ -219,6 +290,7 @@ export default function useSpeechAnnouncer(settings) {
   const sequenceTokenRef = useRef(0);
   const voicesReadyRef = useRef(false);
   const platformRef = useRef(getSpeechPlatform());
+  const voicesPromiseRef = useRef(null);
 
   const clearStepTimer = useCallback(() => {
     if (stepTimerRef.current) {
@@ -241,42 +313,79 @@ export default function useSpeechAnnouncer(settings) {
     setStatus((current) => (current === "unsupported" ? current : "ready"));
   }, [clearStepTimer]);
 
-  useEffect(() => {
-    if (!canUseSpeechSynthesis()) return undefined;
+  const ensureVoicesReady = useCallback(() => {
+    if (!canUseSpeechSynthesis()) {
+      return Promise.resolve([]);
+    }
 
-    let retryTimer = null;
-    let retries = 0;
+    const existingVoices = window.speechSynthesis.getVoices();
+    if (existingVoices.length > 0) {
+      voicesReadyRef.current = true;
+      const selectedVoice = pickAmericanVoice(existingVoices, platformRef.current);
+      setVoice(selectedVoice);
+      setStatus((current) => (current === "unsupported" ? current : "ready"));
+      return Promise.resolve(existingVoices);
+    }
 
-    const assignVoice = () => {
-      const voices = window.speechSynthesis.getVoices();
-      if (voices.length > 0) {
-        voicesReadyRef.current = true;
-        setVoice(pickAmericanVoice(voices, platformRef.current));
-        setStatus((current) => (current === "unsupported" ? current : "ready"));
-        return true;
-      }
+    if (voicesPromiseRef.current) {
+      return voicesPromiseRef.current;
+    }
 
-      if (retries < 8) {
-        retries += 1;
-        retryTimer = window.setTimeout(assignVoice, 250);
-      }
+    voicesPromiseRef.current = new Promise((resolve) => {
+      let resolved = false;
+      let retryTimer = null;
+      let retries = 0;
 
-      return false;
-    };
+      const finish = (voices) => {
+        if (resolved) {
+          return;
+        }
+        resolved = true;
+        if (retryTimer) {
+          window.clearTimeout(retryTimer);
+        }
+        window.speechSynthesis.removeEventListener("voiceschanged", assignVoice);
+        voicesPromiseRef.current = null;
+        resolve(voices);
+      };
 
-    platformRef.current = getSpeechPlatform();
-    assignVoice();
-    window.speechSynthesis.addEventListener("voiceschanged", assignVoice);
-    return () => {
-      if (retryTimer) {
-        window.clearTimeout(retryTimer);
-      }
-      window.speechSynthesis.removeEventListener("voiceschanged", assignVoice);
-    };
+      const assignVoice = () => {
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          voicesReadyRef.current = true;
+          const selectedVoice = pickAmericanVoice(voices, platformRef.current);
+          setVoice(selectedVoice);
+          setStatus((current) => (current === "unsupported" ? current : "ready"));
+          finish(voices);
+          return true;
+        }
+
+        if (retries < 12) {
+          retries += 1;
+          retryTimer = window.setTimeout(assignVoice, 200);
+          return false;
+        }
+
+        finish([]);
+        return false;
+      };
+
+      window.speechSynthesis.addEventListener("voiceschanged", assignVoice);
+      assignVoice();
+    });
+
+    return voicesPromiseRef.current;
   }, []);
 
+  useEffect(() => {
+    if (!canUseSpeechSynthesis()) return undefined;
+    platformRef.current = getSpeechPlatform();
+    void ensureVoicesReady();
+    return undefined;
+  }, [ensureVoicesReady]);
+
   const runSequence = useCallback(
-    (sequence, token = sequenceTokenRef.current) => {
+    async (sequence, token = sequenceTokenRef.current) => {
       if (!sequence?.items?.length || !canUseSpeechSynthesis()) {
         setStatus((current) => (current === "unsupported" ? current : "ready"));
         return false;
@@ -294,21 +403,11 @@ export default function useSpeechAnnouncer(settings) {
         return true;
       }
 
-      if (!voicesReadyRef.current && !sequence.waitedForVoices) {
-        clearStepTimer();
-        stepTimerRef.current = window.setTimeout(() => {
-          if (token !== sequenceTokenRef.current) {
-            return;
-          }
-          runSequence(
-            {
-              ...sequence,
-              waitedForVoices: true,
-            },
-            token
-          );
-        }, 180);
-        return true;
+      if (!voicesReadyRef.current) {
+        await ensureVoicesReady();
+        if (token !== sequenceTokenRef.current) {
+          return false;
+        }
       }
 
       try {
@@ -352,7 +451,7 @@ export default function useSpeechAnnouncer(settings) {
           if (token !== sequenceTokenRef.current) {
             return;
           }
-          runSequence(nextSequence, token);
+          void runSequence(nextSequence, token);
         }, pauseAfterMs);
       };
 
@@ -384,7 +483,7 @@ export default function useSpeechAnnouncer(settings) {
           currentSequenceRef.current = null;
           clearStepTimer();
           sequenceTokenRef.current += 1;
-          return runSequence(
+          return void runSequence(
             {
               ...sequence,
               useSystemVoice: true,
@@ -401,6 +500,15 @@ export default function useSpeechAnnouncer(settings) {
       };
 
       try {
+        if (profile.preDelayMs > 0) {
+          await new Promise((resolve) => {
+            stepTimerRef.current = window.setTimeout(resolve, profile.preDelayMs);
+          });
+          if (token !== sequenceTokenRef.current) {
+            return false;
+          }
+        }
+
         window.speechSynthesis.speak(utterance);
       } catch {
         setStatus("blocked");
@@ -409,7 +517,7 @@ export default function useSpeechAnnouncer(settings) {
 
       return true;
     },
-    [clearStepTimer, settings.volume, voice]
+    [clearStepTimer, ensureVoicesReady, settings.volume, voice]
   );
 
   const queueSequence = useCallback(
@@ -495,7 +603,8 @@ export default function useSpeechAnnouncer(settings) {
       if (!hasActiveSpeech) {
         clearStepTimer();
         sequenceTokenRef.current += 1;
-        return runSequence(request, sequenceTokenRef.current);
+        void runSequence(request, sequenceTokenRef.current);
+        return true;
       }
 
       const currentPriority = currentSequenceRef.current?.priority ?? 1;
@@ -504,7 +613,8 @@ export default function useSpeechAnnouncer(settings) {
         queuedSequencesRef.current = [];
         sequenceTokenRef.current += 1;
         window.speechSynthesis.cancel();
-        return runSequence(request, sequenceTokenRef.current);
+        void runSequence(request, sequenceTokenRef.current);
+        return true;
       }
 
       queuedSequencesRef.current.push(request);
@@ -526,7 +636,7 @@ export default function useSpeechAnnouncer(settings) {
     }
 
     try {
-      window.speechSynthesis.getVoices();
+      void ensureVoicesReady();
       window.speechSynthesis.resume?.();
 
       isPrimedRef.current = true;
@@ -547,7 +657,7 @@ export default function useSpeechAnnouncer(settings) {
       setStatus("blocked");
       return false;
     }
-  }, [queueSequence]);
+  }, [ensureVoicesReady, queueSequence]);
 
   useEffect(() => {
     if (!canUseSpeechSynthesis()) return undefined;
@@ -639,5 +749,7 @@ export default function useSpeechAnnouncer(settings) {
     needsGesture: status === "waiting_for_gesture",
     status,
     voiceName: voice?.name || "",
+    cloudTtsRecommended:
+      platformRef.current.isIOS && platformRef.current.isSafari && !voice?.name,
   };
 }

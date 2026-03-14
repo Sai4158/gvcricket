@@ -1,9 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { duckPageMedia, playUiTone, restorePageMedia } from "../../lib/page-audio";
+import {
+  duckPageMedia,
+  playUiTone,
+  primeUiAudio,
+  restorePageMedia,
+} from "../../lib/page-audio";
 
-const WALKIE_FINISH_DELAY_MS = 1000;
+const WALKIE_FINISH_DELAY_MS = 1200;
 const WALKIE_SIGNAL_RACE_MESSAGES = new Set([
   "No active walkie transmission.",
   "Active speaker not found.",
@@ -31,10 +36,30 @@ function getParticipantId(matchId, role) {
   return `${role}:${crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`}`;
 }
 
-function createPeerConnection() {
+const DEFAULT_ICE_SERVERS = [
+  { urls: ["stun:stun.l.google.com:19302", "stun:stun.cloudflare.com:3478"] },
+];
+
+function createPeerConnection(iceServers) {
   return new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    bundlePolicy: "max-bundle",
+    iceCandidatePoolSize: 2,
+    iceServers: Array.isArray(iceServers) && iceServers.length ? iceServers : DEFAULT_ICE_SERVERS,
   });
+}
+
+function getAudioEncodingParams(sender) {
+  const params = sender.getParameters?.() || {};
+  const encodings = params.encodings?.length ? params.encodings : [{}];
+
+  return {
+    ...params,
+    encodings: encodings.map((encoding) => ({
+      ...encoding,
+      maxBitrate: 24_000,
+      networkPriority: "high",
+    })),
+  };
 }
 
 export default function useWalkieTalkie({
@@ -55,6 +80,8 @@ export default function useWalkieTalkie({
   const [finishDelayLeft, setFinishDelayLeft] = useState(0);
   const [requestCooldownLeft, setRequestCooldownLeft] = useState(0);
   const [requestState, setRequestState] = useState("idle");
+  const [iceServers, setIceServers] = useState(DEFAULT_ICE_SERVERS);
+  const [needsAudioUnlock, setNeedsAudioUnlock] = useState(false);
   const listenerPcRef = useRef(null);
   const speakerPeersRef = useRef(new Map());
   const localStreamRef = useRef(null);
@@ -71,6 +98,7 @@ export default function useWalkieTalkie({
   const releaseInFlightRef = useRef(false);
   const suppressOwnTransmissionEndedRef = useRef(false);
   const tokenRef = useRef("");
+  const iceConfigLoadedRef = useRef(false);
 
   useEffect(() => {
     snapshotRef.current = snapshot;
@@ -83,6 +111,33 @@ export default function useWalkieTalkie({
   useEffect(() => {
     tokenRef.current = token;
   }, [token]);
+
+  const loadIceConfig = useCallback(async () => {
+    if (!matchId || !participantId || !role || !tokenRef.current || iceConfigLoadedRef.current) {
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams({
+        role,
+        participantId,
+        token: tokenRef.current,
+      });
+      const response = await fetch(`/api/live/walkie/${matchId}/ice?${params.toString()}`, {
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return;
+      }
+      if (Array.isArray(payload.iceServers) && payload.iceServers.length) {
+        setIceServers(payload.iceServers);
+      }
+      iceConfigLoadedRef.current = true;
+    } catch {
+      // Fall back to bundled public STUN servers.
+    }
+  }, [matchId, participantId, role]);
 
   useEffect(() => {
     if (!matchId || !role) {
@@ -155,11 +210,19 @@ export default function useWalkieTalkie({
     }
 
     if (!remoteAudioRef.current) {
-      const audio = new Audio();
+      const audio = document.createElement("audio");
       audio.autoplay = true;
       audio.playsInline = true;
+      audio.setAttribute("playsinline", "");
+      audio.preload = "auto";
       audio.muted = false;
       audio.volume = 1;
+      audio.style.position = "fixed";
+      audio.style.width = "0";
+      audio.style.height = "0";
+      audio.style.opacity = "0";
+      audio.style.pointerEvents = "none";
+      document.body.appendChild(audio);
       remoteAudioRef.current = audio;
     }
 
@@ -168,7 +231,13 @@ export default function useWalkieTalkie({
 
   const primeRemoteAudio = useCallback(() => {
     const audio = ensureRemoteAudio();
-    if (!audio || remoteAudioPrimedRef.current) {
+    if (!audio) {
+      return;
+    }
+
+    void primeUiAudio();
+
+    if (remoteAudioPrimedRef.current) {
       return;
     }
 
@@ -176,9 +245,30 @@ export default function useWalkieTalkie({
     try {
       void audio.play().catch(() => {
         remoteAudioPrimedRef.current = false;
+        setNeedsAudioUnlock(true);
       });
     } catch {
       remoteAudioPrimedRef.current = false;
+      setNeedsAudioUnlock(true);
+    }
+  }, [ensureRemoteAudio]);
+
+  const unlockAudio = useCallback(async () => {
+    const audio = ensureRemoteAudio();
+    if (!audio) {
+      return false;
+    }
+
+    try {
+      await primeUiAudio();
+      await audio.play();
+      remoteAudioPrimedRef.current = true;
+      setNeedsAudioUnlock(false);
+      setError("");
+      return true;
+    } catch {
+      setNeedsAudioUnlock(true);
+      return false;
     }
   }, [ensureRemoteAudio]);
 
@@ -235,6 +325,9 @@ export default function useWalkieTalkie({
     previousTransmissionRef.current = "";
     snapshotRef.current = null;
     remoteAudioPrimedRef.current = false;
+    setNeedsAudioUnlock(false);
+    iceConfigLoadedRef.current = false;
+    setIceServers(DEFAULT_ICE_SERVERS);
     setToken("");
     setSnapshot(null);
     setNotice("");
@@ -320,8 +413,18 @@ export default function useWalkieTalkie({
         noiseSuppression: true,
         autoGainControl: true,
         channelCount: 1,
+        sampleRate: 48000,
+        sampleSize: 16,
+        latency: 0.02,
       },
       video: false,
+    });
+    stream.getAudioTracks().forEach((track) => {
+      try {
+        track.contentHint = "speech";
+      } catch {
+        // contentHint is optional across browsers.
+      }
     });
     localStreamRef.current = stream;
     return stream;
@@ -337,8 +440,15 @@ export default function useWalkieTalkie({
         let peer = speakerPeersRef.current.get(message.fromId);
 
         if (!peer) {
-          peer = createPeerConnection();
-          stream.getTracks().forEach((track) => peer.addTrack(track, stream));
+          peer = createPeerConnection(iceServers);
+          stream.getTracks().forEach((track) => {
+            const sender = peer.addTrack(track, stream);
+            try {
+              sender.setParameters?.(getAudioEncodingParams(sender));
+            } catch {
+              // Best-effort only.
+            }
+          });
           peer.onicecandidate = (event) => {
             if (event.candidate) {
               void sendSignal(message.fromId, {
@@ -417,7 +527,7 @@ export default function useWalkieTalkie({
     } catch (nextError) {
       setError(nextError.message || "Walkie signal failed.");
     }
-  }, [participantId, sendSignal]);
+  }, [iceServers, participantId, sendSignal]);
 
   useEffect(() => {
     if (!eventSourceUrl) {
@@ -547,11 +657,20 @@ export default function useWalkieTalkie({
     eventSourceUrl,
     finalizeTransmission,
     handleIncomingSignal,
+    loadIceConfig,
     participantId,
     playWalkieEndTone,
     role,
     stopLocalStream,
   ]);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    void loadIceConfig();
+  }, [loadIceConfig, token]);
 
   useEffect(() => {
     if (snapshot?.enabled) {
@@ -634,7 +753,7 @@ export default function useWalkieTalkie({
     duckPageMedia(pageMediaDuckRef, 0.18);
     playWalkieStartTone();
 
-    const peer = createPeerConnection();
+    const peer = createPeerConnection(iceServers);
     const remoteStream = new MediaStream();
     listenerPcRef.current = peer;
 
@@ -649,6 +768,7 @@ export default function useWalkieTalkie({
       audio.volume = 1;
       void audio.play().catch(() => {
         remoteAudioPrimedRef.current = false;
+        setNeedsAudioUnlock(true);
       });
     };
 
@@ -691,6 +811,7 @@ export default function useWalkieTalkie({
     transmissionId,
     shouldListen,
     stopLocalStream,
+    iceServers,
   ]);
 
   useEffect(
@@ -729,19 +850,21 @@ export default function useWalkieTalkie({
     setError("");
 
     try {
+      await ensureSpeakerStream();
       const payload = await sendJson(`/api/matches/${matchId}/walkie/claim`, {
         participantId,
         role,
         token,
       });
 
+      await loadIceConfig();
       primeRemoteAudio();
       duckPageMedia(pageMediaDuckRef, 0.18);
-      await ensureSpeakerStream();
       playWalkieStartTone();
       setSnapshot(payload.walkie || null);
       return true;
     } catch (nextError) {
+      stopLocalStream();
       setError(nextError.message || "Could not start talking.");
       return false;
     } finally {
@@ -749,7 +872,7 @@ export default function useWalkieTalkie({
     }
   };
 
-  const stopTalking = async () => {
+  const stopTalking = useCallback(async () => {
     if (!matchId || !participantId || !token) {
       return;
     }
@@ -784,7 +907,39 @@ export default function useWalkieTalkie({
         finalizeTransmission({ playTone: true });
       }
     }, WALKIE_FINISH_DELAY_MS);
-  };
+  }, [
+    clearFinishTimer,
+    finalizeTransmission,
+    matchId,
+    participantId,
+    sendJson,
+    token,
+    role,
+  ]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return undefined;
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") {
+        void stopTalking();
+      }
+    };
+
+    const handlePageHide = () => {
+      void stopTalking();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, [stopTalking]);
 
   const dismissNotice = () => setNotice("");
 
@@ -858,6 +1013,8 @@ export default function useWalkieTalkie({
     requestState,
     pendingRequests: snapshot?.pendingRequests || [],
     dismissNotice,
+    needsAudioUnlock,
+    unlockAudio,
     acceptRequest: (requestId) => respondToRequest(requestId, "accept"),
     dismissRequest: (requestId) => respondToRequest(requestId, "dismiss"),
   };

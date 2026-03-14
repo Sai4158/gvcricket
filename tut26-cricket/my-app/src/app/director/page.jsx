@@ -1,5 +1,5 @@
 import DirectorConsoleClient from "../components/director/DirectorConsoleClient";
-import { absoluteUrl } from "../lib/site-metadata";
+import { absoluteUrl, siteConfig } from "../lib/site-metadata";
 import { loadDirectorConsoleData } from "../lib/server-data";
 
 export const metadata = {
@@ -8,6 +8,26 @@ export const metadata = {
     "Private director console for PA mic, match audio, effects, and walkie control.",
   alternates: {
     canonical: absoluteUrl("/director"),
+  },
+  openGraph: {
+    title: "Director Console | GV Cricket",
+    description:
+      "Private director console for PA mic, match audio, effects, and walkie control.",
+    url: absoluteUrl("/director"),
+    images: [
+      {
+        url: absoluteUrl(siteConfig.ogImagePath),
+        width: 1200,
+        height: 630,
+        alt: "GV Cricket director console preview",
+      },
+    ],
+  },
+  twitter: {
+    title: "Director Console | GV Cricket",
+    description:
+      "Private director console for PA mic, match audio, effects, and walkie control.",
+    images: [absoluteUrl(siteConfig.twitterImagePath)],
   },
   robots: {
     index: false,

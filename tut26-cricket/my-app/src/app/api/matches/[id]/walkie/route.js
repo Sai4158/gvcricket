@@ -10,9 +10,9 @@ import { getRequestMeta } from "../../../../lib/request-meta";
 import { parseJsonRequest } from "../../../../lib/request-security";
 import { walkieToggleSchema } from "../../../../lib/validators";
 import {
-  getWalkieSnapshot,
-  setWalkieEnabled,
-} from "../../../../lib/walkie-talkie";
+  getPersistentWalkieSnapshot,
+  setPersistentWalkieEnabled,
+} from "../../../../lib/walkie-store";
 import Match from "../../../../../models/Match";
 
 async function hasMatchAccess(matchId, accessVersion) {
@@ -47,9 +47,7 @@ export async function POST(req, { params }) {
     }
 
     const { enabled } = parsedRequest.value;
-    const currentSnapshot = getWalkieSnapshot(id);
-
-    const snapshot = setWalkieEnabled(id, enabled);
+    const snapshot = await setPersistentWalkieEnabled(id, enabled);
 
     await writeAuditLog({
       action: enabled ? "walkie_enabled" : "walkie_disabled",
@@ -79,7 +77,7 @@ export async function GET(_req, { params }) {
     return jsonError("Match not found.", 404);
   }
 
-  const snapshot = getWalkieSnapshot(id);
+  const { snapshot } = await getPersistentWalkieSnapshot(id);
   return Response.json(
     {
       walkie: snapshot,

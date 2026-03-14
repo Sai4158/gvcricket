@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 export default function AnimatedSection({
   children,
@@ -9,14 +9,19 @@ export default function AnimatedSection({
   viewportAmount = 0.08,
   viewportMargin = "0px 0px -6% 0px",
 }) {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
     <motion.section
       id={id}
-      initial={{ opacity: 0, y: 28 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.965 }}
+      whileInView={{ opacity: 1, scale: 1 }}
       viewport={{ once: true, amount: viewportAmount, margin: viewportMargin }}
-      transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
-      className={`relative transform-gpu will-change-transform ${className}`}
+      transition={{
+        duration: prefersReducedMotion ? 0 : 0.72,
+        ease: [0.16, 1, 0.3, 1],
+      }}
+      className={`relative ${className}`}
     >
       {children}
     </motion.section>

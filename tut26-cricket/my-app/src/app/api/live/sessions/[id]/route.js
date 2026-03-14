@@ -31,9 +31,53 @@ export async function GET(request, { params }) {
       let cleanupMatch = () => {};
       let heartbeat = null;
       let currentMatchId = "";
+      let closed = false;
+      let didCleanup = false;
+
+      const finalize = () => {
+        if (didCleanup) {
+          return;
+        }
+        didCleanup = true;
+        cleanupSession();
+        cleanupMatch();
+        cleanupSession = () => {};
+        cleanupMatch = () => {};
+        if (heartbeat) {
+          clearInterval(heartbeat);
+          heartbeat = null;
+        }
+      };
 
       const send = (event, data) => {
-        controller.enqueue(encoder.encode(encodeEvent(event, data)));
+        if (closed) {
+          return false;
+        }
+
+        try {
+          controller.enqueue(encoder.encode(encodeEvent(event, data)));
+          return true;
+        } catch (error) {
+          closed = true;
+          finalize();
+          if (error?.code !== "ERR_INVALID_STATE") {
+            console.error("Session SSE enqueue failed:", error);
+          }
+          return false;
+        }
+      };
+
+      const stopStream = () => {
+        if (closed) {
+          return;
+        }
+        closed = true;
+        finalize();
+        try {
+          controller.close();
+        } catch {
+          // Ignore close races.
+        }
       };
 
       try {
@@ -56,8 +100,14 @@ export async function GET(request, { params }) {
         };
 
         const pushSessionPayload = async () => {
+          if (closed) {
+            return null;
+          }
           const session = await Session.findById(id).lean();
           const match = await resolveLatestMatch(session);
+          if (closed) {
+            return null;
+          }
           const nextMatchId = match?._id ? String(match._id) : "";
 
           if (nextMatchId !== currentMatchId) {
@@ -71,11 +121,15 @@ export async function GET(request, { params }) {
             }
           }
 
-          send("session", {
+          if (
+            !send("session", {
             session: serializePublicSession(session),
             match: serializePublicMatch(match, session),
             updatedAt: new Date().toISOString(),
-          });
+            })
+          ) {
+            return null;
+          }
           return { session, match };
         };
 
@@ -89,17 +143,11 @@ export async function GET(request, { params }) {
         }, 15000);
 
         request.signal.addEventListener("abort", () => {
-          cleanupSession();
-          cleanupMatch();
-          if (heartbeat) clearInterval(heartbeat);
-          controller.close();
+          stopStream();
         });
       } catch (error) {
         send("error", { message: "Live updates are temporarily unavailable." });
-        if (heartbeat) clearInterval(heartbeat);
-        cleanupSession();
-        cleanupMatch();
-        controller.close();
+        stopStream();
       }
     },
   });

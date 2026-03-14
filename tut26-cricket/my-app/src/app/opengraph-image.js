@@ -1,4 +1,6 @@
+/* eslint-disable @next/next/no-img-element */
 import { ImageResponse } from "next/og";
+import { absoluteUrl, siteConfig } from "./lib/site-metadata";
 
 export const runtime = "nodejs";
 export const alt = "GV Cricket - free cricket scoring app";
@@ -40,26 +42,41 @@ export default function OpenGraphImage() {
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
-            padding: "72px 72px 64px",
+            padding: "60px 72px 64px",
             width: "100%",
           }}
         >
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                padding: "12px 22px",
-                borderRadius: 999,
-                fontSize: 22,
-                letterSpacing: "0.28em",
-                textTransform: "uppercase",
-                border: "1px solid rgba(255,217,119,0.18)",
-                background: "rgba(255,217,119,0.08)",
-                color: "#fde68a",
+                gap: 20,
               }}
             >
-              GV Cricket
+              <img
+                src={absoluteUrl(siteConfig.logoPath)}
+                alt="GV Cricket"
+                width="88"
+                height="88"
+                style={{ borderRadius: 24 }}
+              />
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "12px 22px",
+                  borderRadius: 999,
+                  fontSize: 22,
+                  letterSpacing: "0.28em",
+                  textTransform: "uppercase",
+                  border: "1px solid rgba(255,217,119,0.18)",
+                  background: "rgba(255,217,119,0.08)",
+                  color: "#fde68a",
+                }}
+              >
+                GV Cricket
+              </div>
             </div>
             <div
               style={{

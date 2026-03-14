@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   FaArrowRight,
   FaBroadcastTower,
@@ -9,15 +9,31 @@ import {
   FaClipboardList,
 } from "react-icons/fa";
 
-const cardMotionProps = {
-  initial: { opacity: 0, y: 20 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, amount: 0.12, margin: "0px 0px -8% 0px" },
-  transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1] },
-  whileTap: { scale: 0.99 },
+const sectionVariants = {
+  hidden: {},
+  visible: {
+    transition: {
+      delayChildren: 0.06,
+      staggerChildren: 0.12,
+    },
+  },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, scale: 0.94 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: {
+      duration: 0.68,
+      ease: [0.16, 1, 0.3, 1],
+    },
+  },
 };
 
 export default function PrimaryActionsSection() {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
     <section
       id="quick-start"
@@ -35,11 +51,19 @@ export default function PrimaryActionsSection() {
         </p>
       </div>
 
-      <div className="grid w-full max-w-3xl gap-4 sm:grid-cols-2">
+      <motion.div
+        initial={prefersReducedMotion ? false : "hidden"}
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.16, margin: "0px 0px -10% 0px" }}
+        variants={sectionVariants}
+        className="grid w-full max-w-3xl gap-4 sm:grid-cols-2"
+      >
         <Link href="/session/new" className="block">
           <motion.div
-            {...cardMotionProps}
-            className="liquid-glass group rounded-[30px] p-5 text-left transition duration-300 hover:border-white/28 transform-gpu will-change-transform"
+            variants={cardVariants}
+            whileHover={prefersReducedMotion ? undefined : { scale: 1.015 }}
+            whileTap={{ scale: 0.99 }}
+            className="liquid-glass group rounded-[30px] p-5 text-left transition duration-300 hover:border-white/28"
           >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(250,204,21,0.12),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_30%)] opacity-90" />
             <div className="pointer-events-none absolute right-5 top-5 text-amber-100/15 transition duration-300 group-hover:scale-105 group-hover:text-amber-50/20">
@@ -69,9 +93,10 @@ export default function PrimaryActionsSection() {
 
         <Link href="/session" className="block">
           <motion.div
-            {...cardMotionProps}
-            transition={{ ...cardMotionProps.transition, delay: 0.06 }}
-            className="liquid-glass group rounded-[30px] p-5 text-left transition duration-300 hover:border-white/28 transform-gpu will-change-transform"
+            variants={cardVariants}
+            whileHover={prefersReducedMotion ? undefined : { scale: 1.015 }}
+            whileTap={{ scale: 0.99 }}
+            className="liquid-glass group rounded-[30px] p-5 text-left transition duration-300 hover:border-white/28"
           >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.14),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_28%)] opacity-90" />
             <div className="pointer-events-none absolute right-5 top-5 text-sky-100/15 transition duration-300 group-hover:scale-105 group-hover:text-sky-50/20">
@@ -98,13 +123,17 @@ export default function PrimaryActionsSection() {
             </div>
           </motion.div>
         </Link>
-      </div>
+      </motion.div>
 
       <Link href="/director" className="block w-full max-w-3xl">
         <motion.div
-          {...cardMotionProps}
-          transition={{ ...cardMotionProps.transition, delay: 0.1 }}
-          className="liquid-glass group flex w-full items-center gap-4 rounded-[28px] px-6 py-5 text-left transition duration-300 hover:-translate-y-0.5 hover:border-white/28 sm:gap-5 transform-gpu will-change-transform"
+          initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.955 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true, amount: 0.2, margin: "0px 0px -10% 0px" }}
+          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.08 }}
+          whileHover={prefersReducedMotion ? undefined : { scale: 1.012 }}
+          whileTap={{ scale: 0.99 }}
+          className="liquid-glass group flex w-full items-center gap-4 rounded-[28px] px-6 py-5 text-left transition duration-300 hover:border-white/28 sm:gap-5"
         >
           <span className="flex min-w-0 flex-1 items-center gap-4 sm:gap-5">
             <span className="liquid-icon inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-lg text-emerald-50 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-[1.04]">

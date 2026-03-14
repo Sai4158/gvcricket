@@ -5,7 +5,30 @@ import { FaTimes } from "react-icons/fa";
 import { Ball } from "./MatchBallHistory";
 import MatchImageUploader from "./MatchImageUploader";
 
-export function ModalBase({ children, title, onExit, hideHeader = false }) {
+export function ModalBase({
+  children,
+  title,
+  onExit,
+  hideHeader = false,
+  panelClassName = "",
+  bodyClassName = "",
+}) {
+  const panelClasses = [
+    "relative max-h-[calc(100vh-2rem)] w-full overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl shadow-black",
+    "max-w-sm",
+    panelClassName,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const bodyClasses = [
+    "overflow-y-auto px-5 pb-5",
+    hideHeader ? "pt-5" : "max-h-[calc(100vh-7.5rem)] pt-4",
+    bodyClassName,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -19,17 +42,21 @@ export function ModalBase({ children, title, onExit, hideHeader = false }) {
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         transition={{ type: "spring", stiffness: 400, damping: 25 }}
-        className="relative bg-zinc-900 p-6 rounded-2xl max-w-sm w-full border border-zinc-700 shadow-2xl shadow-black"
+        className={panelClasses}
         onClick={(event) => event.stopPropagation()}
       >
         {!hideHeader ? (
-          <h2 className="mb-4 text-center text-2xl font-bold text-white">{title}</h2>
+          <div className="sticky top-0 z-10 border-b border-white/6 bg-zinc-900/95 px-5 pb-3 pt-5 backdrop-blur">
+            <h2 className="text-center text-2xl font-bold text-white">{title}</h2>
+          </div>
         ) : null}
-        {children}
+        <div className={bodyClasses}>
+          {children}
+        </div>
         {!hideHeader ? (
           <button
             onClick={onExit}
-            className="absolute top-3 right-3 rounded-full p-2 text-zinc-500 transition-colors hover:text-white"
+            className="absolute right-3 top-3 z-20 rounded-full p-2 text-zinc-500 transition-colors hover:text-white"
             aria-label="Close modal"
           >
             <FaTimes size={20} />
@@ -197,6 +224,8 @@ export function MatchImageModal({ match, onUploaded, onClose }) {
     <ModalBase
       title={match?.matchImageUrl ? "Replace Match Image" : "Add Match Image"}
       onExit={onClose}
+      panelClassName="max-w-md"
+      bodyClassName="max-h-[calc(100vh-7rem)]"
     >
       <MatchImageUploader
         matchId={String(match._id)}

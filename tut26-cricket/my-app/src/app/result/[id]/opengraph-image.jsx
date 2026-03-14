@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import { ImageResponse } from "next/og";
-import { getMatchupLabel } from "../../lib/site-metadata";
+import { absoluteUrl, getMatchupLabel, siteConfig } from "../../lib/site-metadata";
 import { loadPublicMatchData } from "../../lib/server-data";
 
 export const runtime = "nodejs";
@@ -65,7 +65,7 @@ export default async function OpenGraphImage({ params }) {
                 }}
               >
                 <img
-                  src="https://gvcricket.com/gvLogo.png"
+                  src={absoluteUrl(siteConfig.logoPath)}
                   alt="GV Cricket"
                   width="86"
                   height="86"

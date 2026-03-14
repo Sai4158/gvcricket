@@ -33,6 +33,10 @@ import Session from "../../../../../models/Session";
 
 export const runtime = "nodejs";
 
+function getMatchImageModerationMode() {
+  return String(process.env.MATCH_IMAGE_MODERATION_MODE || "best-effort").trim().toLowerCase();
+}
+
 function getSafeUploadName(file) {
   const extension = String(file?.name || "")
     .split(".")
@@ -121,7 +125,31 @@ export async function POST(req, { params }) {
       return jsonError(validation.message, 400);
     }
 
-    const moderation = await moderateMatchImageBuffer(buffer);
+    let moderation = {
+      ok: true,
+      blockedLabels: [],
+      predictions: [],
+      message: "",
+    };
+
+    try {
+      moderation = await moderateMatchImageBuffer(buffer);
+    } catch (error) {
+      if (getMatchImageModerationMode() === "strict") {
+        throw error;
+      }
+
+      await writeAuditLog({
+        action: "match_media_moderation_bypassed",
+        targetType: "match",
+        targetId: id,
+        status: "failure",
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        metadata: { reason: error?.message || "Image moderation unavailable." },
+      });
+    }
+
     if (!moderation.ok) {
       await writeAuditLog({
         action: "match_media_upload_blocked",

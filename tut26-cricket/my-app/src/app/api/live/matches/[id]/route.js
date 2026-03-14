@@ -31,9 +31,51 @@ export async function GET(request, { params }) {
     async start(controller) {
       let cleanup = () => {};
       let heartbeat = null;
+      let closed = false;
+      let didCleanup = false;
+
+      const finalize = () => {
+        if (didCleanup) {
+          return;
+        }
+        didCleanup = true;
+        cleanup();
+        cleanup = () => {};
+        if (heartbeat) {
+          clearInterval(heartbeat);
+          heartbeat = null;
+        }
+      };
 
       const send = (event, data) => {
-        controller.enqueue(encoder.encode(encodeEvent(event, data)));
+        if (closed) {
+          return false;
+        }
+
+        try {
+          controller.enqueue(encoder.encode(encodeEvent(event, data)));
+          return true;
+        } catch (error) {
+          closed = true;
+          finalize();
+          if (error?.code !== "ERR_INVALID_STATE") {
+            console.error("Match SSE enqueue failed:", error);
+          }
+          return false;
+        }
+      };
+
+      const stopStream = () => {
+        if (closed) {
+          return;
+        }
+        closed = true;
+        finalize();
+        try {
+          controller.close();
+        } catch {
+          // Ignore close races.
+        }
       };
 
       try {
@@ -41,6 +83,9 @@ export async function GET(request, { params }) {
         await ensureLiveUpdates();
 
         const pushMatch = async () => {
+          if (closed) {
+            return;
+          }
           const match = await Match.findById(id);
           const fallbackSession =
             match && match.sessionId
@@ -48,6 +93,9 @@ export async function GET(request, { params }) {
                   "tossWinner tossDecision teamAName teamBName teamA teamB"
                 )
               : null;
+          if (closed) {
+            return;
+          }
 
           if (match && hydrateLegacyTossState(match, fallbackSession)) {
             await match.save();
@@ -73,15 +121,11 @@ export async function GET(request, { params }) {
         }, 15000);
 
         request.signal.addEventListener("abort", () => {
-          cleanup();
-          if (heartbeat) clearInterval(heartbeat);
-          controller.close();
+          stopStream();
         });
       } catch (error) {
         send("error", { message: "Live updates are temporarily unavailable." });
-        if (heartbeat) clearInterval(heartbeat);
-        cleanup();
-        controller.close();
+        stopStream();
       }
     },
   });

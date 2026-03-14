@@ -10,11 +10,17 @@ import {
 } from "../../../../lib/match-access";
 import { createWalkieParticipantToken } from "../../../../lib/walkie-auth";
 import {
-  getWalkieSnapshot,
-  registerWalkieParticipant,
-  subscribeToWalkieMatch,
-  subscribeToWalkieParticipant,
-} from "../../../../lib/walkie-talkie";
+  ensureWalkieLiveUpdates,
+  subscribeToWalkieMessages,
+  subscribeToWalkieState,
+} from "../../../../lib/walkie-live-updates";
+import {
+  clearPersistentWalkieMessages,
+  getPersistentWalkieSnapshot,
+  registerPersistentWalkieParticipant,
+  heartbeatPersistentWalkieParticipant,
+  takePersistentWalkieMessages,
+} from "../../../../lib/walkie-store";
 import Match from "../../../../../models/Match";
 
 export const runtime = "nodejs";
@@ -27,6 +33,8 @@ function sseHeaders() {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+    "Content-Encoding": "none",
   };
 }
 
@@ -82,54 +90,230 @@ export async function GET(request, { params }) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      let cleanupParticipant = () => {};
-      let cleanupMatch = () => {};
-      let cleanupPersonal = () => {};
       let heartbeat = null;
+      let closed = false;
+      let lastVersion = -1;
+      let lastNotificationId = "";
+      let cleanupState = () => {};
+      let cleanupMessages = () => {};
+      let hasChangeStreamUpdates = false;
+      let didCleanup = false;
+      let pendingStateReplays = 0;
+
+      const finalize = () => {
+        if (didCleanup) {
+          return;
+        }
+        didCleanup = true;
+        cleanupState();
+        cleanupMessages();
+        cleanupState = () => {};
+        cleanupMessages = () => {};
+        void clearPersistentWalkieMessages(id, participantId).catch(() => {});
+        if (heartbeat) {
+          clearTimeout(heartbeat);
+          heartbeat = null;
+        }
+      };
 
       const send = (event, data) => {
-        controller.enqueue(encoder.encode(encodeEvent(event, data)));
+        if (closed) {
+          return false;
+        }
+
+        try {
+          controller.enqueue(encoder.encode(encodeEvent(event, data)));
+          return true;
+        } catch (error) {
+          closed = true;
+          finalize();
+          if (error?.code !== "ERR_INVALID_STATE") {
+            console.error("Walkie SSE enqueue failed:", error);
+          }
+          return false;
+        }
+      };
+
+      const stopStream = () => {
+        if (closed) {
+          return;
+        }
+        closed = true;
+        finalize();
+        try {
+          controller.close();
+        } catch {
+          // Ignore double-close races.
+        }
+      };
+
+      const scheduleHeartbeat = (delay) => {
+        if (closed) {
+          return;
+        }
+        if (heartbeat) {
+          clearTimeout(heartbeat);
+        }
+        heartbeat = setTimeout(() => {
+          void heartbeatLoop();
+        }, delay);
+      };
+
+      const pushState = async (force = false) => {
+        if (closed) {
+          return;
+        }
+
+        const current = await getPersistentWalkieSnapshot(id);
+        if (closed) {
+          return;
+        }
+        const version = Number(current.snapshot?.version || 0);
+        const notificationId = current.notification?.id || "";
+        if (force || version !== lastVersion || notificationId !== lastNotificationId) {
+          const sent = send("state", {
+            snapshot: current.snapshot,
+            ...(current.notification ? { notification: current.notification } : {}),
+          });
+          if (!sent) {
+            return;
+          }
+          lastVersion = version;
+          lastNotificationId = notificationId;
+        }
+      };
+
+      const drainMessages = async () => {
+        if (closed) {
+          return;
+        }
+
+        const messages = await takePersistentWalkieMessages(id, participantId);
+        if (closed) {
+          return;
+        }
+        for (const message of messages) {
+          const sent = send(
+            message.eventType === "signal" ? "signal" : "participant",
+            message.payload
+          );
+          if (!sent) {
+            return;
+          }
+        }
+      };
+
+      const heartbeatLoop = async () => {
+        if (closed) {
+          return;
+        }
+
+        try {
+          const current = await heartbeatPersistentWalkieParticipant(
+            id,
+            participantId,
+            role,
+            name
+          );
+          if (closed) {
+            return;
+          }
+          const version = Number(current.snapshot?.version || 0);
+          const notificationId = current.notification?.id || "";
+          const shouldReplayState = pendingStateReplays > 0;
+          if (shouldReplayState || version !== lastVersion || notificationId !== lastNotificationId) {
+            const sentState = send("state", {
+              snapshot: current.snapshot,
+              ...(current.notification ? { notification: current.notification } : {}),
+            });
+            if (!sentState) {
+              return;
+            }
+            if (shouldReplayState) {
+              pendingStateReplays -= 1;
+            }
+            lastVersion = version;
+            lastNotificationId = notificationId;
+          }
+          if (!send("ping", { ok: true, ts: Date.now() })) {
+            return;
+          }
+        } catch (error) {
+          console.error("Walkie SSE heartbeat failed:", error);
+          stopStream();
+          return;
+        }
+
+        heartbeat = setTimeout(() => {
+          void heartbeatLoop();
+        }, hasChangeStreamUpdates ? 5000 : 400);
       };
 
       try {
-        const initialSnapshot = getWalkieSnapshot(id);
-        const registration = registerWalkieParticipant(id, {
+        await connectDB();
+        const registration = await registerPersistentWalkieParticipant(id, {
           id: participantId,
           role,
           name,
         });
-
-        cleanupParticipant = registration.cleanup;
-        send("state", {
-          snapshot: registration.snapshot || initialSnapshot,
+        if (
+          !send("state", {
+          snapshot: registration.snapshot,
+          ...(registration.notification ? { notification: registration.notification } : {}),
           token: createWalkieParticipantToken(id, participantId, role),
+          })
+        ) {
+          return;
+        }
+        send("ping", {
+          ok: true,
+          ts: Date.now(),
+          init: true,
+          pad: "0".repeat(2048),
+        });
+        lastVersion = Number(registration.snapshot?.version || 0);
+        lastNotificationId = registration.notification?.id || "";
+        pendingStateReplays = 2;
+
+        void drainMessages().catch((error) => {
+          console.error("Walkie initial message drain failed:", error);
+          stopStream();
         });
 
-        cleanupMatch = subscribeToWalkieMatch(id, (payload) => {
-          send(payload.type === "signal" ? "signal" : "state", payload);
-        });
+        void (async () => {
+          try {
+            await ensureWalkieLiveUpdates();
+            if (closed) {
+              return;
+            }
+            hasChangeStreamUpdates = true;
+            cleanupState = subscribeToWalkieState(id, () => {
+              void pushState().catch((error) => {
+                console.error("Walkie state push failed:", error);
+                stopStream();
+              });
+            });
+            cleanupMessages = subscribeToWalkieMessages(id, participantId, () => {
+              void drainMessages().catch((error) => {
+                console.error("Walkie message drain failed:", error);
+                stopStream();
+              });
+            });
+            scheduleHeartbeat(5000);
+          } catch (error) {
+            console.warn("Walkie change streams unavailable, using timed fallback.", error);
+            hasChangeStreamUpdates = false;
+          }
+        })();
 
-        cleanupPersonal = subscribeToWalkieParticipant(id, participantId, (payload) => {
-          send(payload.type === "signal" ? "signal" : "participant", payload);
-        });
-
-        heartbeat = setInterval(() => {
-          send("ping", { ok: true, ts: Date.now() });
-        }, 15000);
+        scheduleHeartbeat(400);
 
         request.signal.addEventListener("abort", () => {
-          cleanupPersonal();
-          cleanupMatch();
-          cleanupParticipant();
-          if (heartbeat) clearInterval(heartbeat);
-          controller.close();
+          stopStream();
         });
-      } catch {
-        cleanupPersonal();
-        cleanupMatch();
-        cleanupParticipant();
-        if (heartbeat) clearInterval(heartbeat);
-        controller.close();
+      } catch (error) {
+        console.error("Walkie SSE setup failed:", error);
+        stopStream();
       }
     },
   });

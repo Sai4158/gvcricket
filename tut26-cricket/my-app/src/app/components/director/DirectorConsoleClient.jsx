@@ -36,7 +36,7 @@ import useWalkieTalkie from "../live/useWalkieTalkie";
 import { WalkieNotice, WalkieTalkButton } from "../live/WalkiePanel";
 import { buildCurrentScoreAnnouncement } from "../../lib/live-announcements";
 import { getBattingTeamBundle } from "../../lib/team-utils";
-import { playUiTone } from "../../lib/page-audio";
+import { playUiTone, primeUiAudio } from "../../lib/page-audio";
 
 const DIRECTOR_AUDIO_LIBRARY_CACHE_KEY = "gv-director-audio-library-v1";
 const DIRECTOR_AUDIO_METADATA_CACHE_KEY = "gv-director-audio-metadata-v1";
@@ -327,6 +327,7 @@ export default function DirectorConsoleClient({
   const [libraryCurrentTime, setLibraryCurrentTime] = useState(0);
   const [libraryLiveId, setLibraryLiveId] = useState("");
   const [libraryState, setLibraryState] = useState("idle");
+  const [effectsNeedsUnlock, setEffectsNeedsUnlock] = useState(false);
   const [draggingLibraryId, setDraggingLibraryId] = useState("");
   const [libraryDropTargetId, setLibraryDropTargetId] = useState("");
   const audioRef = useRef(null);
@@ -951,6 +952,7 @@ export default function DirectorConsoleClient({
     audio.addEventListener("play", handlePlay);
     audio.addEventListener("waiting", handleWaiting);
     audio.addEventListener("canplay", handleCanPlay);
+    audio.addEventListener("canplaythrough", handleCanPlay);
     audio.addEventListener("error", handleError);
     audio.addEventListener("timeupdate", handleTimeUpdate);
 
@@ -960,6 +962,7 @@ export default function DirectorConsoleClient({
       audio.removeEventListener("play", handlePlay);
       audio.removeEventListener("waiting", handleWaiting);
       audio.removeEventListener("canplay", handleCanPlay);
+      audio.removeEventListener("canplaythrough", handleCanPlay);
       audio.removeEventListener("error", handleError);
       audio.removeEventListener("timeupdate", handleTimeUpdate);
     };
@@ -1007,6 +1010,7 @@ export default function DirectorConsoleClient({
     }
 
     setConsoleError("");
+    setEffectsNeedsUnlock(false);
     audio.pause();
     audio.currentTime = 0;
     audio.src = "";
@@ -1016,6 +1020,21 @@ export default function DirectorConsoleClient({
     setLibraryState("idle");
     setLibraryCurrentTime(0);
   };
+
+  const primeEffectsAudio = useCallback(async () => {
+    const audio = effectsAudioRef.current;
+    await primeUiAudio();
+
+    if (!audio) {
+      return;
+    }
+
+    audio.muted = false;
+    audio.playsInline = true;
+    audio.setAttribute("playsinline", "");
+    audio.setAttribute("webkit-playsinline", "");
+    audio.volume = Math.max(0, Math.min(1, masterVolume));
+  }, [masterVolume]);
 
   const playEffect = async (file) => {
     const audio = effectsAudioRef.current;
@@ -1030,15 +1049,18 @@ export default function DirectorConsoleClient({
 
     stopAllEffects();
     setConsoleError("");
+    setEffectsNeedsUnlock(false);
     setLibraryLiveId(file.id);
     setLibraryState("loading");
     setLibraryCurrentTime(0);
-    audio.preload = "none";
+    await primeEffectsAudio();
+    audio.preload = "metadata";
     audio.src = file.src;
     audio.volume = Math.max(
       0,
       Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume)
     );
+    audio.load();
 
     try {
       await audio.play();
@@ -1047,6 +1069,10 @@ export default function DirectorConsoleClient({
         error instanceof DOMException &&
         (error.name === "AbortError" || error.name === "NotAllowedError")
       ) {
+        setConsoleError(
+          "Safari blocked this audio. Tap Enable Audio once, then play the sound again."
+        );
+        setEffectsNeedsUnlock(true);
         setLibraryState("idle");
         setLibraryLiveId("");
         return;
@@ -1616,6 +1642,18 @@ export default function DirectorConsoleClient({
                     {walkie.error}
                   </div>
                 ) : null}
+                {walkie.needsAudioUnlock ? (
+                  <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                    <p>Safari needs one tap to enable walkie audio on this device.</p>
+                    <button
+                      type="button"
+                      onClick={() => void walkie.unlockAudio()}
+                      className="mt-3 rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-amber-300"
+                    >
+                      Enable Audio
+                    </button>
+                  </div>
+                ) : null}
               </div>
               <div className="flex flex-col items-center gap-4">
                 {walkie.snapshot?.enabled ? (
@@ -1673,8 +1711,25 @@ export default function DirectorConsoleClient({
               </button>
             }
           >
-            <audio ref={effectsAudioRef} hidden preload="none" />
+            <audio ref={effectsAudioRef} hidden preload="metadata" playsInline />
             <div className="rounded-[28px] border border-white/10 bg-black/15 p-2">
+              {effectsNeedsUnlock ? (
+                <div className="mb-3 rounded-[22px] border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                  <p>Safari needs one quick tap to enable audio playback on this device.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void primeEffectsAudio().then(() => {
+                        setEffectsNeedsUnlock(false);
+                        setConsoleError("");
+                      });
+                    }}
+                    className="mt-3 rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-amber-300"
+                  >
+                    Enable Audio
+                  </button>
+                </div>
+              ) : null}
               {orderedLibraryFiles.length ? (
                 <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
                   {orderedLibraryFiles.map((file) => (
@@ -1684,6 +1739,9 @@ export default function DirectorConsoleClient({
                       onDragOver={(event) => handleLibraryDragOver(event, file.id)}
                       onDrop={(event) => handleLibraryDrop(event, file.id)}
                       onDragEnd={clearLibraryDragState}
+                      onPointerDown={() => {
+                        void primeEffectsAudio();
+                      }}
                       onClick={() => void playEffect(file)}
                       role="button"
                       tabIndex={0}
@@ -1693,7 +1751,7 @@ export default function DirectorConsoleClient({
                           void playEffect(file);
                         }
                       }}
-                      className={`group relative aspect-square overflow-hidden rounded-[24px] border px-4 py-4 text-left transition cursor-pointer ${
+                      className={`group relative min-h-[11.75rem] overflow-hidden rounded-[24px] border px-4 py-4 pb-5 text-left transition cursor-pointer ${
                         libraryLiveId === file.id
                           ? "border-emerald-300/30 bg-[linear-gradient(180deg,rgba(18,40,34,0.9),rgba(10,16,18,0.94))] shadow-[0_18px_40px_rgba(16,185,129,0.16)]"
                           : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
@@ -1731,8 +1789,8 @@ export default function DirectorConsoleClient({
                             <div className="truncate text-xs text-zinc-400">{file.fileName}</div>
                           </div>
                         </div>
-                        <div className="flex items-end justify-between gap-2">
-                          <div className="space-y-1 text-xs text-zinc-400">
+                        <div className="mt-3 flex items-end justify-between gap-2">
+                          <div className="space-y-1 pb-1 text-xs text-zinc-400">
                             {libraryLiveId === file.id
                               ? libraryState === "loading"
                                 ? "Loading..."

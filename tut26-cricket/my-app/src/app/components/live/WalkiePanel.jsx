@@ -166,6 +166,18 @@ export function WalkieTalkButton({
         ref={buttonRef}
         type="button"
         disabled={disabled}
+        onTouchStart={(event) => {
+          event.preventDefault();
+          void startHold();
+        }}
+        onTouchEnd={(event) => {
+          event.preventDefault();
+          void endHold();
+        }}
+        onTouchCancel={(event) => {
+          event.preventDefault();
+          void endHold();
+        }}
         onPointerDown={(event) => {
           pointerIdRef.current = event.pointerId;
           event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -182,7 +194,7 @@ export function WalkieTalkButton({
         onContextMenu={(event) => {
           event.preventDefault();
         }}
-        className={`relative inline-flex h-24 w-24 items-center justify-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
+        className={`relative inline-flex h-24 w-24 touch-none select-none items-center justify-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
           disabled
             ? "cursor-not-allowed border-white/5 bg-zinc-900 text-zinc-600"
             : active || holding || finishing
@@ -230,12 +242,14 @@ export default function WalkiePanel({
   finishDelayLeft,
   requestCooldownLeft,
   requestState = "idle",
+  needsAudioUnlock = false,
   pendingRequests = [],
   onRequestEnable,
   onToggleEnabled,
   onStartTalking,
   onStopTalking,
   onDismissNotice,
+  onUnlockAudio,
   onAcceptRequest,
   onDismissRequest,
 }) {
@@ -346,6 +360,19 @@ export default function WalkiePanel({
         {error ? (
           <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-center text-sm text-rose-200">
             {error}
+          </div>
+        ) : null}
+
+        {needsAudioUnlock ? (
+          <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
+            <p>Safari needs one tap to enable walkie audio on this device.</p>
+            <button
+              type="button"
+              onClick={() => onUnlockAudio?.()}
+              className="mt-3 rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-amber-300"
+            >
+              Enable Audio
+            </button>
           </div>
         ) : null}
 

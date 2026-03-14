@@ -1,5 +1,5 @@
 import SessionsPageClient from "../components/session/SessionsPageClient";
-import { absoluteUrl } from "../lib/site-metadata";
+import { absoluteUrl, siteConfig } from "../lib/site-metadata";
 import { loadSessionsIndexData } from "../lib/server-data";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +16,20 @@ export const metadata = {
     description:
       "Open live scoreboards, finished results, and saved cricket sessions in one place.",
     url: absoluteUrl("/session"),
+    images: [
+      {
+        url: absoluteUrl(siteConfig.ogImagePath),
+        width: 1200,
+        height: 630,
+        alt: "GV Cricket sessions and live score preview",
+      },
+    ],
+  },
+  twitter: {
+    title: "All Cricket Sessions | GV Cricket",
+    description:
+      "Open live scoreboards, finished results, and saved cricket sessions in one place.",
+    images: [absoluteUrl(siteConfig.twitterImagePath)],
   },
 };
 

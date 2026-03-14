@@ -1,20 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { FaPlay } from "react-icons/fa";
 
 export default function YouTubeVideoPlayer({ videoId, title }) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
   const thumbnailUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
 
   return (
     <motion.figure
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.96 }}
+      whileInView={{ opacity: 1, scale: 1 }}
       viewport={{ once: true, amount: 0.12, margin: "0px 0px -6% 0px" }}
-      transition={{ duration: 0.42, ease: "easeOut" }}
-      className="liquid-glass group relative overflow-hidden rounded-[30px] p-2.5 transition-all duration-300 hover:border-white/28 hover:shadow-[0_18px_48px_rgba(0,0,0,0.32)] transform-gpu will-change-transform"
+      transition={{ duration: prefersReducedMotion ? 0 : 0.72, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={prefersReducedMotion ? undefined : { scale: 1.01 }}
+      className="liquid-glass group relative overflow-hidden rounded-[30px] p-2.5 transition-all duration-300 hover:border-white/28 hover:shadow-[0_18px_48px_rgba(0,0,0,0.32)]"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.16),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,210,130,0.12),transparent_30%)] opacity-90" />
       <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-black/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">

@@ -1,3 +1,38 @@
+let sharedUiAudioContext = null;
+
+function getUiAudioContext() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    return null;
+  }
+
+  if (!sharedUiAudioContext || sharedUiAudioContext.state === "closed") {
+    sharedUiAudioContext = new AudioContextClass();
+  }
+
+  return sharedUiAudioContext;
+}
+
+export async function primeUiAudio() {
+  const context = getUiAudioContext();
+  if (!context) {
+    return false;
+  }
+
+  try {
+    if (context.state === "suspended") {
+      await context.resume();
+    }
+    return context.state === "running";
+  } catch {
+    return false;
+  }
+}
+
 export function duckPageMedia(stateRef, duckVolume = 0.18) {
   if (typeof document === "undefined" || !stateRef) {
     return;
@@ -56,13 +91,16 @@ export function playUiTone({
     return;
   }
 
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) {
-    return;
-  }
-
   try {
-    const audioContext = new AudioContextClass();
+    const audioContext = getUiAudioContext();
+    if (!audioContext) {
+      return;
+    }
+
+    if (audioContext.state === "suspended") {
+      void audioContext.resume().catch(() => {});
+    }
+
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
     const now = audioContext.currentTime;
@@ -77,9 +115,6 @@ export function playUiTone({
     gainNode.connect(audioContext.destination);
     oscillator.start(now);
     oscillator.stop(now + durationMs / 1000);
-    oscillator.onended = () => {
-      void audioContext.close().catch(() => {});
-    };
   } catch {
     // Best-effort only.
   }

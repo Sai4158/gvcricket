@@ -13,10 +13,9 @@ import { parseJsonRequest } from "../../../../../lib/request-security";
 import { walkieSignalSchema } from "../../../../../lib/validators";
 import { hasValidWalkieParticipantToken } from "../../../../../lib/walkie-auth";
 import {
-  dispatchWalkieSignal,
-  hasRegisteredWalkieParticipant,
-  registerWalkieParticipantFromToken,
-} from "../../../../../lib/walkie-talkie";
+  dispatchPersistentWalkieSignal,
+  registerPersistentWalkieParticipant,
+} from "../../../../../lib/walkie-store";
 import Match from "../../../../../../models/Match";
 
 async function hasMatchAccess(matchId, accessVersion) {
@@ -53,22 +52,14 @@ export async function POST(req, { params }) {
     parsedRequest.value.participantId,
     parsedRequest.value.role
   );
-  const hasRegisteredParticipant = hasRegisteredWalkieParticipant(
-    id,
-    parsedRequest.value.participantId,
-    parsedRequest.value.role
-  );
-
-  if (!hasValidToken && !hasRegisteredParticipant) {
+  if (!hasValidToken) {
     return jsonError("Walkie participant token is invalid.", 403);
   }
 
-  if (hasValidToken && !hasRegisteredParticipant) {
-    registerWalkieParticipantFromToken(id, {
-      id: parsedRequest.value.participantId,
-      role: parsedRequest.value.role,
-    });
-  }
+  await registerPersistentWalkieParticipant(id, {
+    id: parsedRequest.value.participantId,
+    role: parsedRequest.value.role,
+  });
 
   const hasAccess = await hasMatchAccess(id, Number(match.adminAccessVersion || 1));
   if (!hasAccess && parsedRequest.value.role === "umpire") {
@@ -82,7 +73,7 @@ export async function POST(req, { params }) {
     }
   }
 
-  const result = dispatchWalkieSignal(id, {
+  const result = await dispatchPersistentWalkieSignal(id, {
     fromId: parsedRequest.value.participantId,
     toId: parsedRequest.value.toId,
     payload: parsedRequest.value.payload,

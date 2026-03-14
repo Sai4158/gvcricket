@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FaArrowLeft } from "react-icons/fa";
-import { absoluteUrl } from "../lib/site-metadata";
+import { absoluteUrl, siteConfig } from "../lib/site-metadata";
 import { RuleItem, RulesSection } from "../components/rules/RulesSection";
 import {
   appGuideIcon,
@@ -14,6 +14,26 @@ export const metadata = {
     "Read the cricket scoring rules, app guide, and match flow used inside GV Cricket.",
   alternates: {
     canonical: absoluteUrl("/rules"),
+  },
+  openGraph: {
+    title: "Cricket Scoring Rules and App Guide | GV Cricket",
+    description:
+      "Read the cricket scoring rules, app guide, and match flow used inside GV Cricket.",
+    url: absoluteUrl("/rules"),
+    images: [
+      {
+        url: absoluteUrl(siteConfig.ogImagePath),
+        width: 1200,
+        height: 630,
+        alt: "GV Cricket rules and app guide preview",
+      },
+    ],
+  },
+  twitter: {
+    title: "Cricket Scoring Rules and App Guide | GV Cricket",
+    description:
+      "Read the cricket scoring rules, app guide, and match flow used inside GV Cricket.",
+    images: [absoluteUrl(siteConfig.twitterImagePath)],
   },
 };
 

@@ -93,7 +93,9 @@ export default function MatchPageClient({
       return;
     }
 
-    const nextSignature = walkie.pendingRequests.map((request) => request.id).join("|");
+    const nextSignature = walkie.pendingRequests
+      .map((request) => request.requestId)
+      .join("|");
     if (nextSignature === lastWalkieRequestSignatureRef.current) {
       return;
     }
@@ -104,7 +106,7 @@ export default function MatchPageClient({
       latestRequest?.role === "director" ? "Director" : "Spectator";
 
     speak(`${requestRole} requested walkie-talkie.`, {
-      key: `umpire-walkie-request-${latestRequest?.id || nextSignature}`,
+      key: `umpire-walkie-request-${latestRequest?.requestId || nextSignature}`,
       rate: 0.9,
       interrupt: true,
       ignoreEnabled: true,
@@ -406,6 +408,7 @@ export default function MatchPageClient({
                 isFinishing: walkie.isFinishing,
                 countdown: walkie.countdown,
                 finishDelayLeft: walkie.finishDelayLeft,
+                needsAudioUnlock: walkie.needsAudioUnlock,
                 requestCooldownLeft: 0,
                 requestState: "idle",
                 pendingRequests: walkie.pendingRequests,
@@ -413,6 +416,7 @@ export default function MatchPageClient({
                 onToggleEnabled: walkie.toggleEnabled,
                 onStartTalking: walkie.startTalking,
                 onStopTalking: walkie.stopTalking,
+                onUnlockAudio: walkie.unlockAudio,
                 onDismissNotice: walkie.dismissNotice,
                 onAcceptRequest: walkie.acceptRequest,
                 onDismissRequest: walkie.dismissRequest,

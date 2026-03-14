@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   FaBroadcastTower,
   FaBullhorn,
@@ -23,19 +23,27 @@ import {
 } from "react-icons/fa";
 import AnimatedSection from "./AnimatedSection";
 
-function getCardMotionProps(index) {
-  const fromLeft = index % 2 === 0;
-  return {
-    initial: { opacity: 0, x: fromLeft ? -28 : 28, y: 12 },
-    whileInView: { opacity: 1, x: 0, y: 0 },
-    viewport: { once: true, amount: 0.12, margin: "0px 0px -8% 0px" },
+const gridVariants = {
+  hidden: {},
+  visible: {
     transition: {
-      duration: 0.5,
-      ease: [0.22, 1, 0.36, 1],
-      delay: Math.min(index * 0.04, 0.2),
+      delayChildren: 0.08,
+      staggerChildren: 0.1,
     },
-  };
-}
+  },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, scale: 0.945 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: {
+      duration: 0.7,
+      ease: [0.16, 1, 0.3, 1],
+    },
+  },
+};
 
 function splitCardsForLargeGrid(cards, columns = 5) {
   const remainder = cards.length % columns;
@@ -178,27 +186,6 @@ const coreCards = [
     accent: "amber",
   },
   {
-    icon: FaBroadcastTower,
-    title: "Live Communication",
-    copy:
-      "Use walkie-talkie, score feedback, and director controls to keep everyone in sync during the match.",
-    accent: "emerald",
-  },
-  {
-    icon: FaImage,
-    title: "Session Branding",
-    copy:
-      "Reuse one match image across live score, spectator view, results, and stats with a consistent identity.",
-    accent: "violet",
-  },
-  {
-    icon: FaDrum,
-    title: "Match Atmosphere",
-    copy:
-      "Bring in sound effects, mic control, and faster audio tools without slowing down the scoring flow.",
-    accent: "rose",
-  },
-  {
     icon: FaLock,
     title: "Protected Match Access",
     copy:
@@ -249,6 +236,7 @@ function getAccentLineClasses(accent) {
 }
 
 export default function HowItWorksSection() {
+  const prefersReducedMotion = useReducedMotion();
   const modernCardClass =
     "liquid-glass-soft group relative overflow-hidden rounded-[28px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_38%),linear-gradient(180deg,rgba(20,20,26,0.82),rgba(9,9,14,0.72))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)]";
   const updateGrid = splitCardsForLargeGrid(updateCards);
@@ -257,9 +245,9 @@ export default function HowItWorksSection() {
   const renderCard = (card, index, hoverRotateClass = "") => (
     <motion.div
       key={card.title}
-      {...getCardMotionProps(index)}
-      whileHover={{ y: -4 }}
-      className={`${modernCardClass} transform-gpu will-change-transform`}
+      variants={cardVariants}
+      whileHover={prefersReducedMotion ? undefined : { scale: 1.012 }}
+      className={modernCardClass}
     >
       <div
         className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentLineClasses(
@@ -290,8 +278,10 @@ export default function HowItWorksSection() {
       <div className="space-y-8">
         <div className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.82),rgba(8,8,14,0.72))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10">
           <div className="mx-auto max-w-3xl text-center">
-            <span className="liquid-pill inline-flex rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-amber-50">
-              Latest features
+            <span className="liquid-pill inline-flex rounded-full bg-[linear-gradient(180deg,rgba(255,244,214,0.18),rgba(120,74,16,0.12))] px-4 py-1 text-xs font-semibold uppercase tracking-[0.28em] shadow-[inset_0_1px_0_rgba(255,248,224,0.28)]">
+              <span className="bg-[linear-gradient(180deg,#fff6cf_0%,#f6d365_38%,#e3a72f_68%,#fff1b3_100%)] text-transparent [background-clip:text] [-webkit-background-clip:text] drop-shadow-[0_0_10px_rgba(245,193,64,0.18)]">
+                Latest features
+              </span>
             </span>
             <h2 className="mt-5 text-4xl font-semibold tracking-[-0.04em] text-white md:text-5xl">
               Built for faster live scoring
@@ -301,7 +291,13 @@ export default function HowItWorksSection() {
             </p>
           </div>
 
-          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+          <motion.div
+            initial={prefersReducedMotion ? false : "hidden"}
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.12, margin: "0px 0px -8% 0px" }}
+            variants={gridVariants}
+            className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5"
+          >
             {updateGrid.regularCards.map((card, index) =>
               renderCard(card, index, "group-hover:-rotate-3")
             )}
@@ -318,7 +314,7 @@ export default function HowItWorksSection() {
                 </div>
               </div>
             ) : null}
-          </div>
+          </motion.div>
         </div>
 
         <div className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.82),rgba(8,8,14,0.72))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10">
@@ -331,7 +327,13 @@ export default function HowItWorksSection() {
             </p>
           </div>
 
-          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+          <motion.div
+            initial={prefersReducedMotion ? false : "hidden"}
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.12, margin: "0px 0px -8% 0px" }}
+            variants={gridVariants}
+            className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5"
+          >
             {coreGrid.regularCards.map((card, index) =>
               renderCard(card, index, "group-hover:rotate-3")
             )}
@@ -348,7 +350,7 @@ export default function HowItWorksSection() {
                 </div>
               </div>
             ) : null}
-          </div>
+          </motion.div>
         </div>
       </div>
     </AnimatedSection>

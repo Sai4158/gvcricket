@@ -2,12 +2,11 @@ import { cookies } from "next/headers";
 import { jsonError } from "../../../../../lib/api-response";
 import { connectDB } from "../../../../../lib/db";
 import {
-  getMatchAccessCookieName,
-  hasValidMatchAccess,
+  getMatchAccessCookieName, hasValidMatchAccess,
 } from "../../../../../lib/match-access";
 import { parseJsonRequest } from "../../../../../lib/request-security";
 import { walkieRespondSchema } from "../../../../../lib/validators";
-import { respondToWalkieRequest } from "../../../../../lib/walkie-talkie";
+import { respondToPersistentWalkieRequest } from "../../../../../lib/walkie-store";
 import Match from "../../../../../../models/Match";
 
 async function hasMatchAccess(matchId, accessVersion) {
@@ -43,7 +42,7 @@ export async function POST(req, { params }) {
     return jsonError("Walkie-talkie is only available during a live match.", 409);
   }
 
-  const result = respondToWalkieRequest(id, parsedRequest.value);
+  const result = await respondToPersistentWalkieRequest(id, parsedRequest.value);
   if (!result.ok) {
     return jsonError(result.message, result.status);
   }

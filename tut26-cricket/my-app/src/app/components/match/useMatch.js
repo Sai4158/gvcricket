@@ -201,6 +201,14 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
         .catch(() => ({ message: "Failed to update match." }));
 
       if (!response.ok) {
+        if (
+          body.message === "The current innings is already complete." ||
+          body.message === "The current innings is not complete yet."
+        ) {
+          await refreshMatch();
+          setError(null);
+          return null;
+        }
         throw new Error(body.message || "Failed to update match.");
       }
 

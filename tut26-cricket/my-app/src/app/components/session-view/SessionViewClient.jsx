@@ -1097,6 +1097,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
             isFinishing={walkie.isFinishing}
             countdown={walkie.countdown}
             finishDelayLeft={walkie.finishDelayLeft}
+            needsAudioUnlock={walkie.needsAudioUnlock}
             requestCooldownLeft={walkie.requestCooldownLeft}
             requestState={walkie.requestState}
             pendingRequests={walkie.pendingRequests}
@@ -1104,6 +1105,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
             onToggleEnabled={() => {}}
             onStartTalking={walkie.startTalking}
             onStopTalking={walkie.stopTalking}
+            onUnlockAudio={walkie.unlockAudio}
             onDismissNotice={walkie.dismissNotice}
             onAcceptRequest={() => {}}
             onDismissRequest={() => {}}

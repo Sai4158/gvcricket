@@ -133,32 +133,32 @@ export default function MatchImageUploader({
   };
 
   return (
-    <section className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,20,24,0.96),rgba(10,10,14,0.98))] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.38)] ring-1 ring-white/5 sm:p-6">
-      <div className="mb-5 flex items-start gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-400/12 text-xl text-amber-300 shadow-[0_12px_28px_rgba(245,158,11,0.12)]">
+    <section className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,20,24,0.96),rgba(10,10,14,0.98))] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.38)] ring-1 ring-white/5 sm:p-5">
+      <div className="mb-4 flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-400/12 text-lg text-amber-300 shadow-[0_12px_28px_rgba(245,158,11,0.12)]">
           <FaImage />
         </div>
         <div>
-          <h3 className="text-xl font-semibold text-white">{title}</h3>
-          <p className="mt-1 text-sm leading-6 text-zinc-400">{description}</p>
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          <p className="mt-1 text-sm leading-5 text-zinc-400">{description}</p>
         </div>
       </div>
 
       {currentPreview && (
-        <div className="mb-5 overflow-hidden rounded-[24px] border border-white/10 bg-black/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="mb-4 overflow-hidden rounded-[22px] border border-white/10 bg-black/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={currentPreview}
             alt="Selected match"
-            className="max-h-80 w-full object-cover"
+            className="max-h-56 w-full object-cover sm:max-h-64"
           />
         </div>
       )}
 
-      <div className="space-y-4">
-        <div className="rounded-[24px] border border-white/8 bg-black/20 p-3">
+      <div className="space-y-3">
+        <div className="rounded-[22px] border border-white/8 bg-black/20 p-3">
           <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3">
-            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/[0.06] text-zinc-400">
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/[0.06] text-zinc-400">
               <FaImage />
             </span>
             <label
@@ -185,7 +185,7 @@ export default function MatchImageUploader({
         <button
           onClick={handleUpload}
           disabled={!selectedFile || isUploading}
-          className="w-full rounded-full bg-[linear-gradient(90deg,#10b981_0%,#059669_100%)] px-5 py-3.5 font-semibold text-black shadow-[0_16px_36px_rgba(16,185,129,0.22)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-full bg-[linear-gradient(90deg,#10b981_0%,#059669_100%)] px-5 py-3 font-semibold text-black shadow-[0_16px_36px_rgba(16,185,129,0.22)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isUploading ? "Uploading..." : primaryLabel}
         </button>
@@ -199,11 +199,11 @@ export default function MatchImageUploader({
         ) : null}
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-3">
+      <div className="mt-5 flex flex-wrap gap-3">
         {onSkip && (
           <button
             onClick={onSkip}
-            className="rounded-full border border-white/10 px-5 py-3 font-semibold text-zinc-200 transition hover:bg-white/5"
+            className="rounded-full border border-white/10 px-5 py-2.5 font-semibold text-zinc-200 transition hover:bg-white/5"
           >
             {secondaryLabel}
           </button>
