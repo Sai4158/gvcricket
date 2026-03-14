@@ -39,6 +39,7 @@ export default function MatchPageClient({
   const [modal, setModal] = useState({ type: null });
   const [infoText, setInfoText] = useState(null);
   const localAnnouncementIdRef = useRef(0);
+  const lastWalkieRequestSignatureRef = useRef("");
   const { authStatus, authError, authSubmitting, submitPin } = useMatchAccess(
     matchId,
     initialAuthStatus
@@ -85,6 +86,30 @@ export default function MatchPageClient({
       stop();
     }
   }, [isLiveMatch, stop]);
+
+  useEffect(() => {
+    if (!isLiveMatch || !walkie.pendingRequests?.length) {
+      lastWalkieRequestSignatureRef.current = "";
+      return;
+    }
+
+    const nextSignature = walkie.pendingRequests.map((request) => request.id).join("|");
+    if (nextSignature === lastWalkieRequestSignatureRef.current) {
+      return;
+    }
+
+    lastWalkieRequestSignatureRef.current = nextSignature;
+    const latestRequest = walkie.pendingRequests[0];
+    const requestRole =
+      latestRequest?.role === "director" ? "Director" : "Spectator";
+
+    speak(`${requestRole} requested walkie-talkie.`, {
+      key: `umpire-walkie-request-${latestRequest?.id || nextSignature}`,
+      rate: 0.9,
+      interrupt: true,
+      ignoreEnabled: true,
+    });
+  }, [isLiveMatch, speak, walkie.pendingRequests]);
 
   const announceUmpireAction = (runs, isOut = false, extraType = null) => {
     const nextMatch = match

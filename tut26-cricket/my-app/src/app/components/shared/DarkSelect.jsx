@@ -143,11 +143,6 @@ export default function DarkSelect({
         {iconOnly ? (
           <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/8 bg-white/[0.05] text-zinc-200">
             {LeadingIcon ? <LeadingIcon className="text-[13px]" /> : null}
-            <FaChevronDown
-              className={`absolute -bottom-0.5 -right-0.5 text-[9px] text-zinc-400 transition-transform ${
-                open ? "rotate-180" : ""
-              }`}
-            />
           </span>
         ) : (
           <>
