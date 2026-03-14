@@ -157,6 +157,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const previousWalkieEnabledRef = useRef(false);
   const previousWalkieRequestStateRef = useRef("idle");
   const lastStreamUpdateRef = useRef(initialData?.updatedAt || "");
+  const announcerAutoEnabledMatchRef = useRef("");
   const router = useRouter();
   const sessionData = data?.session;
   const match = data?.match;
@@ -250,6 +251,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     previousEnabledRef.current = false;
     previousWalkieEnabledRef.current = false;
     previousWalkieRequestStateRef.current = "idle";
+    announcerAutoEnabledMatchRef.current = "";
     queueMicrotask(() => {
       setSpectatorWalkieEnabled(false);
       setLocalWalkieNotice("");
@@ -257,6 +259,21 @@ export default function SessionViewClient({ sessionId, initialData }) {
     clearAnnouncementTimers();
     stop();
   }, [clearAnnouncementTimers, match?._id, stop]);
+
+  useEffect(() => {
+    if (!match?._id || !isLiveMatch) {
+      return;
+    }
+
+    if (announcerAutoEnabledMatchRef.current === match._id) {
+      return;
+    }
+
+    announcerAutoEnabledMatchRef.current = match._id;
+    if (!settings.enabled) {
+      updateSetting("enabled", true);
+    }
+  }, [isLiveMatch, match?._id, settings.enabled, updateSetting]);
 
   useEffect(() => {
     const announcerEnabled = Boolean(match && isLiveMatch && settings.enabled && settings.mode !== "silent");
