@@ -1,86 +1,69 @@
-# 🏏 GV Cricket
+# GV Cricket 2.0
 
-**GV Cricket** is a scorekeeping app for cricket matches. Use it to set up teams, score matches ball-by-ball, and share live results with the community. Ditch the paper scorecard and manage everything in one place.
+GV Cricket 2.0 is a modern cricket scoring app for running a match from setup to result in one clean flow.
 
----
+It is built for:
+- umpires who need fast live scoring
+- spectators who want instant score updates
+- directors who want audio, walkie-talkie, and match control tools
 
-## ✨ Features
+## Features
 
-A complete, end-to-end solution for managing and scoring cricket matches, built with a focus on a dynamic and immersive user experience.
+- 🏏 Fast ball-by-ball umpire scoring
+- 📣 Live spectator score announcer
+- 🎙️ Loudspeaker and commentary tools
+- 📻 Walkie-Talkie for live match communication
+- 🎛️ Director Console for audio and session control
+- 🪙 Toss flow with batting and bowling selection
+- 👥 Team setup with editable player lists
+- 🖼️ Match cover image and branded match pages
+- 📊 Result insights, scorecards, and saved match history
+- 🔄 Live updates across umpire, spectator, and result views
 
-- **✨ Living User Interface:** A stunning homepage and UI featuring dynamic, animated gradients on text and buttons, interactive mouse-following glows, and ambient animations that make the application feel alive.
-- **📋 Session Management:**
-  - Create new match sessions with a unique name.
-  - View a list of all past and live sessions.
-  - Dynamic status indicators show if a game is **LIVE NOW** or when it **Ended**.
-- **🏏 Team Selection:**
-  - A fast and intuitive interface for setting up teams.
-  - Quickly set player counts with `+/-` buttons.
-  - Players are automatically named to save time.
-  - An "Edit Mode" allows for renaming teams/players and deleting specific players from the roster.
-- **🪙 Interactive Coin Toss:**
-  - A 10-second countdown builds suspense before the toss.
-  - Features a 3-second, 3D gold coin spin animation.
-  - The winning team can choose to "Bat First" or "Bowl First", with the result saved automatically.
-- **🖋️ Live Umpire Mode:**
-  - The main scoring interface, protected by a PIN.
-  - Simple, clear buttons for tracking every ball (runs, wides, outs, etc.).
-  - An "Undo" feature to easily correct mistakes.
-  - Live over-by-over history tracking.
-- **👀 Live Spectator View:**
-  - A shareable, real-time scoreboard that anyone can view.
-  - Automatically refreshes every few seconds to show the latest score.
-  - Perfect for players on the sideline or for displaying on a larger screen.
-- **📊 Final Results Page:**
-  - Automatically displays a clear summary of the match winner.
-  - Includes detailed charts and graphs to visualize scoring progression and run rates.
-  - Provides a complete ball-by-ball history for both innings.
-- **📱 Fully Responsive:** Designed to work beautifully on desktop, tablets, and mobile phones.
+## How it works
 
----
+1. Create a session
+2. Add team names, players, and overs
+3. Complete the toss
+4. Start the real live match
+5. Score each ball in umpire mode
+6. Share the live score with spectators
+7. Finish the match and view the result page
 
-## 🛠️ Tech Stack
+## Main views
 
-This project is built with a modern, full-stack JavaScript toolkit.
+- **Home**  
+  Product overview, live match entry points, and highlight sections.
 
-- **Framework:** ▲ [Next.js](https://nextjs.org/)
-- **UI Library:** ⚛️ [React 19](https://react.dev/)
-- **Styling:** 🎨 [Tailwind CSS](https://tailwindcss.com/)
-- **Database:** 🍃 [MongoDB Atlas](https://www.mongodb.com/atlas)
-- **ODM:** [Mongoose](https://mongoosejs.com/)
-- **Animation:** ✨ [Framer Motion](https://www.framer.com/motion/)
-- **Deployment:** ▲ [Vercel](https://vercel.com/)
+- **Session setup**  
+  Create the session, define teams, players, and overs.
 
----
+- **Toss**  
+  Decide the toss winner and choose bat or bowl.
 
-## 📦 Key NPM Packages
+- **Umpire mode**  
+  Score runs, wickets, wides, no balls, undo actions, and manage the match live.
 
-- `next`: The core React framework.
-- `react` & `react-dom`: For building the user interface.
-- `mongoose`: For modeling and connecting to the MongoDB database.
-- `tailwindcss`: For all styling and UI design.
-- `framer-motion`: Powers all the page transitions and component animations.
-- `swr`: For client-side data fetching and real-time updates.
-- `recharts`: For creating the charts on the results page.
-- `@studio-freight/react-lenis`: For a smooth scrolling experience.
-- `react-icons`: For all the icons used throughout the application.
+- **Spectator view**  
+  Follow the live score, hear score announcements, and use walkie-talkie when enabled.
 
----
+- **Director Console**  
+  Manage music, sound effects, audio playback, walkie, and session-level control tools.
 
-## 🚀 Getting Started
+- **Results**  
+  View final scores, winner summary, charts, insights, and saved match details.
 
-To run this project on your local machine, follow these steps:
+## Stack
 
-1.  **Clone the Repository**
+- **Next.js** for the app framework
+- **React** for the UI
+- **MongoDB + Mongoose** for persistence
+- **Server-Sent Events (SSE)** for live updates
+- **Framer Motion** for motion and UI polish
+- **Tailwind CSS** for styling
 
-    ```bash
-    git clone https://github.com/Sai4158/gvcricket.git
-    cd gvcricket
-    ```
+## Notes
 
-2.  **Create an Environment File**
-    - Create a new file named `.env.local` in the root of your project.
-    - Add your MongoDB connection string to this file:
-      ```
-      MONGODB_URI="your_mongodb_connection_string"
-      ```
+- Built to be simple, fast, and mobile-friendly
+- Designed for live cricket scoring with synced match views
+- Keeps umpire, spectator, result, and director flows connected in one system
