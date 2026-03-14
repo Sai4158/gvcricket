@@ -874,7 +874,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                 setActivePanel("mic");
               }
             }}
-            className={`${launcherCardClass} min-h-[138px] px-4 py-3.5`}
+            className={`${launcherCardClass} min-h-34.5 px-4 py-3.5`}
             aria-label="Open loudspeaker"
           >
             <div className="flex h-full flex-col">
@@ -899,7 +899,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                 <span className="block text-[15px] font-semibold leading-5 text-white">
                   Loudspeaker
                 </span>
-                <span className="mt-1.5 block max-w-[14rem] text-[13px] leading-5 text-zinc-400">
+                <span className="mt-1.5 block max-w-56 text-[13px] leading-5 text-zinc-400">
                   {speakerCardDescription}
                 </span>
               </div>
@@ -948,7 +948,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                 setActivePanel("announce");
               }
             }}
-            className={`${launcherCardClass} min-h-[138px] px-4 py-3.5`}
+            className={`${launcherCardClass} min-h-34.5 px-4 py-3.5`}
             aria-label="Open score announcer"
           >
             <div className="flex h-full flex-col">
@@ -976,7 +976,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                 <span className="block text-[15px] font-semibold leading-5 text-white">
                   Score Announcer
                 </span>
-                <span className="mt-1.5 block max-w-[14rem] text-[13px] leading-5 text-zinc-400">
+                <span className="mt-1.5 block max-w-56 text-[13px] leading-5 text-zinc-400">
                   {announcerCardDescription}
                 </span>
               </div>
