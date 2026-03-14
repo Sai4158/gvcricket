@@ -1,16 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "regions": ["iad1"],
-  "functions": {
-    "src/app/api/live/matches/[id]/route.js": {
-      "maxDuration": 300
-    },
-    "src/app/api/live/sessions/[id]/route.js": {
-      "maxDuration": 300
-    },
-    "src/app/api/live/walkie/[id]/route.js": {
-      "maxDuration": 300
-    }
-  }
+  "regions": ["iad1"]
 }

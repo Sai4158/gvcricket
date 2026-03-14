@@ -31,6 +31,7 @@ const nextConfig = {
       },
     ],
   },
+  outputFileTracingRoot: __dirname,
   serverExternalPackages: ["@tensorflow/tfjs", "nsfwjs", "sharp"],
   turbopack: {
     root: __dirname,
