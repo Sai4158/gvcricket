@@ -113,23 +113,23 @@ function IosGlassSwitch({ checked, onChange, label, disabled = false }) {
           onChange(!checked);
         }
       }}
-      className={`relative inline-flex h-8 w-[58px] items-center rounded-full border p-1 transition ${
+      className={`relative inline-flex h-8 w-14.5 items-center rounded-full border p-1 transition ${
         disabled
-          ? "cursor-not-allowed border-white/8 bg-white/[0.04] opacity-55"
+          ? "cursor-not-allowed border-white/8 bg-white/4 opacity-55"
           : checked
           ? "border-emerald-300/35 bg-[linear-gradient(180deg,rgba(16,185,129,0.92),rgba(6,95,70,0.92))] shadow-[0_12px_28px_rgba(16,185,129,0.24)]"
           : "border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.06))] shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]"
       }`}
     >
       <span
-        className={`absolute inset-[1px] rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] ${
+        className={`absolute inset-px rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] ${
           checked ? "opacity-30" : "opacity-100"
         }`}
         aria-hidden="true"
       />
       <span
         className={`relative z-10 inline-flex h-6 w-6 items-center justify-center rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(229,231,235,0.92))] shadow-[0_6px_16px_rgba(0,0,0,0.28)] transition-transform ${
-          checked ? "translate-x-[26px]" : "translate-x-0"
+          checked ? "translate-x-6.5" : "translate-x-0"
         }`}
       />
     </button>
@@ -733,7 +733,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       <div className="w-full max-w-4xl mt-4 mb-2 flex items-center justify-between gap-3 px-1">
         <button
           onClick={() => router.push("/session")}
-          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
+          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
           aria-label="Back to Sessions"
         >
           <FaArrowLeft size={15} />
@@ -741,7 +741,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         </button>
         <button
           onClick={handleShare}
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/4 text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
           aria-label="Share Link"
         >
           {copied ? (
@@ -841,7 +841,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                         ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_28px_rgba(16,185,129,0.38)]"
                         : walkieCardFinishing
                         ? "border-amber-300/40 bg-amber-500/12 text-amber-100 shadow-[0_0_22px_rgba(245,158,11,0.18)]"
-                        : "border-white/12 bg-white/[0.05] text-white"
+                        : "border-white/12 bg-white/5 text-white"
                     }`}
                   >
                     {walkieCardTalking ? (
@@ -928,7 +928,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                     className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${
                       speakerCardTalking
                         ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_24px_rgba(16,185,129,0.35)]"
-                        : "border-white/12 bg-white/[0.05] text-white"
+                        : "border-white/12 bg-white/5 text-white"
                     }`}
                   >
                     {speakerCardTalking ? <FaMicrophone /> : <FaMicrophoneSlash />}
@@ -981,7 +981,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                 </span>
               </div>
               <div className="mt-auto flex justify-end pt-3">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.05] text-zinc-400">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-zinc-400">
                   <FaVolumeUp className="text-sm" />
                 </span>
               </div>

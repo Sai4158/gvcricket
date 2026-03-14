@@ -8,7 +8,7 @@ function ChoiceButton({ onClick, tone, children }) {
   return (
     <button
       onClick={onClick}
-      className={`btn-ui press-feedback group flex min-h-[96px] flex-1 items-center justify-center rounded-[24px] px-5 py-4 text-center transition duration-300 hover:-translate-y-0.5 ${
+      className={`btn-ui press-feedback group flex min-h-24 flex-1 items-center justify-center rounded-3xl px-5 py-4 text-center transition duration-300 hover:-translate-y-0.5 ${
         tone === "heads"
           ? "btn-ui-glass-dark"
           : "btn-ui-glass-dark-alt"
@@ -45,11 +45,11 @@ export default function TossStatePanels({
   );
 
   return (
-    <div className="relative min-h-[520px] overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.12),transparent_34%),linear-gradient(180deg,rgba(18,18,24,0.98),rgba(8,8,12,0.99))] px-5 py-6 shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
+    <div className="relative min-h-130 overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.12),transparent_34%),linear-gradient(180deg,rgba(18,18,24,0.98),rgba(8,8,12,0.99))] px-5 py-6 shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-[linear-gradient(90deg,rgba(251,191,36,0.96),rgba(251,146,60,0.72),transparent)]" />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),transparent_16%)]" />
       {status === "finished" ? (
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[260px] overflow-hidden">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-65 overflow-hidden">
           {confettiPieces.map((piece) => (
             <span
               key={piece.id}
@@ -73,7 +73,7 @@ export default function TossStatePanels({
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
-            className="flex min-h-[468px] flex-col justify-between"
+            className="flex min-h-117 flex-col justify-between"
           >
             <div className="text-center">
               <h2 className="text-[2.15rem] font-semibold tracking-tight text-white">{teamName}</h2>
@@ -88,7 +88,7 @@ export default function TossStatePanels({
                   ease: "linear",
                   repeat: Number.POSITIVE_INFINITY,
                 }}
-                className="[transform-style:preserve-3d]"
+                className="transform-3d"
               >
                 <SpinningCoin />
               </motion.div>
@@ -111,7 +111,7 @@ export default function TossStatePanels({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
-            className="flex min-h-[468px] flex-col items-center justify-center text-center"
+            className="flex min-h-117 flex-col items-center justify-center text-center"
           >
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-300">
               <FaCircle className="text-[9px] text-amber-300" />
@@ -131,12 +131,12 @@ export default function TossStatePanels({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
-            className="flex min-h-[468px] flex-col items-center justify-center text-center"
+            className="flex min-h-117 flex-col items-center justify-center text-center"
           >
             <motion.div
               animate={{ rotateY: 1440 }}
               transition={{ duration: 2.2, ease: "easeInOut" }}
-              className="[transform-style:preserve-3d]"
+              className="transform-3d"
             >
               <SpinningCoin />
             </motion.div>
@@ -149,7 +149,7 @@ export default function TossStatePanels({
             key="finished"
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex min-h-[468px] flex-col items-center justify-between text-center"
+            className="flex min-h-117 flex-col items-center justify-between text-center"
           >
             <div>
               <div className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-300">
@@ -171,7 +171,7 @@ export default function TossStatePanels({
                 <button
                   onClick={() => onDecision("bat")}
                   disabled={isSubmitting}
-                  className="btn-ui btn-ui-glass-dark group rounded-[24px] px-4 py-4 text-base font-medium disabled:hover:translate-y-0"
+                  className="btn-ui btn-ui-glass-dark group rounded-3xl px-4 py-4 text-base font-medium disabled:hover:translate-y-0"
                 >
                   <span className="block transition-transform group-hover:translate-x-0.5">
                     {isSubmitting ? "Saving..." : "Bat First"}
@@ -180,7 +180,7 @@ export default function TossStatePanels({
                 <button
                   onClick={() => onDecision("bowl")}
                   disabled={isSubmitting}
-                  className="btn-ui btn-ui-glass-dark-alt group rounded-[24px] px-4 py-4 text-base font-medium disabled:hover:translate-y-0"
+                  className="btn-ui btn-ui-glass-dark-alt group rounded-3xl px-4 py-4 text-base font-medium disabled:hover:translate-y-0"
                 >
                   <span className="block transition-transform group-hover:translate-x-0.5">
                     {isSubmitting ? "Saving..." : "Bowl First"}
