@@ -217,6 +217,26 @@ function Card({
   );
 }
 
+const HOLD_BUTTON_INTERACTION_PROPS = {
+  draggable: false,
+  onContextMenu: (event) => {
+    event.preventDefault();
+  },
+  onMouseDown: (event) => {
+    event.preventDefault();
+  },
+  onDragStart: (event) => {
+    event.preventDefault();
+  },
+  style: {
+    userSelect: "none",
+    WebkitUserSelect: "none",
+    WebkitTouchCallout: "none",
+    touchAction: "none",
+    WebkitTapHighlightColor: "transparent",
+  },
+};
+
 function SessionHeader({
   selectedSession,
   liveMatch,
@@ -1544,19 +1564,31 @@ export default function DirectorConsoleClient({
             }
           >
             <div className="rounded-[24px] border border-white/10 bg-black/20 px-4 py-5">
-              <div className="flex flex-col items-center gap-4 text-center">
+              <div
+                className="flex flex-col items-center gap-4 text-center"
+                style={{
+                  userSelect: "none",
+                  WebkitUserSelect: "none",
+                  WebkitTouchCallout: "none",
+                }}
+              >
                 <button
                   type="button"
-                  onPointerDown={() => {
+                  {...HOLD_BUTTON_INTERACTION_PROPS}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
                     void handleDirectorMicStart();
                   }}
-                  onPointerUp={() => {
+                  onPointerUp={(event) => {
+                    event.preventDefault();
                     void handleDirectorMicStop();
                   }}
-                  onPointerCancel={() => {
+                  onPointerCancel={(event) => {
+                    event.preventDefault();
                     void handleDirectorMicStop();
                   }}
-                  onPointerLeave={() => {
+                  onPointerLeave={(event) => {
+                    event.preventDefault();
                     void handleDirectorMicStop();
                   }}
                   className={`relative inline-flex h-28 w-28 items-center justify-center rounded-full border text-3xl transition focus:outline-none focus:ring-2 focus:ring-emerald-400/40 ${
@@ -1575,7 +1607,13 @@ export default function DirectorConsoleClient({
                   />
                   <FaMicrophone />
                 </button>
-                <div>
+                <div
+                  style={{
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
+                    WebkitTouchCallout: "none",
+                  }}
+                >
                   <p className="text-lg font-semibold text-white">
                     {directorHoldLive || micMonitor.isActive
                       ? "Release to stop"

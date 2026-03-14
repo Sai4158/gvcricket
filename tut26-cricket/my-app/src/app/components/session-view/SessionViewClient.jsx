@@ -136,6 +136,26 @@ function IosGlassSwitch({ checked, onChange, label, disabled = false }) {
   );
 }
 
+const HOLD_BUTTON_INTERACTION_PROPS = {
+  draggable: false,
+  onContextMenu: (event) => {
+    event.preventDefault();
+  },
+  onMouseDown: (event) => {
+    event.preventDefault();
+  },
+  onDragStart: (event) => {
+    event.preventDefault();
+  },
+  style: {
+    userSelect: "none",
+    WebkitUserSelect: "none",
+    WebkitTouchCallout: "none",
+    touchAction: "none",
+    WebkitTapHighlightColor: "transparent",
+  },
+};
+
 export default function SessionViewClient({ sessionId, initialData }) {
   const [copied, setCopied] = useState(false);
   const [data, setData] = useState(initialData || null);
@@ -811,7 +831,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
       <div className="w-full max-w-4xl mt-2">
         {showWalkieLauncher ? (
           <div className={`${launcherCardClass} mb-4 px-4 py-3`}>
-            <div className="flex w-full flex-col gap-4">
+            <div
+              className="flex w-full flex-col gap-4"
+              style={{
+                userSelect: "none",
+                WebkitUserSelect: "none",
+                WebkitTouchCallout: "none",
+              }}
+            >
               <div className="flex items-start gap-3">
                 <span className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg shadow-[0_12px_26px_rgba(16,185,129,0.16)] ${
                   walkieCardTalking
@@ -820,7 +847,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
                 }`}>
                   {walkieCardTalking ? <FaMicrophone /> : <DualWalkieIcon />}
                 </span>
-                <span className="min-w-0 flex-1">
+                <span
+                  className="min-w-0 flex-1"
+                  style={{
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
+                    WebkitTouchCallout: "none",
+                  }}
+                >
                   <span className="block text-base font-semibold text-white">
                     Walkie-Talkie
                   </span>
@@ -841,16 +875,21 @@ export default function SessionViewClient({ sessionId, initialData }) {
                   <button
                     type="button"
                     aria-label="Tap and hold walkie-talkie mic"
-                    onPointerDown={() => {
+                    {...HOLD_BUTTON_INTERACTION_PROPS}
+                    onPointerDown={(event) => {
+                      event.preventDefault();
                       handleWalkieLauncherPressStart();
                     }}
-                    onPointerUp={() => {
+                    onPointerUp={(event) => {
+                      event.preventDefault();
                       void handleWalkieLauncherPressEnd();
                     }}
-                    onPointerCancel={() => {
+                    onPointerCancel={(event) => {
+                      event.preventDefault();
                       void handleWalkieLauncherPressEnd();
                     }}
-                    onPointerLeave={() => {
+                    onPointerLeave={(event) => {
+                      event.preventDefault();
                       void handleWalkieLauncherPressEnd();
                     }}
                     className={`inline-flex h-20 w-20 items-center justify-center rounded-full border transition ${
@@ -867,7 +906,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
                       <FaMicrophoneSlash className="text-2xl" />
                     )}
                   </button>
-                  <span className="mt-3 text-xs font-medium tracking-[0.18em] text-zinc-400 uppercase">
+                  <span
+                    className="mt-3 text-xs font-medium tracking-[0.18em] text-zinc-400 uppercase"
+                    style={{
+                      userSelect: "none",
+                      WebkitUserSelect: "none",
+                      WebkitTouchCallout: "none",
+                    }}
+                  >
                     {walkieCardTalking
                       ? "Release to stop"
                       : walkieCardFinishing
@@ -925,21 +971,26 @@ export default function SessionViewClient({ sessionId, initialData }) {
                   <button
                     type="button"
                     aria-label="Hold loudspeaker"
+                    {...HOLD_BUTTON_INTERACTION_PROPS}
                     onClick={(event) => event.stopPropagation()}
                     onPointerDown={(event) => {
                       event.stopPropagation();
+                      event.preventDefault();
                       handleSpeakerLauncherPressStart();
                     }}
                     onPointerUp={(event) => {
                       event.stopPropagation();
+                      event.preventDefault();
                       void handleSpeakerLauncherPressEnd();
                     }}
                     onPointerCancel={(event) => {
                       event.stopPropagation();
+                      event.preventDefault();
                       void handleSpeakerLauncherPressEnd();
                     }}
                     onPointerLeave={(event) => {
                       event.stopPropagation();
+                      event.preventDefault();
                       void handleSpeakerLauncherPressEnd();
                     }}
                     className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${
