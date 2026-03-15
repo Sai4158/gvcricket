@@ -42,6 +42,8 @@ const FINISH_TAIL_MS = 320;
 const REQUEST_RESET_MS = 1800;
 const RTC_TOKEN_REFRESH_BUFFER_MS = 90 * 1000;
 const SIGNAL_TOKEN_REFRESH_BUFFER_MS = 90 * 1000;
+const AGORA_CHANNEL_NAME_MAX = 64;
+const AGORA_USER_ID_MAX = 64;
 const TALK_RETRY_MESSAGES = [
   "Connecting walkie...",
   "Retrying audio...",
@@ -67,6 +69,16 @@ function messageFor(error, fallback) {
   return error?.message || fallback;
 }
 
+function walkieConsole(level, event, details = {}) {
+  const logger =
+    level === "error"
+      ? console.error
+      : level === "warn"
+      ? console.warn
+      : console.info;
+  logger(`[GV Walkie] ${event}`, details);
+}
+
 function withTokenExpiry(payload) {
   if (!payload) return null;
   const expiresInSeconds = Number(payload.expiresInSeconds || 0);
@@ -89,6 +101,31 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function validateWalkieTokenPayload(payload, type) {
+  const appId = String(payload?.appId || "");
+  const token = String(payload?.token || "");
+  const userId = String(payload?.userId || "");
+  const channelName = String(payload?.channelName || "");
+
+  if (!appId || !token || !userId || !channelName) {
+    throw new Error(`Invalid ${type} token payload.`);
+  }
+  if (channelName.length > AGORA_CHANNEL_NAME_MAX) {
+    throw new Error(`${type} channel name is too long.`);
+  }
+  if (userId.length > AGORA_USER_ID_MAX) {
+    throw new Error(`${type} user id is too long.`);
+  }
+
+  return {
+    ...payload,
+    appId,
+    token,
+    userId,
+    channelName,
+  };
+}
+
 function defaultDisplayName(role, name = "") {
   if (name) return name;
   if (role === "umpire") return "Umpire";
@@ -103,7 +140,10 @@ function storageParticipantId(matchId, role) {
     try {
       return window.sessionStorage.getItem(key);
     } catch (error) {
-      console.error("Walkie session storage unavailable:", error);
+      walkieConsole("warn", "Session storage unavailable", {
+        stage: "participant-id-read",
+        message: messageFor(error, "Session storage unavailable."),
+      });
       return participantIdCache.get(key) || "";
     }
   })();
@@ -114,7 +154,10 @@ function storageParticipantId(matchId, role) {
   try {
     window.sessionStorage.setItem(key, next);
   } catch (error) {
-    console.error("Walkie session storage unavailable:", error);
+    walkieConsole("warn", "Session storage unavailable", {
+      stage: "participant-id-write",
+      message: messageFor(error, "Session storage unavailable."),
+    });
     participantIdCache.set(key, next);
   }
   return next;
@@ -356,8 +399,13 @@ export default function useWalkieTalkie({
       role,
     })
       .then((payload) => {
-        const next = withTokenExpiry(payload);
+        const next = withTokenExpiry(validateWalkieTokenPayload(payload, "RTC"));
         rtcTokenRef.current = next;
+        walkieConsole("info", "RTC token ready", {
+          channelName: next.channelName,
+          userId: next.userId,
+          expiresInSeconds: next.expiresInSeconds || 0,
+        });
         return next;
       })
       .finally(() => {
@@ -381,12 +429,17 @@ export default function useWalkieTalkie({
       role,
     })
       .then((payload) => {
-        const next = withTokenExpiry(payload);
+        const next = withTokenExpiry(validateWalkieTokenPayload(payload, "Signaling"));
         signalTokenRef.current = next;
         signalingUserIdRef.current = next?.userId || buildAgoraUserId(matchId, id, role);
         signalingChannelRef.current =
           next?.channelName || buildAgoraSignalingChannelName(matchId);
         setHasWalkieToken(Boolean(next?.token));
+        walkieConsole("info", "Signaling token ready", {
+          channelName: signalingChannelRef.current,
+          userId: signalingUserIdRef.current,
+          expiresInSeconds: next.expiresInSeconds || 0,
+        });
         return next;
       })
       .finally(() => {
@@ -419,7 +472,10 @@ export default function useWalkieTalkie({
       } catch (subscribeError) {
         setNeedsAudioUnlock(isSafari);
         updateNotice("Enable Audio if Safari blocks walkie playback.");
-        console.error("Walkie remote subscribe failed:", subscribeError);
+        walkieConsole("error", "RTC remote subscribe failed", {
+          stage: "rtc-subscribe",
+          message: messageFor(subscribeError, "Remote subscribe failed."),
+        });
       }
     });
     client.on("user-unpublished", (user, mediaType) => {
@@ -434,6 +490,7 @@ export default function useWalkieTalkie({
       if (state === "DISCONNECTED" && snapshotRef.current.enabled) {
         updateNotice("Retrying audio...");
       }
+      walkieConsole("info", "RTC connection state", { state });
     });
     rtcClientRef.current = client;
     return client;
@@ -452,6 +509,10 @@ export default function useWalkieTalkie({
           await client.setClientRole("audience");
           await client.join(token.appId, token.channelName, token.token, token.userId);
           rtcJoinedRef.current = true;
+          walkieConsole("info", "RTC joined", {
+            channelName: token.channelName,
+            userId: token.userId,
+          });
           return client;
         } catch (joinError) {
           lastError = joinError;
@@ -722,19 +783,37 @@ export default function useWalkieTalkie({
       const id = ensureParticipantId();
       const userId = token?.userId || buildAgoraUserId(matchId, id, role);
       const channelName = token?.channelName || buildAgoraSignalingChannelName(matchId);
+      if (!token?.token) {
+        throw new Error("Signaling token missing.");
+      }
+      if (!token?.appId) {
+        throw new Error("Signaling app id missing.");
+      }
       signalingUserIdRef.current = userId;
       signalingChannelRef.current = channelName;
+
+      if (rtmClientRef.current && (!rtmLoggedInRef.current || !rtmSubscribedRef.current)) {
+        walkieConsole("warn", "Discarding partial signaling client", {
+          stage: "rtm-reset",
+          loggedIn: rtmLoggedInRef.current,
+          subscribed: rtmSubscribedRef.current,
+        });
+        try {
+          await rtmClientRef.current.logout?.();
+        } catch {
+        }
+        rtmClientRef.current = null;
+        rtmListenersRef.current = null;
+        rtmLoggedInRef.current = false;
+        rtmSubscribedRef.current = false;
+      }
 
       if (!rtmClientRef.current) {
         const client = new RTM(token.appId, userId, {
           logUpload: false,
           logLevel: "none",
-          heartbeatInterval: 30,
           presenceTimeout: 20,
-          privateConfig: {
-            eventUploadHosts: [],
-            logUploadHosts: [],
-          },
+          useStringUserId: true,
         });
 
         const onStatus = (event) => {
@@ -833,7 +912,10 @@ export default function useWalkieTalkie({
             const next = await fetchSignalingToken();
             await client.renewToken(next.token);
           } catch (renewError) {
-            console.error("Walkie signaling token renew failed:", renewError);
+            walkieConsole("error", "Signaling token renew failed", {
+              stage: "rtm-renew",
+              message: messageFor(renewError, "Could not renew signaling token."),
+            });
           }
         };
 
@@ -864,8 +946,16 @@ export default function useWalkieTalkie({
         .catch(() => {});
 
       if (!rtmLoggedInRef.current) {
+        walkieConsole("info", "Signaling login starting", {
+          channelName,
+          userId,
+        });
         await client.login({ token: token.token });
         rtmLoggedInRef.current = true;
+        walkieConsole("info", "Signaling login ready", {
+          channelName,
+          userId,
+        });
       }
 
       if (!rtmSubscribedRef.current) {
@@ -876,6 +966,7 @@ export default function useWalkieTalkie({
           withLock: true,
         });
         rtmSubscribedRef.current = true;
+        walkieConsole("info", "Signaling subscribed", { channelName });
       }
 
       await client.presence.setState(channelName, WALKIE_CHANNEL_TYPE, {
@@ -890,6 +981,11 @@ export default function useWalkieTalkie({
       ]);
       await refreshRuntimeState(client);
       setHasWalkieToken(true);
+      walkieConsole("info", "Walkie signaling ready", {
+        channelName,
+        userId,
+        enabled: metadataStateRef.current.enabled,
+      });
       return client;
     })().finally(() => {
       rtmReadyPromiseRef.current = null;
@@ -967,9 +1063,12 @@ export default function useWalkieTalkie({
       activeSpeakerRef.current = null;
       setHasWalkieToken(false);
       syncSnapshot();
+      walkieConsole("info", "Walkie signaling cleaned up", {
+        channelName,
+      });
     })();
     rtmCleanupPromiseRef.current = cleanupTask.finally(() => {
-      if (rtmCleanupPromiseRef.current === cleanupTask) {
+      if (rtmCleanupPromiseRef.current) {
         rtmCleanupPromiseRef.current = null;
       }
     });
@@ -1080,6 +1179,10 @@ export default function useWalkieTalkie({
           );
         } catch (releaseError) {
           setError(messageFor(releaseError, "Could not release walkie."));
+          walkieConsole("error", "Walkie release failed", {
+            stage: "speaker-release",
+            message: messageFor(releaseError, "Could not release walkie."),
+          });
         }
         activeSpeakerRef.current = null;
         syncSnapshot();
@@ -1091,6 +1194,10 @@ export default function useWalkieTalkie({
           setManualAudioReady(false);
           await cleanupTransport();
         }
+        walkieConsole("info", "Walkie speaker stopped", {
+          reason,
+          participantId: selfId,
+        });
       }, releaseDelayMs);
       return true;
     },
@@ -1191,6 +1298,12 @@ export default function useWalkieTalkie({
           setIsSelfTalking(true);
           updateNotice("");
           setClaiming(false);
+          walkieConsole("info", "Walkie speaker started", {
+            channelName,
+            participantId: participant.participantId,
+            role: participant.role,
+            transmissionId,
+          });
           return true;
         } catch (talkError) {
           lastError = talkError;
@@ -1211,6 +1324,10 @@ export default function useWalkieTalkie({
       setClaiming(false);
       setIsSelfTalking(false);
       setError(messageFor(lastError, "Could not start walkie audio."));
+      walkieConsole("error", "Walkie speaker start failed", {
+        stage: "speaker-start",
+        message: messageFor(lastError, "Could not start walkie audio."),
+      });
       return false;
     },
     [
@@ -1287,11 +1404,19 @@ export default function useWalkieTalkie({
           name: request.name,
         })
       );
+      walkieConsole("info", "Walkie requested", {
+        participantId: request.participantId,
+        role: request.role,
+      });
       return true;
     } catch (requestError) {
       const message = messageFor(requestError, "Could not request walkie.");
       setError(message);
       setRequestState("idle");
+      walkieConsole("error", "Walkie request failed", {
+        stage: "request-enable",
+        message,
+      });
       return false;
     }
   }, [
@@ -1347,9 +1472,16 @@ export default function useWalkieTalkie({
         }
 
         updateNotice(nextEnabled ? "Walkie-talkie is live." : "Walkie-talkie is off.");
+        walkieConsole("info", "Walkie enabled state changed", {
+          enabled: Boolean(nextEnabled),
+        });
         return true;
       } catch (toggleError) {
         setError(messageFor(toggleError, "Could not update walkie."));
+        walkieConsole("error", "Walkie toggle failed", {
+          stage: "toggle-enabled",
+          message: messageFor(toggleError, "Could not update walkie."),
+        });
         return false;
       }
     },
@@ -1395,9 +1527,19 @@ export default function useWalkieTalkie({
         if (action === "accept") {
           updateNotice("Walkie-talkie is live.");
         }
+        walkieConsole("info", "Walkie request resolved", {
+          action,
+          requestId,
+          participantId: targetRequest?.participantId || "",
+        });
         return true;
       } catch (respondError) {
         setError(messageFor(respondError, "Could not update walkie request."));
+        walkieConsole("error", "Walkie request resolve failed", {
+          stage: "request-response",
+          action,
+          message: messageFor(respondError, "Could not update walkie request."),
+        });
         return false;
       }
     },
@@ -1421,6 +1563,10 @@ export default function useWalkieTalkie({
       return true;
     } catch (unlockError) {
       setError(messageFor(unlockError, "Could not enable walkie audio."));
+      walkieConsole("error", "Walkie audio unlock failed", {
+        stage: "audio-unlock",
+        message: messageFor(unlockError, "Could not enable walkie audio."),
+      });
       return false;
     }
   }, [ensureAudioUnlock, joinRtc, participantId]);
@@ -1469,9 +1615,18 @@ export default function useWalkieTalkie({
       return;
     }
     void ensureRtmSession().catch((connectError) => {
-      console.error("Walkie signaling setup failed:", connectError);
+      if (
+        connectError?.message === "Walkie signaling changed before setup completed." ||
+        connectError?.message === "Walkie is not available."
+      ) {
+        return;
+      }
+      walkieConsole("error", "Walkie signaling setup failed", {
+        stage: "signaling-setup",
+        message: messageFor(connectError, "Walkie live connection is unavailable."),
+      });
       if (mountedRef.current) {
-        setError("Walkie live connection is unavailable.");
+        setError(messageFor(connectError, "Walkie live connection is unavailable."));
       }
     });
     return () => {
@@ -1488,9 +1643,14 @@ export default function useWalkieTalkie({
 
   useEffect(() => {
     if (shouldMaintainAudioTransport) {
-      void joinRtc().catch((joinError) =>
-        setError(messageFor(joinError, "Could not connect walkie audio."))
-      );
+      void joinRtc().catch((joinError) => {
+        const message = messageFor(joinError, "Could not connect walkie audio.");
+        setError(message);
+        walkieConsole("error", "Walkie audio connect failed", {
+          stage: "rtc-join",
+          message,
+        });
+      });
       return;
     }
     void cleanupTransport();

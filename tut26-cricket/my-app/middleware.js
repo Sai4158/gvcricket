@@ -35,7 +35,7 @@ function buildContentSecurityPolicy() {
     "media-src 'self' blob:",
     "worker-src 'self' blob:",
     "child-src 'self' blob:",
-    "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
+    "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://vercel.live",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

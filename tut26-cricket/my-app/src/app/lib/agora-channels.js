@@ -1,17 +1,23 @@
-function sanitizeAgoraChannelPart(value) {
+const AGORA_CHANNEL_PART_MAX = 48;
+const AGORA_USER_ID_MAX = 64;
+
+function sanitizeAgoraChannelPart(value, maxLength = AGORA_CHANNEL_PART_MAX) {
   return String(value || "")
     .replace(/[^a-zA-Z0-9._:-]/g, "-")
-    .slice(0, 60);
+    .slice(0, maxLength);
 }
 
 export function buildAgoraRtcChannelName(matchId) {
-  return `gv-walkie-rtc-${sanitizeAgoraChannelPart(matchId)}`;
+  return `gvrtc-${sanitizeAgoraChannelPart(matchId)}`;
 }
 
 export function buildAgoraSignalingChannelName(matchId) {
-  return `gv-walkie-sig-${sanitizeAgoraChannelPart(matchId)}`;
+  return `gvsig-${sanitizeAgoraChannelPart(matchId)}`;
 }
 
 export function buildAgoraUserId(matchId, participantId, role) {
-  return sanitizeAgoraChannelPart(`${role}-${matchId}-${participantId}`).slice(0, 64);
+  return sanitizeAgoraChannelPart(
+    `${role}-${matchId}-${participantId}`,
+    AGORA_USER_ID_MAX
+  );
 }
