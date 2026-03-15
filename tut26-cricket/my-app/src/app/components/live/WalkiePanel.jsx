@@ -37,6 +37,7 @@ function roleLabel(role) {
 export function WalkieRequestQueue({
   requests = [],
   onAccept,
+  onDismiss,
 }) {
   if (!requests.length) return null;
 
@@ -59,13 +60,22 @@ export function WalkieRequestQueue({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => onAccept?.(request.requestId)}
-            className="mt-4 flex w-full items-center justify-center rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black shadow-[0_14px_34px_rgba(16,185,129,0.24)] transition hover:bg-emerald-400"
-          >
-            Accept
-          </button>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => onAccept?.(request.requestId)}
+              className="flex w-full items-center justify-center rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black shadow-[0_14px_34px_rgba(16,185,129,0.24)] transition hover:bg-emerald-400"
+            >
+              Accept
+            </button>
+            <button
+              type="button"
+              onClick={() => onDismiss?.(request.requestId)}
+              className="flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-semibold text-zinc-100 transition hover:bg-white/[0.09]"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       ))}
     </div>
@@ -173,20 +183,9 @@ export function WalkieTalkButton({
         ref={buttonRef}
         type="button"
         disabled={disabled}
-        onTouchStart={(event) => {
-          event.preventDefault();
-          void startHold();
-        }}
-        onTouchEnd={(event) => {
-          event.preventDefault();
-          void endHold();
-        }}
-        onTouchCancel={(event) => {
-          event.preventDefault();
-          void endHold();
-        }}
         onPointerDown={(event) => {
-          event.preventDefault();
+          if (!event.isPrimary) return;
+          if (event.pointerType === "mouse" && event.button !== 0) return;
           pointerIdRef.current = event.pointerId;
           event.currentTarget.setPointerCapture?.(event.pointerId);
           void startHold();
@@ -221,7 +220,9 @@ export function WalkieTalkButton({
           WebkitUserSelect: "none",
           WebkitTouchCallout: "none",
           touchAction: "none",
+          WebkitTapHighlightColor: "transparent",
         }}
+        draggable={false}
       >
         <span
           className={`absolute inset-[-8px] rounded-full border transition-opacity ${
@@ -240,6 +241,7 @@ export function WalkieTalkButton({
           userSelect: "none",
           WebkitUserSelect: "none",
           WebkitTouchCallout: "none",
+          WebkitTapHighlightColor: "transparent",
         }}
       >
         <p className="text-xs font-medium text-zinc-400">
@@ -295,6 +297,13 @@ export default function WalkiePanel({
     : snapshot?.activeSpeakerRole === "spectator"
     ? "Spectator is speaking"
     : "Ready";
+  const activeSpeakerLabel = snapshot?.activeSpeakerName
+    ? `${snapshot.activeSpeakerName}${
+        snapshot?.activeSpeakerRole && !isSelfTalking ? ` • ${roleLabel(snapshot.activeSpeakerRole)}` : ""
+      }`
+    : snapshot?.activeSpeakerRole
+    ? roleLabel(snapshot.activeSpeakerRole)
+    : "";
 
   const handleToggle = (checked) => {
     if (isUmpire) {
@@ -340,6 +349,11 @@ export default function WalkiePanel({
                 {isUmpire ? "Walkie-Talkie" : "Push to Talk"}
               </h3>
               <p className="mt-1 text-sm text-zinc-400">{statusText}</p>
+              {snapshot?.enabled && activeSpeakerLabel && !isSelfTalking ? (
+                <p className="mt-1 text-xs font-medium text-emerald-200">
+                  Live now: {activeSpeakerLabel}
+                </p>
+              ) : null}
               <p className="mt-1 text-xs text-zinc-500">
                 {isUmpire
                   ? "Talk with spectators and the director."

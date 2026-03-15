@@ -137,12 +137,14 @@ export async function loadTossPageData(matchId) {
       Number(match.adminAccessVersion || 1)
     );
 
-    return {
-      authStatus: authorized ? "granted" : "locked",
-      match: serializePublicMatch(match),
-      sessionId: String(match.sessionId || ""),
-      hasCreatedMatch: true,
-      actualMatchId: String(match._id),
+      return {
+        authStatus: authorized ? "granted" : "locked",
+        match: serializePublicMatch(match, null, {
+          includeActionHistory: true,
+        }),
+        sessionId: String(match.sessionId || ""),
+        hasCreatedMatch: true,
+        actualMatchId: String(match._id),
     };
   }
 
@@ -170,7 +172,9 @@ export async function loadTossPageData(matchId) {
 
       return {
         authStatus: authorized ? "granted" : "locked",
-        match: serializePublicMatch(linkedMatch, session),
+        match: serializePublicMatch(linkedMatch, session, {
+          includeActionHistory: true,
+        }),
         sessionId: String(session._id),
         hasCreatedMatch: true,
         actualMatchId: String(linkedMatch._id),
@@ -239,7 +243,11 @@ export async function loadMatchAccessData(matchId) {
 
   return {
     authStatus: authorized ? "granted" : "locked",
-    match: authorized ? serializePublicMatch(match, fallbackSession) : null,
+    match: authorized
+      ? serializePublicMatch(match, fallbackSession, {
+          includeActionHistory: true,
+        })
+      : null,
   };
 }
 

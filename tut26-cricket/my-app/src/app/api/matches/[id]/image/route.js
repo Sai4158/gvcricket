@@ -4,6 +4,7 @@ import { jsonError, jsonRateLimit } from "../../../../lib/api-response";
 import { writeAuditLog } from "../../../../lib/audit-log";
 import { connectDB } from "../../../../lib/db";
 import { buildSessionMirrorUpdate } from "../../../../lib/match-engine";
+import { publishMatchUpdate, publishSessionUpdate } from "../../../../lib/live-updates";
 import {
   getMatchAccessCookieName,
   hasValidMatchAccess,
@@ -225,6 +226,8 @@ export async function POST(req, { params }) {
     await Session.findByIdAndUpdate(match.sessionId, {
       $set: buildSessionMirrorUpdate(match),
     });
+    publishMatchUpdate(match._id);
+    publishSessionUpdate(match.sessionId);
 
     await writeAuditLog({
       action: "match_media_upload",
@@ -339,6 +342,8 @@ export async function DELETE(req, { params }) {
     await Session.findByIdAndUpdate(match.sessionId, {
       $set: buildSessionMirrorUpdate(match),
     });
+    publishMatchUpdate(match._id);
+    publishSessionUpdate(match.sessionId);
 
     await writeAuditLog({
       action: "match_media_delete",

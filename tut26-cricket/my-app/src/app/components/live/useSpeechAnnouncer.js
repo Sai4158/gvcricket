@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isUiAudioUnlocked, primeUiAudio, subscribeUiAudioUnlock } from "../../lib/page-audio";
 
 const IOS_PREFERRED_VOICE_NAMES = ["samantha", "ava", "allison", "nicky"];
 const CHROME_PREFERRED_VOICE_NAMES = [
@@ -62,9 +63,13 @@ function getVoiceScore(voice, platform) {
   if (name.includes("compact")) score -= 20;
 
   if (name.includes("samantha")) score += 120;
+  if (name.includes("samantha") && name.includes("enhanced")) score += 180;
   if (name.includes("ava")) score += 110;
+  if (name.includes("ava") && name.includes("enhanced")) score += 150;
   if (name.includes("allison")) score += 105;
+  if (name.includes("allison") && name.includes("enhanced")) score += 145;
   if (name.includes("nicky")) score += 100;
+  if (name.includes("nicky") && name.includes("enhanced")) score += 140;
   if (name.includes("google us english")) score += 95;
   if (name.includes("google")) score += 55;
   if (name.includes("microsoft aria")) score += 100;
@@ -154,7 +159,7 @@ function splitSpeechText(text) {
   }
 
   const platform = getSpeechPlatform();
-  const maxChunkLength = platform.isIOS && platform.isSafari ? 84 : 110;
+  const maxChunkLength = platform.isIOS && platform.isSafari ? 68 : 110;
   const sentenceChunks = normalized
     .split(/(?<=[.!?])\s+/)
     .map((chunk) => chunk.trim())
@@ -231,8 +236,8 @@ function getSpeechProfile(voice, options, platform) {
       options.rate ??
       (isIOSSafari
         ? isAppleNatural
-          ? 0.86
-          : 0.84
+          ? 0.82
+          : 0.8
         : isAppleNatural
         ? 0.88
         : isGoogleNatural
@@ -248,8 +253,8 @@ function getSpeechProfile(voice, options, platform) {
       options.pitch ??
       (isIOSSafari
         ? isAppleNatural
-          ? 0.97
-          : 0.95
+          ? 1
+          : 0.98
         : isAppleNatural
         ? 0.98
         : isGoogleNatural
@@ -258,7 +263,7 @@ function getSpeechProfile(voice, options, platform) {
         ? 0.92
         : 0.96),
     volume: options.volume ?? (isIOSSafari ? 1 : undefined),
-    preDelayMs: options.preDelayMs ?? (isIOSSafari ? 55 : 0),
+    preDelayMs: options.preDelayMs ?? (isIOSSafari ? 80 : 0),
   };
 }
 
@@ -276,6 +281,7 @@ function normalizeSpeechError(error) {
 
 export default function useSpeechAnnouncer(settings) {
   const [voice, setVoice] = useState(null);
+  const [audioUnlocked, setAudioUnlocked] = useState(() => isUiAudioUnlocked());
   const [status, setStatus] = useState(() => {
     if (typeof window === "undefined") return "idle";
     return window.speechSynthesis ? "idle" : "unsupported";
@@ -291,6 +297,8 @@ export default function useSpeechAnnouncer(settings) {
   const voicesReadyRef = useRef(false);
   const platformRef = useRef(getSpeechPlatform());
   const voicesPromiseRef = useRef(null);
+
+  useEffect(() => subscribeUiAudioUnlock(setAudioUnlocked), []);
 
   const clearStepTimer = useCallback(() => {
     if (stepTimerRef.current) {
@@ -552,7 +560,13 @@ export default function useSpeechAnnouncer(settings) {
             pauseAfterMs:
               index === chunks.length - 1
                 ? normalizedItem.pauseAfterMs
-                : Math.max(120, Math.min(220, normalizedItem.pauseAfterMs ?? 160)),
+                : Math.max(
+                    platformRef.current.isIOS && platformRef.current.isSafari ? 180 : 120,
+                    Math.min(
+                      platformRef.current.isIOS && platformRef.current.isSafari ? 280 : 220,
+                      normalizedItem.pauseAfterMs ?? (platformRef.current.isIOS && platformRef.current.isSafari ? 210 : 160)
+                    )
+                  ),
           }));
         })
         .filter((item) => item.text);
@@ -636,6 +650,7 @@ export default function useSpeechAnnouncer(settings) {
     }
 
     try {
+      void primeUiAudio();
       void ensureVoicesReady();
       window.speechSynthesis.resume?.();
 
@@ -665,6 +680,8 @@ export default function useSpeechAnnouncer(settings) {
     const primeFromGesture = () => {
       if (!isPrimedRef.current) {
         prime();
+      } else {
+        void primeUiAudio();
       }
     };
 
@@ -749,6 +766,7 @@ export default function useSpeechAnnouncer(settings) {
     needsGesture: status === "waiting_for_gesture",
     status,
     voiceName: voice?.name || "",
+    audioUnlocked,
     cloudTtsRecommended:
       platformRef.current.isIOS && platformRef.current.isSafari && !voice?.name,
   };

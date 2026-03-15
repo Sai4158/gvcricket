@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "../../../../lib/db";
 import { jsonError, jsonRateLimit } from "../../../../lib/api-response";
 import { writeAuditLog } from "../../../../lib/audit-log";
+import { publishSessionUpdate } from "../../../../lib/live-updates";
 import { serializePublicSession } from "../../../../lib/public-data";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
@@ -78,6 +79,7 @@ export async function POST(req, { params }) {
         "Cache-Control": "no-store",
       },
     });
+    publishSessionUpdate(existingSession._id);
 
     await writeAuditLog({
       action: "session_setup_draft",

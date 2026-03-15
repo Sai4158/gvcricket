@@ -199,6 +199,8 @@ export const walkieSignalSchema = z
         candidate: z.string().max(10000).optional(),
         sdpMid: z.string().max(100).optional(),
         sdpMLineIndex: z.number().int().min(0).max(32).optional(),
+        transmissionId: z.string().min(1).max(160).optional(),
+        attempt: z.number().int().min(1).max(8).optional(),
       })
       .strict(),
   })

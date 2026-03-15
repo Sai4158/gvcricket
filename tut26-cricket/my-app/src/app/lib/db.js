@@ -13,11 +13,25 @@ if (!cached) {
   cached = global.mongoose = { conn: null, promise: null };
 }
 
+const DEFAULT_MAX_POOL_SIZE = 5;
+const DEFAULT_MAX_IDLE_MS = 20_000;
+const DEFAULT_SERVER_SELECTION_TIMEOUT_MS = 5_000;
+
 export async function connectDB() {
   if (cached.conn) return cached.conn;
   if (!cached.promise) {
     cached.promise = mongoose.connect(MONGODB_URI, {
       bufferCommands: false,
+      maxPoolSize: Number(process.env.MONGODB_MAX_POOL_SIZE || DEFAULT_MAX_POOL_SIZE),
+      minPoolSize: 0,
+      maxIdleTimeMS: Number(
+        process.env.MONGODB_MAX_IDLE_TIME_MS || DEFAULT_MAX_IDLE_MS
+      ),
+      serverSelectionTimeoutMS: Number(
+        process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS ||
+          DEFAULT_SERVER_SELECTION_TIMEOUT_MS
+      ),
+      socketTimeoutMS: Number(process.env.MONGODB_SOCKET_TIMEOUT_MS || 45_000),
     });
   }
   cached.conn = await cached.promise;

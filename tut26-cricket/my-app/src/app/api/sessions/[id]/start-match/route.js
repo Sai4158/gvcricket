@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 import { connectDB } from "../../../../lib/db";
+import { publishMatchUpdate, publishSessionUpdate } from "../../../../lib/live-updates";
 import { jsonError, jsonRateLimit } from "../../../../lib/api-response";
 import { writeAuditLog } from "../../../../lib/audit-log";
 import { getMatchAccessCookie } from "../../../../lib/match-access";
@@ -167,6 +168,8 @@ export async function POST(req, { params }) {
       Number(finalMatch.adminAccessVersion || 1)
     );
     response.cookies.set(matchCookie.name, matchCookie.value, matchCookie.options);
+    publishMatchUpdate(finalMatch._id);
+    publishSessionUpdate(sessionId);
 
     await writeAuditLog({
       action: "match_started_from_toss",

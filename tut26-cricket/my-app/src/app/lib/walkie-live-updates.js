@@ -34,6 +34,14 @@ function emitWalkieMessage(matchId, participantId) {
   });
 }
 
+export function publishWalkieStateUpdate(matchId) {
+  emitWalkieState(matchId);
+}
+
+export function publishWalkieMessage(matchId, participantId) {
+  emitWalkieMessage(matchId, participantId);
+}
+
 async function startWatchers() {
   await connectDB();
 

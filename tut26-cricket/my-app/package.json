@@ -16,6 +16,9 @@
   "dependencies": {
     "@tensorflow/tfjs": "^4.22.0",
     "@vercel/analytics": "^1.6.1",
+    "agora-rtc-sdk-ng": "^4.23.0",
+    "agora-rtm-sdk": "^2.2.3-1",
+    "agora-token": "^2.0.5",
     "framer-motion": "^12.35.1",
     "howler": "^2.2.4",
     "html-to-image": "^1.11.13",

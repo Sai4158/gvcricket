@@ -1,6 +1,13 @@
 import { connectDB } from "../../../../lib/db";
-import { ensureLiveUpdates, subscribeToMatch, subscribeToSession } from "../../../../lib/live-updates";
-import { serializePublicMatch, serializePublicSession } from "../../../../lib/public-data";
+import {
+  ensureLiveUpdates,
+  subscribeToMatch,
+  subscribeToSession,
+} from "../../../../lib/live-updates";
+import {
+  serializePublicMatch,
+  serializePublicSession,
+} from "../../../../lib/public-data";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 
@@ -8,6 +15,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 export const preferredRegion = ["iad1"];
+
+const SESSION_PAD = "0".repeat(4096);
+const PING_PAD = "0".repeat(4096);
 
 function sseHeaders() {
   return {
@@ -26,189 +36,227 @@ function encodeEvent(event, data) {
 export async function GET(request, { params }) {
   const { id } = await params;
   const encoder = new TextEncoder();
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      let cleanupSession = () => {};
-      let cleanupMatch = () => {};
-      let heartbeat = null;
-      let currentMatchId = "";
-      let closed = false;
-      let didCleanup = false;
-      let lastSerializedPayload = "";
+  let cleanupSession = () => {};
+  let cleanupMatch = () => {};
+  let heartbeat = null;
+  let catchup = null;
+  let currentMatchId = "";
+  let closed = false;
+  let didCleanup = false;
+  let lastSerializedPayload = "";
 
-      const finalize = () => {
-        if (didCleanup) {
-          return;
-        }
-        didCleanup = true;
-        cleanupSession();
-        cleanupMatch();
-        cleanupSession = () => {};
-        cleanupMatch = () => {};
-        if (heartbeat) {
-          clearTimeout(heartbeat);
-          heartbeat = null;
-        }
-      };
+  const finalize = () => {
+    if (didCleanup) {
+      return;
+    }
+    didCleanup = true;
+    cleanupSession();
+    cleanupMatch();
+    cleanupSession = () => {};
+    cleanupMatch = () => {};
+    if (heartbeat) {
+      clearTimeout(heartbeat);
+      heartbeat = null;
+    }
+    if (catchup) {
+      clearTimeout(catchup);
+      catchup = null;
+    }
+  };
 
-      const send = (event, data) => {
-        if (closed) {
-          return false;
-        }
+  const send = async (event, data) => {
+    if (closed) {
+      return false;
+    }
 
-        try {
-          controller.enqueue(encoder.encode(encodeEvent(event, data)));
-          return true;
-        } catch (error) {
-          closed = true;
-          finalize();
-          if (error?.code !== "ERR_INVALID_STATE") {
-            console.error("Session SSE enqueue failed:", error);
+    try {
+      await writer.write(encoder.encode(encodeEvent(event, data)));
+      return true;
+    } catch (error) {
+      closed = true;
+      finalize();
+      if (error?.code !== "ERR_INVALID_STATE") {
+        console.error("Session SSE enqueue failed:", error);
+      }
+      return false;
+    }
+  };
+
+  const stopStream = async () => {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    finalize();
+    try {
+      await writer.close();
+    } catch {
+      // Ignore close races.
+    }
+  };
+
+  const scheduleHeartbeat = (delay = 4000) => {
+    if (closed) {
+      return;
+    }
+    if (heartbeat) {
+      clearTimeout(heartbeat);
+    }
+    heartbeat = setTimeout(() => {
+      void heartbeatLoop();
+    }, delay);
+  };
+
+  const scheduleCatchup = (delay = 1200) => {
+    if (closed) {
+      return;
+    }
+    if (catchup) {
+      clearTimeout(catchup);
+    }
+    catchup = setTimeout(() => {
+      void catchupLoop();
+    }, delay);
+  };
+
+  const resolveLatestMatch = async (session) => {
+    if (!session) {
+      return null;
+    }
+
+    if (session.match) {
+      const linkedMatch = await Match.findById(session.match).lean();
+      if (linkedMatch) {
+        return linkedMatch;
+      }
+    }
+
+    return Match.findOne({ sessionId: session._id }).sort({ updatedAt: -1 }).lean();
+  };
+
+  const pushSessionPayload = async () => {
+    if (closed) {
+      return null;
+    }
+    const session = await Session.findById(id).lean();
+    const match = await resolveLatestMatch(session);
+    if (closed) {
+      return null;
+    }
+    const nextMatchId = match?._id ? String(match._id) : "";
+
+    if (nextMatchId !== currentMatchId) {
+      cleanupMatch();
+      currentMatchId = nextMatchId;
+
+      if (currentMatchId) {
+        cleanupMatch = subscribeToMatch(currentMatchId, async () => {
+          try {
+            await pushSessionPayload();
+          } catch (error) {
+            console.error("Session SSE match push failed:", error);
           }
-          return false;
-        }
-      };
+        });
+      }
+    }
 
-      const stopStream = () => {
-        if (closed) {
-          return;
-        }
-        closed = true;
-        finalize();
-        try {
-          controller.close();
-        } catch {
-          // Ignore close races.
-        }
-      };
+    const payload = {
+      session: serializePublicSession(session),
+      match: serializePublicMatch(match, session),
+    };
+    const nextSerializedPayload = JSON.stringify(payload);
 
-      const scheduleHeartbeat = (delay = 15000) => {
-        if (closed) {
-          return;
-        }
-        if (heartbeat) {
-          clearTimeout(heartbeat);
-        }
-        heartbeat = setTimeout(() => {
-          void heartbeatLoop();
-        }, delay);
-      };
+    if (nextSerializedPayload === lastSerializedPayload) {
+      return { session, match };
+    }
+
+    lastSerializedPayload = nextSerializedPayload;
+
+    if (
+      !(await send("session", {
+        ...payload,
+        updatedAt: new Date().toISOString(),
+        pad: SESSION_PAD,
+      }))
+    ) {
+      return null;
+    }
+
+    return { session, match };
+  };
+
+  const heartbeatLoop = async () => {
+    if (closed) {
+      return;
+    }
+
+    try {
+      if (!(await send("ping", { ok: true, ts: Date.now(), pad: PING_PAD }))) {
+        return;
+      }
+    } catch (error) {
+      console.error("Session SSE heartbeat failed:", error);
+      await stopStream();
+      return;
+    }
+
+    scheduleHeartbeat();
+  };
+
+  const catchupLoop = async () => {
+    if (closed) {
+      return;
+    }
+
+    try {
+      await pushSessionPayload();
+    } catch (error) {
+      console.error("Session SSE catchup failed:", error);
+    }
+
+    scheduleCatchup();
+  };
+
+  void (async () => {
+    try {
+      await connectDB();
+      await pushSessionPayload();
+      await send("ping", {
+        ok: true,
+        ts: Date.now(),
+        init: true,
+        pad: PING_PAD,
+      });
 
       try {
-        await connectDB();
-
-        const resolveLatestMatch = async (session) => {
-          if (!session) {
-            return null;
-          }
-
-          if (session.match) {
-            const linkedMatch = await Match.findById(session.match).lean();
-            if (linkedMatch) {
-              return linkedMatch;
-            }
-          }
-
-          return Match.findOne({ sessionId: session._id }).sort({ updatedAt: -1 }).lean();
-        };
-
-        const pushSessionPayload = async () => {
-          if (closed) {
-            return null;
-          }
-          const session = await Session.findById(id).lean();
-          const match = await resolveLatestMatch(session);
-          if (closed) {
-            return null;
-          }
-          const nextMatchId = match?._id ? String(match._id) : "";
-
-          if (nextMatchId !== currentMatchId) {
-            cleanupMatch();
-            currentMatchId = nextMatchId;
-
-            if (currentMatchId) {
-              cleanupMatch = subscribeToMatch(currentMatchId, async () => {
-                await pushSessionPayload();
-              });
-            }
-          }
-
-          const payload = {
-            session: serializePublicSession(session),
-            match: serializePublicMatch(match, session),
-          };
-          const nextSerializedPayload = JSON.stringify(payload);
-
-          if (nextSerializedPayload === lastSerializedPayload) {
-            return { session, match };
-          }
-
-          lastSerializedPayload = nextSerializedPayload;
-
-          if (
-            !send("session", {
-              ...payload,
-              updatedAt: new Date().toISOString(),
-            })
-          ) {
-            return null;
-          }
-          return { session, match };
-        };
-
-        const heartbeatLoop = async () => {
-          if (closed) {
-            return;
-          }
-
-          try {
-            if (!send("ping", { ok: true, ts: Date.now() })) {
-              return;
-            }
-          } catch (error) {
-            console.error("Session SSE heartbeat failed:", error);
-            stopStream();
-            return;
-          }
-
-          scheduleHeartbeat();
-        };
-
-        await pushSessionPayload();
-        send("ping", {
-          ok: true,
-          ts: Date.now(),
-          init: true,
-          pad: "0".repeat(2048),
-        });
-
-        try {
-          await ensureLiveUpdates();
-          if (!closed) {
-            cleanupSession = subscribeToSession(id, async () => {
+        await ensureLiveUpdates();
+        if (!closed) {
+          cleanupSession = subscribeToSession(id, async () => {
+            try {
               await pushSessionPayload();
-            });
-          }
-        } catch (error) {
-          console.error("Session change streams unavailable.", error);
-          send("error", { message: "Live session updates require realtime database events." });
-          stopStream();
-          return;
+            } catch (error) {
+              console.error("Session SSE session push failed:", error);
+            }
+          });
         }
-
-        scheduleHeartbeat();
-
-        request.signal.addEventListener("abort", () => {
-          stopStream();
-        });
       } catch (error) {
-        send("error", { message: "Live updates are temporarily unavailable." });
-        stopStream();
+        console.error("Session change streams unavailable.", error);
       }
-    },
+
+      scheduleHeartbeat();
+      scheduleCatchup();
+    } catch (error) {
+      await send("error", { message: "Live updates are temporarily unavailable." });
+      await stopStream();
+    }
+  })();
+
+  request.signal.addEventListener("abort", () => {
+    void stopStream();
   });
 
-  return new Response(stream, { headers: sseHeaders() });
+  return new Response(readable, { headers: sseHeaders() });
 }

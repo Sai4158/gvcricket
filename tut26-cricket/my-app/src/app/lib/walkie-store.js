@@ -1,5 +1,9 @@
 import WalkieMessage from "../../models/WalkieMessage";
 import WalkieState from "../../models/WalkieState";
+import {
+  publishWalkieMessage,
+  publishWalkieStateUpdate,
+} from "./walkie-live-updates";
 
 const SPEAKER_MAX_MS = 30_000;
 const REQUEST_COOLDOWN_MS = 30_000;
@@ -115,6 +119,7 @@ async function touchAndCleanState(matchId) {
       );
       touchIdleExpiry(doc);
       await doc.save();
+      publishWalkieStateUpdate(matchId);
     }
   }
 
@@ -128,6 +133,7 @@ async function touchAndCleanState(matchId) {
       doc.lastNotification = newNotification("walkie_disabled", "Walkie-talkie is off.");
       touchIdleExpiry(doc);
       await doc.save();
+      publishWalkieStateUpdate(matchId);
     }
   }
 
@@ -157,6 +163,8 @@ async function queueParticipantMessage(matchId, toParticipantId, eventType, payl
       _id: { $in: staleMessages.map((item) => item._id) },
     });
   }
+
+  publishWalkieMessage(matchId, toParticipantId);
 }
 
 export async function getPersistentWalkieSnapshot(matchId) {
@@ -190,6 +198,7 @@ export async function registerPersistentWalkieParticipant(matchId, participant) 
   doc.version += 1;
   touchIdleExpiry(doc);
   await doc.save();
+  publishWalkieStateUpdate(matchId);
   return {
     snapshot: buildSnapshot(doc),
     notification: doc.lastNotification?.id ? doc.lastNotification : null,
@@ -254,6 +263,7 @@ export async function setPersistentWalkieEnabled(matchId, enabled) {
   );
   touchIdleExpiry(doc);
   await doc.save();
+  publishWalkieStateUpdate(matchId);
   return buildSnapshot(doc);
 }
 
@@ -308,6 +318,7 @@ export async function requestPersistentWalkieEnable(matchId, { participantId, ro
   });
   touchIdleExpiry(doc);
   await doc.save();
+  publishWalkieStateUpdate(matchId);
 
   await queueParticipantMessage(matchId, participant.id, "participant", {
     type: "request-sent",
@@ -340,6 +351,7 @@ export async function respondToPersistentWalkieRequest(matchId, { requestId, act
     );
     touchIdleExpiry(doc);
     await doc.save();
+    publishWalkieStateUpdate(matchId);
     await queueParticipantMessage(matchId, request.participantId, "participant", {
       type: "request-dismissed",
       requestId: request.requestId,
@@ -362,6 +374,7 @@ export async function respondToPersistentWalkieRequest(matchId, { requestId, act
   );
   touchIdleExpiry(doc);
   await doc.save();
+  publishWalkieStateUpdate(matchId);
 
   await queueParticipantMessage(matchId, request.participantId, "participant", {
     type: "request-accepted",
@@ -428,6 +441,7 @@ export async function claimPersistentWalkieSpeaker(matchId, { role, participantI
   );
   touchIdleExpiry(doc);
   await doc.save();
+  publishWalkieStateUpdate(matchId);
 
   return { ok: true, snapshot: buildSnapshot(doc) };
 }
@@ -449,6 +463,7 @@ export async function releasePersistentWalkieSpeaker(matchId, { participantId })
   doc.lastNotification = newNotification("transmission_ended", "Channel is free.");
   touchIdleExpiry(doc);
   await doc.save();
+  publishWalkieStateUpdate(matchId);
 
   await queueParticipantMessage(matchId, previousSpeakerId, "participant", {
     type: "transmission-ended",

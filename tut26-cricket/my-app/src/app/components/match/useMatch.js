@@ -2,6 +2,7 @@
 
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { applyMatchAction, MatchEngineError } from "../../lib/match-engine";
 import useEventSource from "../live/useEventSource";
 
 function triggerHapticFeedback() {
@@ -22,6 +23,21 @@ export function triggerMatchHapticFeedback() {
   triggerHapticFeedback();
 }
 
+function normalizeOptimisticMatch(nextMatch) {
+  if (!nextMatch) {
+    return null;
+  }
+
+  return {
+    ...nextMatch,
+    actionHistory: Array.isArray(nextMatch.actionHistory) ? nextMatch.actionHistory : [],
+    undoCount: Array.isArray(nextMatch.actionHistory)
+      ? nextMatch.actionHistory.length
+      : Number(nextMatch.undoCount || 0),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 export default function useMatch(matchId, hasAccess, initialMatch = null) {
   const router = useRouter();
   const [match, setMatch] = useState(initialMatch);
@@ -32,8 +48,14 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState("");
   const lastStreamUpdateRef = useRef(initialMatch?.updatedAt || "");
-  const updateInFlightRef = useRef(false);
   const previousMatchIdRef = useRef(matchId);
+  const matchRef = useRef(initialMatch);
+  const actionQueueRef = useRef([]);
+  const processingQueueRef = useRef(false);
+
+  useEffect(() => {
+    matchRef.current = match;
+  }, [match]);
 
   const refreshMatch = async () => {
     if (!matchId || !hasAccess) {
@@ -69,7 +91,8 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     previousMatchIdRef.current = matchId;
 
     if (matchChanged) {
-      updateInFlightRef.current = false;
+      processingQueueRef.current = false;
+      actionQueueRef.current = [];
       lastStreamUpdateRef.current = initialMatch?.updatedAt || "";
       setMatch(initialMatch || null);
       setError(null);
@@ -124,69 +147,124 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     match?.[activeInningsKey]?.history?.some((over) => Array.isArray(over?.balls) && over.balls.length > 0)
   );
 
-  const sendAction = async (action, allowOneRetry = true) => {
-    if (!matchId || !hasAccess || updateInFlightRef.current) return null;
+  const refreshMatchFromServer = async () => {
+    const refreshedMatch = await refreshMatch();
+    if (refreshedMatch) {
+      matchRef.current = refreshedMatch;
+    }
+    return refreshedMatch;
+  };
 
-    updateInFlightRef.current = true;
-    setIsUpdating(true);
+  const processQueuedActions = async () => {
+    if (processingQueueRef.current) {
+      return;
+    }
 
-    try {
-      const response = await fetch(`/api/matches/${matchId}/actions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(action),
-      });
+    processingQueueRef.current = true;
 
-      const body = await response
-        .json()
-        .catch(() => ({ message: "Failed to update match." }));
+    while (actionQueueRef.current.length > 0) {
+      const currentEntry = actionQueueRef.current[0];
+      setIsUpdating(true);
 
-      if (!response.ok) {
-        if (body.message === "Set the toss before scoring starts.") {
-          const refreshedMatch = await refreshMatch();
+      try {
+        const response = await fetch(`/api/matches/${matchId}/actions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(currentEntry.action),
+        });
 
-          if (refreshedMatch?.tossReady && allowOneRetry) {
-            updateInFlightRef.current = false;
-            setIsUpdating(false);
-            return sendAction(action, false);
+        const body = await response
+          .json()
+          .catch(() => ({ message: "Failed to update match." }));
+
+        if (!response.ok) {
+          if (body.message === "Set the toss before scoring starts.") {
+            const refreshedMatch = await refreshMatchFromServer();
+
+            if (refreshedMatch?.tossReady && currentEntry.allowOneRetry) {
+              currentEntry.allowOneRetry = false;
+              continue;
+            }
+
+            setError(null);
+            router.replace(`/toss/${matchId}`);
+            break;
           }
 
-          setError(null);
-          router.replace(`/toss/${matchId}`);
-          return null;
+          if (
+            body.message === "The current innings is not complete yet." ||
+            body.message === "The current innings is already complete."
+          ) {
+            await refreshMatchFromServer();
+            setError(null);
+            actionQueueRef.current.shift();
+            continue;
+          }
+
+          throw new Error(body.message || "Failed to update match.");
         }
-        if (body.message === "The current innings is not complete yet.") {
-          await refreshMatch();
-          setError(null);
-          return null;
+
+        if (body.match) {
+          matchRef.current = body.match;
+          startTransition(() => {
+            setMatch(body.match);
+            setLastUpdatedAt(new Date().toISOString());
+          });
         }
-        throw new Error(body.message || "Failed to update match.");
+
+        setError(null);
+        actionQueueRef.current.shift();
+      } catch (caughtError) {
+        console.error("Failed to update match:", caughtError);
+        await refreshMatchFromServer();
+        setError(caughtError);
+        actionQueueRef.current.shift();
       }
+    }
 
-      if (body.match) {
-        startTransition(() => {
-          setMatch(body.match);
-          setLastUpdatedAt(new Date().toISOString());
-        });
-      }
+    processingQueueRef.current = false;
+    setIsUpdating(false);
+  };
 
-      setError(null);
+  const sendAction = async (action, allowOneRetry = true) => {
+    if (!matchId || !hasAccess) return null;
 
-      return body.match || null;
+    const baseMatch = matchRef.current;
+    if (!baseMatch) {
+      return null;
+    }
+
+    try {
+      const optimisticMatch = applyMatchAction(baseMatch, action);
+      const nextOptimisticMatch = normalizeOptimisticMatch(optimisticMatch);
+      matchRef.current = nextOptimisticMatch;
+      startTransition(() => {
+        setMatch(nextOptimisticMatch);
+        setLastUpdatedAt(nextOptimisticMatch.updatedAt || new Date().toISOString());
+        setError(null);
+      });
     } catch (caughtError) {
+      if (caughtError instanceof MatchEngineError) {
+        setError(caughtError);
+        return null;
+      }
       console.error("Failed to update match:", caughtError);
       setError(caughtError);
       return null;
-    } finally {
-      updateInFlightRef.current = false;
-      setIsUpdating(false);
     }
+
+    actionQueueRef.current.push({
+      action,
+      allowOneRetry,
+    });
+    void processQueuedActions();
+
+    return matchRef.current;
   };
 
   const patchAndUpdate = async (payload) => {
-    if (!matchId || !hasAccess || updateInFlightRef.current) return null;
+    if (!matchId || !hasAccess || processingQueueRef.current) return null;
 
-    updateInFlightRef.current = true;
     setIsUpdating(true);
 
     try {
@@ -205,7 +283,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
           body.message === "The current innings is already complete." ||
           body.message === "The current innings is not complete yet."
         ) {
-          await refreshMatch();
+          await refreshMatchFromServer();
           setError(null);
           return null;
         }
@@ -223,7 +301,6 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       setError(caughtError);
       return null;
     } finally {
-      updateInFlightRef.current = false;
       setIsUpdating(false);
     }
   };

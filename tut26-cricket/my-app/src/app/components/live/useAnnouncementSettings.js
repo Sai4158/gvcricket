@@ -36,7 +36,12 @@ function readRawValue(role) {
     return "";
   }
 
-  return window.localStorage.getItem(getStorageKey(role)) || "";
+  try {
+    return window.localStorage.getItem(getStorageKey(role)) || "";
+  } catch (error) {
+    console.error("Failed to read announcer settings:", error);
+    return "";
+  }
 }
 
 function readEnabledValue(role, scopeKey) {
@@ -44,7 +49,24 @@ function readEnabledValue(role, scopeKey) {
     return "";
   }
 
-  return window.sessionStorage.getItem(getEnabledStorageKey(role, scopeKey)) || "";
+  try {
+    return window.sessionStorage.getItem(getEnabledStorageKey(role, scopeKey)) || "";
+  } catch (error) {
+    console.error("Failed to read announcer enabled state:", error);
+    return "";
+  }
+}
+
+function persistSettings(role, settings) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(getStorageKey(role), JSON.stringify(settings));
+  } catch (error) {
+    console.error("Failed to persist announcer settings:", error);
+  }
 }
 
 export default function useAnnouncementSettings(role, scopeKey = "") {
@@ -138,10 +160,10 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
     try {
       const parsed = JSON.parse(rawValue);
       if (!parsed.version || parsed.version < SETTINGS_VERSION) {
-        window.localStorage.setItem(getStorageKey(role), JSON.stringify(settings));
+        persistSettings(role, settings);
       }
     } catch {
-      window.localStorage.setItem(getStorageKey(role), JSON.stringify(settings));
+      persistSettings(role, settings);
     }
   }, [rawValue, role, settings]);
 
@@ -168,10 +190,7 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
         ...persistedSettings,
         [key]: value,
       };
-      window.localStorage.setItem(
-        getStorageKey(role),
-        JSON.stringify(nextSettings)
-      );
+      persistSettings(role, nextSettings);
       window.dispatchEvent(
         new CustomEvent("gv-announcer-change", {
           detail: { role, scopeKey },

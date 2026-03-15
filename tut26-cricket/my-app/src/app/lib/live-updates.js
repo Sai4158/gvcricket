@@ -31,6 +31,14 @@ async function emitSessionChange(documentId) {
   emitter.emit(`session:${documentId}`, { documentId: String(documentId) });
 }
 
+export function publishMatchUpdate(documentId) {
+  void emitMatchChange(documentId);
+}
+
+export function publishSessionUpdate(documentId) {
+  void emitSessionChange(documentId);
+}
+
 async function startWatchers() {
   await connectDB();
 

@@ -4,6 +4,7 @@ import { AnimatePresence } from "framer-motion";
 import AnnouncementControls from "../live/AnnouncementControls";
 import LiveMicModal from "../live/LiveMicModal";
 import WalkiePanel from "../live/WalkiePanel";
+import OptionalFeatureBoundary from "../shared/OptionalFeatureBoundary";
 import {
   HistoryModal,
   InningsEndModal,
@@ -31,6 +32,14 @@ export default function MatchModalLayer({
   onClose,
   onInfoClose,
 }) {
+  const modalFallback = (label) => (
+    <ModalBase title="Unavailable" onExit={onClose}>
+      <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-center text-sm text-zinc-400">
+        {label}
+      </div>
+    </ModalBase>
+  );
+
   return (
     <AnimatePresence>
       {showInningsEnd && <InningsEndModal match={match} onNext={onNext} />}
@@ -81,28 +90,36 @@ export default function MatchModalLayer({
         />
       )}
       {modalType === "image" && (
-        <MatchImageModal
-          match={match}
-          onUploaded={onImageUploaded}
-          onClose={onClose}
-        />
+        <OptionalFeatureBoundary fallback={modalFallback("Image unavailable right now.")}>
+          <MatchImageModal
+            match={match}
+            onUploaded={onImageUploaded}
+            onClose={onClose}
+          />
+        </OptionalFeatureBoundary>
       )}
       {modalType === "commentary" && commentaryProps ? (
-        <ModalBase title="" onExit={onClose} hideHeader>
-          <AnnouncementControls {...commentaryProps} />
-        </ModalBase>
+        <OptionalFeatureBoundary fallback={modalFallback("Commentary controls unavailable right now.")}>
+          <ModalBase title="" onExit={onClose} hideHeader>
+            <AnnouncementControls {...commentaryProps} />
+          </ModalBase>
+        </OptionalFeatureBoundary>
       ) : null}
       {modalType === "walkie" && walkieProps ? (
-        <ModalBase title="Walkie-Talkie" onExit={onClose}>
-          <WalkiePanel {...walkieProps} />
-        </ModalBase>
+        <OptionalFeatureBoundary fallback={modalFallback("Walkie unavailable right now.")}>
+          <ModalBase title="Walkie-Talkie" onExit={onClose}>
+            <WalkiePanel {...walkieProps} />
+          </ModalBase>
+        </OptionalFeatureBoundary>
       ) : null}
       {modalType === "mic" && (
-        <LiveMicModal
-          title="Live Commentary Mic"
-          monitor={micMonitor}
-          onClose={onClose}
-        />
+        <OptionalFeatureBoundary fallback={modalFallback("Live mic unavailable right now.")}>
+          <LiveMicModal
+            title="Live Commentary Mic"
+            monitor={micMonitor}
+            onClose={onClose}
+          />
+        </OptionalFeatureBoundary>
       )}
       {modalType === "rules" && <RulesModal onClose={onClose} />}
       {infoText && (

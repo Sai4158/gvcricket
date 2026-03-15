@@ -29,6 +29,7 @@ import useLiveRelativeTime from "../live/useLiveRelativeTime";
 import useSpeechAnnouncer from "../live/useSpeechAnnouncer";
 import useMatch, { triggerMatchHapticFeedback } from "./useMatch";
 import useMatchAccess from "./useMatchAccess";
+import OptionalFeatureBoundary from "../shared/OptionalFeatureBoundary";
 
 export default function MatchPageClient({
   matchId,
@@ -72,6 +73,7 @@ export default function MatchPageClient({
     role: "umpire",
     hasUmpireAccess: authStatus === "granted",
     displayName: "Umpire",
+    autoConnectAudio: modal.type === "walkie",
   });
   const hasPendingWalkieRequests = Boolean(isLiveMatch && walkie.pendingRequests?.length);
 
@@ -105,12 +107,16 @@ export default function MatchPageClient({
     const requestRole =
       latestRequest?.role === "director" ? "Director" : "Spectator";
 
-    speak(`${requestRole} requested walkie-talkie.`, {
-      key: `umpire-walkie-request-${latestRequest?.requestId || nextSignature}`,
-      rate: 0.9,
-      interrupt: true,
-      ignoreEnabled: true,
-    });
+    try {
+      speak(`${requestRole} requested walkie-talkie.`, {
+        key: `umpire-walkie-request-${latestRequest?.requestId || nextSignature}`,
+        rate: 0.9,
+        interrupt: true,
+        ignoreEnabled: true,
+      });
+    } catch (error) {
+      console.error("Walkie request speech failed:", error);
+    }
   }, [isLiveMatch, speak, walkie.pendingRequests]);
 
   const announceUmpireAction = (runs, isOut = false, extraType = null) => {
@@ -301,19 +307,21 @@ export default function MatchPageClient({
               {error.message || "Match update failed."}
             </div>
           ) : null}
-          {!hasPendingWalkieRequests ? (
-            <WalkieNotice
-              notice={walkie.notice}
-              onDismiss={walkie.dismissNotice}
-            />
-          ) : null}
-          {hasPendingWalkieRequests ? (
-            <WalkieRequestQueue
-              requests={walkie.pendingRequests}
-              onAccept={walkie.acceptRequest}
-              onDismiss={walkie.dismissRequest}
-            />
-          ) : null}
+          <OptionalFeatureBoundary label="Walkie unavailable right now.">
+            {!hasPendingWalkieRequests ? (
+              <WalkieNotice
+                notice={walkie.notice}
+                onDismiss={walkie.dismissNotice}
+              />
+            ) : null}
+            {hasPendingWalkieRequests ? (
+              <WalkieRequestQueue
+                requests={walkie.pendingRequests}
+                onAccept={walkie.acceptRequest}
+                onDismiss={walkie.dismissRequest}
+              />
+            ) : null}
+          </OptionalFeatureBoundary>
           <BallTracker history={oversHistory} />
           <Controls
             onScore={handleAnnouncedScoreEvent}
@@ -351,88 +359,94 @@ export default function MatchPageClient({
           />
         </div>
       </main>
-      <MatchModalLayer
-        showInningsEnd={showInningsEnd}
-        match={match}
-        modalType={modal.type}
-        micMonitor={micMonitor}
-        commentaryProps={
-          isLiveMatch
-            ? {
-                title: "Umpire Commentary",
-                variant: "modal",
-                simpleMode: true,
-                onClose: () => setModal({ type: null }),
-                settings: umpireSettings,
-                updateSetting: updateUmpireSetting,
-                onToggleEnabled: (nextEnabled) => {
-                  if (nextEnabled) {
-                    prime();
-                    speak("Umpire voice on.", {
-                      key: "umpire-voice-enabled",
-                      rate: 0.9,
-                      interrupt: false,
-                      userGesture: true,
-                      ignoreEnabled: true,
-                    });
-                  } else {
-                    stop();
-                  }
-                },
-                statusText: umpireSettings.enabled
-                  ? status === "waiting_for_gesture"
-                    ? voiceName
+      <OptionalFeatureBoundary label="Optional match tools unavailable right now.">
+        <MatchModalLayer
+          showInningsEnd={showInningsEnd}
+          match={match}
+          modalType={modal.type}
+          micMonitor={micMonitor}
+          commentaryProps={
+            isLiveMatch
+              ? {
+                  title: "Umpire Commentary",
+                  variant: "modal",
+                  simpleMode: true,
+                  onClose: () => setModal({ type: null }),
+                  settings: umpireSettings,
+                  updateSetting: updateUmpireSetting,
+                  onToggleEnabled: (nextEnabled) => {
+                    if (nextEnabled) {
+                      try {
+                        prime();
+                        speak("Umpire voice on.", {
+                          key: "umpire-voice-enabled",
+                          rate: 0.9,
+                          interrupt: false,
+                          userGesture: true,
+                          ignoreEnabled: true,
+                        });
+                      } catch (error) {
+                        console.error("Umpire announcer enable failed:", error);
+                      }
+                    } else {
+                      stop();
+                    }
+                  },
+                  statusText: umpireSettings.enabled
+                    ? status === "waiting_for_gesture"
                       ? voiceName
-                      : "Tap Read Score once."
-                    : voiceName
-                    ? voiceName
-                    : ""
-                  : "",
-                onAnnounceNow: handleManualScoreAnnouncement,
-                announceLabel: "Read Score",
-                announceDisabled: false,
-              }
-            : null
-        }
-        walkieProps={
-          isLiveMatch
-            ? {
-                role: "umpire",
-                snapshot: walkie.snapshot,
-                notice: walkie.notice,
-                error: walkie.error,
-                canEnable: walkie.canEnable,
-                canRequestEnable: false,
-                canTalk: walkie.canTalk,
-                isSelfTalking: walkie.isSelfTalking,
-                isFinishing: walkie.isFinishing,
-                countdown: walkie.countdown,
-                finishDelayLeft: walkie.finishDelayLeft,
-                needsAudioUnlock: walkie.needsAudioUnlock,
-                requestCooldownLeft: 0,
-                requestState: "idle",
-                pendingRequests: walkie.pendingRequests,
-                onRequestEnable: () => {},
-                onToggleEnabled: walkie.toggleEnabled,
-                onStartTalking: walkie.startTalking,
-                onStopTalking: walkie.stopTalking,
-                onUnlockAudio: walkie.unlockAudio,
-                onDismissNotice: walkie.dismissNotice,
-                onAcceptRequest: walkie.acceptRequest,
-                onDismissRequest: walkie.dismissRequest,
-              }
-            : null
-        }
-        currentOverNumber={currentOverNumber}
-        firstInningsOversPlayed={firstInningsOversPlayed}
-        infoText={infoText}
-        onNext={handleNextInningsOrEnd}
-        onUpdate={patchAndUpdate}
-        onImageUploaded={replaceMatch}
-        onScoreEvent={handleAnnouncedScoreEvent}
-        onClose={() => setModal({ type: null })}
-        onInfoClose={() => setInfoText(null)}
-      />
+                        ? voiceName
+                        : "Tap Read Score once."
+                      : voiceName
+                      ? voiceName
+                      : ""
+                    : "",
+                  onAnnounceNow: handleManualScoreAnnouncement,
+                  announceLabel: "Read Score",
+                  announceDisabled: false,
+                }
+              : null
+          }
+          walkieProps={
+            isLiveMatch
+              ? {
+                  role: "umpire",
+                  snapshot: walkie.snapshot,
+                  notice: walkie.notice,
+                  error: walkie.error,
+                  canEnable: walkie.canEnable,
+                  canRequestEnable: false,
+                  canTalk: walkie.canTalk,
+                  isSelfTalking: walkie.isSelfTalking,
+                  isFinishing: walkie.isFinishing,
+                  countdown: walkie.countdown,
+                  finishDelayLeft: walkie.finishDelayLeft,
+                  needsAudioUnlock: walkie.needsAudioUnlock,
+                  requestCooldownLeft: 0,
+                  requestState: "idle",
+                  pendingRequests: walkie.pendingRequests,
+                  onRequestEnable: () => {},
+                  onToggleEnabled: walkie.toggleEnabled,
+                  onStartTalking: walkie.startTalking,
+                  onStopTalking: walkie.stopTalking,
+                  onUnlockAudio: walkie.unlockAudio,
+                  onDismissNotice: walkie.dismissNotice,
+                  onAcceptRequest: walkie.acceptRequest,
+                  onDismissRequest: walkie.dismissRequest,
+                }
+              : null
+          }
+          currentOverNumber={currentOverNumber}
+          firstInningsOversPlayed={firstInningsOversPlayed}
+          infoText={infoText}
+          onNext={handleNextInningsOrEnd}
+          onUpdate={patchAndUpdate}
+          onImageUploaded={replaceMatch}
+          onScoreEvent={handleAnnouncedScoreEvent}
+          onClose={() => setModal({ type: null })}
+          onInfoClose={() => setInfoText(null)}
+        />
+      </OptionalFeatureBoundary>
     </>
   );
 }

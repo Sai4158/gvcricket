@@ -8,13 +8,13 @@ import {
   isProcessedAction,
   MatchEngineError,
 } from "../../../../lib/match-engine";
+import { publishMatchUpdate, publishSessionUpdate } from "../../../../lib/live-updates";
 import {
   getMatchAccessCookieName,
   hasValidMatchAccess,
 } from "../../../../lib/match-access";
 import { serializePublicMatch } from "../../../../lib/public-data";
 import { getRequestMeta } from "../../../../lib/request-meta";
-import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../../lib/request-security";
 import { hydrateLegacyTossState } from "../../../../lib/match-toss";
 import { matchActionSchema } from "../../../../lib/validators";
@@ -48,29 +48,6 @@ async function hasMatchAccess(matchId, accessVersion) {
 export async function POST(req, { params }) {
   const { id } = await params;
   const meta = getRequestMeta(req);
-  const actionLimit = enforceRateLimit({
-    key: `match-action:${id}:${meta.ip}`,
-    limit: 10,
-    windowMs: 1000,
-    blockMs: 3000,
-  });
-
-  if (!actionLimit.allowed) {
-    await writeAuditLog({
-        action: "match_action_rate_limited",
-        targetType: "match",
-        targetId: id,
-      status: "failure",
-      ip: meta.ip,
-      userAgent: meta.userAgent,
-      metadata: { retryAfterMs: actionLimit.retryAfterMs },
-    });
-
-    return jsonRateLimit(
-      "Too many scoring actions. Slow down briefly.",
-      actionLimit.retryAfterMs
-    );
-  }
 
   try {
     const parsedRequest = await parseJsonRequest(req, matchActionSchema, {
@@ -120,7 +97,7 @@ export async function POST(req, { params }) {
     if (isProcessedAction(match, parsedRequest.value.actionId)) {
       return Response.json(
         {
-          match: serializePublicMatch(match),
+          match: serializePublicMatch(match, null, { includeActionHistory: true }),
           replayed: true,
         },
         {
@@ -149,6 +126,8 @@ export async function POST(req, { params }) {
     await Session.findByIdAndUpdate(updatedMatch.sessionId, {
       $set: buildSessionMirrorUpdate(updatedMatch),
     });
+    publishMatchUpdate(updatedMatch._id);
+    publishSessionUpdate(updatedMatch.sessionId);
 
     await writeAuditLog({
       action: parsedRequest.value.type,
@@ -162,7 +141,9 @@ export async function POST(req, { params }) {
 
     return Response.json(
       {
-        match: serializePublicMatch(updatedMatch),
+        match: serializePublicMatch(updatedMatch, null, {
+          includeActionHistory: true,
+        }),
       },
       {
         headers: {

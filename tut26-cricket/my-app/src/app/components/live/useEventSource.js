@@ -28,7 +28,12 @@ export default function useEventSource({
     const handler = (message) => {
       try {
         const data = JSON.parse(message.data);
-        onMessageRef.current?.(data);
+        try {
+          onMessageRef.current?.(data);
+        } catch (error) {
+          console.error("SSE handler failed:", error);
+          onErrorRef.current?.(error);
+        }
       } catch (error) {
         console.error("Failed to parse SSE message:", error);
       }

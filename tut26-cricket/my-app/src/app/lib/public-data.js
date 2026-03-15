@@ -3,7 +3,11 @@ import { getPublicMatchImagePath } from "./match-image-secure";
 import { isSafeMatchImageUrl } from "./match-image";
 import { hasCompleteTossState, normalizeLegacyTossState } from "./match-toss";
 
-export function serializePublicMatch(matchDocument, fallbackState = null) {
+export function serializePublicMatch(
+  matchDocument,
+  fallbackState = null,
+  options = {}
+) {
   if (!matchDocument) return null;
 
   const rawMatch =
@@ -11,6 +15,7 @@ export function serializePublicMatch(matchDocument, fallbackState = null) {
       ? matchDocument.toObject()
       : matchDocument;
   const match = normalizeLegacyTossState(rawMatch, fallbackState);
+  const includeActionHistory = Boolean(options.includeActionHistory);
 
   return {
     _id: String(match._id),
@@ -39,6 +44,13 @@ export function serializePublicMatch(matchDocument, fallbackState = null) {
     lastLiveEvent: match.lastLiveEvent || null,
     lastEventType: match.lastEventType || "",
     lastEventText: match.lastEventText || "",
+    ...(includeActionHistory
+      ? {
+          actionHistory: Array.isArray(match.actionHistory)
+            ? match.actionHistory
+            : [],
+        }
+      : {}),
     undoCount: Array.isArray(match.actionHistory) ? match.actionHistory.length : 0,
     createdAt: match.createdAt || null,
     updatedAt: match.updatedAt || null,

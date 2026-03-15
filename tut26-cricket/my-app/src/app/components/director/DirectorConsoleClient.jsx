@@ -36,7 +36,15 @@ import useWalkieTalkie from "../live/useWalkieTalkie";
 import { WalkieNotice, WalkieTalkButton } from "../live/WalkiePanel";
 import { buildCurrentScoreAnnouncement } from "../../lib/live-announcements";
 import { getBattingTeamBundle } from "../../lib/team-utils";
-import { playUiTone, primeUiAudio } from "../../lib/page-audio";
+import {
+  getCachedAudioAssetUrl,
+  isIOSSafari,
+  isUiAudioUnlocked,
+  playUiTone,
+  preloadCachedAudioAssets,
+  primeUiAudio,
+  subscribeUiAudioUnlock,
+} from "../../lib/page-audio";
 
 const DIRECTOR_AUDIO_LIBRARY_CACHE_KEY = "gv-director-audio-library-v1";
 const DIRECTOR_AUDIO_METADATA_CACHE_KEY = "gv-director-audio-metadata-v1";
@@ -348,14 +356,30 @@ export default function DirectorConsoleClient({
   const [libraryLiveId, setLibraryLiveId] = useState("");
   const [libraryState, setLibraryState] = useState("idle");
   const [effectsNeedsUnlock, setEffectsNeedsUnlock] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(() => isUiAudioUnlocked());
   const [draggingLibraryId, setDraggingLibraryId] = useState("");
   const [libraryDropTargetId, setLibraryDropTargetId] = useState("");
   const audioRef = useRef(null);
   const effectsAudioRef = useRef(null);
   const musicUrlsRef = useRef([]);
+  const cachedEffectUrlRef = useRef(new Map());
   const [speechSettings, setSpeechSettings] = useState(createSpeechSettings);
   const speech = useSpeechAnnouncer(speechSettings);
   const micMonitor = useLocalMicMonitor();
+  const iOSSafari = useMemo(() => isIOSSafari(), []);
+
+  useEffect(() => subscribeUiAudioUnlock(setAudioUnlocked), []);
+
+  useEffect(() => {
+    if (audioUnlocked) {
+      setEffectsNeedsUnlock(false);
+      setConsoleError((current) =>
+        current === "Safari blocked this audio. Tap Enable Audio once, then play the sound again."
+          ? ""
+          : current
+      );
+    }
+  }, [audioUnlocked]);
 
   useEffect(() => {
     if (initialSessions?.length) {
@@ -719,6 +743,19 @@ export default function DirectorConsoleClient({
     });
   }, [libraryDurations, libraryFiles, libraryOrder]);
 
+  useEffect(() => {
+    if (!audioUnlocked || !orderedLibraryFiles.length) {
+      return;
+    }
+
+    const preloadTargets = orderedLibraryFiles
+      .filter((file) => (libraryDurations[file.id] || 0) <= 6)
+      .slice(0, 6)
+      .map((file) => file.src);
+
+    void preloadCachedAudioAssets(preloadTargets);
+  }, [audioUnlocked, libraryDurations, orderedLibraryFiles]);
+
   const handleLibraryReorder = (nextFiles) => {
     setLibraryFiles(nextFiles);
     const nextOrder = nextFiles.map((file) => file.id);
@@ -821,6 +858,7 @@ export default function DirectorConsoleClient({
       return;
     }
 
+    void primeUiAudio({ mediaElements: [effectsAudioRef.current, audioRef.current] });
     speech.prime();
     speech.speak(buildCurrentScoreAnnouncement(targetMatch), {
       key: `director-score-${targetMatch._id}`,
@@ -1043,10 +1081,12 @@ export default function DirectorConsoleClient({
 
   const primeEffectsAudio = useCallback(async () => {
     const audio = effectsAudioRef.current;
-    await primeUiAudio();
+    const unlocked = await primeUiAudio({
+      mediaElements: [audio, audioRef.current],
+    });
 
     if (!audio) {
-      return;
+      return unlocked;
     }
 
     audio.muted = false;
@@ -1054,7 +1094,9 @@ export default function DirectorConsoleClient({
     audio.setAttribute("playsinline", "");
     audio.setAttribute("webkit-playsinline", "");
     audio.volume = Math.max(0, Math.min(1, masterVolume));
-  }, [masterVolume]);
+    setEffectsNeedsUnlock(!unlocked && iOSSafari);
+    return unlocked;
+  }, [iOSSafari, masterVolume]);
 
   const playEffect = async (file) => {
     const audio = effectsAudioRef.current;
@@ -1073,9 +1115,27 @@ export default function DirectorConsoleClient({
     setLibraryLiveId(file.id);
     setLibraryState("loading");
     setLibraryCurrentTime(0);
-    await primeEffectsAudio();
-    audio.preload = "metadata";
-    audio.src = file.src;
+    const unlocked = await primeEffectsAudio();
+    if (iOSSafari && !unlocked) {
+      setConsoleError("Tap Enable Audio once, then play the sound again.");
+      setLibraryState("idle");
+      setLibraryLiveId("");
+      return;
+    }
+
+    audio.preload = "auto";
+    let effectSrc = cachedEffectUrlRef.current.get(file.id) || "";
+    if (!effectSrc) {
+      try {
+        effectSrc = await getCachedAudioAssetUrl(file.src);
+        if (effectSrc) {
+          cachedEffectUrlRef.current.set(file.id, effectSrc);
+        }
+      } catch {
+        effectSrc = file.src;
+      }
+    }
+    audio.src = effectSrc || file.src;
     audio.volume = Math.max(
       0,
       Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume)
@@ -1768,6 +1828,11 @@ export default function DirectorConsoleClient({
                   </button>
                 </div>
               ) : null}
+              {!effectsNeedsUnlock && iOSSafari && !audioUnlocked ? (
+                <div className="mb-3 rounded-[22px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-zinc-300">
+                  Tap any sound once to enable audio on this iPhone or iPad.
+                </div>
+              ) : null}
               {orderedLibraryFiles.length ? (
                 <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
                   {orderedLibraryFiles.map((file) => (
@@ -1906,6 +1971,16 @@ export default function DirectorConsoleClient({
                     ? "Score announcer is on."
                     : "Score announcer is off."}
                 </p>
+                {speech.needsGesture && !speech.audioUnlocked ? (
+                  <p className="mt-2 text-sm text-amber-200">
+                    Tap Read current score once to enable iPhone audio.
+                  </p>
+                ) : null}
+                {speech.status === "blocked" ? (
+                  <p className="mt-2 text-sm text-rose-200">
+                    Audio is blocked in this browser right now.
+                  </p>
+                ) : null}
               </div>
               <button
                 type="button"

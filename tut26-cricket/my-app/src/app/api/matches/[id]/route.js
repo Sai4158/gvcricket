@@ -8,6 +8,7 @@ import {
   buildSessionMirrorUpdate,
   MatchEngineError,
 } from "../../../lib/match-engine";
+import { publishMatchUpdate, publishSessionUpdate } from "../../../lib/live-updates";
 import {
   getClearedMatchAccessCookie,
   getMatchAccessCookieName,
@@ -41,6 +42,11 @@ export async function GET(_req, { params }) {
       return jsonError("Match not found.", 404);
     }
 
+    const hasAccess = await hasMatchAccess(
+      id,
+      Number(match.adminAccessVersion || 1)
+    );
+
     const fallbackSession = match.sessionId
       ? await Session.findById(match.sessionId).select(
           "tossWinner tossDecision teamAName teamBName teamA teamB"
@@ -54,11 +60,16 @@ export async function GET(_req, { params }) {
       });
     }
 
-    return Response.json(serializePublicMatch(match), {
-      headers: {
-        "Cache-Control": "no-store",
-      },
-    });
+    return Response.json(
+      serializePublicMatch(match, fallbackSession, {
+        includeActionHistory: hasAccess,
+      }),
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
   } catch {
     return jsonError("Could not load match.", 500);
   }
@@ -151,6 +162,8 @@ export async function PATCH(req, { params }) {
     await Session.findByIdAndUpdate(match.sessionId, {
       $set: buildSessionMirrorUpdate(match),
     });
+    publishMatchUpdate(match._id);
+    publishSessionUpdate(match.sessionId);
 
     await writeAuditLog({
       action: "match_patch",
@@ -162,7 +175,7 @@ export async function PATCH(req, { params }) {
       metadata: { fields: Object.keys(parsedRequest.value) },
     });
 
-    return Response.json(serializePublicMatch(match), {
+    return Response.json(serializePublicMatch(match, null, { includeActionHistory: true }), {
       headers: {
         "Cache-Control": "no-store",
       },
@@ -216,6 +229,8 @@ export async function DELETE(req, { params }) {
       },
     });
     await Match.findByIdAndDelete(id);
+    publishMatchUpdate(id);
+    publishSessionUpdate(match.sessionId);
 
     await writeAuditLog({
       action: "match_delete",

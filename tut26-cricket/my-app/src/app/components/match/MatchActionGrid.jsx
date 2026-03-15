@@ -107,6 +107,7 @@ function ActionIconButton({
   const holdStartedRef = useRef(false);
   const suppressClickRef = useRef(false);
   const feedbackTriggeredRef = useRef(false);
+  const pointerIdRef = useRef(null);
 
   const clearHoldTimer = () => {
     if (holdTimerRef.current) {
@@ -145,7 +146,8 @@ function ActionIconButton({
 
   return (
     <motion.button
-      whileTap={{ scale: 0.92, y: 2 }}
+      type="button"
+      whileTap={{ scale: 0.985 }}
       onClick={() => {
         if (holdStartedRef.current || suppressClickRef.current) {
           holdStartedRef.current = false;
@@ -158,13 +160,67 @@ function ActionIconButton({
         onClick?.();
       }}
       disabled={disabled}
-      onPointerDown={beginPress}
-      onPointerUp={endPress}
-      onPointerLeave={endPress}
-      onPointerCancel={endPress}
+      onPointerDown={(event) => {
+        if (!event.isPrimary) return;
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        pointerIdRef.current = event.pointerId;
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        beginPress();
+      }}
+      onPointerUp={(event) => {
+        if (
+          pointerIdRef.current !== null &&
+          event.pointerId !== undefined &&
+          event.pointerId !== pointerIdRef.current
+        ) {
+          return;
+        }
+        pointerIdRef.current = null;
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+        endPress();
+      }}
+      onPointerLeave={(event) => {
+        if (
+          pointerIdRef.current !== null &&
+          event.pointerId !== undefined &&
+          event.pointerId !== pointerIdRef.current
+        ) {
+          return;
+        }
+        endPress();
+      }}
+      onPointerCancel={(event) => {
+        if (
+          pointerIdRef.current !== null &&
+          event.pointerId !== undefined &&
+          event.pointerId !== pointerIdRef.current
+        ) {
+          return;
+        }
+        pointerIdRef.current = null;
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+        endPress();
+      }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+      }}
+      onMouseDown={(event) => {
+        event.preventDefault();
+      }}
+      onDragStart={(event) => {
+        event.preventDefault();
+      }}
       className={`press-feedback relative flex flex-col items-center justify-center text-zinc-300 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40 ${
         compact ? "w-24 gap-2 p-2" : "w-24 gap-2 p-2"
       }`}
+      style={{
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
+        touchAction: "none",
+        WebkitTapHighlightColor: "transparent",
+      }}
+      draggable={false}
     >
       {badge ? (
         <span className={`absolute right-2 top-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] ${badgeClass}`}>
@@ -175,6 +231,12 @@ function ActionIconButton({
         className={`relative ${compact ? "text-4xl" : "text-[2.35rem]"} ${colorClass} ${
           active ? "drop-shadow-[0_0_16px_currentColor]" : ""
         } ${talking ? "animate-pulse drop-shadow-[0_0_22px_currentColor]" : ""}`}
+        style={{
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
+          WebkitTapHighlightColor: "transparent",
+        }}
       >
         {talking ? (
           <span className="absolute -inset-3 rounded-full border border-current/30" aria-hidden="true" />
@@ -185,6 +247,12 @@ function ActionIconButton({
         className={`text-center text-zinc-100 ${
           compact ? "text-[12px] font-medium tracking-[0.08em]" : "text-[12px] font-medium tracking-[0.08em]"
         }`}
+        style={{
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
+          WebkitTapHighlightColor: "transparent",
+        }}
       >
         {label}
       </span>

@@ -33,9 +33,11 @@ export async function GET(request, { params }) {
     async start(controller) {
       let cleanup = () => {};
       let heartbeat = null;
+      let bootstrapCatchup = null;
       let closed = false;
       let didCleanup = false;
       let lastSerializedMatch = "";
+      const bootstrapDeadline = Date.now() + 12_000;
 
       const finalize = () => {
         if (didCleanup) {
@@ -47,6 +49,10 @@ export async function GET(request, { params }) {
         if (heartbeat) {
           clearTimeout(heartbeat);
           heartbeat = null;
+        }
+        if (bootstrapCatchup) {
+          clearTimeout(bootstrapCatchup);
+          bootstrapCatchup = null;
         }
       };
 
@@ -81,7 +87,7 @@ export async function GET(request, { params }) {
         }
       };
 
-      const scheduleHeartbeat = (delay = 15000) => {
+      const scheduleHeartbeat = (delay = 4000) => {
         if (closed) {
           return;
         }
@@ -90,6 +96,18 @@ export async function GET(request, { params }) {
         }
         heartbeat = setTimeout(() => {
           void heartbeatLoop();
+        }, delay);
+      };
+
+      const scheduleBootstrapCatchup = (delay = 1200) => {
+        if (closed || Date.now() >= bootstrapDeadline) {
+          return;
+        }
+        if (bootstrapCatchup) {
+          clearTimeout(bootstrapCatchup);
+        }
+        bootstrapCatchup = setTimeout(() => {
+          void bootstrapCatchupLoop();
         }, delay);
       };
 
@@ -119,15 +137,19 @@ export async function GET(request, { params }) {
           }
 
           const nextMatch = serializePublicMatch(match, fallbackSession);
-          const nextSerializedMatch = JSON.stringify(nextMatch);
+          const nextPublicMatch = serializePublicMatch(match, fallbackSession, {
+            includeActionHistory: true,
+          });
+          const nextSerializedMatch = JSON.stringify(nextPublicMatch);
           if (nextSerializedMatch === lastSerializedMatch) {
             return;
           }
 
           lastSerializedMatch = nextSerializedMatch;
           send("match", {
-            match: nextMatch,
+            match: nextPublicMatch,
             updatedAt: new Date().toISOString(),
+            pad: "0".repeat(1024),
           });
         };
 
@@ -137,7 +159,7 @@ export async function GET(request, { params }) {
           }
 
           try {
-            if (!send("ping", { ok: true, ts: Date.now() })) {
+            if (!send("ping", { ok: true, ts: Date.now(), pad: "0".repeat(2048) })) {
               return;
             }
           } catch (error) {
@@ -147,6 +169,20 @@ export async function GET(request, { params }) {
           }
 
           scheduleHeartbeat();
+        };
+
+        const bootstrapCatchupLoop = async () => {
+          if (closed || Date.now() >= bootstrapDeadline) {
+            return;
+          }
+
+          try {
+            await pushMatch();
+          } catch (error) {
+            console.error("Match SSE bootstrap catchup failed:", error);
+          }
+
+          scheduleBootstrapCatchup();
         };
 
         await pushMatch();
@@ -161,17 +197,19 @@ export async function GET(request, { params }) {
           await ensureLiveUpdates();
           if (!closed) {
             cleanup = subscribeToMatch(id, async () => {
-              await pushMatch();
+              try {
+                await pushMatch();
+              } catch (error) {
+                console.error("Match SSE push failed:", error);
+              }
             });
           }
         } catch (error) {
           console.error("Match change streams unavailable.", error);
-          send("error", { message: "Live match updates require realtime database events." });
-          stopStream();
-          return;
         }
 
         scheduleHeartbeat();
+        scheduleBootstrapCatchup();
 
         request.signal.addEventListener("abort", () => {
           stopStream();

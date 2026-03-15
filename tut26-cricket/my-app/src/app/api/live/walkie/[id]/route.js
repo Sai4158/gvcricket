@@ -91,6 +91,7 @@ export async function GET(request, { params }) {
   const stream = new ReadableStream({
     async start(controller) {
       let heartbeat = null;
+      let pollTimer = null;
       let closed = false;
       let lastVersion = -1;
       let lastNotificationId = "";
@@ -113,6 +114,10 @@ export async function GET(request, { params }) {
         if (heartbeat) {
           clearTimeout(heartbeat);
           heartbeat = null;
+        }
+        if (pollTimer) {
+          clearTimeout(pollTimer);
+          pollTimer = null;
         }
       };
 
@@ -156,6 +161,18 @@ export async function GET(request, { params }) {
         }
         heartbeat = setTimeout(() => {
           void heartbeatLoop();
+        }, delay);
+      };
+
+      const schedulePoll = (delay = 800) => {
+        if (closed || hasChangeStreamUpdates) {
+          return;
+        }
+        if (pollTimer) {
+          clearTimeout(pollTimer);
+        }
+        pollTimer = setTimeout(() => {
+          void pollLoop();
         }, delay);
       };
 
@@ -213,6 +230,13 @@ export async function GET(request, { params }) {
           if (closed) {
             return;
           }
+          if (!hasChangeStreamUpdates) {
+            await drainMessages();
+            await pushState();
+            if (closed) {
+              return;
+            }
+          }
           if (pendingStateReplays > 0) {
             const sentState = send("state", {
               snapshot: current.snapshot,
@@ -237,6 +261,21 @@ export async function GET(request, { params }) {
         heartbeat = setTimeout(() => {
           void heartbeatLoop();
         }, 5000);
+      };
+
+      const pollLoop = async () => {
+        if (closed || hasChangeStreamUpdates) {
+          return;
+        }
+
+        try {
+          await drainMessages();
+          await pushState();
+        } catch (error) {
+          console.error("Walkie SSE fallback poll failed:", error);
+        }
+
+        schedulePoll();
       };
 
       try {
@@ -292,7 +331,8 @@ export async function GET(request, { params }) {
             scheduleHeartbeat(3000);
           } catch (error) {
             console.error("Walkie change streams unavailable.", error);
-            stopStream();
+            hasChangeStreamUpdates = false;
+            schedulePoll(500);
           }
         })();
 
