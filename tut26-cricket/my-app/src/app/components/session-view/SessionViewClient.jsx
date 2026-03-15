@@ -904,18 +904,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
         </div>
       </MatchHeroBackdrop>
 
-      <div className="w-full max-w-4xl mt-1">
-        <OptionalFeatureBoundary label="Walkie unavailable right now.">
-          <WalkieNotice
-            notice={localWalkieNotice || walkie.notice}
-            onDismiss={() => {
-              setLocalWalkieNotice("");
-              walkie.dismissNotice();
-            }}
-          />
-        </OptionalFeatureBoundary>
-      </div>
-
       <OptionalFeatureBoundary
         fallback={
           <div className="w-full max-w-4xl mt-2 rounded-3xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-zinc-400">
@@ -965,6 +953,16 @@ export default function SessionViewClient({ sessionId, initialData }) {
                   />
                 </div>
               </div>
+              <div className="min-h-[72px]">
+                <WalkieNotice
+                  embedded
+                  notice={localWalkieNotice || walkie.notice}
+                  onDismiss={() => {
+                    setLocalWalkieNotice("");
+                    walkie.dismissNotice();
+                  }}
+                />
+              </div>
               {walkieSwitchOn ? (
                 <div className="flex flex-col items-center justify-center pt-1 pb-1">
                   <button
@@ -996,9 +994,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
                     }`}
                   >
                     {walkieCardTalking ? (
-                      <FaMicrophone className="text-2xl" />
+                      <FaMicrophone className="text-[1.75rem]" />
                     ) : (
-                      <FaMicrophoneSlash className="text-2xl" />
+                      <FaMicrophoneSlash className="text-[1.75rem]" />
                     )}
                   </button>
                   <span

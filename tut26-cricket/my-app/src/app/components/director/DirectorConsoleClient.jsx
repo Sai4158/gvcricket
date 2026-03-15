@@ -41,7 +41,6 @@ import {
   isIOSSafari,
   isUiAudioUnlocked,
   playUiTone,
-  preloadCachedAudioAssets,
   primeUiAudio,
   subscribeUiAudioUnlock,
 } from "../../lib/page-audio";
@@ -349,6 +348,7 @@ export default function DirectorConsoleClient({
   const [consoleError, setConsoleError] = useState("");
   const [musicMessage, setMusicMessage] = useState("");
   const [directorHoldLive, setDirectorHoldLive] = useState(false);
+  const [directorWalkieOn, setDirectorWalkieOn] = useState(true);
   const [libraryFiles, setLibraryFiles] = useState([]);
   const [libraryOrder, setLibraryOrder] = useState([]);
   const [libraryDurations, setLibraryDurations] = useState({});
@@ -361,6 +361,9 @@ export default function DirectorConsoleClient({
   const [libraryDropTargetId, setLibraryDropTargetId] = useState("");
   const audioRef = useRef(null);
   const effectsAudioRef = useRef(null);
+  const directorMicPointerIdRef = useRef(null);
+  const directorMicHoldingRef = useRef(false);
+  const effectPlayRequestRef = useRef(0);
   const musicUrlsRef = useRef([]);
   const cachedEffectUrlRef = useRef(new Map());
   const [speechSettings, setSpeechSettings] = useState(createSpeechSettings);
@@ -658,66 +661,6 @@ export default function DirectorConsoleClient({
     }
   }, [audioOrderStorageKey]);
 
-  useEffect(() => {
-    if (!libraryFiles.length) {
-      return;
-    }
-
-    const missingFiles = libraryFiles.filter(
-      (file) => !Number.isFinite(libraryDurations[file.id])
-    );
-
-    if (!missingFiles.length) {
-      return;
-    }
-
-    let cancelled = false;
-
-    missingFiles.forEach((file) => {
-      const audio = new Audio();
-      audio.preload = "metadata";
-      audio.src = file.src;
-
-      const finalize = () => {
-        audio.src = "";
-      };
-
-      audio.onloadedmetadata = () => {
-        if (cancelled) {
-          finalize();
-          return;
-        }
-
-        const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
-        setLibraryDurations((current) => {
-          if (Number.isFinite(current[file.id])) {
-            return current;
-          }
-          const next = { ...current, [file.id]: duration };
-          directorAudioMetadataMemoryCache = next;
-          if (typeof window !== "undefined") {
-            try {
-              window.sessionStorage.setItem(
-                DIRECTOR_AUDIO_METADATA_CACHE_KEY,
-                JSON.stringify(next)
-              );
-            } catch {
-              // Ignore storage failures.
-            }
-          }
-          return next;
-        });
-        finalize();
-      };
-
-      audio.onerror = finalize;
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [libraryDurations, libraryFiles]);
-
   const orderedLibraryFiles = useMemo(() => {
     if (!libraryFiles.length) {
       return [];
@@ -742,19 +685,6 @@ export default function DirectorConsoleClient({
       return left.label.localeCompare(right.label);
     });
   }, [libraryDurations, libraryFiles, libraryOrder]);
-
-  useEffect(() => {
-    if (!audioUnlocked || !orderedLibraryFiles.length) {
-      return;
-    }
-
-    const preloadTargets = orderedLibraryFiles
-      .filter((file) => (libraryDurations[file.id] || 0) <= 6)
-      .slice(0, 6)
-      .map((file) => file.src);
-
-    void preloadCachedAudioAssets(preloadTargets);
-  }, [audioUnlocked, libraryDurations, orderedLibraryFiles]);
 
   const handleLibraryReorder = (nextFiles) => {
     setLibraryFiles(nextFiles);
@@ -842,18 +772,34 @@ export default function DirectorConsoleClient({
     },
   });
 
+  const directorWalkieMatch = liveMatch || managedSession?.match || null;
+  const directorWalkieAvailable = Boolean(
+    authorized &&
+      managedSession?.match?._id &&
+      (directorWalkieMatch?.isOngoing ?? managedSession?.isLive)
+  );
+
   const walkie = useWalkieTalkie({
     matchId: managedSession?.match?._id || "",
-    enabled: Boolean(authorized && managedSession?.match?._id && liveMatch?.isOngoing),
+    enabled: directorWalkieAvailable,
     role: "director",
     displayName:
       managedSession?.session?.name
         ? `${managedSession.session.name} Director`
         : "Director",
-    autoConnectAudio: Boolean(
-      authorized && managedSession?.match?._id && liveMatch?.isOngoing
-    ),
+    autoConnectAudio: directorWalkieAvailable && directorWalkieOn,
+    signalingActive: directorWalkieAvailable,
   });
+
+  const handleDirectorWalkieSwitchChange = useCallback(
+    async (nextChecked) => {
+      setDirectorWalkieOn(nextChecked);
+      if (!nextChecked) {
+        await walkie.stopTalking();
+      }
+    },
+    [walkie]
+  );
 
   const readCurrentScore = () => {
     const targetMatch = liveMatch || managedSession?.match;
@@ -973,6 +919,33 @@ export default function DirectorConsoleClient({
       return undefined;
     }
 
+    const persistLibraryDuration = () => {
+      const fileId = audio.dataset.effectId || "";
+      const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+      if (!fileId || !Number.isFinite(duration) || duration <= 0) {
+        return;
+      }
+
+      setLibraryDurations((current) => {
+        if (Number.isFinite(current[fileId])) {
+          return current;
+        }
+        const next = { ...current, [fileId]: duration };
+        directorAudioMetadataMemoryCache = next;
+        if (typeof window !== "undefined") {
+          try {
+            window.sessionStorage.setItem(
+              DIRECTOR_AUDIO_METADATA_CACHE_KEY,
+              JSON.stringify(next)
+            );
+          } catch {
+            // Ignore storage failures.
+          }
+        }
+        return next;
+      });
+    };
+
     const handleEnded = () => {
       setLibraryLiveId("");
       setLibraryState("idle");
@@ -994,6 +967,7 @@ export default function DirectorConsoleClient({
     const handleCanPlay = () => {
       setConsoleError("");
       setLibraryState((current) => (current === "loading" ? "paused" : current));
+      persistLibraryDuration();
     };
     const handleError = () => {
       if (!audio.src) {
@@ -1014,6 +988,7 @@ export default function DirectorConsoleClient({
     audio.addEventListener("waiting", handleWaiting);
     audio.addEventListener("canplay", handleCanPlay);
     audio.addEventListener("canplaythrough", handleCanPlay);
+    audio.addEventListener("loadedmetadata", persistLibraryDuration);
     audio.addEventListener("error", handleError);
     audio.addEventListener("timeupdate", handleTimeUpdate);
 
@@ -1024,6 +999,7 @@ export default function DirectorConsoleClient({
       audio.removeEventListener("waiting", handleWaiting);
       audio.removeEventListener("canplay", handleCanPlay);
       audio.removeEventListener("canplaythrough", handleCanPlay);
+      audio.removeEventListener("loadedmetadata", persistLibraryDuration);
       audio.removeEventListener("error", handleError);
       audio.removeEventListener("timeupdate", handleTimeUpdate);
     };
@@ -1064,19 +1040,32 @@ export default function DirectorConsoleClient({
     };
   }, []);
 
-  const stopAllEffects = () => {
+  const stopAllEffects = (options = {}) => {
+    const { clearSource = true, preserveRequest = false } = options;
     const audio = effectsAudioRef.current;
     if (!audio) {
       return;
     }
 
+    if (!preserveRequest) {
+      effectPlayRequestRef.current += 1;
+    }
+
     setConsoleError("");
     setEffectsNeedsUnlock(false);
     audio.pause();
-    audio.currentTime = 0;
-    audio.src = "";
-    audio.removeAttribute("src");
-    audio.load();
+    try {
+      audio.currentTime = 0;
+    } catch {
+      // Ignore stubborn Safari currentTime resets while the element is settling.
+    }
+    if (clearSource) {
+      audio.src = "";
+      audio.removeAttribute("src");
+      delete audio.dataset.effectSrc;
+      delete audio.dataset.effectId;
+      audio.load();
+    }
     setLibraryLiveId("");
     setLibraryState("idle");
     setLibraryCurrentTime(0);
@@ -1112,7 +1101,10 @@ export default function DirectorConsoleClient({
       return;
     }
 
-    stopAllEffects();
+    const requestId = effectPlayRequestRef.current + 1;
+    effectPlayRequestRef.current = requestId;
+
+    stopAllEffects({ clearSource: false, preserveRequest: true });
     setConsoleError("");
     setEffectsNeedsUnlock(false);
     setLibraryLiveId(file.id);
@@ -1128,7 +1120,7 @@ export default function DirectorConsoleClient({
 
     audio.preload = "auto";
     let effectSrc = cachedEffectUrlRef.current.get(file.id) || "";
-    if (!effectSrc) {
+    if (!effectSrc && !iOSSafari) {
       try {
         effectSrc = await getCachedAudioAssetUrl(file.src);
         if (effectSrc) {
@@ -1138,16 +1130,48 @@ export default function DirectorConsoleClient({
         effectSrc = file.src;
       }
     }
-    audio.src = effectSrc || file.src;
+    if (!effectSrc) {
+      effectSrc = file.src;
+    }
+
+    if (requestId !== effectPlayRequestRef.current) {
+      return;
+    }
+
+    const nextSrc = effectSrc || file.src;
+    const sourceChanged = audio.dataset.effectSrc !== nextSrc;
+    audio.dataset.effectSrc = nextSrc;
+    audio.dataset.effectId = file.id;
     audio.volume = Math.max(
       0,
       Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume)
     );
-    audio.load();
+    if (sourceChanged) {
+      audio.src = nextSrc;
+      audio.load();
+    } else {
+      try {
+        audio.currentTime = 0;
+      } catch {
+        // Ignore reset failures and still attempt playback.
+      }
+    }
 
     try {
       await audio.play();
+      if (iOSSafari && !cachedEffectUrlRef.current.has(file.id)) {
+        void getCachedAudioAssetUrl(file.src)
+          .then((cachedUrl) => {
+            if (cachedUrl) {
+              cachedEffectUrlRef.current.set(file.id, cachedUrl);
+            }
+          })
+          .catch(() => {});
+      }
     } catch (error) {
+      if (requestId !== effectPlayRequestRef.current) {
+        return;
+      }
       if (
         error instanceof DOMException &&
         (error.name === "AbortError" || error.name === "NotAllowedError")
@@ -1192,6 +1216,8 @@ export default function DirectorConsoleClient({
       effectsAudioRef.current.pause();
       effectsAudioRef.current.currentTime = 0;
       effectsAudioRef.current.src = "";
+      delete effectsAudioRef.current.dataset.effectSrc;
+      delete effectsAudioRef.current.dataset.effectId;
     }
 
     if (audioRef.current) {
@@ -1294,19 +1320,49 @@ export default function DirectorConsoleClient({
     setMusicState("stopped");
   };
 
-  const handleDirectorMicStart = async () => {
+  const handleDirectorMicStart = useCallback(async () => {
+    if (directorMicHoldingRef.current) {
+      return;
+    }
+
+    directorMicHoldingRef.current = true;
     setDirectorHoldLive(true);
     playUiTone({ frequency: 900, durationMs: 100, type: "sine", volume: 0.04 });
     const started = await micMonitor.start({ pauseMedia: true });
     if (!started) {
+      directorMicHoldingRef.current = false;
       setDirectorHoldLive(false);
     }
-  };
+  }, [micMonitor]);
 
-  const handleDirectorMicStop = async () => {
+  const handleDirectorMicStop = useCallback(async () => {
+    directorMicHoldingRef.current = false;
     setDirectorHoldLive(false);
     await micMonitor.stop({ resumeMedia: true });
-  };
+  }, [micMonitor]);
+
+  useEffect(() => {
+    const handlePointerRelease = (event) => {
+      if (
+        directorMicPointerIdRef.current !== null &&
+        event.pointerId !== undefined &&
+        event.pointerId !== directorMicPointerIdRef.current
+      ) {
+        return;
+      }
+
+      directorMicPointerIdRef.current = null;
+      void handleDirectorMicStop();
+    };
+
+    window.addEventListener("pointerup", handlePointerRelease);
+    window.addEventListener("pointercancel", handlePointerRelease);
+
+    return () => {
+      window.removeEventListener("pointerup", handlePointerRelease);
+      window.removeEventListener("pointercancel", handlePointerRelease);
+    };
+  }, [handleDirectorMicStop]);
 
   const handleSpeakerOutputChange = async (deviceId) => {
     setSpeakerDeviceId(deviceId);
@@ -1390,6 +1446,8 @@ export default function DirectorConsoleClient({
 
   const walkieStatus = !walkie.snapshot?.enabled
     ? "Off"
+    : !directorWalkieOn
+    ? "Off"
     : walkie.isFinishing
     ? "Finishing"
     : walkie.isSelfTalking
@@ -1399,6 +1457,8 @@ export default function DirectorConsoleClient({
     : walkie.snapshot?.activeSpeakerRole === "spectator"
     ? "Spectator Live"
     : "Ready";
+  const directorWalkieChannelEnabled = Boolean(walkie.snapshot?.enabled);
+  const showDirectorWalkieNotice = Boolean(walkie.notice);
   const canManageSession = Boolean(authorized && managedSession?.match?._id);
 
   return (
@@ -1514,6 +1574,11 @@ export default function DirectorConsoleClient({
                   >
                     {isSubmittingPin ? "Checking..." : "Enter Director Mode"}
                   </button>
+                  {!isSubmittingPin && pin.length !== 4 ? (
+                    <p className="mt-3 text-center text-xs text-zinc-500">
+                      Enter all 4 digits to enable Director Mode.
+                    </p>
+                  ) : null}
                 </div>
               </>
             ) : showPicker || !selectedSession ? (
@@ -1585,15 +1650,6 @@ export default function DirectorConsoleClient({
         </SessionCoverHero>
       )}
 
-      <div className="mb-5 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
-          <FaHeadphones className="text-zinc-200" />
-          {speakerMessage || "Using phone speaker output."}
-        </span>
-      </div>
-
-      {authorized ? <WalkieNotice notice={walkie.notice} onDismiss={walkie.dismissNotice} /> : null}
-
       {authorized && consoleError ? (
         <div className="mb-5 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
           {consoleError}
@@ -1601,17 +1657,18 @@ export default function DirectorConsoleClient({
       ) : null}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.78fr)] 2xl:grid-cols-[minmax(0,1.48fr)_minmax(380px,0.72fr)]">
-        <div className="space-y-5">
+        <div className="flex flex-col gap-5">
+          <div className="order-3 xl:order-1">
           <Card
-            title="PA Mic"
+            title="Loudspeaker"
             subtitle={
               directorHoldLive || micMonitor.isActive
                 ? "Live on speaker"
-                : "Hold to talk over PA"
+                : "Hold to talk over loudspeaker"
             }
             icon={<FaMicrophone />}
             help={{
-              title: "PA mic",
+              title: "Loudspeaker",
               body: "Press and hold to speak over the phone speaker or connected Bluetooth speaker. Music and effects duck automatically while you talk.",
             }}
             action={
@@ -1639,19 +1696,20 @@ export default function DirectorConsoleClient({
                   type="button"
                   {...HOLD_BUTTON_INTERACTION_PROPS}
                   onPointerDown={(event) => {
+                    if (!event.isPrimary) return;
+                    if (event.pointerType === "mouse" && event.button !== 0) return;
                     event.preventDefault();
+                    directorMicPointerIdRef.current = event.pointerId;
+                    event.currentTarget.setPointerCapture?.(event.pointerId);
                     void handleDirectorMicStart();
                   }}
                   onPointerUp={(event) => {
-                    event.preventDefault();
-                    void handleDirectorMicStop();
+                    event.currentTarget.releasePointerCapture?.(event.pointerId);
                   }}
                   onPointerCancel={(event) => {
                     event.preventDefault();
-                    void handleDirectorMicStop();
-                  }}
-                  onPointerLeave={(event) => {
-                    event.preventDefault();
+                    event.currentTarget.releasePointerCapture?.(event.pointerId);
+                    directorMicPointerIdRef.current = null;
                     void handleDirectorMicStop();
                   }}
                   className={`relative inline-flex h-28 w-28 items-center justify-center rounded-full border text-3xl transition focus:outline-none focus:ring-2 focus:ring-emerald-400/40 ${
@@ -1659,7 +1717,7 @@ export default function DirectorConsoleClient({
                       ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_40px_rgba(16,185,129,0.34)]"
                       : "border-white/10 bg-white/[0.05] text-white"
                   }`}
-                  aria-label="Hold to talk on PA mic"
+                  aria-label="Hold to talk on loudspeaker"
                 >
                   <span
                     className={`absolute inset-[-8px] rounded-full border ${
@@ -1692,7 +1750,9 @@ export default function DirectorConsoleClient({
               </div>
             </div>
           </Card>
+          </div>
 
+          <div className="order-1 xl:order-2">
           <Card
             title="Walkie with umpire"
             subtitle="Shared live channel"
@@ -1702,20 +1762,42 @@ export default function DirectorConsoleClient({
               body: "Request walkie when it is off. Once it is on, you can talk with the umpire or spectators. Only one person can hold the channel at a time.",
             }}
             action={
-              <span
-                className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                  walkieStatus === "Off"
-                    ? "bg-rose-500/12 text-rose-200"
-                    : walkieStatus.includes("Live")
-                    ? "bg-emerald-500/14 text-emerald-200"
-                    : "bg-white/[0.06] text-zinc-300"
-                }`}
-              >
-                {walkieStatus}
-              </span>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                    walkieStatus === "Off"
+                      ? "bg-rose-500/12 text-rose-200"
+                      : walkieStatus.includes("Live")
+                      ? "bg-emerald-500/14 text-emerald-200"
+                      : "bg-white/[0.06] text-zinc-300"
+                  }`}
+                >
+                  {walkieStatus}
+                </span>
+                <IosSwitch
+                  checked={directorWalkieOn}
+                  label="Walkie state"
+                  onChange={(nextChecked) => {
+                    void handleDirectorWalkieSwitchChange(nextChecked);
+                  }}
+                  disabled={!canManageSession}
+                />
+              </div>
             }
           >
-            <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+            <div className="space-y-4">
+              {showDirectorWalkieNotice ? (
+              <div className="min-h-[72px]">
+                <WalkieNotice embedded notice={walkie.notice} onDismiss={walkie.dismissNotice} />
+              </div>
+              ) : null}
+              <div
+                className={
+                  directorWalkieChannelEnabled && directorWalkieOn
+                    ? "grid gap-4 md:grid-cols-[1fr_auto] md:items-center"
+                    : "space-y-3"
+                }
+              >
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-sm text-zinc-300">
@@ -1730,6 +1812,8 @@ export default function DirectorConsoleClient({
                 <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-300">
                   {!canManageSession
                     ? "Enter director mode and choose a live session to use walkie."
+                    : walkie.snapshot?.enabled && !directorWalkieOn
+                    ? "Turn on this device to listen or talk."
                     : walkie.snapshot?.enabled
                     ? "Hold to talk with the live channel."
                     : walkie.requestState === "pending" || walkie.hasOwnPendingRequest
@@ -1756,15 +1840,8 @@ export default function DirectorConsoleClient({
                   </div>
                 ) : null}
               </div>
+              {directorWalkieChannelEnabled && directorWalkieOn ? (
               <div className="flex flex-col items-center gap-4">
-                {walkie.snapshot?.enabled ? (
-                  <IosSwitch
-                    checked
-                    label="Walkie state"
-                    onChange={() => {}}
-                    disabled
-                  />
-                ) : null}
                 {walkie.snapshot?.enabled ? (
                   <WalkieTalkButton
                     active={walkie.isSelfTalking}
@@ -1791,9 +1868,28 @@ export default function DirectorConsoleClient({
                   </button>
                 )}
               </div>
+              ) : (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => void walkie.requestEnable()}
+                  disabled={!canManageSession || !walkie.canRequestEnable}
+                  className="w-full rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-black shadow-[0_12px_30px_rgba(16,185,129,0.22)] transition disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+                >
+                  {!canManageSession
+                    ? "Choose session first"
+                    : walkie.requestState === "pending" || walkie.hasOwnPendingRequest
+                    ? "Request sent"
+                    : "Request walkie"}
+                </button>
+              </div>
+              )}
+            </div>
             </div>
           </Card>
+          </div>
 
+          <div className="order-2 xl:order-3">
           <Card
             title="Audio Library"
             subtitle="Tap to play audio."
@@ -1943,6 +2039,14 @@ export default function DirectorConsoleClient({
               )}
             </div>
           </Card>
+          </div>
+
+          <div className="order-4 xl:order-4 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
+              <FaHeadphones className="text-zinc-200" />
+              {speakerMessage || "Using phone speaker output."}
+            </span>
+          </div>
         </div>
 
         <div className="space-y-5">

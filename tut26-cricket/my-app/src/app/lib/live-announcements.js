@@ -418,3 +418,54 @@ export function buildUmpireAnnouncement(event, mode = "simple") {
 
   return `Umpire gives ${pluralizeRuns(safeNumber(ball.runs))}.`;
 }
+
+export function buildUmpireTapAnnouncement(event, mode = "simple") {
+  if (!event || mode === "silent") {
+    return "";
+  }
+
+  if (event.type === "undo") {
+    return "Undo.";
+  }
+
+  if (event.type === "match_end") {
+    return "Match over.";
+  }
+
+  const ball = event.ball;
+  if (!ball) {
+    return "";
+  }
+
+  if (ball.isOut) {
+    return safeNumber(ball.runs) > 0
+      ? `${pluralizeRuns(safeNumber(ball.runs))} and out.`
+      : "Out.";
+  }
+
+  if (ball.extraType === "wide") {
+    const extraRuns = Math.max(safeNumber(ball.runs) - 1, 0);
+    return extraRuns > 0 ? `Wide, ${pluralizeRuns(extraRuns)} taken.` : "Wide.";
+  }
+
+  if (ball.extraType === "noball") {
+    const extraRuns = Math.max(safeNumber(ball.runs) - 1, 0);
+    return extraRuns > 0 ? `No ball, ${pluralizeRuns(extraRuns)} taken.` : "No ball.";
+  }
+
+  if (ball.extraType === "bye") {
+    return safeNumber(ball.runs) > 0 ? `Bye, ${pluralizeRuns(safeNumber(ball.runs))}.` : "Bye.";
+  }
+
+  if (ball.extraType === "legbye") {
+    return safeNumber(ball.runs) > 0
+      ? `Leg bye, ${pluralizeRuns(safeNumber(ball.runs))}.`
+      : "Leg bye.";
+  }
+
+  if (safeNumber(ball.runs) === 0) {
+    return "Dot ball.";
+  }
+
+  return `${pluralizeRuns(safeNumber(ball.runs))}.`;
+}

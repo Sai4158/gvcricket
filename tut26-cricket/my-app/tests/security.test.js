@@ -35,6 +35,7 @@ import { countLegalBalls, buildWinByWicketsText } from "../src/app/lib/match-sco
 import {
   buildCurrentScoreAnnouncement,
   buildUmpireAnnouncement,
+  buildUmpireTapAnnouncement,
   buildSpectatorAnnouncement,
   buildSpectatorOverCompleteAnnouncement,
   buildSpectatorScoreAnnouncement,
@@ -1231,6 +1232,50 @@ test("umpire commentary speaks score buttons and undo with clean wording", () =>
     buildUmpireAnnouncement(undoEvent, "simple"),
     "Umpire has undone the last ball. The score for that ball has been removed. Umpire will redo this ball."
   );
+});
+
+test("umpire tap announcer keeps score-button speech short and direct", () => {
+  const matchBefore = applyMatchAction(buildBaseMatch(), {
+    actionId: "toss:umpire-tap-audio",
+    type: "set_toss",
+    tossWinner: "Falcons",
+    tossDecision: "bat",
+  });
+  const twoRunsAfter = applyMatchAction(matchBefore, {
+    actionId: "score:umpire-tap-two",
+    type: "score_ball",
+    runs: 2,
+    isOut: false,
+    extraType: null,
+  });
+  const twoRunsEvent = createScoreLiveEvent(matchBefore, twoRunsAfter, {
+    runs: 2,
+    isOut: false,
+    extraType: null,
+  });
+  const dotBallEvent = createScoreLiveEvent(matchBefore, matchBefore, {
+    runs: 0,
+    isOut: false,
+    extraType: null,
+  });
+  const outAfter = applyMatchAction(matchBefore, {
+    actionId: "score:umpire-tap-out",
+    type: "score_ball",
+    runs: 0,
+    isOut: true,
+    extraType: null,
+  });
+  const outEvent = createScoreLiveEvent(matchBefore, outAfter, {
+    runs: 0,
+    isOut: true,
+    extraType: null,
+  });
+  const undoEvent = createUndoLiveEvent(twoRunsAfter);
+
+  assert.equal(buildUmpireTapAnnouncement(twoRunsEvent, "simple"), "2 runs.");
+  assert.equal(buildUmpireTapAnnouncement(dotBallEvent, "simple"), "Dot ball.");
+  assert.equal(buildUmpireTapAnnouncement(outEvent, "simple"), "Out.");
+  assert.equal(buildUmpireTapAnnouncement(undoEvent, "simple"), "Undo.");
 });
 
 test("walkie snapshot tracks director presence and spectator requests stay live-only", () => {

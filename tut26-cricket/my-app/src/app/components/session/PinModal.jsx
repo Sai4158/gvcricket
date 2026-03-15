@@ -40,7 +40,7 @@ export default function PinModal({
         className="relative w-full max-w-sm bg-zinc-900 p-8 rounded-2xl ring-1 ring-white/10 shadow-2xl text-center"
         onClick={(event) => event.stopPropagation()}
       >
-        <FaShieldAlt className="mx-auto text-5xl text-blue-400 mb-4" />
+        <FaShieldAlt className="mx-auto mb-4 text-5xl text-sky-300" />
         <h2 className="text-2xl font-bold text-white mb-2">Umpire Mode PIN</h2>
         <p className="text-zinc-400 mb-6">
           Enter the PIN to access scoring controls.
@@ -63,13 +63,13 @@ export default function PinModal({
               }
             }}
             placeholder="0000"
-            className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-blue-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(59,130,246,0.08)]"
+            className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-sky-300/35 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(37,99,235,0.1)]"
           />
           <button
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting || pin.length !== 4}
-            className="w-full rounded-2xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-2xl border border-sky-400/20 bg-[linear-gradient(180deg,rgba(37,99,235,0.2),rgba(15,23,42,0.9))] py-3 font-semibold text-sky-50 shadow-[0_16px_38px_rgba(37,99,235,0.16)] transition hover:border-sky-300/35 hover:bg-[linear-gradient(180deg,rgba(59,130,246,0.24),rgba(15,23,42,0.94))] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting ? "Checking..." : "Enter"}
           </button>

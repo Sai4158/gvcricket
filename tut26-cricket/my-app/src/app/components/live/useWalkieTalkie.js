@@ -2073,12 +2073,23 @@ export default function useWalkieTalkie({
       ) {
         return;
       }
+      const message = messageFor(connectError, "Walkie live connection is unavailable.");
+      if (isExpectedWalkieTransportError(connectError)) {
+        walkieConsole("warn", "Walkie signaling setup delayed", {
+          stage: "signaling-setup",
+          message,
+        });
+        if (mountedRef.current) {
+          updateNotice("Retrying live walkie...");
+        }
+        return;
+      }
       walkieConsole("error", "Walkie signaling setup failed", {
         stage: "signaling-setup",
-        message: messageFor(connectError, "Walkie live connection is unavailable."),
+        message,
       });
       if (mountedRef.current) {
-        setError(messageFor(connectError, "Walkie live connection is unavailable."));
+        setError(message);
       }
     });
   }, [
@@ -2088,6 +2099,7 @@ export default function useWalkieTalkie({
     matchId,
     shouldMaintainSignaling,
     syncSnapshot,
+    updateNotice,
   ]);
 
   useEffect(() => {

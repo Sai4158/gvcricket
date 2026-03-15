@@ -141,6 +141,7 @@ function WalkieInlineTalkButton({
 export function WalkieNotice({
   notice,
   onDismiss,
+  embedded = false,
   quickTalkEnabled = false,
   quickTalkActive = false,
   quickTalkFinishing = false,
@@ -155,7 +156,7 @@ export function WalkieNotice({
 
   return (
     <div
-      className="mb-4 flex select-none items-start justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100"
+      className={`${embedded ? "" : "mb-4 "}flex select-none items-start justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 ${quickTalkEnabled ? "text-[13px]" : "text-sm"} text-emerald-100`}
       style={{
         userSelect: "none",
         WebkitUserSelect: "none",
@@ -164,12 +165,14 @@ export function WalkieNotice({
     >
       <div className="min-w-0 flex-1">
         {quickTalkEnabled ? (
-          <div className="mb-1 inline-flex items-center gap-2 rounded-full border border-emerald-300/16 bg-black/20 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-50">
+          <div className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/16 bg-black/20 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-emerald-50">
             <FaLock className="shrink-0" />
             <span className="select-none">Live Channel</span>
           </div>
         ) : null}
-        <span className="block min-w-0 [overflow-wrap:anywhere]">{displayNotice}</span>
+        <span className={`block min-w-0 [overflow-wrap:anywhere] ${quickTalkEnabled ? "leading-5" : ""}`}>
+          {displayNotice}
+        </span>
       </div>
       {quickTalkEnabled ? (
         <WalkieInlineTalkButton
@@ -489,9 +492,11 @@ export default function WalkiePanel({
 
   return (
     <div className="space-y-4">
-      <WalkieNotice notice={notice} onDismiss={onDismissNotice} />
-
       <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,8,12,0.98))] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.34)]">
+        <div className="min-h-[72px]">
+          <WalkieNotice embedded notice={notice} onDismiss={onDismissNotice} />
+        </div>
+
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-300">

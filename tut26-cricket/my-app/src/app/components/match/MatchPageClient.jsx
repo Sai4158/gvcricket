@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { FaBroadcastTower } from "react-icons/fa";
 import useLocalMicMonitor from "../live/useLocalMicMonitor";
 import useAnnouncementSettings from "../live/useAnnouncementSettings";
 import { WalkieNotice, WalkieRequestQueue } from "../live/WalkiePanel";
@@ -11,6 +12,7 @@ import { countLegalBalls } from "../../lib/match-scoring";
 import {
   buildCurrentScoreAnnouncement,
   buildUmpireAnnouncement,
+  buildUmpireTapAnnouncement,
   createScoreLiveEvent,
   createUndoLiveEvent,
 } from "../../lib/live-announcements";
@@ -160,7 +162,7 @@ export default function MatchPageClient({
       isOut,
       extraType,
     });
-    const text = buildUmpireAnnouncement(event, umpireSettings.mode);
+    const text = buildUmpireTapAnnouncement(event, umpireSettings.mode);
 
     if (!text) return;
 
@@ -203,9 +205,7 @@ export default function MatchPageClient({
     pendingUmpireAnnouncementRef.current = null;
     localAnnouncementIdRef.current += 1;
     const undoEvent = createUndoLiveEvent(match);
-    const undoText =
-      buildUmpireAnnouncement(undoEvent, umpireSettings.mode) ||
-      "Umpire has undone the last ball.";
+    const undoText = buildUmpireTapAnnouncement(undoEvent, umpireSettings.mode) || "Undo.";
 
     speak(undoText, {
       key: `umpire-undo-${localAnnouncementIdRef.current}`,
@@ -313,6 +313,9 @@ export default function MatchPageClient({
   const showInningsEnd = firstInningsComplete || matchFinished;
   const controlsDisabled =
     isUpdating || showInningsEnd || Boolean(match.result) || tossPending;
+  const showCompactUmpireWalkie = Boolean(
+    !hasPendingWalkieRequests && isLiveMatch && walkie.snapshot?.enabled
+  );
 
   return (
     <>
@@ -343,19 +346,50 @@ export default function MatchPageClient({
             </div>
           ) : null}
           <OptionalFeatureBoundary label="Walkie unavailable right now.">
-            {!hasPendingWalkieRequests ? (
-              <WalkieNotice
-                notice={walkie.notice}
-                onDismiss={walkie.dismissNotice}
-                quickTalkEnabled={Boolean(isLiveMatch && walkie.snapshot?.enabled)}
-                quickTalkActive={walkie.isSelfTalking}
-                quickTalkFinishing={walkie.isFinishing}
-                quickTalkCountdown={walkie.countdown}
-                quickTalkFinishDelayLeft={walkie.finishDelayLeft}
-                onQuickTalkPrepare={walkie.prepareToTalk}
-                onQuickTalkStart={walkie.startTalking}
-                onQuickTalkStop={walkie.stopTalking}
-              />
+            {showCompactUmpireWalkie ? (
+              <div className="mb-4">
+                <WalkieNotice
+                  notice={walkie.notice}
+                  onDismiss={walkie.dismissNotice}
+                  quickTalkEnabled
+                  quickTalkActive={walkie.isSelfTalking}
+                  quickTalkFinishing={walkie.isFinishing}
+                  quickTalkCountdown={walkie.countdown}
+                  quickTalkFinishDelayLeft={walkie.finishDelayLeft}
+                  onQuickTalkPrepare={walkie.prepareToTalk}
+                  onQuickTalkStart={walkie.startTalking}
+                  onQuickTalkStop={walkie.stopTalking}
+                />
+              </div>
+            ) : !hasPendingWalkieRequests && walkie.notice && walkie.snapshot?.enabled ? (
+              <section className="mb-4 rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.98),rgba(10,10,14,0.98))] p-4 shadow-[0_20px_70px_rgba(0,0,0,0.35)]">
+                <div className="mb-3 flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/14 text-emerald-300">
+                      <FaBroadcastTower />
+                    </span>
+                    <div>
+                      <h3 className="text-base font-semibold text-white">Walkie-Talkie</h3>
+                      <p className="mt-1 text-sm text-zinc-400">
+                        {walkie.isSelfTalking
+                          ? "You are live"
+                          : walkie.isFinishing
+                          ? "Finishing"
+                          : walkie.snapshot?.enabled
+                          ? "Channel is live"
+                          : "Channel update"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="min-h-[84px]">
+                  <WalkieNotice
+                    embedded
+                    notice={walkie.notice}
+                    onDismiss={walkie.dismissNotice}
+                  />
+                </div>
+              </section>
             ) : null}
             {hasPendingWalkieRequests ? (
               <WalkieRequestQueue
