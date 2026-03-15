@@ -11,12 +11,12 @@ function Ball({ runs, isOut, extraType }) {
     label = "W";
   } else if (extraType === "wide") {
     style = "bg-amber-500 text-black";
-    const extraRuns = Math.max(Number(runs || 0) - 1, 0);
-    label = extraRuns > 0 ? `Wd+${extraRuns}` : "Wd";
+    const wideRuns = Math.max(Number(runs || 0), 0);
+    label = wideRuns > 0 ? `Wd+${wideRuns}` : "Wd";
   } else if (extraType) {
     style = "bg-purple-500 text-white";
-    const extraRuns = Math.max(Number(runs || 0) - 1, 0);
-    label = extraRuns > 0 ? `NB+${extraRuns}` : "NB";
+    const noBallRuns = Math.max(Number(runs || 0), 0);
+    label = noBallRuns > 0 ? `NB+${noBallRuns}` : "NB";
   } else if (runs === 0) {
     style = "bg-zinc-700 text-zinc-300";
     label = ".";
@@ -40,10 +40,16 @@ function Ball({ runs, isOut, extraType }) {
   );
 }
 
-export default function TeamInningsDetail({ title, inningsData }) {
+export default function TeamInningsDetail({
+  title,
+  inningsData,
+  statusLabel = "",
+  targetSummary = "",
+}) {
   if (!inningsData) return null;
 
   const runRate = calculateRunRate(inningsData.score, inningsData.history);
+  const formattedTargetSummary = String(targetSummary || "").replace(/\s*•\s*/g, "\n");
   const isRedSide = /red|team b/i.test(title || "");
   const accentStripClass = isRedSide
     ? "from-rose-500 via-red-500 to-orange-400"
@@ -54,6 +60,11 @@ export default function TeamInningsDetail({ title, inningsData }) {
   const panelGlowClass = isRedSide
     ? "before:from-rose-500/18 before:via-red-500/8 before:to-transparent"
     : "before:from-cyan-400/18 before:via-sky-500/8 before:to-transparent";
+  const statusToneClass = /live/i.test(statusLabel)
+    ? "border-emerald-400/25 bg-emerald-500/12 text-emerald-100"
+    : /completed/i.test(statusLabel)
+    ? "border-amber-400/20 bg-amber-500/10 text-amber-100"
+    : "border-white/10 bg-white/[0.05] text-zinc-200";
 
   return (
     <div
@@ -63,13 +74,34 @@ export default function TeamInningsDetail({ title, inningsData }) {
         className={`absolute inset-x-0 top-0 h-[4px] bg-gradient-to-r ${accentStripClass}`}
         aria-hidden="true"
       />
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="relative text-2xl font-bold tracking-tight text-white">
-          {title}
-        </h2>
-        <span className="relative text-[2rem] font-black tracking-tight text-amber-300">
-          {inningsData.score ?? 0} Runs
-        </span>
+      <div className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-3">
+        <div className="relative min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-2xl font-bold tracking-tight text-white">
+              {title}
+            </h2>
+            {statusLabel ? (
+              <span
+                className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${statusToneClass}`}
+              >
+                {statusLabel}
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <div className="relative shrink-0 self-start text-right">
+          <div className="text-[2.1rem] font-black leading-none tracking-tight text-amber-300">
+            {inningsData.score ?? 0}
+          </div>
+          <div className="mt-1 text-[1rem] font-black uppercase leading-none tracking-tight text-amber-300">
+            Runs
+          </div>
+        </div>
+        {formattedTargetSummary ? (
+          <p className="col-span-2 whitespace-pre-line text-xs font-medium uppercase leading-5 tracking-[0.14em] text-amber-200/90">
+            {formattedTargetSummary}
+          </p>
+        ) : null}
       </div>
       <div className="relative mb-5 text-sm font-medium text-zinc-200">
         Run Rate: {runRate}

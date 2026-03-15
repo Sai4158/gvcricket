@@ -120,17 +120,17 @@ function buildBallEventLine(ball) {
   }
 
   if (ball.extraType === "wide") {
-    const extraRuns = Math.max(safeNumber(ball.runs) - 1, 0);
-    if (extraRuns > 0) {
-      return `Umpire has given a wide. ${pluralizeRuns(extraRuns)} taken.`;
+    const wideRuns = Math.max(safeNumber(ball.runs), 0);
+    if (wideRuns > 0) {
+      return `Umpire has given a wide. ${pluralizeRuns(wideRuns)} taken.`;
     }
     return "Umpire has given a wide.";
   }
 
   if (ball.extraType === "noball") {
-    const extraRuns = Math.max(safeNumber(ball.runs) - 1, 0);
-    if (extraRuns > 0) {
-      return `Umpire has given a no ball. ${pluralizeRuns(extraRuns)} taken.`;
+    const noBallRuns = Math.max(safeNumber(ball.runs), 0);
+    if (noBallRuns > 0) {
+      return `Umpire has given a no ball. ${pluralizeRuns(noBallRuns)} taken.`;
     }
     return "Umpire has given a no ball.";
   }
@@ -379,16 +379,16 @@ export function buildUmpireAnnouncement(event, mode = "simple") {
   }
 
   if (ball.extraType === "wide") {
-    const extraRuns = Math.max(safeNumber(ball.runs) - 1, 0);
-    return extraRuns > 0
-      ? `Umpire says wide ball. ${pluralizeRuns(extraRuns)} more taken.`
+    const wideRuns = Math.max(safeNumber(ball.runs), 0);
+    return wideRuns > 0
+      ? `Umpire says wide ball. ${pluralizeRuns(wideRuns)} more taken.`
       : "Umpire says wide ball.";
   }
 
   if (ball.extraType === "noball") {
-    const extraRuns = Math.max(safeNumber(ball.runs) - 1, 0);
-    return extraRuns > 0
-      ? `Umpire says no ball. ${pluralizeRuns(extraRuns)} more taken.`
+    const noBallRuns = Math.max(safeNumber(ball.runs), 0);
+    return noBallRuns > 0
+      ? `Umpire says no ball. ${pluralizeRuns(noBallRuns)} more taken.`
       : "Umpire says no ball.";
   }
 
@@ -444,13 +444,13 @@ export function buildUmpireTapAnnouncement(event, mode = "simple") {
   }
 
   if (ball.extraType === "wide") {
-    const extraRuns = Math.max(safeNumber(ball.runs) - 1, 0);
-    return extraRuns > 0 ? `Wide, ${pluralizeRuns(extraRuns)} taken.` : "Wide.";
+    const wideRuns = Math.max(safeNumber(ball.runs), 0);
+    return wideRuns > 0 ? `Wide, ${pluralizeRuns(wideRuns)} taken.` : "Wide.";
   }
 
   if (ball.extraType === "noball") {
-    const extraRuns = Math.max(safeNumber(ball.runs) - 1, 0);
-    return extraRuns > 0 ? `No ball, ${pluralizeRuns(extraRuns)} taken.` : "No ball.";
+    const noBallRuns = Math.max(safeNumber(ball.runs), 0);
+    return noBallRuns > 0 ? `No ball, ${pluralizeRuns(noBallRuns)} taken.` : "No ball.";
   }
 
   if (ball.extraType === "bye") {

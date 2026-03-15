@@ -15,13 +15,13 @@ export function Ball({ ball, ballNumber }) {
   } else if (ball.extraType === "wide") {
     style =
       "border border-emerald-300/18 bg-[linear-gradient(180deg,rgba(22,163,74,0.95),rgba(22,129,61,0.98))] shadow-[0_12px_28px_rgba(22,163,74,0.24)]";
-    const extraRuns = Math.max(Number(ball.runs || 0) - 1, 0);
-    label = extraRuns > 0 ? `Wd+${extraRuns}` : "Wd";
+    const wideRuns = Math.max(Number(ball.runs || 0), 0);
+    label = wideRuns > 0 ? `Wd+${wideRuns}` : "Wd";
   } else if (ball.extraType === "noball") {
     style =
       "border border-orange-300/18 bg-[linear-gradient(180deg,rgba(249,115,22,0.95),rgba(234,88,12,0.98))] shadow-[0_12px_28px_rgba(249,115,22,0.26)]";
-    const extraRuns = Math.max(Number(ball.runs || 0) - 1, 0);
-    label = extraRuns > 0 ? `NB+${extraRuns}` : "NB";
+    const noBallRuns = Math.max(Number(ball.runs || 0), 0);
+    label = noBallRuns > 0 ? `NB+${noBallRuns}` : "NB";
   } else if (ball.runs === 0) {
     label = ".";
   }

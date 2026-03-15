@@ -298,11 +298,12 @@ function scoreBall(match, action) {
     throw new MatchEngineError("That scoring combination is not supported.", 400);
   }
 
-  if (
-    (action.extraType === "wide" || action.extraType === "noball") &&
-    Number(action.runs || 0) < 1
-  ) {
-    throw new MatchEngineError("Extras must add at least 1 run.", 400);
+  if (action.extraType === "wide" && Number(action.runs || 0) < 0) {
+    throw new MatchEngineError("Wides cannot remove runs.", 400);
+  }
+
+  if (action.extraType === "noball" && Number(action.runs || 0) < 0) {
+    throw new MatchEngineError("No balls cannot remove runs.", 400);
   }
 
   if (!action.extraType && Number(action.runs || 0) > 6) {

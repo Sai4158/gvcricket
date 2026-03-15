@@ -79,14 +79,14 @@ export function RunInputModal({ title, onConfirm, onClose }) {
       : title === "Wide"
       ? {
           options: [0, 1],
-          prompt: "How many bat runs came with this wide?",
-          helper: "1 wide is added automatically. Ball does not count.",
+          prompt: "Tap the total runs to add for this wide.",
+          helper: "",
           activeClass: "bg-emerald-600 hover:bg-emerald-500",
         }
       : {
           options: [0, 1, 2, 3, 4, 6],
-          prompt: "How many bat runs came with this no ball?",
-          helper: "1 no ball is added automatically. Ball does not count.",
+          prompt: "Tap the total runs to add for this no ball.",
+          helper: "",
           activeClass: "bg-orange-600 hover:bg-orange-500",
         };
 

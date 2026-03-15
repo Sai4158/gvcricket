@@ -230,8 +230,12 @@ export const matchActionSchema = z.discriminatedUnion("type", [
     })
     .refine(
       (value) => {
-        if (value.extraType === "wide" || value.extraType === "noball") {
-          return value.runs >= 1;
+        if (value.extraType === "wide") {
+          return value.runs >= 0;
+        }
+
+        if (value.extraType === "noball") {
+          return value.runs >= 0;
         }
 
         return value.runs <= 6;

@@ -20,10 +20,10 @@ export function getBallDisplayLabel(ball) {
   }
   if (ball.isOut) return "W";
   if (ball.extraType === "wide") {
-    return toNumber(ball.runs) > 1 ? `Wd+${ball.runs - 1}` : "Wd";
+    return toNumber(ball.runs) > 0 ? `Wd+${ball.runs}` : "Wd";
   }
   if (ball.extraType === "noball") {
-    return toNumber(ball.runs) > 1 ? `NB+${ball.runs - 1}` : "NB";
+    return toNumber(ball.runs) > 0 ? `NB+${ball.runs}` : "NB";
   }
   if (ball.extraType === "byes") {
     return toNumber(ball.runs) > 0 ? `B${ball.runs}` : "B";

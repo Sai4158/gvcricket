@@ -234,34 +234,42 @@ test("extras stay legal, do not consume legal balls, and wicket margin stays acc
   const afterWide = applyMatchAction(afterToss, {
     actionId: "score:wide",
     type: "score_ball",
+    runs: 0,
+    isOut: false,
+    extraType: "wide",
+  });
+  assert.equal(afterWide.score, 0);
+  assert.equal(countLegalBalls(afterWide.innings1.history), 0);
+
+  const afterSingleWide = applyMatchAction(afterWide, {
+    actionId: "score:wide-single",
+    type: "score_ball",
     runs: 1,
     isOut: false,
     extraType: "wide",
   });
-  assert.equal(afterWide.score, 1);
-  assert.equal(countLegalBalls(afterWide.innings1.history), 0);
+  assert.equal(afterSingleWide.score, 1);
+  assert.equal(countLegalBalls(afterSingleWide.innings1.history), 0);
 
-  const afterNoBall = applyMatchAction(afterWide, {
+  const afterNoBall = applyMatchAction(afterSingleWide, {
     actionId: "score:noball",
     type: "score_ball",
-    runs: 7,
+    runs: 0,
     isOut: false,
     extraType: "noball",
   });
-  assert.equal(afterNoBall.score, 8);
+  assert.equal(afterNoBall.score, 1);
   assert.equal(countLegalBalls(afterNoBall.innings1.history), 0);
 
-  assert.throws(
-    () =>
-      applyMatchAction(afterToss, {
-        actionId: "score:bad-extra",
-        type: "score_ball",
-        runs: 0,
-        isOut: false,
-        extraType: "wide",
-      }),
-    (error) => error instanceof MatchEngineError && error.status === 400
-  );
+  const afterSingleNoBall = applyMatchAction(afterNoBall, {
+    actionId: "score:noball-single",
+    type: "score_ball",
+    runs: 1,
+    isOut: false,
+    extraType: "noball",
+  });
+  assert.equal(afterSingleNoBall.score, 2);
+  assert.equal(countLegalBalls(afterSingleNoBall.innings1.history), 0);
 
   const chaseMatch = {
     ...buildBaseMatch(),

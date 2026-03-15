@@ -17,6 +17,7 @@ function EditableRoster({
   theme = "blue",
 }) {
   const [isEditingName, setIsEditingName] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const isBlue = theme === "blue";
   const cardClass = isBlue
     ? "border-sky-400/20 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.18),transparent_32%),linear-gradient(180deg,rgba(16,24,44,0.985),rgba(10,12,20,0.99))]"
@@ -141,6 +142,13 @@ function EditableRoster({
           >
             <FaPlus />
           </button>
+          <button
+            type="button"
+            onClick={() => setIsExpanded((current) => !current)}
+            className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.06] px-4 text-sm font-semibold text-white transition hover:bg-white/[0.12]"
+          >
+            {isExpanded ? "Close" : "Open"}
+          </button>
         </div>
       </div>
 
@@ -150,27 +158,31 @@ function EditableRoster({
         </p>
       ) : null}
 
-      <div className="space-y-3">
-        {players.map((player, index) => (
-          <div key={`${title}-${index}`} className="flex items-center gap-3">
-            <input
-              type="text"
-              value={player}
-              onChange={(event) => updatePlayer(index, event.target.value)}
-              placeholder={`Player ${index + 1}`}
-              className={`w-full rounded-2xl border px-3 py-2.5 text-sm text-white outline-none transition ${inputClass}`}
-            />
-            <button
-              type="button"
-              onClick={() => removePlayerAtIndex(index)}
-              disabled={!canEditPlayers || players.length <= 1}
-              className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40 ${iconButtonClass}`}
-            >
-              <FaTrash size={13} />
-            </button>
+      {isExpanded ? (
+        <>
+          <div className="space-y-3">
+            {players.map((player, index) => (
+              <div key={`${title}-${index}`} className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={player}
+                  onChange={(event) => updatePlayer(index, event.target.value)}
+                  placeholder={`Player ${index + 1}`}
+                  className={`w-full rounded-2xl border px-3 py-2.5 text-sm text-white outline-none transition ${inputClass}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => removePlayerAtIndex(index)}
+                  disabled={!canEditPlayers || players.length <= 1}
+                  className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40 ${iconButtonClass}`}
+                >
+                  <FaTrash size={13} />
+                </button>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      ) : null}
     </div>
   );
 }

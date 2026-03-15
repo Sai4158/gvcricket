@@ -32,7 +32,7 @@ export const metadata = {
     ],
   },
   twitter: {
-    title: "Free Cricket Scoring, Made Simple | GV Cricket",
+    title: "GV Cricket",
     description:
       "Live cricket score, umpire mode, spectator view, score announcer, walkie-talkie, and results in one free app.",
     images: [absoluteUrl(siteConfig.twitterImagePath)],

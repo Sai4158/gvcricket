@@ -63,7 +63,7 @@ export default function MatchModalLayer({
         <RunInputModal
           title="No Ball"
           onConfirm={(runs) => {
-            onScoreEvent(runs + 1, false, "noball");
+            onScoreEvent(runs, false, "noball");
             onClose();
           }}
           onClose={onClose}
@@ -73,7 +73,7 @@ export default function MatchModalLayer({
         <RunInputModal
           title="Wide"
           onConfirm={(runs) => {
-            onScoreEvent(runs + 1, false, "wide");
+            onScoreEvent(runs, false, "wide");
             onClose();
           }}
           onClose={onClose}

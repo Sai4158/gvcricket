@@ -137,6 +137,25 @@ function IosGlassSwitch({ checked, onChange, label, disabled = false }) {
   );
 }
 
+function countLegalBallsLocal(history = []) {
+  return (history || []).reduce((total, over) => {
+    const balls = Array.isArray(over?.balls) ? over.balls : [];
+    return (
+      total +
+      balls.filter((ball) => ball?.extraType !== "wide" && ball?.extraType !== "noball").length
+    );
+  }, 0);
+}
+
+function formatOversLeftLocal(match) {
+  const totalBalls = Math.max(Number(match?.overs || 0), 0) * 6;
+  const legalBalls = countLegalBallsLocal(match?.innings2?.history || []);
+  const ballsLeft = Math.max(totalBalls - legalBalls, 0);
+  const overs = Math.floor(ballsLeft / 6);
+  const balls = ballsLeft % 6;
+  return balls > 0 ? `${overs}.${balls} overs left` : `${overs} overs left`;
+}
+
 const HOLD_BUTTON_INTERACTION_PROPS = {
   draggable: false,
   onContextMenu: (event) => {
@@ -817,6 +836,19 @@ export default function SessionViewClient({ sessionId, initialData }) {
     : walkieSwitchOn
     ? "Waiting for umpire approval."
     : "Turn it on to request access.";
+  const rawWalkieNotice = localWalkieNotice || walkie.notice || "";
+  const walkieStatusNotice =
+    walkie.snapshot?.enabled && !walkieCardTalking
+      ? walkie.snapshot?.busy
+        ? walkie.snapshot?.activeSpeakerRole === "umpire"
+          ? "Umpire is live."
+          : "Live channel is busy."
+        : "Channel is free."
+      : "";
+  const walkieNoticeText =
+    rawWalkieNotice === "Retrying audio..." || rawWalkieNotice === "Retrying live walkie..."
+      ? walkieStatusNotice || rawWalkieNotice
+      : rawWalkieNotice || walkieStatusNotice;
   const speakerCardDescription = speakerCardTalking
     ? "Live now."
     : speakerMicOn
@@ -850,10 +882,54 @@ export default function SessionViewClient({ sessionId, initialData }) {
   }
   const launcherCardClass =
     "w-full rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] text-left shadow-[0_18px_50px_rgba(0,0,0,0.32)] backdrop-blur-sm transition-transform hover:-translate-y-0.5";
+  const innings1Complete = match?.innings === "second" || Boolean(match?.result);
+  const innings2Complete = match?.innings === "second" && !isLiveMatch;
+  const targetRuns = Number(match?.innings1?.score || 0) + 1;
+  const runsNeeded = Math.max(0, targetRuns - Number(match?.innings2?.score || 0));
+  const inningsCards =
+    match?.innings === "second"
+      ? [
+          {
+            key: "innings2",
+            title: match.innings2?.team || teamB.name,
+            inningsData: match.innings2,
+            statusLabel: innings2Complete ? "Innings completed" : "Live",
+            targetSummary:
+              Number(match?.innings1?.score || 0) > 0
+                ? runsNeeded > 0
+                  ? `Target ${targetRuns} • Need ${runsNeeded} • ${formatOversLeftLocal(match)}`
+                  : `Target ${targetRuns}`
+                : "",
+          },
+          {
+            key: "innings1",
+            title: match.innings1?.team || teamA.name,
+            inningsData: match.innings1,
+            statusLabel: innings1Complete ? "Innings completed" : "",
+            targetSummary:
+              Number(match?.innings1?.score || 0) > 0 ? `Target set: ${targetRuns}` : "",
+          },
+        ]
+      : [
+          {
+            key: "innings1",
+            title: match.innings1?.team || teamA.name,
+            inningsData: match.innings1,
+            statusLabel: isLiveMatch ? "Live" : innings1Complete ? "Innings completed" : "",
+            targetSummary: "",
+          },
+          {
+            key: "innings2",
+            title: match.innings2?.team || teamB.name,
+            inningsData: match.innings2,
+            statusLabel: innings2Complete ? "Innings completed" : "",
+            targetSummary: "",
+          },
+        ];
 
   return (
     <main className="min-h-screen bg-zinc-950 text-white font-sans p-4 pb-10 flex flex-col items-center">
-      <div className="w-full max-w-4xl mt-4 mb-2 flex items-center justify-between gap-3 px-1">
+      <div className="w-full max-w-4xl mt-4 mb-2 grid grid-cols-[auto_1fr_auto] items-center gap-3 px-1">
         <button
           onClick={() => router.push("/session")}
           className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
@@ -862,9 +938,15 @@ export default function SessionViewClient({ sessionId, initialData }) {
           <FaArrowLeft size={15} />
           <span>Back</span>
         </button>
+        <div className="flex min-w-0 items-center justify-center justify-self-center text-center">
+          <span className="inline-flex items-center gap-2 text-sm font-semibold text-white">
+            <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse"></span>
+            <span className="truncate">Live Spectator View</span>
+          </span>
+        </div>
         <button
           onClick={handleShare}
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/4 text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center justify-self-end rounded-full border border-white/10 bg-white/4 text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
           aria-label="Share Link"
         >
           {copied ? (
@@ -875,21 +957,13 @@ export default function SessionViewClient({ sessionId, initialData }) {
         </button>
       </div>
 
-      <MatchHeroBackdrop match={match} className="w-full max-w-4xl mt-5 mb-4">
+      <MatchHeroBackdrop match={match} className="w-full max-w-4xl mt-5 mb-2">
         <div className="px-5 py-7 sm:px-7">
           <header className="w-full text-center">
             <div>
               <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-[2.15rem]">
                 {sessionData.name}
               </h1>
-              <br />
-              <div className="flex items-center justify-center gap-3 mb-2">
-                <p className="text-green-400">Live Spectator View</p>
-                <span className="inline-flex items-center gap-2 text-sm text-zinc-300">
-                  <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse"></span>
-                  Live
-                </span>
-              </div>
             </div>
           </header>
 
@@ -906,12 +980,12 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
       <OptionalFeatureBoundary
         fallback={
-          <div className="w-full max-w-4xl mt-2 rounded-3xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-zinc-400">
+          <div className="w-full max-w-4xl mt-1 rounded-3xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-zinc-400">
             Optional audio tools are unavailable right now.
           </div>
         }
       >
-        <div className="w-full max-w-4xl mt-2">
+        <div className="w-full max-w-4xl mt-1">
           {showWalkieLauncher ? (
             <div className={`${launcherCardClass} mb-4 px-4 py-3`}>
             <div
@@ -953,10 +1027,16 @@ export default function SessionViewClient({ sessionId, initialData }) {
                   />
                 </div>
               </div>
-              <div className="min-h-[72px]">
+              <div
+                className={
+                  walkieSwitchOn || localWalkieNotice || walkie.notice
+                    ? "min-h-[72px]"
+                    : ""
+                }
+              >
                 <WalkieNotice
                   embedded
-                  notice={localWalkieNotice || walkie.notice}
+                  notice={walkieNoticeText}
                   onDismiss={() => {
                     setLocalWalkieNotice("");
                     walkie.dismissNotice();
@@ -1155,14 +1235,15 @@ export default function SessionViewClient({ sessionId, initialData }) {
       </OptionalFeatureBoundary>
 
       <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
-        <TeamInningsDetail
-          title={match.innings1?.team || teamA.name}
-          inningsData={match.innings1}
-        />
-        <TeamInningsDetail
-          title={match.innings2?.team || teamB.name}
-          inningsData={match.innings2}
-        />
+        {inningsCards.map((inningsCard) => (
+          <TeamInningsDetail
+            key={inningsCard.key}
+            title={inningsCard.title}
+            inningsData={inningsCard.inningsData}
+            statusLabel={inningsCard.statusLabel}
+            targetSummary={inningsCard.targetSummary}
+          />
+        ))}
       </div>
 
       <style jsx global>{`
