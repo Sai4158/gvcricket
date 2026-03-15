@@ -222,6 +222,7 @@ export default function useWalkieTalkie({
 
   const rtmClientRef = useRef(null);
   const rtmReadyPromiseRef = useRef(null);
+  const rtmCleanupPromiseRef = useRef(null);
   const rtmLoggedInRef = useRef(false);
   const rtmSubscribedRef = useRef(false);
   const rtmListenersRef = useRef(null);
@@ -232,6 +233,7 @@ export default function useWalkieTalkie({
   const controlLockReadyRef = useRef(false);
   const speakerLockReadyRef = useRef(false);
   const metadataOperationRef = useRef(Promise.resolve());
+  const signalingGenerationRef = useRef(0);
 
   const snapshotRef = useRef(EMPTY);
   const metadataStateRef = useRef({
@@ -694,6 +696,9 @@ export default function useWalkieTalkie({
     if (!shouldMaintainSignaling) {
       throw new Error("Walkie is not available.");
     }
+    if (rtmCleanupPromiseRef.current) {
+      await rtmCleanupPromiseRef.current.catch(() => {});
+    }
     if (rtmClientRef.current && rtmLoggedInRef.current && rtmSubscribedRef.current) {
       return rtmClientRef.current;
     }
@@ -701,11 +706,18 @@ export default function useWalkieTalkie({
       return rtmReadyPromiseRef.current;
     }
     rtmReadyPromiseRef.current = (async () => {
+      const generation = signalingGenerationRef.current;
       const token = await fetchSignalingToken();
       const AgoraRTM = await loadRtm();
       const RTM = AgoraRTM?.RTM || AgoraRTM;
       if (!RTM) {
         throw new Error("Agora signaling is unavailable.");
+      }
+      if (
+        generation !== signalingGenerationRef.current ||
+        !shouldMaintainSignaling
+      ) {
+        throw new Error("Walkie signaling changed before setup completed.");
       }
       const id = ensureParticipantId();
       const userId = token?.userId || buildAgoraUserId(matchId, id, role);
@@ -716,7 +728,13 @@ export default function useWalkieTalkie({
       if (!rtmClientRef.current) {
         const client = new RTM(token.appId, userId, {
           logUpload: false,
+          logLevel: "none",
+          heartbeatInterval: 30,
           presenceTimeout: 20,
+          privateConfig: {
+            eventUploadHosts: [],
+            logUploadHosts: [],
+          },
         });
 
         const onStatus = (event) => {
@@ -838,6 +856,12 @@ export default function useWalkieTalkie({
       }
 
       const client = rtmClientRef.current;
+      await client
+        .updateConfig?.({
+          logUpload: false,
+          logLevel: "none",
+        })
+        .catch(() => {});
 
       if (!rtmLoggedInRef.current) {
         await client.login({ token: token.token });
@@ -891,52 +915,65 @@ export default function useWalkieTalkie({
   ]);
 
   const cleanupSignaling = useCallback(async () => {
-    clearTimer(requestResetRef);
-    const client = rtmClientRef.current;
-    const listeners = rtmListenersRef.current;
-    const channelName = signalingChannelRef.current;
-    rtmReadyPromiseRef.current = null;
-    signalTokenRef.current = null;
-    signalTokenPromiseRef.current = null;
-    controlLockReadyRef.current = false;
-    speakerLockReadyRef.current = false;
-    signalingUserIdRef.current = "";
-    signalingChannelRef.current = "";
-    if (client) {
-      try {
-        if (channelName && rtmSubscribedRef.current) {
-          try {
-            await client.presence.removeState(channelName, WALKIE_CHANNEL_TYPE);
-          } catch {
-          }
-          await client.unsubscribe(channelName).catch(() => {});
-        }
-      } catch {
-      }
-      if (listeners) {
-        client.removeEventListener("status", listeners.onStatus);
-        client.removeEventListener("presence", listeners.onPresence);
-        client.removeEventListener("storage", listeners.onStorage);
-        client.removeEventListener("lock", listeners.onLock);
-        client.removeEventListener("message", listeners.onMessage);
-        client.removeEventListener("tokenPrivilegeWillExpire", listeners.onTokenWillExpire);
-      }
-      try {
-        if (rtmLoggedInRef.current) {
-          await client.logout();
-        }
-      } catch {
-      }
+    if (rtmCleanupPromiseRef.current) {
+      await rtmCleanupPromiseRef.current.catch(() => {});
+      return;
     }
-    rtmClientRef.current = null;
-    rtmListenersRef.current = null;
-    rtmLoggedInRef.current = false;
-    rtmSubscribedRef.current = false;
-    participantsRef.current = new Map();
-    metadataStateRef.current = { enabled: false, pendingRequests: [] };
-    activeSpeakerRef.current = null;
-    setHasWalkieToken(false);
-    syncSnapshot();
+    clearTimer(requestResetRef);
+    signalingGenerationRef.current += 1;
+    const cleanupTask = (async () => {
+      const client = rtmClientRef.current;
+      const listeners = rtmListenersRef.current;
+      const channelName = signalingChannelRef.current;
+      rtmReadyPromiseRef.current = null;
+      signalTokenRef.current = null;
+      signalTokenPromiseRef.current = null;
+      controlLockReadyRef.current = false;
+      speakerLockReadyRef.current = false;
+      signalingUserIdRef.current = "";
+      signalingChannelRef.current = "";
+      if (client) {
+        try {
+          if (channelName && rtmSubscribedRef.current) {
+            try {
+              await client.presence.removeState(channelName, WALKIE_CHANNEL_TYPE);
+            } catch {
+            }
+            await client.unsubscribe(channelName).catch(() => {});
+          }
+        } catch {
+        }
+        if (listeners) {
+          client.removeEventListener("status", listeners.onStatus);
+          client.removeEventListener("presence", listeners.onPresence);
+          client.removeEventListener("storage", listeners.onStorage);
+          client.removeEventListener("lock", listeners.onLock);
+          client.removeEventListener("message", listeners.onMessage);
+          client.removeEventListener("tokenPrivilegeWillExpire", listeners.onTokenWillExpire);
+        }
+        try {
+          if (rtmLoggedInRef.current) {
+            await client.logout();
+          }
+        } catch {
+        }
+      }
+      rtmClientRef.current = null;
+      rtmListenersRef.current = null;
+      rtmLoggedInRef.current = false;
+      rtmSubscribedRef.current = false;
+      participantsRef.current = new Map();
+      metadataStateRef.current = { enabled: false, pendingRequests: [] };
+      activeSpeakerRef.current = null;
+      setHasWalkieToken(false);
+      syncSnapshot();
+    })();
+    rtmCleanupPromiseRef.current = cleanupTask.finally(() => {
+      if (rtmCleanupPromiseRef.current === cleanupTask) {
+        rtmCleanupPromiseRef.current = null;
+      }
+    });
+    await rtmCleanupPromiseRef.current;
   }, [syncSnapshot]);
 
   const runWithControlMetadata = useCallback(

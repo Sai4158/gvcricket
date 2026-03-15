@@ -1,7 +1,7 @@
 export const siteConfig = {
   name: "GV Cricket",
   shortName: "GV Cricket",
-  url: "https://gvcricket.com",
+  url: "https://www.gvcricket.com",
   logoPath: "/gvLogo.png",
   description:
     "Free cricket scoring app with live score updates, umpire mode, spectator view, score announcer, walkie-talkie, match images, and final stats in one simple mobile-friendly flow.",
@@ -26,6 +26,14 @@ export const siteConfig = {
 };
 
 export function getSiteUrl() {
+  const vercelEnv = String(process.env.VERCEL_ENV || "").trim().toLowerCase();
+  const previewUrl = String(
+    process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL || ""
+  ).trim();
+  if (vercelEnv && vercelEnv !== "production" && previewUrl) {
+    return previewUrl.startsWith("http") ? previewUrl : `https://${previewUrl}`;
+  }
+
   const explicitUrl = String(process.env.NEXT_PUBLIC_SITE_URL || "").trim();
   if (explicitUrl) {
     return explicitUrl.startsWith("http") ? explicitUrl : `https://${explicitUrl}`;
