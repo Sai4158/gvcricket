@@ -38,6 +38,8 @@ export async function GET(request, { params }) {
       let didCleanup = false;
       let lastSerializedMatch = "";
       let bootstrapCatchupDone = false;
+      let heartbeatLoop = async () => {};
+      let bootstrapCatchupLoop = async () => {};
 
       const finalize = () => {
         if (didCleanup) {
@@ -153,7 +155,7 @@ export async function GET(request, { params }) {
           });
         };
 
-        const heartbeatLoop = async () => {
+        heartbeatLoop = async () => {
           if (closed) {
             return;
           }
@@ -171,7 +173,7 @@ export async function GET(request, { params }) {
           scheduleHeartbeat();
         };
 
-      const bootstrapCatchupLoop = async () => {
+      bootstrapCatchupLoop = async () => {
         if (closed || bootstrapCatchupDone) {
           return;
         }

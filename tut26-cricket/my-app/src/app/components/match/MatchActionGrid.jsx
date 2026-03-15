@@ -90,6 +90,7 @@ function AnnounceIcon() {
 
 function ActionIconButton({
   onClick,
+  onPressStart,
   onHoldStart,
   onHoldEnd,
   onPressFeedback,
@@ -124,11 +125,12 @@ function ActionIconButton({
 
     onPressFeedback?.();
     feedbackTriggeredRef.current = true;
+    void onPressStart?.();
     clearHoldTimer();
     holdTimerRef.current = window.setTimeout(() => {
       holdStartedRef.current = true;
       void onHoldStart();
-    }, 220);
+    }, 140);
   };
 
   const endPress = () => {
@@ -272,6 +274,7 @@ export default function MatchActionGrid({
   onWalkie,
   onMic,
   onShare,
+  onWalkiePressStart,
   onWalkieHoldStart,
   onWalkieHoldEnd,
   onMicHoldStart,
@@ -293,6 +296,7 @@ export default function MatchActionGrid({
         <div className="grid grid-cols-3 gap-x-4 gap-y-6">
           <ActionIconButton
             onClick={onWalkie}
+            onPressStart={onWalkiePressStart}
             onHoldStart={onWalkieHoldStart}
             onHoldEnd={onWalkieHoldEnd}
             onPressFeedback={onPressFeedback}

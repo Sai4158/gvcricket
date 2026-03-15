@@ -179,6 +179,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const previousWalkieRequestStateRef = useRef("idle");
   const lastStreamUpdateRef = useRef(initialData?.updatedAt || "");
   const announcerAutoEnabledMatchRef = useRef("");
+  const announcerInitialSummaryRef = useRef("");
   const router = useRouter();
   const sessionData = data?.session;
   const match = data?.match;
@@ -227,7 +228,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
     role: "spectator",
     displayName: sessionData?.name ? `${sessionData.name} Spectator` : "Spectator",
     autoConnectAudio: spectatorWalkieEnabled,
-    signalingActive: spectatorWalkieEnabled,
   });
 
   const speakSequenceWithDuck = useCallback(
@@ -249,6 +249,39 @@ export default function SessionViewClient({ sessionId, initialData }) {
       return true;
     },
     [speakSequence]
+  );
+
+  const announceCurrentScore = useCallback(
+    (options = {}) => {
+      if (!match?._id) {
+        return false;
+      }
+
+      const text = buildCurrentScoreAnnouncement(match);
+      if (!text) {
+        return false;
+      }
+
+      return speakSequenceWithDuck(
+        [
+          {
+            text,
+            pauseAfterMs: 0,
+            rate: 0.8,
+          },
+        ],
+        {
+          key: `spectator-current-score-${match._id}-${currentLiveEventId || "snapshot"}`,
+          priority: 3,
+          interrupt: Boolean(options.interrupt),
+          minGapMs: 0,
+          ignoreEnabled: true,
+          userGesture: Boolean(options.userGesture),
+        },
+        2400
+      );
+    },
+    [currentLiveEventId, match, speakSequenceWithDuck]
   );
 
   const clearAnnouncementTimers = useCallback(() => {
@@ -276,6 +309,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     previousWalkieEnabledRef.current = false;
     previousWalkieRequestStateRef.current = "idle";
     announcerAutoEnabledMatchRef.current = "";
+    announcerInitialSummaryRef.current = "";
     queueMicrotask(() => {
       setSpectatorWalkieEnabled(false);
       setLocalWalkieNotice("");
@@ -308,38 +342,50 @@ export default function SessionViewClient({ sessionId, initialData }) {
         clearAnnouncementTimers();
         stop();
       }
+      announcerInitialSummaryRef.current = "";
       previousEnabledRef.current = false;
       return;
     }
 
     if (!previousEnabledRef.current) {
-      lastAnnouncedEventRef.current = match?.lastLiveEvent?.id || "";
+      lastAnnouncedEventRef.current = currentLiveEventId;
       clearAnnouncementTimers();
       stop();
-      speakSequenceWithDuck(
-        [
-          {
-            text: "Score announcer is now on.",
-            pauseAfterMs: 420,
-            rate: 0.74,
-          },
-          {
-            text: "I will announce the next update.",
-            pauseAfterMs: 0,
-            rate: 0.73,
-          },
-        ],
-        {
-          key: `spectator-announcer-on-${match?._id || "match"}`,
-          priority: 3,
-          interrupt: true,
-        },
-        1700
-      );
     }
 
     previousEnabledRef.current = true;
-  }, [clearAnnouncementTimers, isLiveMatch, match, settings.enabled, settings.mode, speakSequenceWithDuck, stop]);
+  }, [clearAnnouncementTimers, currentLiveEventId, isLiveMatch, match, settings.enabled, settings.mode, stop]);
+
+  useEffect(() => {
+    const announcerEnabled = Boolean(match && isLiveMatch && settings.enabled && settings.mode !== "silent");
+    if (!announcerEnabled || !match?._id) {
+      return;
+    }
+
+    const initialSummaryKey = `${match._id}:${currentLiveEventId || "snapshot"}`;
+    if (announcerInitialSummaryRef.current === initialSummaryKey) {
+      return;
+    }
+
+    if (needsGesture) {
+      return;
+    }
+
+    const spoke = announceCurrentScore();
+    if (!spoke) {
+      return;
+    }
+
+    announcerInitialSummaryRef.current = initialSummaryKey;
+  }, [
+    announceCurrentScore,
+    currentLiveEventId,
+    isLiveMatch,
+    match,
+    needsGesture,
+    settings.enabled,
+    settings.mode,
+  ]);
 
   useEffect(() => {
     const event = match?.lastLiveEvent;
@@ -356,15 +402,29 @@ export default function SessionViewClient({ sessionId, initialData }) {
       ? buildSpectatorOverCompleteAnnouncement(match)
       : "";
     const priority = getSpectatorAnnouncementPriority(event);
-    const combinedText = [line, scoreLine, overSummary].filter(Boolean).join(" ");
+    const items = [
+      {
+        text: line,
+        pauseAfterMs: scoreLine || overSummary ? 180 : 0,
+        rate: 0.78,
+      },
+      scoreLine
+        ? {
+            text: scoreLine,
+            pauseAfterMs: overSummary ? 220 : 0,
+            rate: 0.8,
+          }
+        : null,
+      overSummary
+        ? {
+            text: overSummary,
+            pauseAfterMs: 0,
+            rate: 0.8,
+          }
+        : null,
+    ].filter(Boolean);
     speakSequenceWithDuck(
-      [
-        {
-          text: combinedText,
-          pauseAfterMs: 0,
-          rate: 0.82,
-        },
-      ],
+      items,
       {
         key: event.id,
         priority,
@@ -407,10 +467,26 @@ export default function SessionViewClient({ sessionId, initialData }) {
       !previousWalkieEnabledRef.current
     ) {
       queueMicrotask(() => {
-        if (spectatorWalkieEnabled) {
-          showTemporaryWalkieNotice("Walkie-talkie is on. Tap and hold to talk.");
-        }
+        setSpectatorWalkieEnabled(true);
+        setActivePanel("walkie");
+        showTemporaryWalkieNotice("Walkie-talkie is on. Hold to talk.");
       });
+      speakSequenceWithDuck(
+        [
+          {
+            text: "Walkie-talkie is on. Hold to talk.",
+            pauseAfterMs: 0,
+            rate: 0.84,
+          },
+        ],
+        {
+          key: `spectator-walkie-live-${match?._id || sessionId || "session"}`,
+          priority: 4,
+          interrupt: true,
+          ignoreEnabled: true,
+        },
+        1800
+      );
       previousWalkieEnabledRef.current = walkieEnabled;
       return undefined;
     }
@@ -419,6 +495,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       queueMicrotask(() => {
         setQuickWalkieTalking(false);
         setActivePanel((current) => (current === "walkie" ? null : current));
+        setSpectatorWalkieEnabled(false);
       });
       walkieHeldRef.current = false;
     }
@@ -426,8 +503,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
     previousWalkieEnabledRef.current = walkieEnabled;
   }, [
     isLiveMatch,
+    match?._id,
+    sessionId,
     showTemporaryWalkieNotice,
-    spectatorWalkieEnabled,
+    speakSequenceWithDuck,
     walkie.snapshot?.enabled,
   ]);
 
@@ -442,12 +521,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
     if (requestState === "accepted") {
       queueMicrotask(() => {
-        showTemporaryWalkieNotice("Walkie accepted. Tap and hold to talk.");
+        setSpectatorWalkieEnabled(true);
+        setActivePanel("walkie");
+        showTemporaryWalkieNotice("Walkie accepted. Hold to talk.");
       });
       speakSequenceWithDuck(
         [
           {
-            text: "Walkie-talkie accepted. Tap and hold to talk.",
+            text: "Walkie-talkie accepted. Hold to talk.",
             pauseAfterMs: 0,
             rate: 0.84,
           },
@@ -518,23 +599,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
 
     prime();
-    speakSequenceWithDuck(
-      [
-        {
-          text: buildCurrentScoreAnnouncement(match),
-          pauseAfterMs: 0,
-          rate: 0.8,
-        },
-      ],
-      {
-        key: `spectator-quick-score-${match._id}`,
-        priority: 3,
-        minGapMs: 1500,
-        ignoreEnabled: true,
-        userGesture: true,
-      },
-      2400
-    );
+    announceCurrentScore({ userGesture: true, interrupt: true });
   };
 
   const clearWalkieHoldTimer = () => {
@@ -557,15 +622,22 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
 
     clearWalkieHoldTimer();
-    walkieHoldTimerRef.current = window.setTimeout(async () => {
-      walkieHeldRef.current = true;
-      setQuickWalkieTalking(true);
+    walkieHeldRef.current = true;
+    setQuickWalkieTalking(true);
+    void (async () => {
+      const prepared = await walkie.prepareToTalk?.();
+      if (!walkieHeldRef.current || prepared === false) {
+        walkieHeldRef.current = false;
+        setQuickWalkieTalking(false);
+        return;
+      }
+
       const started = await walkie.startTalking();
-      if (!started) {
+      if (!walkieHeldRef.current || !started) {
         walkieHeldRef.current = false;
         setQuickWalkieTalking(false);
       }
-    }, 170);
+    })();
   };
 
   const handleWalkieLauncherPressEnd = async () => {
@@ -585,15 +657,15 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
 
     clearSpeakerHoldTimer();
-    speakerHoldTimerRef.current = window.setTimeout(async () => {
-      speakerHeldRef.current = true;
-      setQuickSpeakerTalking(true);
+    speakerHeldRef.current = true;
+    setQuickSpeakerTalking(true);
+    void (async () => {
       const started = await micMonitor.start({ pauseMedia: true });
       if (!started) {
         speakerHeldRef.current = false;
         setQuickSpeakerTalking(false);
       }
-    }, 170);
+    })();
   };
 
   const handleSpeakerLauncherPressEnd = async () => {
@@ -612,11 +684,12 @@ export default function SessionViewClient({ sessionId, initialData }) {
     if (nextChecked) {
         setSpectatorWalkieEnabled(true);
         if (walkie.snapshot?.enabled) {
-          showTemporaryWalkieNotice("Walkie-talkie is on. Tap and hold to talk.");
+          showTemporaryWalkieNotice("Walkie-talkie is on. Hold to talk.");
           return;
         }
 
-        if (walkie.requestState === "pending") {
+        if (walkie.requestState === "pending" || walkie.hasOwnPendingRequest) {
+          showTemporaryWalkieNotice("Waiting for umpire approval.");
           return;
         }
 
@@ -643,6 +716,12 @@ export default function SessionViewClient({ sessionId, initialData }) {
         if (!requested) {
           setSpectatorWalkieEnabled(false);
         }
+        return;
+      }
+
+      if (walkie.snapshot?.enabled) {
+        setSpectatorWalkieEnabled(true);
+        showTemporaryWalkieNotice("Walkie is live. Hold to talk.");
         return;
       }
 
@@ -686,35 +765,15 @@ export default function SessionViewClient({ sessionId, initialData }) {
       if (nextChecked) {
         setActivePanel("announce");
         prime();
-        speakSequenceWithDuck(
-        [
-          {
-            text: "Score announcer is now on.",
-            pauseAfterMs: 420,
-            rate: 0.82,
-          },
-          {
-            text: "I will announce the next update.",
-            pauseAfterMs: 0,
-            rate: 0.81,
-          },
-        ],
-          {
-            key: "spectator-voice-enabled",
-            priority: 3,
-            interrupt: true,
-            userGesture: true,
-            ignoreEnabled: true,
-          },
-          1700
-        );
+        announcerInitialSummaryRef.current = "";
+        announceCurrentScore({ userGesture: true, interrupt: true });
         return;
       }
 
       stop();
       setActivePanel((current) => (current === "announce" ? null : current));
     },
-    [prime, speakSequenceWithDuck, stop, updateSetting]
+    [announceCurrentScore, prime, stop, updateSetting]
   );
 
   if (!sessionId) return <SplashMsg>No Session ID provided.</SplashMsg>;
@@ -948,6 +1007,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
                       userSelect: "none",
                       WebkitUserSelect: "none",
                       WebkitTouchCallout: "none",
+                      WebkitTapHighlightColor: "transparent",
+                      touchAction: "none",
                     }}
                   >
                     {walkieCardTalking
@@ -1240,6 +1301,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
               onStartTalking={walkie.startTalking}
               onStopTalking={walkie.stopTalking}
               onUnlockAudio={walkie.unlockAudio}
+              onPrepareTalking={walkie.prepareToTalk}
               onDismissNotice={walkie.dismissNotice}
               onAcceptRequest={() => {}}
               onDismissRequest={() => {}}

@@ -850,6 +850,9 @@ export default function DirectorConsoleClient({
       managedSession?.session?.name
         ? `${managedSession.session.name} Director`
         : "Director",
+    autoConnectAudio: Boolean(
+      authorized && managedSession?.match?._id && liveMatch?.isOngoing
+    ),
   });
 
   const readCurrentScore = () => {
@@ -1729,7 +1732,7 @@ export default function DirectorConsoleClient({
                     ? "Enter director mode and choose a live session to use walkie."
                     : walkie.snapshot?.enabled
                     ? "Hold to talk with the live channel."
-                    : walkie.requestState === "pending"
+                    : walkie.requestState === "pending" || walkie.hasOwnPendingRequest
                     ? "Request sent. Waiting for the umpire."
                     : walkie.requestState === "dismissed"
                     ? "Umpire dismissed the request."
@@ -1782,7 +1785,7 @@ export default function DirectorConsoleClient({
                   >
                     {!canManageSession
                       ? "Choose session first"
-                      : walkie.requestState === "pending"
+                      : walkie.requestState === "pending" || walkie.hasOwnPendingRequest
                       ? "Request sent"
                       : "Request walkie"}
                   </button>

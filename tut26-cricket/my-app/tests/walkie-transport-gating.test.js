@@ -41,7 +41,7 @@ test("walkie audio transport stays off when match walkie is disabled", () => {
   assert.equal(result, false);
 });
 
-test("walkie audio transport turns on only for active talk or opted-in listening", () => {
+test("walkie audio transport stays on for opted-in listening and active talk", () => {
   assert.equal(
     shouldMaintainWalkieAudioTransport({
       enabled: true,
@@ -69,11 +69,30 @@ test("walkie audio transport turns on only for active talk or opted-in listening
       participantId: "self-user",
       hasWalkieToken: true,
       autoConnectAudio: true,
+      listeningGraceActive: false,
       manualAudioReady: false,
       isSelfTalking: false,
       isFinishing: false,
     }),
     false
+  );
+
+  assert.equal(
+    shouldMaintainWalkieAudioTransport({
+      enabled: true,
+      snapshot: {
+        enabled: true,
+        activeSpeakerId: "",
+      },
+      participantId: "self-user",
+      hasWalkieToken: true,
+      autoConnectAudio: true,
+      listeningGraceActive: true,
+      manualAudioReady: false,
+      isSelfTalking: false,
+      isFinishing: false,
+    }),
+    true
   );
 
   assert.equal(

@@ -22,6 +22,12 @@ const schema = z
       .min(8)
       .max(80)
       .regex(/^[a-zA-Z0-9._:-]+$/, "participantId is invalid."),
+    rtcSessionId: z
+      .string()
+      .min(4)
+      .max(32)
+      .regex(/^[a-zA-Z0-9._:-]+$/, "rtcSessionId is invalid.")
+      .optional(),
     role: z.enum(["umpire", "spectator", "director"]),
   })
   .strict();

@@ -152,6 +152,28 @@ function normalizeSpeechText(text) {
     .trim();
 }
 
+function dedupeRepeatedLeadPhrase(text) {
+  const normalized = normalizeSpeechText(text);
+  if (!normalized) {
+    return "";
+  }
+
+  const words = normalized.split(" ").filter(Boolean);
+  for (let size = 4; size >= 1; size -= 1) {
+    if (words.length < size * 2) {
+      continue;
+    }
+
+    const first = words.slice(0, size).join(" ").toLowerCase();
+    const second = words.slice(size, size * 2).join(" ").toLowerCase();
+    if (first === second) {
+      return words.slice(size).join(" ");
+    }
+  }
+
+  return normalized;
+}
+
 function splitSpeechText(text) {
   const normalized = normalizeSpeechText(text);
   if (!normalized) {
@@ -549,7 +571,8 @@ export default function useSpeechAnnouncer(settings) {
                   ...item,
                   text: item?.text || "",
                 };
-          const chunks = splitSpeechText(normalizedItem.text);
+          const dedupedText = dedupeRepeatedLeadPhrase(normalizedItem.text);
+          const chunks = splitSpeechText(dedupedText);
           if (!chunks.length) {
             return [];
           }
@@ -597,7 +620,6 @@ export default function useSpeechAnnouncer(settings) {
       };
 
       if (!isPrimedRef.current && !options.userGesture) {
-        pendingSpeakRef.current = { type: "sequence", items: normalizedItems, options };
         setStatus("waiting_for_gesture");
         return false;
       }
@@ -626,8 +648,19 @@ export default function useSpeechAnnouncer(settings) {
         clearStepTimer();
         queuedSequencesRef.current = [];
         sequenceTokenRef.current += 1;
+        const nextToken = sequenceTokenRef.current;
         window.speechSynthesis.cancel();
-        void runSequence(request, sequenceTokenRef.current);
+        stepTimerRef.current = window.setTimeout(() => {
+          if (nextToken !== sequenceTokenRef.current) {
+            return;
+          }
+          try {
+            window.speechSynthesis.resume?.();
+          } catch {
+            // Ignore resume failures after interrupt.
+          }
+          void runSequence(request, nextToken);
+        }, platformRef.current.isIOS && platformRef.current.isSafari ? 140 : 75);
         return true;
       }
 
@@ -727,7 +760,6 @@ export default function useSpeechAnnouncer(settings) {
       }
 
       if (!isPrimedRef.current) {
-        pendingSpeakRef.current = { type: "single", text, options };
         setStatus("waiting_for_gesture");
         return false;
       }

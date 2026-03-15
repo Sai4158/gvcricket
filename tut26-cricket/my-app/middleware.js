@@ -20,11 +20,16 @@ function buildContentSecurityPolicy() {
     "https://www.youtube.com",
     "https://i.ytimg.com",
     "https://*.agora.io",
+    "https://*.edge.agora.io",
     "https://*.agoraio.cn",
     "https://*.sd-rtn.com",
+    "https://*.edge.sd-rtn.com",
     "wss://*.agora.io",
+    "wss://*.edge.agora.io",
     "wss://*.agoraio.cn",
     "wss://*.sd-rtn.com",
+    "wss://*.edge.sd-rtn.com",
+    "wss://*.pusher.com",
   ];
 
   return [

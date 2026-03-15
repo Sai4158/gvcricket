@@ -75,7 +75,7 @@ export default function MatchPageClient({
     role: "umpire",
     hasUmpireAccess: authStatus === "granted",
     displayName: "Umpire",
-    autoConnectAudio: modal.type === "walkie",
+    autoConnectAudio: Boolean(authStatus === "granted" && isLiveMatch),
   });
   const hasPendingWalkieRequests = Boolean(isLiveMatch && walkie.pendingRequests?.length);
 
@@ -274,6 +274,7 @@ export default function MatchPageClient({
     }
 
     if (walkie.canTalk || walkie.snapshot?.enabled) {
+      await walkie.prepareToTalk?.();
       await walkie.startTalking();
     }
   };
@@ -346,6 +347,14 @@ export default function MatchPageClient({
               <WalkieNotice
                 notice={walkie.notice}
                 onDismiss={walkie.dismissNotice}
+                quickTalkEnabled={Boolean(isLiveMatch && walkie.snapshot?.enabled)}
+                quickTalkActive={walkie.isSelfTalking}
+                quickTalkFinishing={walkie.isFinishing}
+                quickTalkCountdown={walkie.countdown}
+                quickTalkFinishDelayLeft={walkie.finishDelayLeft}
+                onQuickTalkPrepare={walkie.prepareToTalk}
+                onQuickTalkStart={walkie.startTalking}
+                onQuickTalkStop={walkie.stopTalking}
               />
             ) : null}
             {hasPendingWalkieRequests ? (
@@ -377,6 +386,7 @@ export default function MatchPageClient({
             onWalkie={() => setModal({ type: "walkie" })}
             onMic={() => setModal({ type: "mic" })}
             onShare={handleCopyShareLink}
+            onWalkiePressStart={walkie.prepareToTalk}
             onWalkieHoldStart={handleWalkieHoldStart}
             onWalkieHoldEnd={() => walkie.stopTalking()}
             onMicHoldStart={
@@ -464,6 +474,7 @@ export default function MatchPageClient({
                   onStartTalking: walkie.startTalking,
                   onStopTalking: walkie.stopTalking,
                   onUnlockAudio: walkie.unlockAudio,
+                  onPrepareTalking: walkie.prepareToTalk,
                   onDismissNotice: walkie.dismissNotice,
                   onAcceptRequest: walkie.acceptRequest,
                   onDismissRequest: walkie.dismissRequest,

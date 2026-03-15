@@ -21,3 +21,12 @@ export function buildAgoraUserId(matchId, participantId, role) {
     AGORA_USER_ID_MAX
   );
 }
+
+export function buildAgoraRtcUserId(matchId, participantId, role, rtcSessionId = "") {
+  return sanitizeAgoraChannelPart(
+    rtcSessionId
+      ? `${role}-${matchId}-${participantId}-${rtcSessionId}`
+      : `${role}-${matchId}-${participantId}`,
+    AGORA_USER_ID_MAX
+  );
+}

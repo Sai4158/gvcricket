@@ -6,7 +6,11 @@ import { applyMatchAction, MatchEngineError } from "../../lib/match-engine";
 import useEventSource from "../live/useEventSource";
 
 function triggerHapticFeedback() {
-  if (typeof window !== "undefined" && navigator.vibrate) {
+  if (
+    typeof window !== "undefined" &&
+    navigator.vibrate &&
+    (navigator.userActivation?.isActive || navigator.userActivation?.hasBeenActive)
+  ) {
     navigator.vibrate(50);
   }
 }

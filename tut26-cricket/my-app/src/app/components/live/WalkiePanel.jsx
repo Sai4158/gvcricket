@@ -2,28 +2,186 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  FaLock,
   FaMicrophone,
   FaMicrophoneSlash,
   FaPhoneVolume,
-  FaTimes,
   FaUsers,
 } from "react-icons/fa";
 import LiquidLoader from "../shared/LiquidLoader";
 
-export function WalkieNotice({ notice, onDismiss }) {
-  if (!notice) return null;
+function WalkieInlineTalkButton({
+  active = false,
+  finishing = false,
+  countdown = 0,
+  finishDelayLeft = 0,
+  onPrepare,
+  onStart,
+  onStop,
+}) {
+  const [holding, setHolding] = useState(false);
+  const holdingRef = useRef(false);
+  const pointerIdRef = useRef(null);
+  const startAttemptRef = useRef(0);
+
+  const startHold = useCallback(async () => {
+    if (holdingRef.current) return;
+    holdingRef.current = true;
+    setHolding(true);
+    const attemptId = startAttemptRef.current + 1;
+    startAttemptRef.current = attemptId;
+    try {
+      const prepared = await onPrepare?.();
+      if (!holdingRef.current || startAttemptRef.current !== attemptId || prepared === false) {
+        holdingRef.current = false;
+        setHolding(false);
+        return;
+      }
+      await onStart?.();
+      if (!holdingRef.current || startAttemptRef.current !== attemptId) {
+        setHolding(false);
+      }
+    } catch {
+      holdingRef.current = false;
+      setHolding(false);
+    }
+  }, [onPrepare, onStart]);
+
+  const endHold = useCallback(async () => {
+    if (!holdingRef.current) return;
+    holdingRef.current = false;
+    setHolding(false);
+    await onStop?.();
+  }, [onStop]);
+
+  useEffect(() => {
+    const handlePointerRelease = (event) => {
+      if (
+        pointerIdRef.current !== null &&
+        event.pointerId !== undefined &&
+        event.pointerId !== pointerIdRef.current
+      ) {
+        return;
+      }
+
+      pointerIdRef.current = null;
+      void endHold();
+    };
+
+    window.addEventListener("pointerup", handlePointerRelease);
+    window.addEventListener("pointercancel", handlePointerRelease);
+
+    return () => {
+      window.removeEventListener("pointerup", handlePointerRelease);
+      window.removeEventListener("pointercancel", handlePointerRelease);
+    };
+  }, [endHold]);
+
+  useEffect(() => {
+    if (!active && !holding) {
+      holdingRef.current = false;
+      pointerIdRef.current = null;
+    }
+  }, [active, holding]);
 
   return (
-    <div className="mb-4 flex items-start justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-      <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{notice}</span>
-      <button
-        type="button"
-        onClick={onDismiss}
-        className="text-emerald-200 transition-colors hover:text-white"
-        aria-label="Dismiss walkie notice"
+    <button
+      type="button"
+      onPointerDown={(event) => {
+        if (!event.isPrimary) return;
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        pointerIdRef.current = event.pointerId;
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        void startHold();
+      }}
+      onPointerUp={(event) => {
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+      }}
+      onPointerCancel={(event) => {
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+        pointerIdRef.current = null;
+        void endHold();
+      }}
+      onContextMenu={(event) => event.preventDefault()}
+      onMouseDown={(event) => event.preventDefault()}
+      onDragStart={(event) => event.preventDefault()}
+      className={`inline-flex min-w-[154px] touch-none select-none items-center justify-center gap-2 rounded-full px-2 py-2 text-xs font-semibold transition ${
+        active || holding || finishing
+          ? "bg-[linear-gradient(135deg,#d1fae5_0%,#34d399_35%,#10b981_100%)] text-black shadow-[0_14px_34px_rgba(16,185,129,0.28)]"
+          : "border border-white/14 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:border-emerald-200/28 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))]"
+      }`}
+      style={{
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
+        WebkitTapHighlightColor: "transparent",
+        touchAction: "none",
+      }}
+      draggable={false}
+      aria-label={active || holding || finishing ? "Release walkie talk" : "Hold to talk"}
+    >
+      <span
+        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+          active || holding || finishing ? "bg-black/12" : "bg-emerald-400/12 text-emerald-200"
+        }`}
       >
-        <FaTimes />
-      </button>
+        <FaMicrophone className="text-[0.82rem]" />
+      </span>
+      <span className="whitespace-nowrap">
+        {finishing
+          ? `Finishing ${finishDelayLeft || 1}s`
+          : active || holding
+          ? `Live ${countdown}s`
+          : "Press & hold"}
+      </span>
+    </button>
+  );
+}
+
+export function WalkieNotice({
+  notice,
+  onDismiss,
+  quickTalkEnabled = false,
+  quickTalkActive = false,
+  quickTalkFinishing = false,
+  quickTalkCountdown = 0,
+  quickTalkFinishDelayLeft = 0,
+  onQuickTalkPrepare,
+  onQuickTalkStart,
+  onQuickTalkStop,
+}) {
+  const displayNotice = notice || (quickTalkEnabled ? "Walkie is live. Hold here to talk instantly." : "");
+  if (!displayNotice && !quickTalkEnabled) return null;
+
+  return (
+    <div
+      className="mb-4 flex select-none items-start justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100"
+      style={{
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
+      }}
+    >
+      <div className="min-w-0 flex-1">
+        {quickTalkEnabled ? (
+          <div className="mb-1 inline-flex items-center gap-2 rounded-full border border-emerald-300/16 bg-black/20 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-50">
+            <FaLock className="shrink-0" />
+            <span className="select-none">Live Channel</span>
+          </div>
+        ) : null}
+        <span className="block min-w-0 [overflow-wrap:anywhere]">{displayNotice}</span>
+      </div>
+      {quickTalkEnabled ? (
+        <WalkieInlineTalkButton
+          active={quickTalkActive}
+          finishing={quickTalkFinishing}
+          countdown={quickTalkCountdown}
+          finishDelayLeft={quickTalkFinishDelayLeft}
+          onPrepare={onQuickTalkPrepare}
+          onStart={onQuickTalkStart}
+          onStop={onQuickTalkStop}
+        />
+      ) : null}
     </div>
   );
 }
@@ -37,7 +195,6 @@ function roleLabel(role) {
 export function WalkieRequestQueue({
   requests = [],
   onAccept,
-  onDismiss,
 }) {
   if (!requests.length) return null;
 
@@ -60,20 +217,13 @@ export function WalkieRequestQueue({
               </p>
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="mt-4">
             <button
               type="button"
               onClick={() => onAccept?.(request.requestId)}
               className="flex w-full items-center justify-center rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black shadow-[0_14px_34px_rgba(16,185,129,0.24)] transition hover:bg-emerald-400"
             >
               Accept
-            </button>
-            <button
-              type="button"
-              onClick={() => onDismiss?.(request.requestId)}
-              className="flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-semibold text-zinc-100 transition hover:bg-white/[0.09]"
-            >
-              Dismiss
             </button>
           </div>
         </div>
@@ -112,6 +262,7 @@ export function WalkieTalkButton({
   disabled,
   countdown,
   finishDelayLeft = 0,
+  onPrepare,
   onStart,
   onStop,
   label = "Hold to talk",
@@ -188,6 +339,7 @@ export function WalkieTalkButton({
           if (event.pointerType === "mouse" && event.button !== 0) return;
           pointerIdRef.current = event.pointerId;
           event.currentTarget.setPointerCapture?.(event.pointerId);
+          void onPrepare?.();
           void startHold();
         }}
         onPointerUp={(event) => {
@@ -279,6 +431,7 @@ export default function WalkiePanel({
   onStopTalking,
   onDismissNotice,
   onUnlockAudio,
+  onPrepareTalking,
   onAcceptRequest,
   onDismissRequest,
 }) {
@@ -425,6 +578,7 @@ export default function WalkiePanel({
               disabled={!canTalk}
               countdown={countdown}
               finishDelayLeft={finishDelayLeft}
+              onPrepare={onPrepareTalking}
               onStart={onStartTalking}
               onStop={onStopTalking}
               label={isUmpire ? "Hold to reply" : "Hold to talk"}

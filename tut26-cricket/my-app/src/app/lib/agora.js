@@ -1,5 +1,6 @@
 import { RtcRole, RtcTokenBuilder, RtmTokenBuilder } from "agora-token";
 import {
+  buildAgoraRtcUserId,
   buildAgoraRtcChannelName,
   buildAgoraSignalingChannelName,
   buildAgoraUserId,
@@ -22,12 +23,17 @@ export function getAgoraCredentials() {
   };
 }
 
-export { buildAgoraRtcChannelName, buildAgoraSignalingChannelName, buildAgoraUserId };
+export {
+  buildAgoraRtcChannelName,
+  buildAgoraSignalingChannelName,
+  buildAgoraRtcUserId,
+  buildAgoraUserId,
+};
 
-export function createAgoraRtcToken({ matchId, participantId, role }) {
+export function createAgoraRtcToken({ matchId, participantId, role, rtcSessionId = "" }) {
   const { appId, appCertificate } = getAgoraCredentials();
   const channelName = buildAgoraRtcChannelName(matchId);
-  const userId = buildAgoraUserId(matchId, participantId, role);
+  const userId = buildAgoraRtcUserId(matchId, participantId, role, rtcSessionId);
 
   return {
     appId,

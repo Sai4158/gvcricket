@@ -117,9 +117,11 @@ export default function useLocalMicMonitor() {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
+          noiseSuppression: false,
+          autoGainControl: false,
           channelCount: 1,
+          latency: 0,
+          sampleRate: 48000,
         },
         video: false,
       });

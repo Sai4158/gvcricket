@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { shouldReceiveWalkieAudio } from "../src/app/components/live/useWalkieTalkie.js";
+import {
+  shouldPlayWalkieRemoteAudio,
+  shouldReceiveWalkieAudio,
+} from "../src/app/components/live/useWalkieTalkie.js";
 import {
   createDirectorAccessToken,
   hasValidDirectorAccess,
@@ -81,6 +84,44 @@ test("shared walkie audio lets every non-speaker listen to the active speaker", 
       snapshot,
     }),
     true
+  );
+});
+
+test("walkie remote playback stops while this device is actively talking or finishing", () => {
+  const snapshot = {
+    enabled: true,
+    activeSpeakerId: "spectator:one",
+    activeSpeakerRole: "spectator",
+  };
+
+  assert.equal(
+    shouldPlayWalkieRemoteAudio({
+      participantId: "umpire:one",
+      snapshot,
+      isSelfTalking: false,
+      isFinishing: false,
+    }),
+    true
+  );
+
+  assert.equal(
+    shouldPlayWalkieRemoteAudio({
+      participantId: "umpire:one",
+      snapshot,
+      isSelfTalking: true,
+      isFinishing: false,
+    }),
+    false
+  );
+
+  assert.equal(
+    shouldPlayWalkieRemoteAudio({
+      participantId: "umpire:one",
+      snapshot,
+      isSelfTalking: false,
+      isFinishing: true,
+    }),
+    false
   );
 });
 
