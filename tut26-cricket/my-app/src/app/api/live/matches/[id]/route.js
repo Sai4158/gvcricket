@@ -37,7 +37,7 @@ export async function GET(request, { params }) {
       let closed = false;
       let didCleanup = false;
       let lastSerializedMatch = "";
-      const bootstrapDeadline = Date.now() + 12_000;
+      let bootstrapCatchupDone = false;
 
       const finalize = () => {
         if (didCleanup) {
@@ -100,7 +100,7 @@ export async function GET(request, { params }) {
       };
 
       const scheduleBootstrapCatchup = (delay = 1200) => {
-        if (closed || Date.now() >= bootstrapDeadline) {
+        if (closed || bootstrapCatchupDone) {
           return;
         }
         if (bootstrapCatchup) {
@@ -171,19 +171,18 @@ export async function GET(request, { params }) {
           scheduleHeartbeat();
         };
 
-        const bootstrapCatchupLoop = async () => {
-          if (closed || Date.now() >= bootstrapDeadline) {
-            return;
-          }
+      const bootstrapCatchupLoop = async () => {
+        if (closed || bootstrapCatchupDone) {
+          return;
+        }
 
-          try {
-            await pushMatch();
-          } catch (error) {
-            console.error("Match SSE bootstrap catchup failed:", error);
-          }
-
-          scheduleBootstrapCatchup();
-        };
+        try {
+          await pushMatch();
+        } catch (error) {
+          console.error("Match SSE bootstrap catchup failed:", error);
+        }
+        bootstrapCatchupDone = true;
+      };
 
         await pushMatch();
         send("ping", {

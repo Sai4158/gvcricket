@@ -47,6 +47,7 @@ export async function GET(request, { params }) {
   let closed = false;
   let didCleanup = false;
   let lastSerializedPayload = "";
+  let catchupDone = false;
 
   const finalize = () => {
     if (didCleanup) {
@@ -111,7 +112,7 @@ export async function GET(request, { params }) {
   };
 
   const scheduleCatchup = (delay = 1200) => {
-    if (closed) {
+    if (closed || catchupDone) {
       return;
     }
     if (catchup) {
@@ -207,7 +208,7 @@ export async function GET(request, { params }) {
   };
 
   const catchupLoop = async () => {
-    if (closed) {
+    if (closed || catchupDone) {
       return;
     }
 
@@ -216,8 +217,7 @@ export async function GET(request, { params }) {
     } catch (error) {
       console.error("Session SSE catchup failed:", error);
     }
-
-    scheduleCatchup();
+    catchupDone = true;
   };
 
   void (async () => {
