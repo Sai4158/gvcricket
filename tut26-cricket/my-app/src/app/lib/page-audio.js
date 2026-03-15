@@ -296,7 +296,7 @@ export function playUiTone({
   type = "sine",
   volume = 0.04,
 } = {}) {
-  if (typeof window === "undefined") {
+  if (typeof window === "undefined" || !sharedUiAudioUnlocked) {
     return;
   }
 

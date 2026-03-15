@@ -41,6 +41,8 @@ export default function MatchPageClient({
   const [infoText, setInfoText] = useState(null);
   const localAnnouncementIdRef = useRef(0);
   const lastWalkieRequestSignatureRef = useRef("");
+  const umpireAnnouncementTimerRef = useRef(null);
+  const pendingUmpireAnnouncementRef = useRef(null);
   const { authStatus, authError, authSubmitting, submitPin } = useMatchAccess(
     matchId,
     initialAuthStatus
@@ -90,6 +92,16 @@ export default function MatchPageClient({
   }, [isLiveMatch, stop]);
 
   useEffect(() => {
+    return () => {
+      if (umpireAnnouncementTimerRef.current) {
+        window.clearTimeout(umpireAnnouncementTimerRef.current);
+        umpireAnnouncementTimerRef.current = null;
+      }
+      pendingUmpireAnnouncementRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isLiveMatch || !walkie.pendingRequests?.length) {
       lastWalkieRequestSignatureRef.current = "";
       return;
@@ -119,6 +131,22 @@ export default function MatchPageClient({
     }
   }, [isLiveMatch, speak, walkie.pendingRequests]);
 
+  const flushPendingUmpireAnnouncement = () => {
+    const next = pendingUmpireAnnouncementRef.current;
+    if (!next) return;
+
+    pendingUmpireAnnouncementRef.current = null;
+    localAnnouncementIdRef.current += 1;
+    speak(next.text, {
+      key: `umpire-${localAnnouncementIdRef.current}`,
+      rate: 0.92,
+      minGapMs: 0,
+      userGesture: true,
+      interrupt: true,
+      ignoreEnabled: true,
+    });
+  };
+
   const announceUmpireAction = (runs, isOut = false, extraType = null) => {
     const nextMatch = match
       ? {
@@ -135,14 +163,15 @@ export default function MatchPageClient({
     const text = buildUmpireAnnouncement(event, umpireSettings.mode);
 
     if (!text) return;
-    localAnnouncementIdRef.current += 1;
-    speak(text, {
-      key: `umpire-${localAnnouncementIdRef.current}`,
-      rate: 0.92,
-      minGapMs: 0,
-      userGesture: true,
-      interrupt: true,
-    });
+
+    pendingUmpireAnnouncementRef.current = { text };
+    if (umpireAnnouncementTimerRef.current) {
+      window.clearTimeout(umpireAnnouncementTimerRef.current);
+    }
+    umpireAnnouncementTimerRef.current = window.setTimeout(() => {
+      umpireAnnouncementTimerRef.current = null;
+      flushPendingUmpireAnnouncement();
+    }, 140);
   };
 
   const handleAnnouncedScoreEvent = (runs, isOut = false, extraType = null) => {
@@ -167,6 +196,11 @@ export default function MatchPageClient({
   };
 
   const handleAnnouncedUndo = async () => {
+    if (umpireAnnouncementTimerRef.current) {
+      window.clearTimeout(umpireAnnouncementTimerRef.current);
+      umpireAnnouncementTimerRef.current = null;
+    }
+    pendingUmpireAnnouncementRef.current = null;
     localAnnouncementIdRef.current += 1;
     const undoEvent = createUndoLiveEvent(match);
     const undoText =

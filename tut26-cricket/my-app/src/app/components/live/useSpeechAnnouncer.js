@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { isUiAudioUnlocked, primeUiAudio, subscribeUiAudioUnlock } from "../../lib/page-audio";
+import { isUiAudioUnlocked, subscribeUiAudioUnlock } from "../../lib/page-audio";
 
 const IOS_PREFERRED_VOICE_NAMES = ["samantha", "ava", "allison", "nicky"];
 const CHROME_PREFERRED_VOICE_NAMES = [
@@ -650,7 +650,6 @@ export default function useSpeechAnnouncer(settings) {
     }
 
     try {
-      void primeUiAudio();
       void ensureVoicesReady();
       window.speechSynthesis.resume?.();
 
@@ -680,8 +679,6 @@ export default function useSpeechAnnouncer(settings) {
     const primeFromGesture = () => {
       if (!isPrimedRef.current) {
         prime();
-      } else {
-        void primeUiAudio();
       }
     };
 

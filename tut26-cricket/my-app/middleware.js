@@ -10,6 +10,10 @@ function buildContentSecurityPolicy() {
   ];
   const connectSrc = [
     "'self'",
+    "https://vercel.com",
+    "https://*.vercel.com",
+    "https://*.vercel.live",
+    "https://*.vercel.sh",
     "https://vitals.vercel-insights.com",
     "https://*.vercel-insights.com",
     "https://vercel.live",
@@ -29,7 +33,7 @@ function buildContentSecurityPolicy() {
     `script-src-elem ${scriptSrc.join(" ")}`,
     "script-src-attr 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "img-src 'self' data: blob: https://i.ibb.co https://ibb.co https://i.ytimg.com",
+    "img-src 'self' data: blob: https://i.ibb.co https://ibb.co https://i.ytimg.com https://vercel.com https://*.vercel.com",
     "font-src 'self' data: https://fonts.gstatic.com",
     `connect-src ${connectSrc.join(" ")}`,
     "media-src 'self' blob:",

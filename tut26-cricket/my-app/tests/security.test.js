@@ -1226,10 +1226,10 @@ test("umpire commentary speaks score buttons and undo with clean wording", () =>
   });
   const undoEvent = createUndoLiveEvent(matchAfter);
 
-  assert.equal(buildUmpireAnnouncement(scoreEvent, "simple"), "2 runs");
+  assert.equal(buildUmpireAnnouncement(scoreEvent, "simple"), "Umpire gives 2 runs.");
   assert.equal(
     buildUmpireAnnouncement(undoEvent, "simple"),
-    "Undo"
+    "Umpire has undone the last ball. The score for that ball has been removed. Umpire will redo this ball."
   );
 });
 

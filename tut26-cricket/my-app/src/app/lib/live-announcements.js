@@ -360,11 +360,11 @@ export function buildUmpireAnnouncement(event, mode = "simple") {
   }
 
   if (event.type === "undo") {
-    return "Undo";
+    return "Umpire has undone the last ball. The score for that ball has been removed. Umpire will redo this ball.";
   }
 
   if (event.type === "match_end") {
-    return "Match over";
+    return "Umpire says match over.";
   }
 
   const ball = event.ball;
@@ -374,23 +374,47 @@ export function buildUmpireAnnouncement(event, mode = "simple") {
 
   if (ball.isOut) {
     return safeNumber(ball.runs) > 0
-      ? `${pluralizeRuns(safeNumber(ball.runs))} and out`
-      : "Out";
+      ? `Umpire gives ${pluralizeRuns(safeNumber(ball.runs))}, and batter is out.`
+      : "Umpire has decided, out.";
   }
 
   if (ball.extraType === "wide") {
     const extraRuns = Math.max(safeNumber(ball.runs) - 1, 0);
-    return extraRuns > 0 ? `Wide plus ${extraRuns}` : "Wide";
+    return extraRuns > 0
+      ? `Umpire says wide ball. ${pluralizeRuns(extraRuns)} more taken.`
+      : "Umpire says wide ball.";
   }
 
   if (ball.extraType === "noball") {
     const extraRuns = Math.max(safeNumber(ball.runs) - 1, 0);
-    return extraRuns > 0 ? `No ball plus ${extraRuns}` : "No ball";
+    return extraRuns > 0
+      ? `Umpire says no ball. ${pluralizeRuns(extraRuns)} more taken.`
+      : "Umpire says no ball.";
+  }
+
+  if (ball.extraType === "bye") {
+    return safeNumber(ball.runs) > 0
+      ? `Umpire gives bye. ${pluralizeRuns(safeNumber(ball.runs))}.`
+      : "Umpire gives bye.";
+  }
+
+  if (ball.extraType === "legbye") {
+    return safeNumber(ball.runs) > 0
+      ? `Umpire gives leg bye. ${pluralizeRuns(safeNumber(ball.runs))}.`
+      : "Umpire gives leg bye.";
   }
 
   if (ball.runs === 0) {
-    return "Dot";
+    return "Umpire says dot ball.";
   }
 
-  return pluralizeRuns(safeNumber(ball.runs));
+  if (safeNumber(ball.runs) === 4) {
+    return "Umpire gives four runs.";
+  }
+
+  if (safeNumber(ball.runs) === 6) {
+    return "Umpire gives six runs.";
+  }
+
+  return `Umpire gives ${pluralizeRuns(safeNumber(ball.runs))}.`;
 }
