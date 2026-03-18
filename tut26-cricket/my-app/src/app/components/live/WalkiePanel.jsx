@@ -142,6 +142,7 @@ export function WalkieNotice({
   notice,
   onDismiss,
   embedded = false,
+  attention = false,
   quickTalkEnabled = false,
   quickTalkActive = false,
   quickTalkFinishing = false,
@@ -151,16 +152,40 @@ export function WalkieNotice({
   onQuickTalkStart,
   onQuickTalkStop,
 }) {
+  const attentionMode =
+    attention === true
+      ? "flash-pulse"
+      : typeof attention === "string"
+      ? attention
+      : "idle";
+  const attentionActive =
+    attentionMode !== "idle" &&
+    attentionMode !== "off" &&
+    attentionMode !== "none" &&
+    Boolean(attentionMode);
   const displayNotice = notice || (quickTalkEnabled ? "Walkie is live. Hold here to talk instantly." : "");
   if (!displayNotice && !quickTalkEnabled) return null;
 
+  const attentionClasses = attentionActive
+    ? "border-emerald-200/45 bg-emerald-400/18 shadow-[0_0_0_1px_rgba(167,243,208,0.16),0_0_34px_rgba(16,185,129,0.2)]"
+    : "border-emerald-500/20 bg-emerald-500/10";
+  const attentionStyle = attentionActive
+    ? {
+        animation:
+          "pulse 850ms cubic-bezier(0.16,1,0.3,1) 0s 1, pulse 3.2s ease-in-out 900ms infinite",
+      }
+    : undefined;
+
   return (
     <div
-      className={`${embedded ? "" : "mb-4 "}flex select-none items-start justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 ${quickTalkEnabled ? "text-[13px]" : "text-sm"} text-emerald-100`}
+      className={`${embedded ? "" : "mb-4 "}flex select-none items-start justify-between gap-3 rounded-2xl border px-4 py-3 ${quickTalkEnabled ? "text-[13px]" : "text-sm"} text-emerald-100 ${
+        attentionClasses
+      }`}
       style={{
         userSelect: "none",
         WebkitUserSelect: "none",
         WebkitTouchCallout: "none",
+        ...attentionStyle,
       }}
     >
       <div className="min-w-0 flex-1">

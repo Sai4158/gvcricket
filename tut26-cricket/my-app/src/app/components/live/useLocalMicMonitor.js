@@ -22,6 +22,7 @@ function getMicErrorMessage(error) {
 }
 
 export default function useLocalMicMonitor() {
+  const sessionGenerationRef = useRef(0);
   const streamRef = useRef(null);
   const sourceRef = useRef(null);
   const gainNodeRef = useRef(null);
@@ -44,10 +45,14 @@ export default function useLocalMicMonitor() {
     isPausedRef.current = isPaused;
   }, [isPaused]);
 
-  const stop = useCallback(async ({ resumeMedia = false } = {}) => {
+  const stop = useCallback(async ({ resumeMedia = false, preserveGeneration = false } = {}) => {
     const wasLive = Boolean(
       streamRef.current || isActiveRef.current || isPausedRef.current
     );
+
+    if (!preserveGeneration) {
+      sessionGenerationRef.current += 1;
+    }
 
     try {
       sourceRef.current?.disconnect();
@@ -77,6 +82,7 @@ export default function useLocalMicMonitor() {
 
     setIsActive(false);
     setIsPaused(false);
+    setIsStarting(false);
 
     if (resumeMedia) {
       restorePageMedia(pausedMediaRef);
@@ -108,7 +114,10 @@ export default function useLocalMicMonitor() {
     setIsStarting(true);
 
     try {
-      await stop({ resumeMedia: false });
+      await stop({ resumeMedia: false, preserveGeneration: true });
+
+      const currentGeneration = sessionGenerationRef.current + 1;
+      sessionGenerationRef.current = currentGeneration;
 
       if (pauseMedia) {
         duckPageMedia(pausedMediaRef, 0.18);
@@ -125,6 +134,20 @@ export default function useLocalMicMonitor() {
         },
         video: false,
       });
+
+      if (
+        sessionGenerationRef.current !== currentGeneration ||
+        (typeof document !== "undefined" &&
+          document.visibilityState === "hidden")
+      ) {
+        for (const track of stream.getTracks()) {
+          track.stop();
+        }
+        if (pauseMedia) {
+          restorePageMedia(pausedMediaRef);
+        }
+        return false;
+      }
 
       const audioContext = new AudioContextClass({ latencyHint: "interactive" });
       if (audioContext.state === "suspended") {
@@ -197,6 +220,30 @@ export default function useLocalMicMonitor() {
   useEffect(() => {
     return () => {
       void stop();
+    };
+  }, [stop]);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || typeof window === "undefined") {
+      return undefined;
+    }
+
+    const stopIfBackgrounded = () => {
+      if (document.visibilityState === "hidden") {
+        void stop({ resumeMedia: true });
+      }
+    };
+
+    const stopOnPageHide = () => {
+      void stop({ resumeMedia: true });
+    };
+
+    document.addEventListener("visibilitychange", stopIfBackgrounded);
+    window.addEventListener("pagehide", stopOnPageHide);
+
+    return () => {
+      document.removeEventListener("visibilitychange", stopIfBackgrounded);
+      window.removeEventListener("pagehide", stopOnPageHide);
     };
   }, [stop]);
 

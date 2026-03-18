@@ -4,17 +4,37 @@ import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { FaPlay } from "react-icons/fa";
 
-export default function YouTubeVideoPlayer({ videoId, title }) {
+export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const thumbnailUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+  const initialMotion = prefersReducedMotion
+    ? false
+    : {
+        opacity: 0,
+        scale: 0.96,
+        x: index % 2 === 0 ? -72 : 72,
+        y: 22,
+        rotate: index % 2 === 0 ? -1.2 : 1.2,
+        filter: "blur(10px)",
+      };
+  const visibleMotion = prefersReducedMotion
+    ? undefined
+    : {
+        opacity: 1,
+        scale: 1,
+        x: 0,
+        y: 0,
+        rotate: 0,
+        filter: "blur(0px)",
+      };
 
   return (
     <motion.figure
-      initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.96 }}
-      whileInView={{ opacity: 1, scale: 1 }}
+      initial={initialMotion}
+      whileInView={visibleMotion}
       viewport={{ once: true, amount: 0.12, margin: "0px 0px -6% 0px" }}
-      transition={{ duration: prefersReducedMotion ? 0 : 0.72, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: prefersReducedMotion ? 0 : 0.84, ease: [0.16, 1, 0.3, 1] }}
       whileHover={prefersReducedMotion ? undefined : { scale: 1.01 }}
       className="liquid-glass group relative overflow-hidden rounded-[30px] p-2.5 transition-all duration-300 hover:border-white/28 hover:shadow-[0_18px_48px_rgba(0,0,0,0.32)]"
     >

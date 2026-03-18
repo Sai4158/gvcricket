@@ -20,12 +20,23 @@ const sectionVariants = {
 };
 
 const cardVariants = {
-  hidden: { opacity: 0, scale: 0.94 },
+  hidden: (index) => ({
+    opacity: 0,
+    scale: 0.94,
+    x: index % 2 === 0 ? -72 : 72,
+    y: 28,
+    rotate: index % 2 === 0 ? -1.8 : 1.8,
+    filter: "blur(10px)",
+  }),
   visible: {
     opacity: 1,
     scale: 1,
+    x: 0,
+    y: 0,
+    rotate: 0,
+    filter: "blur(0px)",
     transition: {
-      duration: 0.68,
+      duration: 0.82,
       ease: [0.16, 1, 0.3, 1],
     },
   },
@@ -39,7 +50,21 @@ export default function PrimaryActionsSection() {
       id="quick-start"
       className="mx-auto flex w-full max-w-4xl scroll-mt-24 flex-col items-center gap-10 text-center"
     >
-      <div className="max-w-2xl space-y-4">
+      <motion.div
+        initial={
+          prefersReducedMotion
+            ? false
+            : { opacity: 0, y: 34, scale: 0.985, filter: "blur(10px)" }
+        }
+        whileInView={
+          prefersReducedMotion
+            ? undefined
+            : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
+        }
+        viewport={{ once: true, amount: 0.22, margin: "0px 0px -8% 0px" }}
+        transition={{ duration: 0.78, ease: [0.16, 1, 0.3, 1] }}
+        className="max-w-2xl space-y-4"
+      >
         <div className="mx-auto inline-flex items-center rounded-full border border-amber-300/16 bg-amber-300/8 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.34em] text-amber-100">
           Free cricket scoring
         </div>
@@ -49,7 +74,7 @@ export default function PrimaryActionsSection() {
         <p className="text-base leading-7 text-zinc-300 sm:text-lg">
           Score every match from toss to result with spectator view, score announcer, walkie-talkie, and clean mobile controls.
         </p>
-      </div>
+      </motion.div>
 
       <motion.div
         initial={prefersReducedMotion ? false : "hidden"}
@@ -60,6 +85,7 @@ export default function PrimaryActionsSection() {
       >
         <Link href="/session/new" className="block">
           <motion.div
+            custom={0}
             variants={cardVariants}
             whileHover={prefersReducedMotion ? undefined : { scale: 1.015 }}
             whileTap={{ scale: 0.99 }}
@@ -93,6 +119,7 @@ export default function PrimaryActionsSection() {
 
         <Link href="/session" className="block">
           <motion.div
+            custom={1}
             variants={cardVariants}
             whileHover={prefersReducedMotion ? undefined : { scale: 1.015 }}
             whileTap={{ scale: 0.99 }}
@@ -127,10 +154,18 @@ export default function PrimaryActionsSection() {
 
       <Link href="/director" className="block w-full max-w-3xl">
         <motion.div
-          initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.955 }}
-          whileInView={{ opacity: 1, scale: 1 }}
+          initial={
+            prefersReducedMotion
+              ? false
+              : { opacity: 0, x: -84, y: 20, scale: 0.955, filter: "blur(10px)" }
+          }
+          whileInView={
+            prefersReducedMotion
+              ? undefined
+              : { opacity: 1, x: 0, y: 0, scale: 1, filter: "blur(0px)" }
+          }
           viewport={{ once: true, amount: 0.2, margin: "0px 0px -10% 0px" }}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.08 }}
+          transition={{ duration: 0.84, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
           whileHover={prefersReducedMotion ? undefined : { scale: 1.012 }}
           whileTap={{ scale: 0.99 }}
           className="liquid-glass group flex w-full items-center gap-4 rounded-[28px] px-6 py-5 text-left transition duration-300 hover:border-white/28 sm:gap-5"

@@ -51,7 +51,7 @@ export default async function HomePage() {
   return (
     <>
       <HomeHeader />
-      <main className="home-liquid-surface bg-black text-zinc-200 font-sans">
+      <main className="home-liquid-surface overflow-x-hidden bg-black text-zinc-200 font-sans">
         <HeroSection liveMatch={liveMatch} />
         <div className="relative z-10 bg-[linear-gradient(155deg,theme(colors.red.900)_0%,theme(colors.black)_40%)] px-5 py-20 space-y-14 md:space-y-24 md:py-28">
           <PrimaryActionsSection />

@@ -18,8 +18,13 @@ export default function HomeHeader() {
 
   useEffect(() => {
     return scrollY.on("change", (latest) => {
-      const previous = scrollY.getPrevious();
-      if (latest > previous && latest > 150 && !isMenuOpen) {
+      const previous = scrollY.getPrevious() ?? 0;
+      if (isMenuOpen) {
+        setHidden(false);
+        return;
+      }
+
+      if (latest > previous && latest > 120) {
         setHidden(true);
       } else {
         setHidden(false);
@@ -77,18 +82,15 @@ export default function HomeHeader() {
 
   return (
     <motion.header
-      variants={{
-        visible: { y: 0, opacity: 1 },
-        hidden: { y: "-150%", opacity: 0 },
-      }}
-      animate={hidden ? "hidden" : "visible"}
-      transition={{ duration: 0.35, ease: "easeInOut" }}
-      className="pointer-events-none fixed top-0 left-0 right-0 z-50 px-6 pt-8 pb-6 flex justify-end md:hidden font-sans"
+      initial={{ opacity: 0, y: -12 }}
+      animate={hidden ? { opacity: 0, y: -18 } : { opacity: 1, y: 0 }}
+      transition={{ duration: 0.24, ease: "easeOut" }}
+      className="pointer-events-none fixed top-0 left-0 right-0 z-[60] flex justify-end px-4 pt-5 pb-4 md:px-6 md:pt-8 md:pb-6 font-sans"
     >
       <motion.button
         whileTap={{ scale: 0.9 }}
         onClick={() => setIsMenuOpen(true)}
-        className="pointer-events-auto p-3 text-white"
+        className="pointer-events-auto inline-flex h-22 w-14 items-center justify-center text-white drop-shadow-[0_8px_20px_rgba(0,0,0,0.45)]"
         aria-label="Open navigation menu"
       >
         <FaBars className="h-8 w-8" />
@@ -108,7 +110,12 @@ export default function HomeHeader() {
               initial={{ x: "100%", opacity: 0.9, scale: 0.98 }}
               animate={{ x: 0, opacity: 1, scale: 1 }}
               exit={{ x: "100%", opacity: 0.96, scale: 0.985 }}
-              transition={{ type: "spring", stiffness: 360, damping: 34, mass: 0.9 }}
+              transition={{
+                type: "spring",
+                stiffness: 360,
+                damping: 34,
+                mass: 0.9,
+              }}
               drag="x"
               dragDirectionLock
               dragConstraints={{ left: 0, right: 0 }}
@@ -161,25 +168,31 @@ export default function HomeHeader() {
                               href={link.href}
                               target="_blank"
                               rel="noreferrer"
-                              onClick={(event) => handleNavClick(event, link.onClick)}
+                              onClick={(event) =>
+                                handleNavClick(event, link.onClick)
+                              }
                               className={linkStyles}
                             >
                               <span>{link.text}</span>
                               {link.icon && <link.icon className="h-5 w-5" />}
                             </a>
                           ) : (
-                          <Link
-                            href={link.href}
-                            onClick={(event) => handleNavClick(event, link.onClick)}
-                            className={linkStyles}
-                          >
-                            <span>{link.text}</span>
-                            {link.icon && <link.icon className="h-5 w-5" />}
-                          </Link>
+                            <Link
+                              href={link.href}
+                              onClick={(event) =>
+                                handleNavClick(event, link.onClick)
+                              }
+                              className={linkStyles}
+                            >
+                              <span>{link.text}</span>
+                              {link.icon && <link.icon className="h-5 w-5" />}
+                            </Link>
                           )
                         ) : (
                           <button
-                            onClick={(event) => handleNavClick(event, link.onClick)}
+                            onClick={(event) =>
+                              handleNavClick(event, link.onClick)
+                            }
                             className={linkStyles}
                           >
                             <span>{link.text}</span>

@@ -34,12 +34,23 @@ const gridVariants = {
 };
 
 const cardVariants = {
-  hidden: { opacity: 0, scale: 0.945 },
+  hidden: (index) => ({
+    opacity: 0,
+    scale: 0.945,
+    x: index % 2 === 0 ? -70 : 70,
+    y: 26,
+    rotate: index % 2 === 0 ? -1.5 : 1.5,
+    filter: "blur(10px)",
+  }),
   visible: {
     opacity: 1,
     scale: 1,
+    x: 0,
+    y: 0,
+    rotate: 0,
+    filter: "blur(0px)",
     transition: {
-      duration: 0.7,
+      duration: 0.84,
       ease: [0.16, 1, 0.3, 1],
     },
   },
@@ -245,6 +256,7 @@ export default function HowItWorksSection() {
   const renderCard = (card, index, hoverRotateClass = "") => (
     <motion.div
       key={card.title}
+      custom={index}
       variants={cardVariants}
       whileHover={prefersReducedMotion ? undefined : { scale: 1.012 }}
       className={modernCardClass}
@@ -273,10 +285,25 @@ export default function HowItWorksSection() {
   return (
     <AnimatedSection
       id="updates"
+      direction="left"
       className="mx-auto w-full max-w-7xl scroll-mt-28 overflow-hidden 2xl:max-w-[96rem]"
     >
       <div className="space-y-8">
-        <div className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.82),rgba(8,8,14,0.72))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10">
+        <motion.div
+          initial={
+            prefersReducedMotion
+              ? false
+              : { opacity: 0, x: -90, y: 24, scale: 0.975, filter: "blur(12px)" }
+          }
+          whileInView={
+            prefersReducedMotion
+              ? undefined
+              : { opacity: 1, x: 0, y: 0, scale: 1, filter: "blur(0px)" }
+          }
+          viewport={{ once: true, amount: 0.12, margin: "0px 0px -8% 0px" }}
+          transition={{ duration: 0.88, ease: [0.16, 1, 0.3, 1] }}
+          className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.82),rgba(8,8,14,0.72))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10"
+        >
           <div className="mx-auto max-w-3xl text-center">
             <span className="liquid-pill inline-flex rounded-full bg-[linear-gradient(180deg,rgba(255,244,214,0.18),rgba(120,74,16,0.12))] px-4 py-1 text-xs font-semibold uppercase tracking-[0.28em] shadow-[inset_0_1px_0_rgba(255,248,224,0.28)]">
               <span className="bg-[linear-gradient(180deg,#fff6cf_0%,#f6d365_38%,#e3a72f_68%,#fff1b3_100%)] text-transparent [background-clip:text] [-webkit-background-clip:text] drop-shadow-[0_0_10px_rgba(245,193,64,0.18)]">
@@ -315,9 +342,23 @@ export default function HowItWorksSection() {
               </div>
             ) : null}
           </motion.div>
-        </div>
+        </motion.div>
 
-        <div className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.82),rgba(8,8,14,0.72))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10">
+        <motion.div
+          initial={
+            prefersReducedMotion
+              ? false
+              : { opacity: 0, x: 90, y: 24, scale: 0.975, filter: "blur(12px)" }
+          }
+          whileInView={
+            prefersReducedMotion
+              ? undefined
+              : { opacity: 1, x: 0, y: 0, scale: 1, filter: "blur(0px)" }
+          }
+          viewport={{ once: true, amount: 0.12, margin: "0px 0px -8% 0px" }}
+          transition={{ duration: 0.88, ease: [0.16, 1, 0.3, 1], delay: 0.04 }}
+          className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.82),rgba(8,8,14,0.72))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10"
+        >
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="mt-5 text-4xl font-semibold tracking-[-0.04em] text-white md:text-5xl">
               From toss to final result
@@ -351,7 +392,7 @@ export default function HowItWorksSection() {
               </div>
             ) : null}
           </motion.div>
-        </div>
+        </motion.div>
       </div>
     </AnimatedSection>
   );

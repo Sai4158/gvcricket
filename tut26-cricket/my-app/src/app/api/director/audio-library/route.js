@@ -37,12 +37,20 @@ export async function GET() {
 
     return NextResponse.json(
       { files },
-      { headers: { "Cache-Control": "no-store" } }
+      {
+        headers: {
+          "Cache-Control": "public, max-age=600, stale-while-revalidate=86400",
+        },
+      }
     );
   } catch {
     return NextResponse.json(
       { files: [] },
-      { headers: { "Cache-Control": "no-store" } }
+      {
+        headers: {
+          "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+        },
+      }
     );
   }
 }
