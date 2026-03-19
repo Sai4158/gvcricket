@@ -12,11 +12,11 @@ export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
     ? false
     : {
         opacity: 0,
-        scale: 0.96,
-        x: index % 2 === 0 ? -72 : 72,
-        y: 22,
-        rotate: index % 2 === 0 ? -1.2 : 1.2,
-        filter: "blur(10px)",
+        scale: 0.99,
+        x: index % 2 === 0 ? -30 : 30,
+        y: 18,
+        rotate: index % 2 === 0 ? -0.5 : 0.5,
+        filter: "blur(6px)",
       };
   const visibleMotion = prefersReducedMotion
     ? undefined
@@ -33,8 +33,8 @@ export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
     <motion.figure
       initial={initialMotion}
       whileInView={visibleMotion}
-      viewport={{ once: true, amount: 0.12, margin: "0px 0px -6% 0px" }}
-      transition={{ duration: prefersReducedMotion ? 0 : 0.84, ease: [0.16, 1, 0.3, 1] }}
+      viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
+      transition={{ duration: prefersReducedMotion ? 0 : 0.66, ease: [0.22, 1, 0.36, 1] }}
       whileHover={prefersReducedMotion ? undefined : { scale: 1.01 }}
       className="liquid-glass group relative overflow-hidden rounded-[30px] p-2.5 transition-all duration-300 hover:border-white/28 hover:shadow-[0_18px_48px_rgba(0,0,0,0.32)]"
     >

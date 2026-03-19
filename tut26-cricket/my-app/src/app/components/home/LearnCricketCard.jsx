@@ -2,11 +2,50 @@
 
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
-import { FaArrowUpRightFromSquare, FaCircleDot, FaGripLinesVertical } from "react-icons/fa6";
-import { GiCricketBat } from "react-icons/gi";
+import {
+  FaArrowUpRightFromSquare,
+  FaCircleDot,
+  FaGripLinesVertical,
+  FaTableCellsLarge,
+  FaUsers,
+} from "react-icons/fa6";
+import { GiCricketBat, GiPodiumWinner } from "react-icons/gi";
+import LiquidSportText from "./LiquidSportText";
 
 export default function LearnCricketCard() {
   const prefersReducedMotion = useReducedMotion();
+  const learnSteps = [
+    {
+      title: "1. Two teams play",
+      copy: "One team bats to score runs while the other team bowls and fields.",
+      Icon: FaUsers,
+      tone: "text-cyan-200",
+    },
+    {
+      title: "2. Each ball is a chance",
+      copy: "The batter tries to hit the ball and run. More runs means a better total.",
+      Icon: GiCricketBat,
+      tone: "text-amber-200",
+    },
+    {
+      title: "3. Bowlers fight back",
+      copy: "The bowler tries to get the batter out or stop runs with accurate balls.",
+      Icon: FaCircleDot,
+      tone: "text-rose-200",
+    },
+    {
+      title: "4. Overs keep the game moving",
+      copy: "Six legal balls make one over. The score tracks runs, wickets, and overs.",
+      Icon: FaTableCellsLarge,
+      tone: "text-emerald-200",
+    },
+    {
+      title: "5. Highest score wins",
+      copy: "After both teams bat, the team with more runs wins the match.",
+      Icon: GiPodiumWinner,
+      tone: "text-yellow-200",
+    },
+  ];
 
   return (
     <motion.section
@@ -14,15 +53,15 @@ export default function LearnCricketCard() {
       initial={
         prefersReducedMotion
           ? false
-          : { opacity: 0, y: 36, scale: 0.98, filter: "blur(10px)" }
+          : { opacity: 0, y: 22, scale: 0.992, filter: "blur(6px)" }
       }
       whileInView={
         prefersReducedMotion
           ? undefined
           : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
       }
-      viewport={{ once: true, amount: 0.16, margin: "0px 0px -8% 0px" }}
-      transition={{ duration: 0.84, ease: [0.16, 1, 0.3, 1] }}
+      viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
+      transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1] }}
       className="w-full max-w-5xl mx-auto scroll-mt-28"
     >
       <motion.a
@@ -49,28 +88,91 @@ export default function LearnCricketCard() {
             initial={
               prefersReducedMotion
                 ? false
-                : { opacity: 0, x: -72, y: 18, filter: "blur(8px)" }
+                : { opacity: 0, x: -30, y: 14, filter: "blur(5px)" }
             }
             whileInView={
               prefersReducedMotion
                 ? undefined
                 : { opacity: 1, x: 0, y: 0, filter: "blur(0px)" }
             }
-            viewport={{ once: true, amount: 0.18, margin: "0px 0px -8% 0px" }}
-            transition={{ duration: 0.82, ease: [0.16, 1, 0.3, 1] }}
+            viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
+            transition={{ duration: 0.64, ease: [0.22, 1, 0.36, 1] }}
             className="space-y-4 text-left"
           >
             <span className="liquid-pill inline-flex items-center rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-zinc-100/90">
               Learn Cricket
             </span>
             <div className="space-y-3">
-              <h3 className="max-w-xl text-3xl font-semibold tracking-tight text-white md:text-4xl">
-                Want to learn more about cricket?
-              </h3>
-              <p className="max-w-xl text-sm leading-7 text-zinc-200/86 md:text-base">
-                Learn the basics of batting, bowling, wickets, overs, and scoring
-                from the official USA Cricket guide.
-              </p>
+              <LiquidSportText
+                as="div"
+                text={["Want to learn more", "about cricket?"]}
+                characterTyping
+                characterStagger={0.02}
+                characterLineDelay={0.14}
+                className="max-w-xl text-3xl font-semibold tracking-tight md:text-4xl"
+                lineClassName="leading-[1.02]"
+              />
+            </div>
+
+            <motion.div
+              initial={
+                prefersReducedMotion
+                  ? false
+                  : { opacity: 0, x: 34, y: 16, rotate: 0.5, filter: "blur(6px)" }
+              }
+              whileInView={
+                prefersReducedMotion
+                  ? undefined
+                  : { opacity: 1, x: 0, y: 0, rotate: 0, filter: "blur(0px)" }
+              }
+              viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
+              transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.04 }}
+              className="relative md:hidden"
+            >
+              <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,20,28,0.86),rgba(10,10,16,0.92))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                <div className="relative aspect-[16/10] overflow-hidden rounded-[22px] bg-[radial-gradient(circle_at_30%_24%,rgba(255,255,255,0.08),transparent_28%),linear-gradient(180deg,rgba(22,22,30,0.94),rgba(8,8,12,0.96))]">
+                  <FaCircleDot className="absolute right-6 top-6 text-[4.2rem] text-rose-200/16 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-105" />
+                  <GiCricketBat className="absolute left-6 bottom-5 text-[4.2rem] text-amber-200/14 transition-transform duration-500 group-hover:-rotate-6 group-hover:scale-105" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Image
+                      src="/gvLogo.png"
+                      alt="GV Cricket logo"
+                      width={220}
+                      height={220}
+                      sizes="220px"
+                      className="h-auto w-[210px] object-contain drop-shadow-[0_10px_28px_rgba(0,0,0,0.42)] transition-transform duration-500 group-hover:scale-[1.04]"
+                    />
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-white/6" />
+                </div>
+              </div>
+            </motion.div>
+
+            <div className="grid gap-3 pt-1 sm:grid-cols-2 xl:grid-cols-5">
+              {learnSteps.map(({ title, copy, Icon, tone }) => (
+                <motion.div
+                  key={title}
+                  initial={
+                    prefersReducedMotion
+                      ? false
+                      : { opacity: 0, y: 10, filter: "blur(4px)" }
+                  }
+                  whileInView={
+                    prefersReducedMotion
+                      ? undefined
+                      : { opacity: 1, y: 0, filter: "blur(0px)" }
+                  }
+                  viewport={{ once: true, amount: 0.3, margin: "0px 0px 12% 0px" }}
+                  transition={{ duration: 0.46, ease: [0.22, 1, 0.36, 1] }}
+                  className="rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-4"
+                >
+                  <span className="flex items-start gap-2 text-sm font-semibold text-white">
+                    <Icon className={`mt-0.5 shrink-0 ${tone}`} />
+                    {title}
+                  </span>
+                  <p className="mt-2 text-[12px] leading-5 text-zinc-300/86">{copy}</p>
+                </motion.div>
+              ))}
             </div>
 
             <div className="flex items-center gap-3 pt-1">
@@ -85,16 +187,16 @@ export default function LearnCricketCard() {
             initial={
               prefersReducedMotion
                 ? false
-                : { opacity: 0, x: 84, y: 20, rotate: 1.2, filter: "blur(10px)" }
+                : { opacity: 0, x: 34, y: 16, rotate: 0.5, filter: "blur(6px)" }
             }
             whileInView={
               prefersReducedMotion
                 ? undefined
                 : { opacity: 1, x: 0, y: 0, rotate: 0, filter: "blur(0px)" }
             }
-            viewport={{ once: true, amount: 0.18, margin: "0px 0px -8% 0px" }}
-            transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
-            className="relative"
+            viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.04 }}
+            className="relative hidden md:block"
           >
             <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,20,28,0.86),rgba(10,10,16,0.92))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
               <div className="relative aspect-[16/10] overflow-hidden rounded-[22px] bg-[radial-gradient(circle_at_30%_24%,rgba(255,255,255,0.08),transparent_28%),linear-gradient(180deg,rgba(22,22,30,0.94),rgba(8,8,12,0.96))]">

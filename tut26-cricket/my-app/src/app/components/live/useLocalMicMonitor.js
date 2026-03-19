@@ -27,6 +27,7 @@ export default function useLocalMicMonitor() {
   const sourceRef = useRef(null);
   const gainNodeRef = useRef(null);
   const audioContextRef = useRef(null);
+  const startPromiseRef = useRef(null);
   const gainLevelRef = useRef(2);
   const pausedMediaRef = useRef([]);
   const isActiveRef = useRef(false);
@@ -45,55 +46,73 @@ export default function useLocalMicMonitor() {
     isPausedRef.current = isPaused;
   }, [isPaused]);
 
-  const stop = useCallback(async ({ resumeMedia = false, preserveGeneration = false } = {}) => {
-    const wasLive = Boolean(
-      streamRef.current || isActiveRef.current || isPausedRef.current
-    );
+  const stop = useCallback(
+    async ({
+      resumeMedia = false,
+      preserveGeneration = false,
+      disposeAudioContext = false,
+    } = {}) => {
+      const wasLive = Boolean(
+        streamRef.current || isActiveRef.current || isPausedRef.current
+      );
 
-    if (!preserveGeneration) {
-      sessionGenerationRef.current += 1;
-    }
-
-    try {
-      sourceRef.current?.disconnect();
-      gainNodeRef.current?.disconnect();
-    } catch {
-      // Disconnect can throw if nodes are already closed.
-    }
-
-    sourceRef.current = null;
-    gainNodeRef.current = null;
-
-    if (streamRef.current) {
-      for (const track of streamRef.current.getTracks()) {
-        track.stop();
+      if (!preserveGeneration) {
+        sessionGenerationRef.current += 1;
       }
-      streamRef.current = null;
-    }
 
-    if (audioContextRef.current) {
       try {
-        await audioContextRef.current.close();
+        sourceRef.current?.disconnect();
+        gainNodeRef.current?.disconnect();
       } catch {
-        // Ignore close errors during teardown.
+        // Disconnect can throw if nodes are already closed.
       }
-      audioContextRef.current = null;
-    }
 
-    setIsActive(false);
-    setIsPaused(false);
-    setIsStarting(false);
+      sourceRef.current = null;
+      gainNodeRef.current = null;
 
-    if (resumeMedia) {
-      restorePageMedia(pausedMediaRef);
-    }
+      if (streamRef.current) {
+        for (const track of streamRef.current.getTracks()) {
+          track.stop();
+        }
+        streamRef.current = null;
+      }
 
-    if (wasLive) {
-      playUiTone({ frequency: 640, durationMs: 140, type: "triangle", volume: 0.035 });
-    }
-  }, []);
+      const audioContext = audioContextRef.current;
+      if (audioContext) {
+        try {
+          if (disposeAudioContext) {
+            await audioContext.close();
+            audioContextRef.current = null;
+          } else if (audioContext.state === "running") {
+            await audioContext.suspend();
+          }
+        } catch {
+          if (disposeAudioContext) {
+            audioContextRef.current = null;
+          }
+        }
+      }
+
+      setIsActive(false);
+      setIsPaused(false);
+      setIsStarting(false);
+
+      if (resumeMedia) {
+        restorePageMedia(pausedMediaRef);
+      }
+
+      if (wasLive) {
+        playUiTone({ frequency: 640, durationMs: 140, type: "triangle", volume: 0.035 });
+      }
+    },
+    []
+  );
 
   const start = async ({ pauseMedia = false } = {}) => {
+    if (startPromiseRef.current) {
+      return startPromiseRef.current;
+    }
+
     if (
       typeof window === "undefined" ||
       !navigator?.mediaDevices?.getUserMedia
@@ -113,68 +132,76 @@ export default function useLocalMicMonitor() {
     setError("");
     setIsStarting(true);
 
-    try {
-      await stop({ resumeMedia: false, preserveGeneration: true });
+    startPromiseRef.current = (async () => {
+      try {
+        await stop({ resumeMedia: false, preserveGeneration: true });
 
-      const currentGeneration = sessionGenerationRef.current + 1;
-      sessionGenerationRef.current = currentGeneration;
+        const currentGeneration = sessionGenerationRef.current + 1;
+        sessionGenerationRef.current = currentGeneration;
 
-      if (pauseMedia) {
-        duckPageMedia(pausedMediaRef, 0.18);
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: false,
-          autoGainControl: false,
-          channelCount: 1,
-          latency: 0,
-          sampleRate: 48000,
-        },
-        video: false,
-      });
-
-      if (
-        sessionGenerationRef.current !== currentGeneration ||
-        (typeof document !== "undefined" &&
-          document.visibilityState === "hidden")
-      ) {
-        for (const track of stream.getTracks()) {
-          track.stop();
-        }
         if (pauseMedia) {
-          restorePageMedia(pausedMediaRef);
+          duckPageMedia(pausedMediaRef, 0.18);
         }
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: false,
+            autoGainControl: false,
+            channelCount: 1,
+            latency: 0,
+            sampleRate: 48000,
+          },
+          video: false,
+        });
+
+        if (
+          sessionGenerationRef.current !== currentGeneration ||
+          (typeof document !== "undefined" &&
+            document.visibilityState === "hidden")
+        ) {
+          for (const track of stream.getTracks()) {
+            track.stop();
+          }
+          if (pauseMedia) {
+            restorePageMedia(pausedMediaRef);
+          }
+          return false;
+        }
+
+        let audioContext = audioContextRef.current;
+        if (!audioContext || audioContext.state === "closed") {
+          audioContext = new AudioContextClass({ latencyHint: "interactive" });
+          audioContextRef.current = audioContext;
+        }
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
+
+        const source = audioContext.createMediaStreamSource(stream);
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = gainLevelRef.current;
+        source.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        streamRef.current = stream;
+        sourceRef.current = source;
+        gainNodeRef.current = gainNode;
+        setIsActive(true);
+        setIsPaused(false);
+        playUiTone({ frequency: 880, durationMs: 140, type: "sine", volume: 0.04 });
+        return true;
+      } catch (nextError) {
+        await stop({ resumeMedia: pauseMedia });
+        setError(getMicErrorMessage(nextError));
         return false;
+      } finally {
+        setIsStarting(false);
+        startPromiseRef.current = null;
       }
+    })();
 
-      const audioContext = new AudioContextClass({ latencyHint: "interactive" });
-      if (audioContext.state === "suspended") {
-        await audioContext.resume();
-      }
-
-      const source = audioContext.createMediaStreamSource(stream);
-      const gainNode = audioContext.createGain();
-      gainNode.gain.value = gainLevelRef.current;
-      source.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      streamRef.current = stream;
-      sourceRef.current = source;
-      gainNodeRef.current = gainNode;
-      audioContextRef.current = audioContext;
-      setIsActive(true);
-      setIsPaused(false);
-      playUiTone({ frequency: 880, durationMs: 140, type: "sine", volume: 0.04 });
-      return true;
-    } catch (nextError) {
-      await stop({ resumeMedia: pauseMedia });
-      setError(getMicErrorMessage(nextError));
-      return false;
-    } finally {
-      setIsStarting(false);
-    }
+    return startPromiseRef.current;
   };
 
   const setGainLevel = (nextLevel) => {
@@ -219,7 +246,7 @@ export default function useLocalMicMonitor() {
 
   useEffect(() => {
     return () => {
-      void stop();
+      void stop({ disposeAudioContext: true });
     };
   }, [stop]);
 

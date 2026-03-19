@@ -1922,6 +1922,8 @@ export default function DirectorConsoleClient({
             subtitle={
               directorHoldLive || micMonitor.isActive
                 ? "Live on speaker"
+                : micMonitor.isStarting
+                ? "Starting loudspeaker"
                 : directorSpeakerOn
                 ? "Hold to talk over loudspeaker"
                 : "Turn on mic to use hold to talk"
@@ -2004,6 +2006,8 @@ export default function DirectorConsoleClient({
                   <p className="text-lg font-semibold text-white">
                     {!directorSpeakerOn
                       ? "Turn on to talk"
+                      : micMonitor.isStarting
+                      ? "Starting..."
                       : directorHoldLive || micMonitor.isActive
                       ? "Release to stop"
                       : "Hold to talk"}

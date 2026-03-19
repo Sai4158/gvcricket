@@ -42,7 +42,7 @@ export default function LiveMicModal({
   const fallbackMonitor = useLocalMicMonitor();
   const { isActive, isStarting, error, start, stop } = monitor ?? fallbackMonitor;
 
-  const statusLabel = isStarting ? "READY" : isActive ? "LIVE" : "OFF";
+  const statusLabel = isStarting ? "STARTING" : isActive ? "LIVE" : "OFF";
 
   const handleToggle = () => {
     if (isStarting) {
@@ -123,6 +123,11 @@ export default function LiveMicModal({
               <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-zinc-300">
                 {statusLabel}
               </span>
+              {isStarting ? (
+                <p className="text-sm text-zinc-400">
+                  Starting microphone. Please wait a moment.
+                </p>
+              ) : null}
             </div>
           </button>
         </section>

@@ -19,8 +19,10 @@ export default function TwitterImage() {
           height: "100%",
           display: "flex",
           position: "relative",
+          alignItems: "center",
+          justifyContent: "center",
           background:
-            "radial-gradient(circle at top left, rgba(255,164,83,0.22), transparent 28%), linear-gradient(135deg, #190505 0%, #09090d 42%, #050507 100%)",
+            "radial-gradient(circle at 50% 20%, rgba(245, 158, 11, 0.14), transparent 28%), radial-gradient(circle at 50% 80%, rgba(239, 68, 68, 0.12), transparent 30%), linear-gradient(180deg, #080808 0%, #020202 100%)",
           color: "white",
           fontFamily: "sans-serif",
           overflow: "hidden",
@@ -29,11 +31,12 @@ export default function TwitterImage() {
         <div
           style={{
             position: "absolute",
-            inset: 28,
-            borderRadius: 32,
-            border: "1px solid rgba(255,255,255,0.12)",
+            inset: 26,
+            borderRadius: 36,
+            border: "1px solid rgba(255,255,255,0.08)",
             background:
-              "linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03))",
+              "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015))",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
           }}
         />
         <div
@@ -41,104 +44,52 @@ export default function TwitterImage() {
             position: "relative",
             display: "flex",
             flexDirection: "column",
-            justifyContent: "space-between",
-            padding: "60px 72px 64px",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 26,
             width: "100%",
+            height: "100%",
           }}
         >
-          <div style={{ display: "flex", flexDirection: "column", gap: 26 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 24,
-              }}
-            >
-              <img
-                src={absoluteUrl(siteConfig.logoPath)}
-                alt="GV Cricket"
-                width="96"
-                height="96"
-                style={{ borderRadius: 26 }}
-              />
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 6,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 24,
-                    letterSpacing: "0.28em",
-                    textTransform: "uppercase",
-                    color: "#fde68a",
-                  }}
-                >
-                  GV Cricket
-                </div>
-                <div
-                  style={{
-                    fontSize: 54,
-                    fontWeight: 700,
-                    lineHeight: 1,
-                  }}
-                >
-                  Free Cricket Scoring
-                </div>
-              </div>
-            </div>
-
-            <div
-              style={{
-                fontSize: 72,
-                fontWeight: 700,
-                lineHeight: 1.05,
-                maxWidth: 900,
-              }}
-            >
-              Score every match with one fast mobile flow.
-            </div>
-
-            <div
-              style={{
-                fontSize: 32,
-                lineHeight: 1.4,
-                color: "rgba(255,255,255,0.82)",
-                maxWidth: 860,
-              }}
-            >
-              Live score, umpire mode, spectator view, score announcer, walkie-talkie, and results.
-            </div>
-          </div>
-
+          <img
+            src={absoluteUrl(siteConfig.logoPath)}
+            alt="GV Cricket"
+            width="280"
+            height="280"
+            style={{
+              objectFit: "contain",
+              filter: "drop-shadow(0 18px 44px rgba(220, 38, 38, 0.26))",
+            }}
+          />
           <div
             style={{
               display: "flex",
+              flexDirection: "column",
               alignItems: "center",
-              justifyContent: "space-between",
-              width: "100%",
+              gap: 10,
             }}
           >
             <div
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 14,
-                color: "rgba(255,255,255,0.76)",
-                fontSize: 24,
+                fontSize: 72,
+                fontWeight: 800,
+                lineHeight: 1,
+                letterSpacing: "-0.05em",
+                color: "#ffffff",
               }}
             >
-              <div
-                style={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: 999,
-                  background: "#22c55e",
-                }}
-              />
-              gvcricket.com
+              GV Cricket
+            </div>
+            <div
+              style={{
+                fontSize: 30,
+                fontWeight: 700,
+                letterSpacing: "0.32em",
+                textTransform: "uppercase",
+                color: "#fbbf24",
+              }}
+            >
+              GV Cricket 2.0
             </div>
           </div>
         </div>

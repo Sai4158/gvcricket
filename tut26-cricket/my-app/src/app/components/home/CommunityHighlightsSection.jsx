@@ -2,6 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import AnimatedSection from "./AnimatedSection";
+import LiquidSportText from "./LiquidSportText";
 import YouTubeVideoPlayer from "./YouTubeVideoPlayer";
 
 const demoVideos = [
@@ -20,39 +21,46 @@ export default function CommunityHighlightsSection() {
       direction="right"
       className="w-full max-w-6xl mx-auto flex flex-col items-center"
     >
-      <motion.h2
+      <motion.div
         initial={
           prefersReducedMotion
             ? false
-            : { opacity: 0, y: 30, scale: 0.985, filter: "blur(10px)" }
+            : { opacity: 0, y: 22, scale: 0.992, filter: "blur(6px)" }
         }
         whileInView={
           prefersReducedMotion
             ? undefined
             : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
         }
-        viewport={{ once: true, amount: 0.2, margin: "0px 0px -8% 0px" }}
-        transition={{ duration: 0.78, ease: [0.16, 1, 0.3, 1] }}
-        className="text-5xl md:text-7xl font-bold tracking-tight mb-16 text-center text-white"
+        viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
+        transition={{ duration: 0.64, ease: [0.22, 1, 0.36, 1] }}
+        className="mb-16"
       >
-        See the app in action
-      </motion.h2>
+        <LiquidSportText
+          text={["From the", "Community"]}
+          characterTyping
+          characterStagger={0.022}
+          characterLineDelay={0.16}
+          className="text-center text-5xl font-bold tracking-tight md:text-7xl"
+          lineClassName="leading-[0.96]"
+        />
+      </motion.div>
       <motion.p
         initial={
           prefersReducedMotion
             ? false
-            : { opacity: 0, y: 28, filter: "blur(8px)" }
+            : { opacity: 0, y: 18, filter: "blur(5px)" }
         }
         whileInView={
           prefersReducedMotion
             ? undefined
             : { opacity: 1, y: 0, filter: "blur(0px)" }
         }
-        viewport={{ once: true, amount: 0.2, margin: "0px 0px -8% 0px" }}
-        transition={{ duration: 0.74, delay: 0.06, ease: [0.16, 1, 0.3, 1] }}
+        viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
+        transition={{ duration: 0.6, delay: 0.04, ease: [0.22, 1, 0.36, 1] }}
         className="text-lg text-white/78 leading-relaxed text-center max-w-3xl mx-auto -mt-8 mb-16"
       >
-        Watch how live scoring, spectator view, and match flow feel in real use. Fast setup, clean controls, and instant updates stay front and center.
+        It all started in 2022 with a few friends who loved the game. Today, GV Cricket is actively being used by a friendly league of over 50+ members who meet for fun, competitive cricket.
       </motion.p>
       <div className="grid sm:grid-cols-2 lg:grid-cols-2 gap-8 w-full">
         {demoVideos.map((video, index) => (

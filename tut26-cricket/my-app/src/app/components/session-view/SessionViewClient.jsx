@@ -925,6 +925,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
       : rawWalkieNotice || walkieStatusNotice;
   const speakerCardDescription = speakerCardTalking
     ? "Live now."
+    : micMonitor.isStarting
+    ? "Starting mic..."
     : speakerMicOn
     ? "Hold to talk."
     : "Use phone as a mic.";

@@ -19,8 +19,10 @@ export default function OpenGraphImage() {
           height: "100%",
           display: "flex",
           position: "relative",
+          alignItems: "center",
+          justifyContent: "center",
           background:
-            "radial-gradient(circle at top left, rgba(255,164,83,0.22), transparent 28%), linear-gradient(135deg, #190505 0%, #09090d 42%, #050507 100%)",
+            "radial-gradient(circle at 50% 20%, rgba(245, 158, 11, 0.14), transparent 28%), radial-gradient(circle at 50% 80%, rgba(239, 68, 68, 0.12), transparent 30%), linear-gradient(180deg, #080808 0%, #020202 100%)",
           color: "white",
           fontFamily: "sans-serif",
           overflow: "hidden",
@@ -29,11 +31,12 @@ export default function OpenGraphImage() {
         <div
           style={{
             position: "absolute",
-            inset: 28,
-            borderRadius: 32,
-            border: "1px solid rgba(255,255,255,0.12)",
+            inset: 26,
+            borderRadius: 36,
+            border: "1px solid rgba(255,255,255,0.08)",
             background:
-              "linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03))",
+              "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015))",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
           }}
         />
         <div
@@ -41,95 +44,53 @@ export default function OpenGraphImage() {
             position: "relative",
             display: "flex",
             flexDirection: "column",
-            justifyContent: "space-between",
-            padding: "60px 72px 64px",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 26,
             width: "100%",
+            height: "100%",
           }}
         >
-          <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 20,
-              }}
-            >
-              <img
-                src={absoluteUrl(siteConfig.logoPath)}
-                alt="GV Cricket"
-                width="88"
-                height="88"
-                style={{ borderRadius: 24 }}
-              />
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  padding: "12px 22px",
-                  borderRadius: 999,
-                  fontSize: 22,
-                  letterSpacing: "0.28em",
-                  textTransform: "uppercase",
-                  border: "1px solid rgba(255,217,119,0.18)",
-                  background: "rgba(255,217,119,0.08)",
-                  color: "#fde68a",
-                }}
-              >
-                GV Cricket
-              </div>
-            </div>
-            <div
-              style={{
-                fontSize: 74,
-                fontWeight: 700,
-                lineHeight: 1.05,
-                maxWidth: 860,
-              }}
-            >
-              Free cricket scoring, made simple.
-            </div>
-            <div
-              style={{
-                fontSize: 32,
-                lineHeight: 1.4,
-                color: "rgba(255,255,255,0.82)",
-                maxWidth: 860,
-              }}
-            >
-              Live score, umpire mode, spectator view, score announcer, walkie-talkie, and results in one mobile-friendly app.
-            </div>
-          </div>
-
+          <img
+            src={absoluteUrl(siteConfig.logoPath)}
+            alt="GV Cricket"
+            width="280"
+            height="280"
+            style={{
+              objectFit: "contain",
+              filter: "drop-shadow(0 18px 44px rgba(220, 38, 38, 0.26))",
+            }}
+          />
           <div
             style={{
               display: "flex",
-              gap: 18,
-              flexWrap: "wrap",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 10,
             }}
           >
-            {[
-              "Live score updates",
-              "Umpire mode",
-              "Spectator view",
-              "Walkie-talkie",
-              "Match stats",
-            ].map((item) => (
-              <div
-                key={item}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  padding: "14px 22px",
-                  borderRadius: 999,
-                  fontSize: 24,
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  background: "rgba(255,255,255,0.08)",
-                  color: "white",
-                }}
-              >
-                {item}
-              </div>
-            ))}
+            <div
+              style={{
+                fontSize: 72,
+                fontWeight: 800,
+                lineHeight: 1,
+                letterSpacing: "-0.05em",
+                color: "#ffffff",
+              }}
+            >
+              GV Cricket
+            </div>
+            <div
+              style={{
+                fontSize: 30,
+                fontWeight: 700,
+                letterSpacing: "0.32em",
+                textTransform: "uppercase",
+                color: "#fbbf24",
+              }}
+            >
+              GV Cricket 2.0
+            </div>
           </div>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import CommunityHighlightsSection from "./components/home/CommunityHighlightsSection";
 import HeroSection from "./components/home/HeroSection";
 import HomeHeader from "./components/home/HomeHeader";
@@ -59,6 +60,16 @@ export default async function HomePage() {
           <CommunityHighlightsSection />
           <LearnCricketCard />
           <footer className="text-center pt-24 pb-12 border-t border-white/10">
+            <div className="mb-8 flex justify-center">
+              <Image
+                src="/gvLogo.png"
+                alt="GV Cricket logo"
+                width={220}
+                height={220}
+                priority={false}
+                className="h-auto w-[150px] object-contain drop-shadow-[0_16px_40px_rgba(0,0,0,0.42)] sm:w-[180px]"
+              />
+            </div>
             <p className="text-zinc-400">
               &copy; {new Date().getFullYear()} GV Cricket. All rights reserved.
             </p>
