@@ -1,0 +1,99 @@
+import { cookies } from "next/headers";
+import { jsonError } from "../../../../../lib/api-response";
+import { connectDB } from "../../../../../lib/db";
+import {
+  getDirectorAccessCookieName,
+  hasValidDirectorAccess,
+} from "../../../../../lib/director-access";
+import {
+  getMatchAccessCookieName,
+  hasValidMatchAccess,
+} from "../../../../../lib/match-access";
+import { getRequestMeta } from "../../../../../lib/request-meta";
+import { parseJsonRequest } from "../../../../../lib/request-security";
+import { walkieClaimSchema } from "../../../../../lib/validators";
+import { hasValidWalkieParticipantToken } from "../../../../../lib/walkie-auth";
+import {
+  claimPersistentWalkieSpeaker,
+  registerPersistentWalkieParticipant,
+} from "../../../../../lib/walkie-store";
+import Match from "../../../../../../models/Match";
+
+async function hasMatchAccess(matchId, accessVersion) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
+  return hasValidMatchAccess(matchId, token, accessVersion);
+}
+
+async function hasDirectorAccess() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(getDirectorAccessCookieName())?.value;
+  return hasValidDirectorAccess(token);
+}
+
+export async function POST(req, { params }) {
+  const { id } = await params;
+  const parsedRequest = await parseJsonRequest(req, walkieClaimSchema, {
+    maxBytes: 4096,
+  });
+
+  if (!parsedRequest.ok) {
+    return jsonError(parsedRequest.message, parsedRequest.status);
+  }
+
+  await connectDB();
+  const match = await Match.findById(id).select(
+    "_id isOngoing result adminAccessVersion"
+  );
+  if (!match) {
+    return jsonError("Match not found.", 404);
+  }
+
+  if (!match.isOngoing || match.result) {
+    return jsonError("Walkie-talkie is only available during a live match.", 409);
+  }
+
+  const hasValidToken = hasValidWalkieParticipantToken(
+    parsedRequest.value.token,
+    id,
+    parsedRequest.value.participantId,
+    parsedRequest.value.role
+  );
+  if (!hasValidToken) {
+    return jsonError("Walkie participant token is invalid.", 403);
+  }
+
+  await registerPersistentWalkieParticipant(id, {
+    id: parsedRequest.value.participantId,
+    role: parsedRequest.value.role,
+  });
+
+  if (parsedRequest.value.role === "umpire") {
+    const hasAccess = await hasMatchAccess(id, Number(match.adminAccessVersion || 1));
+    if (!hasAccess) {
+      return jsonError("Umpire access required.", 403);
+    }
+  }
+
+  if (parsedRequest.value.role === "director") {
+    const hasAccess = await hasDirectorAccess();
+    if (!hasAccess) {
+      return jsonError("Director access required.", 403);
+    }
+  }
+
+  const result = await claimPersistentWalkieSpeaker(id, parsedRequest.value);
+  if (!result.ok) {
+    return jsonError(result.message, result.status);
+  }
+
+  const meta = getRequestMeta(req);
+  return Response.json(
+    {
+      ok: true,
+      walkie: result.snapshot,
+      participantIp: meta.ip,
+    },
+    { headers: { "Cache-Control": "no-store" } }
+  );
+}

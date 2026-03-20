@@ -1,6 +1,6 @@
 // src/components/SmoothScroll.jsx
 "use client";
-import { ReactLenis } from "@studio-freight/react-lenis";
+import { ReactLenis } from "lenis/react";
 
 function SmoothScroll({ children }) {
   return (

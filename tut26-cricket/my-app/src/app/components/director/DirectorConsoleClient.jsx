@@ -1,0 +1,2871 @@
+"use client";
+
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
+import {
+  FaArrowLeft,
+  FaBroadcastTower,
+  FaBullhorn,
+  FaCompactDisc,
+  FaForward,
+  FaGripVertical,
+  FaHeadphones,
+  FaInfoCircle,
+  FaMicrophone,
+  FaMusic,
+  FaPause,
+  FaPlay,
+  FaPowerOff,
+  FaStop,
+  FaVolumeUp,
+  FaWifi,
+} from "react-icons/fa";
+import LiquidSportText from "../home/LiquidSportText";
+import SessionCoverHero from "../shared/SessionCoverHero";
+import LoadingButton from "../shared/LoadingButton";
+import DirectorSessionPicker from "./DirectorSessionPicker";
+import useEventSource from "../live/useEventSource";
+import useLocalMicMonitor from "../live/useLocalMicMonitor";
+import useSpeechAnnouncer from "../live/useSpeechAnnouncer";
+import useWalkieTalkie from "../live/useWalkieTalkie";
+import { WalkieNotice, WalkieTalkButton } from "../live/WalkiePanel";
+import { buildCurrentScoreAnnouncement } from "../../lib/live-announcements";
+import { getBattingTeamBundle } from "../../lib/team-utils";
+import {
+  didSharedWalkieDisable,
+  didSharedWalkieEnable,
+  getNonUmpireWalkieUiState,
+  getNonUmpireWalkieToggleAction,
+  NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT,
+} from "../../lib/walkie-device-state";
+import {
+  getCachedAudioAssetUrl,
+  isIOSSafari,
+  isUiAudioUnlocked,
+  playUiTone,
+  primeUiAudio,
+  restorePreferredAudioSessionType,
+  setPreferredAudioSessionType,
+  subscribeUiAudioUnlock,
+} from "../../lib/page-audio";
+
+const DIRECTOR_AUDIO_LIBRARY_CACHE_KEY = "gv-director-audio-library-v1";
+const DIRECTOR_AUDIO_METADATA_CACHE_KEY = "gv-director-audio-metadata-v1";
+const DIRECTOR_SESSIONS_CACHE_KEY = "gv-director-sessions-v1";
+const DIRECTOR_AUDIO_LIBRARY_CACHE_TTL_MS = 10 * 60 * 1000;
+const DIRECTOR_AUDIO_ORDER_SAVE_DELAY_MS = 20_000;
+let directorAudioLibraryMemoryCache = null;
+let directorAudioLibraryPromise = null;
+let directorSessionsMemoryCache = null;
+let directorAudioMetadataMemoryCache = {};
+
+function serializeOrder(order) {
+  return JSON.stringify(Array.isArray(order) ? order : []);
+}
+
+function getDirectorAudioOrderStorageKey(sessionId) {
+  return "gv-director-audio-order:global";
+}
+
+function readCachedDirectorSessions() {
+  if (directorSessionsMemoryCache?.length) {
+    return directorSessionsMemoryCache;
+  }
+
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const cachedValue = window.sessionStorage.getItem(DIRECTOR_SESSIONS_CACHE_KEY);
+    if (!cachedValue) {
+      return [];
+    }
+    const parsed = JSON.parse(cachedValue);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    directorSessionsMemoryCache = parsed;
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+
+function writeCachedDirectorSessions(sessions) {
+  if (!Array.isArray(sessions)) {
+    return;
+  }
+
+  directorSessionsMemoryCache = sessions;
+
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(
+      DIRECTOR_SESSIONS_CACHE_KEY,
+      JSON.stringify(sessions)
+    );
+  } catch {
+    // Ignore storage failures and keep the in-memory cache.
+  }
+}
+
+function readCachedDirectorAudioLibrary() {
+  if (directorAudioLibraryMemoryCache?.length) {
+    return directorAudioLibraryMemoryCache;
+  }
+
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const cachedValue = window.localStorage.getItem(DIRECTOR_AUDIO_LIBRARY_CACHE_KEY);
+    if (!cachedValue) {
+      return [];
+    }
+
+    const parsed = JSON.parse(cachedValue);
+    const savedAt = Number(parsed?.savedAt || 0);
+    const files = Array.isArray(parsed?.files) ? parsed.files : [];
+    if (!files.length) {
+      return [];
+    }
+
+    if (savedAt && Date.now() - savedAt > DIRECTOR_AUDIO_LIBRARY_CACHE_TTL_MS) {
+      return [];
+    }
+
+    directorAudioLibraryMemoryCache = files;
+    return files;
+  } catch {
+    return [];
+  }
+}
+
+function writeCachedDirectorAudioLibrary(files) {
+  if (!Array.isArray(files)) {
+    return;
+  }
+
+  directorAudioLibraryMemoryCache = files;
+
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      DIRECTOR_AUDIO_LIBRARY_CACHE_KEY,
+      JSON.stringify({
+        savedAt: Date.now(),
+        files,
+      })
+    );
+  } catch {
+    // Ignore storage failures and keep the in-memory cache.
+  }
+}
+
+function createSpeechSettings() {
+  return {
+    enabled: true,
+    muted: false,
+    mode: "full",
+    volume: 1,
+  };
+}
+
+function buildDirectorScoreLine(match) {
+  if (!match) return "";
+  const battingTeam = getBattingTeamBundle(match);
+  return `${battingTeam.name} ${match.score || 0}/${match.outs || 0}`;
+}
+
+function getPreferredLiveSessionId(sessions, preferredSessionId = "") {
+  const nextSessions = Array.isArray(sessions) ? sessions : [];
+  const preferredLive = preferredSessionId
+    ? nextSessions.find(
+        (item) => item.session?._id === preferredSessionId && item.isLive
+      )
+    : null;
+  const firstLive = nextSessions.find((item) => item.isLive);
+  return preferredLive?.session?._id || firstLive?.session?._id || "";
+}
+
+function formatAudioTime(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return "--:--";
+  }
+
+  const totalSeconds = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainder = totalSeconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, "0")}`;
+}
+
+function IosSwitch({ checked, onChange, label, disabled = false }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange?.(!checked)}
+      className={`relative inline-flex h-8 w-[54px] items-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
+        checked
+          ? "border-emerald-300/35 bg-emerald-500 shadow-[0_10px_24px_rgba(16,185,129,0.22)]"
+          : "border-white/10 bg-white/[0.08]"
+      } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+    >
+      <span
+        className={`inline-flex h-6 w-6 rounded-full bg-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition-transform ${
+          checked ? "translate-x-[26px]" : "translate-x-[3px]"
+        }`}
+      />
+    </button>
+  );
+}
+
+function HelpButton({ title, body }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+  const buttonRef = useRef(null);
+  const panelRef = useRef(null);
+  const [panelStyle, setPanelStyle] = useState(null);
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    const updatePanelPosition = () => {
+      const buttonRect = buttonRef.current?.getBoundingClientRect();
+      if (!buttonRect || typeof window === "undefined") {
+        return;
+      }
+
+      const panelWidth = Math.min(288, Math.max(220, window.innerWidth - 24));
+      const top = Math.min(
+        buttonRect.bottom + 10,
+        window.innerHeight - 24
+      );
+      const left = Math.min(
+        Math.max(12, buttonRect.right - panelWidth),
+        Math.max(12, window.innerWidth - panelWidth - 12)
+      );
+
+      setPanelStyle({
+        top: `${top}px`,
+        left: `${left}px`,
+        width: `${panelWidth}px`,
+      });
+    };
+
+    const handlePointerDown = (event) => {
+      if (
+        !containerRef.current?.contains(event.target) &&
+        !panelRef.current?.contains(event.target)
+      ) {
+        setOpen(false);
+      }
+    };
+
+    updatePanelPosition();
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    window.addEventListener("resize", updatePanelPosition);
+    window.addEventListener("scroll", updatePanelPosition, true);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("resize", updatePanelPosition);
+      window.removeEventListener("scroll", updatePanelPosition, true);
+    };
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative shrink-0">
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-200 transition hover:bg-white/[0.1] focus:outline-none focus:ring-2 focus:ring-emerald-400/35"
+        aria-label={`How ${title} works`}
+      >
+        <FaInfoCircle />
+      </button>
+      {open && panelStyle && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={panelRef}
+              style={panelStyle}
+              className="fixed z-[140] rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(26,26,32,0.98),rgba(11,11,16,0.98))] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
+            >
+              <p className="text-sm font-semibold text-white">{title}</p>
+              <p className="mt-2 text-sm leading-6 text-zinc-300">{body}</p>
+            </div>,
+            document.body
+          )
+        : null}
+    </div>
+  );
+}
+
+const DIRECTOR_CARD_THEMES = {
+  slate: {
+    shellGlow:
+      "before:bg-[radial-gradient(circle_at_12%_0%,rgba(148,163,184,0.16),transparent_42%)]",
+    strip:
+      "bg-[linear-gradient(90deg,rgba(244,244,245,0),rgba(226,232,240,0.72)_22%,rgba(125,211,252,0.72)_62%,rgba(244,244,245,0))]",
+    icon:
+      "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.11),rgba(255,255,255,0.04))] text-white shadow-[0_10px_26px_rgba(15,23,42,0.22)]",
+  },
+  emerald: {
+    shellGlow:
+      "before:bg-[radial-gradient(circle_at_12%_0%,rgba(16,185,129,0.2),transparent_42%)]",
+    strip:
+      "bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(52,211,153,0.86)_18%,rgba(34,211,238,0.82)_58%,rgba(0,0,0,0))]",
+    icon:
+      "border-emerald-300/14 bg-[linear-gradient(180deg,rgba(16,185,129,0.18),rgba(6,95,70,0.08))] text-emerald-100 shadow-[0_10px_26px_rgba(16,185,129,0.18)]",
+  },
+  amber: {
+    shellGlow:
+      "before:bg-[radial-gradient(circle_at_12%_0%,rgba(245,158,11,0.2),transparent_42%)]",
+    strip:
+      "bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(251,191,36,0.85)_18%,rgba(245,158,11,0.82)_54%,rgba(34,211,238,0.54)_82%,rgba(0,0,0,0))]",
+    icon:
+      "border-amber-300/14 bg-[linear-gradient(180deg,rgba(245,158,11,0.18),rgba(120,53,15,0.08))] text-amber-100 shadow-[0_10px_26px_rgba(245,158,11,0.18)]",
+  },
+  violet: {
+    shellGlow:
+      "before:bg-[radial-gradient(circle_at_12%_0%,rgba(168,85,247,0.2),transparent_42%),radial-gradient(circle_at_88%_100%,rgba(59,130,246,0.12),transparent_34%)]",
+    strip:
+      "bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(192,132,252,0.84)_18%,rgba(99,102,241,0.74)_54%,rgba(34,211,238,0.6)_82%,rgba(0,0,0,0))]",
+    icon:
+      "border-violet-300/14 bg-[linear-gradient(180deg,rgba(139,92,246,0.18),rgba(76,29,149,0.08))] text-violet-100 shadow-[0_10px_26px_rgba(139,92,246,0.18)]",
+  },
+  cyan: {
+    shellGlow:
+      "before:bg-[radial-gradient(circle_at_12%_0%,rgba(34,211,238,0.2),transparent_42%)]",
+    strip:
+      "bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(34,211,238,0.86)_18%,rgba(59,130,246,0.74)_54%,rgba(250,204,21,0.52)_82%,rgba(0,0,0,0))]",
+    icon:
+      "border-cyan-300/14 bg-[linear-gradient(180deg,rgba(34,211,238,0.18),rgba(8,47,73,0.08))] text-cyan-100 shadow-[0_10px_26px_rgba(34,211,238,0.18)]",
+  },
+};
+
+function Card({
+  title,
+  subtitle = "",
+  icon,
+  children,
+  action = null,
+  help = null,
+  accent = "slate",
+}) {
+  const theme = DIRECTOR_CARD_THEMES[accent] || DIRECTOR_CARD_THEMES.slate;
+  return (
+    <section
+      className={`relative overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.98),rgba(10,10,14,0.98))] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.35)] before:pointer-events-none before:absolute before:inset-0 before:opacity-100 after:pointer-events-none after:absolute after:inset-x-5 after:top-0 after:h-px after:rounded-full ${theme.shellGlow}`}
+    >
+      <div className={`absolute inset-x-5 top-0 h-[2px] rounded-full ${theme.strip}`} />
+      <div className="relative mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <span
+            className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${theme.icon}`}
+          >
+            {icon}
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold text-white">{title}</h3>
+            {subtitle ? <p className="mt-1 text-sm text-zinc-400">{subtitle}</p> : null}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
+          {help ? <HelpButton title={help.title} body={help.body} /> : null}
+          {action}
+        </div>
+      </div>
+      <div className="relative">{children}</div>
+    </section>
+  );
+}
+
+const HOLD_BUTTON_INTERACTION_PROPS = {
+  draggable: false,
+  onContextMenu: (event) => {
+    event.preventDefault();
+  },
+  onMouseDown: (event) => {
+    event.preventDefault();
+  },
+  onDragStart: (event) => {
+    event.preventDefault();
+  },
+  style: {
+    userSelect: "none",
+    WebkitUserSelect: "none",
+    WebkitTouchCallout: "none",
+    touchAction: "none",
+    WebkitTapHighlightColor: "transparent",
+  },
+};
+
+function SessionHeader({
+  selectedSession,
+  liveMatch,
+  onChangeSession,
+  readCurrentScore,
+}) {
+  const session = selectedSession?.session;
+  const match = liveMatch || selectedSession?.match;
+  const imageUrl = match?.matchImageUrl || session?.matchImageUrl || "";
+  const teams =
+    match?.teamAName && match?.teamBName
+      ? `${match.teamAName} vs ${match.teamBName}`
+      : session?.teamAName && session?.teamBName
+      ? `${session.teamAName} vs ${session.teamBName}`
+      : "Teams pending";
+
+  return (
+    <SessionCoverHero
+      imageUrl={imageUrl}
+      alt={`${session?.name || "Session"} cover`}
+      className="mb-5"
+      priority
+    >
+      <div className="space-y-4 px-5 py-5 sm:px-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 text-center sm:text-left">
+            <div className="mb-2 flex items-center justify-center gap-2 sm:justify-start">
+              {match?.isOngoing && !match?.result ? (
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.08] px-3 py-1 text-xs font-medium text-white">
+                  <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                  Live
+                </span>
+              ) : null}
+            </div>
+            <h1 className="text-2xl font-semibold tracking-[-0.03em] text-white sm:text-[2rem]">
+              {session?.name || "Director Console"}
+            </h1>
+            <p className="mt-1 text-sm text-zinc-200/90">{teams}</p>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 sm:justify-end">
+            <HelpButton
+              title="Director console"
+              body="Use this screen to manage the live session, PA mic, music, effects, and walkie."
+            />
+            <button
+              type="button"
+              onClick={readCurrentScore}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-zinc-100 transition hover:bg-white/[0.1]"
+              aria-label="Read current score"
+            >
+              <FaVolumeUp />
+            </button>
+            <button
+              type="button"
+              onClick={onChangeSession}
+              className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/[0.1] max-sm:text-xs"
+            >
+              Change
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-[24px] border border-white/10 bg-black/30 px-4 py-4">
+          <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">Score</p>
+          <p className="mt-2 text-xl font-semibold text-white sm:text-2xl">
+            {buildDirectorScoreLine(match)}
+          </p>
+          <p className="mt-1 text-sm text-emerald-200">
+            {match?.result ? "Match finished" : "Managing live"}
+          </p>
+        </div>
+      </div>
+    </SessionCoverHero>
+  );
+}
+
+export default function DirectorConsoleClient({
+  initialAuthorized = false,
+  initialSessions = [],
+  initialPreferredSessionId = "",
+  initialAutoManage = false,
+}) {
+  const router = useRouter();
+  const initialTargetSessionId = getPreferredLiveSessionId(
+    initialSessions,
+    initialPreferredSessionId
+  );
+  const [authorized, setAuthorized] = useState(Boolean(initialAuthorized));
+  const [sessions, setSessions] = useState(initialSessions || []);
+  const [pin, setPin] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [isSubmittingPin, setIsSubmittingPin] = useState(false);
+  const [showDirectorPinStep, setShowDirectorPinStep] = useState(
+    Boolean(initialAutoManage && initialTargetSessionId && !initialAuthorized)
+  );
+  const [selectedSessionId, setSelectedSessionId] = useState(initialTargetSessionId);
+  const [managedSessionId, setManagedSessionId] = useState(() =>
+    initialAuthorized && initialAutoManage && initialTargetSessionId
+      ? initialTargetSessionId
+      : ""
+  );
+  const [showPicker, setShowPicker] = useState(false);
+  const [musicTracks, setMusicTracks] = useState([]);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+  const [musicState, setMusicState] = useState("idle");
+  const [musicVolume, setMusicVolume] = useState(0.8);
+  const [masterVolume, setMasterVolume] = useState(1);
+  const [speakerDeviceId, setSpeakerDeviceId] = useState("default");
+  const [speakerDevices, setSpeakerDevices] = useState([]);
+  const [speakerMessage, setSpeakerMessage] = useState("");
+  const [consoleError, setConsoleError] = useState("");
+  const [musicMessage, setMusicMessage] = useState("");
+  const [directorHoldLive, setDirectorHoldLive] = useState(false);
+  const [directorSpeakerOn, setDirectorSpeakerOn] = useState(false);
+  const [directorWalkieOn, setDirectorWalkieOn] = useState(false);
+  const [directorWalkieNotice, setDirectorWalkieNotice] = useState("");
+  const [libraryFiles, setLibraryFiles] = useState([]);
+  const [libraryOrder, setLibraryOrder] = useState([]);
+  const [libraryDurations, setLibraryDurations] = useState({});
+  const [libraryCurrentTime, setLibraryCurrentTime] = useState(0);
+  const [libraryLiveId, setLibraryLiveId] = useState("");
+  const [libraryState, setLibraryState] = useState("idle");
+  const [effectsNeedsUnlock, setEffectsNeedsUnlock] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(() => isUiAudioUnlocked());
+  const [draggingLibraryId, setDraggingLibraryId] = useState("");
+  const [libraryDropTargetId, setLibraryDropTargetId] = useState("");
+  const preferredSessionIdRef = useRef(initialPreferredSessionId || "");
+  const pendingInitialManageRef = useRef(Boolean(initialAutoManage));
+  const pendingLibraryOrderRef = useRef(null);
+  const libraryOrderSaveTimerRef = useRef(null);
+  const lastPersistedLibraryOrderRef = useRef(serializeOrder([]));
+  const audioRef = useRef(null);
+  const effectsAudioRef = useRef(null);
+  const directorMicPointerIdRef = useRef(null);
+  const directorMicHoldingRef = useRef(false);
+  const previousDirectorWalkieEnabledRef = useRef(false);
+  const previousDirectorWalkieRequestStateRef = useRef("idle");
+  const directorWalkieNoticeTimerRef = useRef(null);
+  const effectPlayRequestRef = useRef(0);
+  const musicUrlsRef = useRef([]);
+  const cachedEffectUrlRef = useRef(new Map());
+  const musicEffectDuckFactorRef = useRef(1);
+  const musicDuckAnimationFrameRef = useRef(0);
+  const ambientAudioSessionTypeRef = useRef("");
+  const [speechSettings, setSpeechSettings] = useState(createSpeechSettings);
+  const speech = useSpeechAnnouncer(speechSettings);
+  const micMonitor = useLocalMicMonitor();
+  const iOSSafari = useMemo(() => isIOSSafari(), []);
+
+  const cancelMusicDuckAnimation = useCallback(() => {
+    if (musicDuckAnimationFrameRef.current) {
+      window.cancelAnimationFrame(musicDuckAnimationFrameRef.current);
+      musicDuckAnimationFrameRef.current = 0;
+    }
+  }, []);
+
+  const getBaseMusicVolume = useCallback(() => {
+    const micDuckFactor = micMonitor.isActive ? 0.24 : 1;
+    return Math.max(0, Math.min(1, musicVolume * masterVolume * micDuckFactor));
+  }, [masterVolume, micMonitor.isActive, musicVolume]);
+
+  const getMusicTargetVolume = useCallback(
+    (duckFactor = musicEffectDuckFactorRef.current) =>
+      Math.max(0, Math.min(1, getBaseMusicVolume() * duckFactor)),
+    [getBaseMusicVolume]
+  );
+
+  const applyMusicDuck = useCallback(
+    (duckFactor, { durationMs = 220 } = {}) => {
+      musicEffectDuckFactorRef.current = duckFactor;
+      const audio = audioRef.current;
+      if (!audio) {
+        return;
+      }
+
+      cancelMusicDuckAnimation();
+
+      const targetVolume = getMusicTargetVolume(duckFactor);
+      const startVolume = Number.isFinite(audio.volume) ? audio.volume : targetVolume;
+
+      if (durationMs <= 0 || Math.abs(startVolume - targetVolume) < 0.01) {
+        audio.volume = targetVolume;
+        return;
+      }
+
+      const startTime = performance.now();
+      const step = (now) => {
+        const progress = Math.min(1, (now - startTime) / durationMs);
+        const eased = 0.5 - Math.cos(progress * Math.PI) / 2;
+        audio.volume = startVolume + (targetVolume - startVolume) * eased;
+
+        if (progress < 1) {
+          musicDuckAnimationFrameRef.current = window.requestAnimationFrame(step);
+        } else {
+          musicDuckAnimationFrameRef.current = 0;
+        }
+      };
+
+      musicDuckAnimationFrameRef.current = window.requestAnimationFrame(step);
+    },
+    [cancelMusicDuckAnimation, getMusicTargetVolume]
+  );
+
+  const showTemporaryDirectorWalkieNotice = useCallback(
+    (message, duration = 2600) => {
+      setDirectorWalkieNotice(message);
+      if (directorWalkieNoticeTimerRef.current) {
+        window.clearTimeout(directorWalkieNoticeTimerRef.current);
+      }
+      directorWalkieNoticeTimerRef.current = window.setTimeout(() => {
+        setDirectorWalkieNotice("");
+        directorWalkieNoticeTimerRef.current = null;
+      }, duration);
+    },
+    []
+  );
+
+  useEffect(() => subscribeUiAudioUnlock(setAudioUnlocked), []);
+
+  useEffect(() => {
+    if (audioUnlocked) {
+      setEffectsNeedsUnlock(false);
+      setConsoleError((current) =>
+        current === "Safari blocked this audio. Tap Enable Audio once, then play the sound again."
+          ? ""
+          : current
+      );
+    }
+  }, [audioUnlocked]);
+
+  useEffect(() => {
+    return () => {
+      if (directorWalkieNoticeTimerRef.current) {
+        window.clearTimeout(directorWalkieNoticeTimerRef.current);
+        directorWalkieNoticeTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (initialSessions?.length) {
+      writeCachedDirectorSessions(initialSessions);
+    }
+  }, [initialSessions]);
+
+  const selectedSession = useMemo(() => {
+    return (
+      sessions.find((item) => item.session?._id === selectedSessionId) ||
+      sessions.find((item) => item.isLive) ||
+      sessions[0] ||
+      null
+    );
+  }, [selectedSessionId, sessions]);
+
+  const managedSession = useMemo(() => {
+    if (!managedSessionId) {
+      return null;
+    }
+    return sessions.find((item) => item.session?._id === managedSessionId) || null;
+  }, [managedSessionId, sessions]);
+
+  const audioOrderStorageKey = useMemo(() => getDirectorAudioOrderStorageKey(), []);
+
+  const [liveMatch, setLiveMatch] = useState(managedSession?.match || null);
+  useEffect(() => {
+    setLiveMatch(managedSession?.match || null);
+  }, [managedSession]);
+
+  useEffect(() => {
+    const firstLive = sessions.find((item) => item.isLive);
+    if (!selectedSessionId && firstLive) {
+      setSelectedSessionId(firstLive.session._id);
+    }
+  }, [selectedSessionId, sessions]);
+
+  useEffect(() => {
+    const preferredSessionId = preferredSessionIdRef.current;
+    if (!preferredSessionId) {
+      return;
+    }
+
+    const preferredLive = sessions.find(
+      (item) => item.session?._id === preferredSessionId && item.isLive
+    );
+    if (!preferredLive) {
+      return;
+    }
+
+    if (selectedSessionId !== preferredSessionId) {
+      setSelectedSessionId(preferredSessionId);
+    }
+
+    if (authorized && pendingInitialManageRef.current) {
+      setManagedSessionId(preferredSessionId);
+      setShowPicker(false);
+      setAuthError("");
+      pendingInitialManageRef.current = false;
+    }
+  }, [authorized, selectedSessionId, sessions]);
+
+  useEffect(() => {
+    if (!iOSSafari) {
+      return undefined;
+    }
+
+    ambientAudioSessionTypeRef.current =
+      setPreferredAudioSessionType("ambient") || "";
+
+    return () => {
+      if (ambientAudioSessionTypeRef.current) {
+        restorePreferredAudioSessionType(ambientAudioSessionTypeRef.current);
+        ambientAudioSessionTypeRef.current = "";
+      }
+    };
+  }, [iOSSafari]);
+
+  useEffect(() => {
+    if (
+      managedSessionId &&
+      !sessions.some((item) => item.session?._id === managedSessionId)
+    ) {
+      setManagedSessionId("");
+    }
+  }, [managedSessionId, sessions]);
+
+  useEffect(() => {
+    if (!authorized) {
+      return;
+    }
+
+    const cachedSessions = readCachedDirectorSessions();
+    if (cachedSessions.length) {
+      setSessions((current) => (current.length ? current : cachedSessions));
+      const cachedLiveSessionId = getPreferredLiveSessionId(
+        cachedSessions,
+        preferredSessionIdRef.current
+      );
+      if (cachedLiveSessionId) {
+        setSelectedSessionId((current) => current || cachedLiveSessionId);
+      }
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      const response = await fetch("/api/director/sessions", { cache: "no-store" });
+      const payload = await response.json().catch(() => ({ sessions: [] }));
+      if (!response.ok || cancelled) {
+        return;
+      }
+
+      const nextSessions = Array.isArray(payload.sessions) ? payload.sessions : [];
+      writeCachedDirectorSessions(nextSessions);
+      setSessions(nextSessions);
+
+      const nextLiveSessionId = getPreferredLiveSessionId(
+        nextSessions,
+        preferredSessionIdRef.current
+      );
+
+      if (nextLiveSessionId) {
+        setSelectedSessionId((current) => {
+          if (
+            current &&
+            nextSessions.some(
+              (item) => item.session?._id === current && item.isLive
+            )
+          ) {
+            return current;
+          }
+          return nextLiveSessionId;
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authorized]);
+
+  const fetchAudioLibrary = useCallback(async () => {
+    if (directorAudioLibraryPromise) {
+      const nextFiles = await directorAudioLibraryPromise;
+      setLibraryFiles(nextFiles);
+      return nextFiles;
+    }
+
+    directorAudioLibraryPromise = (async () => {
+      const response = await fetch("/api/director/audio-library", { cache: "no-store" });
+      const payload = await response.json().catch(() => ({ files: [], order: [] }));
+
+      if (!response.ok) {
+        return [];
+      }
+
+      const nextFiles = Array.isArray(payload.files) ? payload.files : [];
+      const nextOrder = Array.isArray(payload.order) ? payload.order : [];
+      setLibraryOrder(nextOrder);
+      lastPersistedLibraryOrderRef.current = serializeOrder(nextOrder);
+      if (
+        pendingLibraryOrderRef.current &&
+        serializeOrder(pendingLibraryOrderRef.current) ===
+          lastPersistedLibraryOrderRef.current
+      ) {
+        pendingLibraryOrderRef.current = null;
+      }
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(audioOrderStorageKey, JSON.stringify(nextOrder));
+        } catch {
+          // Ignore storage failures and keep the in-memory order.
+        }
+      }
+      writeCachedDirectorAudioLibrary(nextFiles);
+      return nextFiles;
+    })();
+
+    try {
+      const nextFiles = await directorAudioLibraryPromise;
+      setLibraryFiles(nextFiles);
+      return nextFiles;
+    } finally {
+      directorAudioLibraryPromise = null;
+    }
+  }, [audioOrderStorageKey]);
+
+  useEffect(() => {
+    const cachedFiles = readCachedDirectorAudioLibrary();
+    if (cachedFiles.length) {
+      setLibraryFiles(cachedFiles);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadLibraryOnce = async () => {
+      try {
+        const nextFiles = await fetchAudioLibrary();
+        if (!cancelled) {
+          setLibraryFiles(nextFiles);
+        }
+      } catch {
+        if (!cancelled) {
+          setLibraryFiles((current) => current);
+        }
+      }
+    };
+
+    void loadLibraryOnce();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchAudioLibrary]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const cachedValue = window.sessionStorage.getItem(
+        DIRECTOR_AUDIO_METADATA_CACHE_KEY
+      );
+      if (!cachedValue) {
+        return;
+      }
+      const parsed = JSON.parse(cachedValue);
+      if (parsed && typeof parsed === "object") {
+        directorAudioMetadataMemoryCache = parsed;
+        setLibraryDurations(parsed);
+      }
+    } catch {
+      // Ignore broken cache.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const rawValue = window.localStorage.getItem(audioOrderStorageKey);
+      if (!rawValue) {
+        setLibraryOrder([]);
+        return;
+      }
+
+      const parsed = JSON.parse(rawValue);
+      setLibraryOrder(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setLibraryOrder([]);
+    }
+  }, [audioOrderStorageKey]);
+
+  const orderedLibraryFiles = useMemo(() => {
+    if (!libraryFiles.length) {
+      return [];
+    }
+
+    if (!libraryOrder.length) {
+      return libraryFiles;
+    }
+
+    const orderMap = new Map(libraryOrder.map((id, index) => [id, index]));
+    return [...libraryFiles].sort((left, right) => {
+      const leftIndex = orderMap.has(left.id) ? orderMap.get(left.id) : Number.MAX_SAFE_INTEGER;
+      const rightIndex = orderMap.has(right.id) ? orderMap.get(right.id) : Number.MAX_SAFE_INTEGER;
+      if (leftIndex !== rightIndex) {
+        return leftIndex - rightIndex;
+      }
+      const leftDuration = libraryDurations[left.id] || 0;
+      const rightDuration = libraryDurations[right.id] || 0;
+      if (leftDuration !== rightDuration) {
+        return rightDuration - leftDuration;
+      }
+      return left.label.localeCompare(right.label);
+    });
+  }, [libraryDurations, libraryFiles, libraryOrder]);
+
+  const clearLibraryOrderSaveTimer = useCallback(() => {
+    if (libraryOrderSaveTimerRef.current) {
+      window.clearTimeout(libraryOrderSaveTimerRef.current);
+      libraryOrderSaveTimerRef.current = null;
+    }
+  }, []);
+
+  const persistLibraryOrder = useCallback(async (nextOrder, { keepalive = false } = {}) => {
+    try {
+      const response = await fetch("/api/director/audio-library", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        keepalive,
+        body: JSON.stringify({ order: nextOrder }),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const flushPendingLibraryOrder = useCallback(
+    async ({ useBeacon = false } = {}) => {
+      const nextOrder = pendingLibraryOrderRef.current;
+      if (!nextOrder?.length) {
+        return false;
+      }
+
+      const serializedOrder = serializeOrder(nextOrder);
+      if (serializedOrder === lastPersistedLibraryOrderRef.current) {
+        pendingLibraryOrderRef.current = null;
+        return true;
+      }
+
+      if (
+        useBeacon &&
+        typeof navigator !== "undefined" &&
+        typeof navigator.sendBeacon === "function"
+      ) {
+        try {
+          const payload = new Blob([JSON.stringify({ order: nextOrder })], {
+            type: "application/json",
+          });
+          const queued = navigator.sendBeacon("/api/director/audio-library", payload);
+          if (queued) {
+            lastPersistedLibraryOrderRef.current = serializedOrder;
+            pendingLibraryOrderRef.current = null;
+            return true;
+          }
+        } catch {
+          // Fall through to fetch keepalive.
+        }
+      }
+
+      const persisted = await persistLibraryOrder(nextOrder, {
+        keepalive: useBeacon,
+      });
+      if (persisted) {
+        lastPersistedLibraryOrderRef.current = serializedOrder;
+        pendingLibraryOrderRef.current = null;
+      }
+      return persisted;
+    },
+    [persistLibraryOrder]
+  );
+
+  const scheduleLibraryOrderPersist = useCallback(
+    (nextOrder) => {
+      const serializedOrder = serializeOrder(nextOrder);
+      pendingLibraryOrderRef.current = nextOrder;
+
+      clearLibraryOrderSaveTimer();
+
+      if (serializedOrder === lastPersistedLibraryOrderRef.current) {
+        pendingLibraryOrderRef.current = null;
+        return;
+      }
+
+      libraryOrderSaveTimerRef.current = window.setTimeout(() => {
+        libraryOrderSaveTimerRef.current = null;
+        void flushPendingLibraryOrder();
+      }, DIRECTOR_AUDIO_ORDER_SAVE_DELAY_MS);
+    },
+    [clearLibraryOrderSaveTimer, flushPendingLibraryOrder]
+  );
+
+  const handleLibraryReorder = useCallback((nextFiles) => {
+    setLibraryFiles(nextFiles);
+    const nextOrder = nextFiles.map((file) => file.id);
+    setLibraryOrder(nextOrder);
+
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(audioOrderStorageKey, JSON.stringify(nextOrder));
+      } catch {
+        // Ignore storage failures and keep the in-memory order.
+      }
+    }
+    scheduleLibraryOrderPersist(nextOrder);
+  }, [audioOrderStorageKey, scheduleLibraryOrderPersist]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const flushQueuedOrder = () => {
+      clearLibraryOrderSaveTimer();
+      void flushPendingLibraryOrder({ useBeacon: true });
+    };
+
+    window.addEventListener("pagehide", flushQueuedOrder);
+    window.addEventListener("beforeunload", flushQueuedOrder);
+
+    return () => {
+      window.removeEventListener("pagehide", flushQueuedOrder);
+      window.removeEventListener("beforeunload", flushQueuedOrder);
+    };
+  }, [clearLibraryOrderSaveTimer, flushPendingLibraryOrder]);
+
+  useEffect(() => {
+    const effectsAudio = effectsAudioRef.current;
+
+    return () => {
+      clearLibraryOrderSaveTimer();
+      void flushPendingLibraryOrder({ useBeacon: true });
+      cancelMusicDuckAnimation();
+      musicUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      if (effectsAudio) {
+        effectsAudio.pause();
+        effectsAudio.src = "";
+      }
+    };
+  }, [cancelMusicDuckAnimation, clearLibraryOrderSaveTimer, flushPendingLibraryOrder]);
+
+  const moveLibraryItem = useCallback((activeId, targetId) => {
+    if (!activeId || !targetId || activeId === targetId) {
+      return;
+    }
+
+    const activeIndex = orderedLibraryFiles.findIndex((file) => file.id === activeId);
+    const targetIndex = orderedLibraryFiles.findIndex((file) => file.id === targetId);
+
+    if (activeIndex < 0 || targetIndex < 0) {
+      return;
+    }
+
+    const nextFiles = [...orderedLibraryFiles];
+    const [movedItem] = nextFiles.splice(activeIndex, 1);
+    nextFiles.splice(targetIndex, 0, movedItem);
+    handleLibraryReorder(nextFiles);
+  }, [handleLibraryReorder, orderedLibraryFiles]);
+
+  const handleLibraryDragStart = (event, fileId) => {
+    if (event.target instanceof HTMLElement && event.target.closest("button")) {
+      event.preventDefault();
+      return;
+    }
+    setDraggingLibraryId(fileId);
+    setLibraryDropTargetId("");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", fileId);
+  };
+
+  const handleLibraryDragEnter = (fileId) => {
+    if (draggingLibraryId && draggingLibraryId !== fileId) {
+      setLibraryDropTargetId(fileId);
+    }
+  };
+
+  const handleLibraryDragOver = (event, fileId) => {
+    event.preventDefault();
+    if (draggingLibraryId && draggingLibraryId !== fileId) {
+      event.dataTransfer.dropEffect = "move";
+      setLibraryDropTargetId(fileId);
+    }
+  };
+
+  const handleLibraryDrop = (event, fileId) => {
+    event.preventDefault();
+    const activeId = event.dataTransfer.getData("text/plain") || draggingLibraryId;
+    moveLibraryItem(activeId, fileId);
+    setDraggingLibraryId("");
+    setLibraryDropTargetId("");
+  };
+
+  const clearLibraryDragState = () => {
+    setDraggingLibraryId("");
+    setLibraryDropTargetId("");
+  };
+
+  useEventSource({
+    url:
+      authorized && managedSession?.match?._id
+        ? `/api/live/matches/${managedSession.match._id}`
+        : null,
+    event: "match",
+    enabled: Boolean(authorized && managedSession?.match?._id),
+    onMessage: (payload) => {
+      startTransition(() => {
+        setLiveMatch(payload);
+        setConsoleError("");
+      });
+    },
+    onError: () => {
+      if (!liveMatch) {
+        setConsoleError("Could not load live match state.");
+      }
+    },
+  });
+
+  const directorWalkieMatch = liveMatch || managedSession?.match || null;
+  const directorWalkieAvailable = Boolean(
+    authorized &&
+      managedSession?.match?._id &&
+      (directorWalkieMatch?.isOngoing ?? managedSession?.isLive)
+  );
+
+  const walkie = useWalkieTalkie({
+    matchId: managedSession?.match?._id || "",
+    enabled: directorWalkieAvailable,
+    role: "director",
+    displayName:
+      managedSession?.session?.name
+        ? `${managedSession.session.name} Director`
+        : "Director",
+    autoConnectAudio: directorWalkieAvailable && directorWalkieOn,
+    signalingActive: directorWalkieAvailable,
+  });
+  const directorWalkieSharedEnabled = Boolean(walkie.snapshot?.enabled);
+  const directorWalkieRequestState = walkie.requestState || "idle";
+  const deactivateDirectorWalkieAudio = walkie.deactivateAudio;
+
+  const handleDirectorWalkieSwitchChange = useCallback(
+    async (nextChecked) => {
+      const action = getNonUmpireWalkieToggleAction({
+        nextChecked,
+        sharedEnabled: directorWalkieSharedEnabled,
+        requestState: directorWalkieRequestState,
+        hasOwnPendingRequest: walkie.hasOwnPendingRequest,
+      });
+
+      if (action === "disable") {
+        setDirectorWalkieOn(false);
+        await walkie.deactivateAudio();
+        return;
+      }
+
+      setDirectorWalkieOn(true);
+
+      if (action === "enable") {
+        return;
+      }
+
+      if (action === "pending") {
+        showTemporaryDirectorWalkieNotice(
+          "Requested umpire access. Waiting for approval.",
+          3200
+        );
+        return;
+      }
+
+      if (!authorized || !managedSession?.match?._id) {
+        setDirectorWalkieOn(false);
+        return;
+      }
+
+      showTemporaryDirectorWalkieNotice("Requesting umpire access...", 3200);
+      const requested = await walkie.requestEnable();
+      if (!requested) {
+        setDirectorWalkieOn(false);
+        setDirectorWalkieNotice("");
+        return;
+      }
+
+      showTemporaryDirectorWalkieNotice(
+        "Requested umpire access. Waiting for approval.",
+        3200
+      );
+    },
+    [
+      authorized,
+      directorWalkieRequestState,
+      directorWalkieSharedEnabled,
+      managedSession?.match?._id,
+      showTemporaryDirectorWalkieNotice,
+      walkie,
+    ]
+  );
+
+  useEffect(() => {
+    if (
+      didSharedWalkieEnable({
+        previousSharedEnabled: previousDirectorWalkieEnabledRef.current,
+        sharedEnabled: directorWalkieSharedEnabled,
+      })
+    ) {
+      const sharedEnableMessage =
+        walkie.nonUmpireUi?.sharedEnableNotice ||
+        NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT;
+      setDirectorWalkieOn(true);
+      showTemporaryDirectorWalkieNotice(sharedEnableMessage, 3600);
+      speech.speak(
+        walkie.nonUmpireUi?.sharedEnableAnnouncement ||
+          NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT,
+        {
+        key: `director-walkie-live-${
+          managedSession?.match?._id || managedSession?.session?._id || "session"
+        }`,
+        priority: 4,
+        interrupt: true,
+        ignoreEnabled: true,
+        }
+      );
+    }
+
+    if (
+      didSharedWalkieDisable({
+        previousSharedEnabled: previousDirectorWalkieEnabledRef.current,
+        sharedEnabled: directorWalkieSharedEnabled,
+      })
+    ) {
+      setDirectorWalkieOn(false);
+      void deactivateDirectorWalkieAudio();
+    }
+
+    previousDirectorWalkieEnabledRef.current = directorWalkieSharedEnabled;
+  }, [
+    deactivateDirectorWalkieAudio,
+    directorWalkieSharedEnabled,
+    managedSession?.match?._id,
+    managedSession?.session?._id,
+    speech,
+    showTemporaryDirectorWalkieNotice,
+    walkie.nonUmpireUi?.sharedEnableAnnouncement,
+    walkie.nonUmpireUi?.sharedEnableNotice,
+  ]);
+
+  useEffect(() => {
+    if (directorWalkieRequestState === previousDirectorWalkieRequestStateRef.current) {
+      return;
+    }
+
+    previousDirectorWalkieRequestStateRef.current = directorWalkieRequestState;
+
+    if (directorWalkieRequestState === "accepted") {
+      setDirectorWalkieOn(true);
+      return;
+    }
+
+    if (directorWalkieRequestState === "dismissed") {
+      setDirectorWalkieOn(false);
+    }
+  }, [directorWalkieRequestState]);
+
+  const readCurrentScore = () => {
+    const targetMatch = liveMatch || managedSession?.match;
+    const announcement = buildCurrentScoreAnnouncement(targetMatch);
+    if (!targetMatch || !announcement) {
+      return;
+    }
+
+    void primeUiAudio();
+    speech.stop();
+    speech.prime();
+    speech.speak(announcement, {
+      key: `director-score-${targetMatch._id}`,
+      userGesture: true,
+      ignoreEnabled: true,
+      interrupt: true,
+      priority: 5,
+      rate: 0.9,
+    });
+  };
+
+  const submitDirectorPin = async () => {
+    setIsSubmittingPin(true);
+    setAuthError("");
+
+    try {
+      const response = await fetch("/api/director/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+      const payload = await response.json().catch(() => ({ message: "Could not verify PIN." }));
+
+      if (!response.ok) {
+        setAuthError(payload.message || "Could not verify PIN.");
+        return;
+      }
+
+      setConsoleError("");
+      setAuthorized(true);
+      setPin("");
+      const nextSessions = sessions.length ? sessions : readCachedDirectorSessions();
+      if (nextSessions.length) {
+        writeCachedDirectorSessions(nextSessions);
+        setSessions(nextSessions);
+        const preferredLive = preferredSessionIdRef.current
+          ? nextSessions.find(
+              (item) =>
+                item.session?._id === preferredSessionIdRef.current && item.isLive
+            )
+          : null;
+        const nextLive = nextSessions.find((item) => item.isLive);
+        setSelectedSessionId(
+          preferredLive?.session?._id ||
+            nextLive?.session?._id ||
+            nextSessions?.[0]?.session?._id ||
+            ""
+        );
+        if (pendingInitialManageRef.current && preferredLive?.session?._id) {
+          setManagedSessionId(preferredLive.session._id);
+          pendingInitialManageRef.current = false;
+        } else {
+          setManagedSessionId("");
+          setShowPicker(true);
+        }
+      }
+      setShowDirectorPinStep(false);
+    } catch {
+      setAuthError("Could not verify PIN.");
+    } finally {
+      setIsSubmittingPin(false);
+    }
+  };
+
+  useEffect(() => {
+    if (authorized) {
+      setConsoleError("");
+    }
+  }, [authorized]);
+
+  const logout = async () => {
+    await fetch("/api/director/auth", {
+      method: "DELETE",
+    }).catch(() => {});
+    setAuthorized(false);
+    setManagedSessionId("");
+    setShowPicker(false);
+    setShowDirectorPinStep(false);
+    setPin("");
+    setAuthError("");
+  };
+
+  const leaveDirectorMode = async () => {
+    await logout();
+    router.push("/");
+  };
+
+  const syncSinkId = async (deviceId) => {
+    const audio = audioRef.current;
+    if (!audio || typeof audio.setSinkId !== "function") {
+      return false;
+    }
+
+    try {
+      await audio.setSinkId(deviceId || "default");
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    applyMusicDuck(musicEffectDuckFactorRef.current, { durationMs: 140 });
+  }, [applyMusicDuck]);
+
+  useEffect(() => {
+    const nextVolume = Math.max(
+      0,
+      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume)
+    );
+    if (effectsAudioRef.current) {
+      effectsAudioRef.current.volume = nextVolume;
+    }
+  }, [masterVolume, micMonitor.isActive]);
+
+  useEffect(() => {
+    const audio = effectsAudioRef.current;
+    if (!audio) {
+      return undefined;
+    }
+
+    const persistLibraryDuration = () => {
+      const fileId = audio.dataset.effectId || "";
+      const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+      if (!fileId || !Number.isFinite(duration) || duration <= 0) {
+        return;
+      }
+
+      setLibraryDurations((current) => {
+        if (Number.isFinite(current[fileId])) {
+          return current;
+        }
+        const next = { ...current, [fileId]: duration };
+        directorAudioMetadataMemoryCache = next;
+        if (typeof window !== "undefined") {
+          try {
+            window.sessionStorage.setItem(
+              DIRECTOR_AUDIO_METADATA_CACHE_KEY,
+              JSON.stringify(next)
+            );
+          } catch {
+            // Ignore storage failures.
+          }
+        }
+        return next;
+      });
+    };
+
+    const handleEnded = () => {
+      setLibraryLiveId("");
+      setLibraryState("idle");
+      setLibraryCurrentTime(0);
+      applyMusicDuck(1, { durationMs: 260 });
+    };
+    const handlePause = () => {
+      setLibraryState((current) => (current === "loading" ? current : "paused"));
+      if (!audio.ended) {
+        setLibraryCurrentTime(audio.currentTime || 0);
+      }
+    };
+    const handlePlay = () => {
+      setConsoleError("");
+      setLibraryState("playing");
+    };
+    const handleWaiting = () => {
+      setLibraryState("loading");
+    };
+    const handleCanPlay = () => {
+      setConsoleError("");
+      setLibraryState((current) => (current === "loading" ? "paused" : current));
+      persistLibraryDuration();
+    };
+    const handleError = () => {
+      if (!audio.src) {
+        return;
+      }
+      setConsoleError("This audio file could not be played in this browser.");
+      setLibraryLiveId("");
+      setLibraryState("idle");
+      setLibraryCurrentTime(0);
+      applyMusicDuck(1, { durationMs: 200 });
+    };
+    const handleTimeUpdate = () => {
+      setLibraryCurrentTime(audio.currentTime || 0);
+    };
+
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("waiting", handleWaiting);
+    audio.addEventListener("canplay", handleCanPlay);
+    audio.addEventListener("canplaythrough", handleCanPlay);
+    audio.addEventListener("loadedmetadata", persistLibraryDuration);
+    audio.addEventListener("error", handleError);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+
+    return () => {
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("waiting", handleWaiting);
+      audio.removeEventListener("canplay", handleCanPlay);
+      audio.removeEventListener("canplaythrough", handleCanPlay);
+      audio.removeEventListener("loadedmetadata", persistLibraryDuration);
+      audio.removeEventListener("error", handleError);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+    };
+  }, [applyMusicDuck]);
+
+  useEffect(() => {
+    if (!navigator?.mediaDevices?.enumerateDevices) {
+      setSpeakerMessage("Uses your phone or browser output.");
+      return;
+    }
+
+    let cancelled = false;
+    void navigator.mediaDevices
+      .enumerateDevices()
+      .then((devices) => {
+        if (cancelled) return;
+        const outputs = devices.filter((device) => device.kind === "audiooutput");
+        setSpeakerDevices(outputs);
+        if (outputs.length) {
+          setSpeakerMessage(
+            typeof HTMLMediaElement !== "undefined" &&
+              "setSinkId" in HTMLMediaElement.prototype
+              ? "Speaker selection is supported in this browser."
+              : "Using your phone or Bluetooth output."
+          );
+        } else {
+          setSpeakerMessage("Using your phone or Bluetooth output.");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSpeakerMessage("Using your phone or Bluetooth output.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const stopAllEffects = (options = {}) => {
+    const { clearSource = true, preserveRequest = false, restoreMusic = !preserveRequest } = options;
+    const audio = effectsAudioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    if (!preserveRequest) {
+      effectPlayRequestRef.current += 1;
+    }
+
+    setConsoleError("");
+    setEffectsNeedsUnlock(false);
+    audio.pause();
+    try {
+      audio.currentTime = 0;
+    } catch {
+      // Ignore stubborn Safari currentTime resets while the element is settling.
+    }
+    if (clearSource) {
+      audio.src = "";
+      audio.removeAttribute("src");
+      delete audio.dataset.effectSrc;
+      delete audio.dataset.effectId;
+      audio.load();
+    }
+    setLibraryLiveId("");
+    setLibraryState("idle");
+    setLibraryCurrentTime(0);
+    if (restoreMusic) {
+      applyMusicDuck(1, { durationMs: 240 });
+    }
+  };
+
+  const primeEffectsAudio = useCallback(async () => {
+    const audio = effectsAudioRef.current;
+    const unlocked = isUiAudioUnlocked()
+      ? true
+      : await primeUiAudio({
+          mediaElements: audio ? [audio] : [],
+        });
+
+    if (!audio) {
+      return unlocked;
+    }
+
+    audio.muted = false;
+    audio.playsInline = true;
+    audio.setAttribute("playsinline", "");
+    audio.setAttribute("webkit-playsinline", "");
+    audio.volume = Math.max(0, Math.min(1, masterVolume));
+    setEffectsNeedsUnlock(!unlocked && iOSSafari);
+    return unlocked;
+  }, [iOSSafari, masterVolume]);
+
+  const playEffect = async (file) => {
+    const audio = effectsAudioRef.current;
+    if (!audio || !file?.src) {
+      return;
+    }
+
+    if (libraryLiveId === file.id) {
+      stopAllEffects();
+      return;
+    }
+
+    const requestId = effectPlayRequestRef.current + 1;
+    effectPlayRequestRef.current = requestId;
+
+    stopAllEffects({ clearSource: false, preserveRequest: true });
+    setConsoleError("");
+    setEffectsNeedsUnlock(false);
+    setLibraryLiveId(file.id);
+    setLibraryState("loading");
+    setLibraryCurrentTime(0);
+    const unlocked = await primeEffectsAudio();
+    if (iOSSafari && !unlocked) {
+      setConsoleError("Tap Enable Audio once, then play the sound again.");
+      setLibraryState("idle");
+      setLibraryLiveId("");
+      return;
+    }
+
+    audio.preload = "auto";
+    let effectSrc = cachedEffectUrlRef.current.get(file.id) || "";
+    if (!effectSrc && !iOSSafari) {
+      try {
+        effectSrc = await getCachedAudioAssetUrl(file.src);
+        if (effectSrc) {
+          cachedEffectUrlRef.current.set(file.id, effectSrc);
+        }
+      } catch {
+        effectSrc = file.src;
+      }
+    }
+    if (!effectSrc) {
+      effectSrc = file.src;
+    }
+
+    if (requestId !== effectPlayRequestRef.current) {
+      return;
+    }
+
+    applyMusicDuck(0.16, { durationMs: 220 });
+    const nextSrc = effectSrc || file.src;
+    const sourceChanged = audio.dataset.effectSrc !== nextSrc;
+    audio.dataset.effectSrc = nextSrc;
+    audio.dataset.effectId = file.id;
+    audio.volume = Math.max(
+      0,
+      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume)
+    );
+    if (sourceChanged) {
+      audio.src = nextSrc;
+      audio.load();
+    } else {
+      try {
+        audio.currentTime = 0;
+      } catch {
+        // Ignore reset failures and still attempt playback.
+      }
+    }
+
+    try {
+      await audio.play();
+      if (iOSSafari && !cachedEffectUrlRef.current.has(file.id)) {
+        void getCachedAudioAssetUrl(file.src)
+          .then((cachedUrl) => {
+            if (cachedUrl) {
+              cachedEffectUrlRef.current.set(file.id, cachedUrl);
+            }
+          })
+          .catch(() => {});
+      }
+    } catch (error) {
+      if (requestId !== effectPlayRequestRef.current) {
+        return;
+      }
+      if (
+        error instanceof DOMException &&
+        (error.name === "AbortError" || error.name === "NotAllowedError")
+      ) {
+        setConsoleError(
+          "Safari blocked this audio. Tap Enable Audio once, then play the sound again."
+        );
+        setEffectsNeedsUnlock(true);
+        setLibraryState("idle");
+        setLibraryLiveId("");
+        applyMusicDuck(1, { durationMs: 180 });
+        return;
+      }
+      setConsoleError("This audio file could not be played in this browser.");
+      setLibraryState("idle");
+      setLibraryLiveId("");
+      applyMusicDuck(1, { durationMs: 180 });
+    }
+  };
+
+  const stopAllAudio = async () => {
+    audioRef.current?.pause();
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+    }
+    setMusicState("stopped");
+    await micMonitor.stop({ resumeMedia: true });
+    await walkie.stopTalking();
+    stopAllEffects();
+  };
+
+  useEffect(() => {
+    setConsoleError("");
+    setMusicMessage("");
+    setAuthError("");
+    setDirectorWalkieNotice("");
+    setDirectorHoldLive(false);
+    setDirectorSpeakerOn(false);
+    setDirectorWalkieOn(false);
+    setLibraryCurrentTime(0);
+    setLibraryLiveId("");
+    setLibraryState("idle");
+    setDraggingLibraryId("");
+    setLibraryDropTargetId("");
+    previousDirectorWalkieEnabledRef.current = false;
+    previousDirectorWalkieRequestStateRef.current = "idle";
+    if (directorWalkieNoticeTimerRef.current) {
+      window.clearTimeout(directorWalkieNoticeTimerRef.current);
+      directorWalkieNoticeTimerRef.current = null;
+    }
+
+    if (effectsAudioRef.current) {
+      effectsAudioRef.current.pause();
+      effectsAudioRef.current.currentTime = 0;
+      effectsAudioRef.current.src = "";
+      delete effectsAudioRef.current.dataset.effectSrc;
+      delete effectsAudioRef.current.dataset.effectId;
+    }
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+
+    setMusicState("idle");
+  }, [managedSessionId]);
+
+  const handleMusicSelection = (event) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) {
+      return;
+    }
+
+    musicUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    const nextTracks = files.map((file) => ({
+      id: `${file.name}-${file.size}-${file.lastModified}`,
+      name: file.name.replace(/\.[^.]+$/, ""),
+      url: URL.createObjectURL(file),
+      type: file.type || "audio/mpeg",
+    }));
+    musicUrlsRef.current = nextTracks.map((track) => track.url);
+    setMusicTracks(nextTracks);
+    setCurrentTrackIndex(0);
+    setMusicMessage(
+      `${nextTracks.length} track${nextTracks.length === 1 ? "" : "s"} loaded.`
+    );
+    window.setTimeout(() => setMusicMessage(""), 2200);
+  };
+
+  useEffect(() => {
+    const currentTrack = musicTracks[currentTrackIndex];
+    const audio = audioRef.current;
+    if (!audio || !currentTrack) {
+      return;
+    }
+
+    if (audio.src !== currentTrack.url) {
+      audio.src = currentTrack.url;
+    }
+
+    void syncSinkId(speakerDeviceId);
+  }, [currentTrackIndex, musicTracks, speakerDeviceId]);
+
+  const handlePlayMusic = async () => {
+    const audio = audioRef.current;
+    const track = musicTracks[currentTrackIndex];
+    if (!audio || !track) {
+      return;
+    }
+
+    audio.src = track.url;
+    audio.volume = musicVolume * masterVolume;
+    const sinkApplied = await syncSinkId(speakerDeviceId);
+    if (!sinkApplied && speakerDeviceId !== "default") {
+      setSpeakerMessage("Output routing is not supported in this browser.");
+    }
+
+    try {
+      await audio.play();
+      setMusicState("playing");
+      setMusicMessage(`Playing ${track.name}.`);
+    } catch {
+      setMusicMessage("Music playback was blocked by the browser.");
+    }
+  };
+
+  const handlePauseMusic = () => {
+    audioRef.current?.pause();
+    setMusicState("paused");
+  };
+
+  const handleStopMusic = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setMusicState("stopped");
+  };
+
+  const handleNextMusic = async () => {
+    if (!musicTracks.length) {
+      return;
+    }
+
+    const nextIndex = (currentTrackIndex + 1) % musicTracks.length;
+    setCurrentTrackIndex(nextIndex);
+    window.setTimeout(() => {
+      void handlePlayMusic();
+    }, 60);
+  };
+
+  const handleTrackEnd = () => {
+    if (musicTracks.length > 1) {
+      void handleNextMusic();
+      return;
+    }
+    setMusicState("stopped");
+  };
+
+  const handleDirectorMicStart = useCallback(async () => {
+    if (!directorSpeakerOn || directorMicHoldingRef.current) {
+      return;
+    }
+
+    directorMicHoldingRef.current = true;
+    setDirectorHoldLive(true);
+    playUiTone({ frequency: 900, durationMs: 100, type: "sine", volume: 0.04 });
+    const started = await micMonitor.start({ pauseMedia: true });
+    if (!started) {
+      directorMicHoldingRef.current = false;
+      setDirectorHoldLive(false);
+    }
+  }, [directorSpeakerOn, micMonitor]);
+
+  const handleDirectorMicStop = useCallback(async () => {
+    directorMicHoldingRef.current = false;
+    setDirectorHoldLive(false);
+    await micMonitor.stop({ resumeMedia: true });
+  }, [micMonitor]);
+
+  const handleDirectorSpeakerSwitchChange = useCallback(
+    async (nextChecked) => {
+      setDirectorSpeakerOn(nextChecked);
+
+      if (nextChecked) {
+        return;
+      }
+
+      directorMicPointerIdRef.current = null;
+      directorMicHoldingRef.current = false;
+      setDirectorHoldLive(false);
+      await micMonitor.stop({ resumeMedia: true });
+    },
+    [micMonitor]
+  );
+
+  useEffect(() => {
+    const handlePointerRelease = (event) => {
+      if (
+        directorMicPointerIdRef.current !== null &&
+        event.pointerId !== undefined &&
+        event.pointerId !== directorMicPointerIdRef.current
+      ) {
+        return;
+      }
+
+      directorMicPointerIdRef.current = null;
+      void handleDirectorMicStop();
+    };
+
+    window.addEventListener("pointerup", handlePointerRelease);
+    window.addEventListener("pointercancel", handlePointerRelease);
+
+    return () => {
+      window.removeEventListener("pointerup", handlePointerRelease);
+      window.removeEventListener("pointercancel", handlePointerRelease);
+    };
+  }, [handleDirectorMicStop]);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || typeof window === "undefined") {
+      return undefined;
+    }
+
+    const resetHeldAudio = () => {
+      directorMicPointerIdRef.current = null;
+      void handleDirectorMicStop();
+      void walkie.stopTalking("backgrounded");
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        resetHeldAudio();
+      }
+    };
+
+    window.addEventListener("pagehide", resetHeldAudio);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.removeEventListener("pagehide", resetHeldAudio);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [handleDirectorMicStop, walkie]);
+
+  const handleSpeakerOutputChange = async (deviceId) => {
+    setSpeakerDeviceId(deviceId);
+    const applied = await syncSinkId(deviceId);
+    setSpeakerMessage(
+      applied
+        ? "Music routed to selected output."
+        : "Using your phone or Bluetooth output."
+    );
+  };
+
+  const currentTrack = musicTracks[currentTrackIndex];
+
+  useEffect(() => {
+    if (
+      typeof navigator === "undefined" ||
+      typeof MediaMetadata === "undefined" ||
+      !("mediaSession" in navigator)
+    ) {
+      return;
+    }
+
+    if (iOSSafari || !currentTrack || musicState !== "playing") {
+      navigator.mediaSession.metadata = null;
+      navigator.mediaSession.playbackState = "none";
+      try {
+        navigator.mediaSession.setActionHandler("play", null);
+        navigator.mediaSession.setActionHandler("pause", null);
+        navigator.mediaSession.setActionHandler("nexttrack", null);
+        navigator.mediaSession.setActionHandler("stop", null);
+      } catch {
+        // Ignore unsupported action cleanup.
+      }
+      return;
+    }
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentTrack.name,
+      artist: "Local phone audio",
+      album: "GV Cricket Music Deck",
+    });
+    navigator.mediaSession.playbackState =
+      musicState === "playing" ? "playing" : "paused";
+
+    try {
+      navigator.mediaSession.setActionHandler("play", () => {
+        const audio = audioRef.current;
+        if (!audio || !currentTrack) {
+          return;
+        }
+        audio
+          .play()
+          .then(() => {
+            setMusicState("playing");
+          })
+          .catch(() => {});
+      });
+      navigator.mediaSession.setActionHandler("pause", () => {
+        audioRef.current?.pause();
+        setMusicState("paused");
+      });
+      navigator.mediaSession.setActionHandler("nexttrack", () => {
+        if (musicTracks.length > 1) {
+          setCurrentTrackIndex((index) => (index + 1) % musicTracks.length);
+        }
+      });
+      navigator.mediaSession.setActionHandler("stop", () => {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+        }
+        setMusicState("stopped");
+      });
+    } catch {
+      // Some browsers only support a subset of media session actions.
+    }
+
+    return () => {
+      try {
+        navigator.mediaSession.setActionHandler("play", null);
+        navigator.mediaSession.setActionHandler("pause", null);
+        navigator.mediaSession.setActionHandler("nexttrack", null);
+        navigator.mediaSession.setActionHandler("stop", null);
+      } catch {
+        // Ignore unsupported action cleanup.
+      }
+    };
+  }, [currentTrack, iOSSafari, musicState, musicTracks.length]);
+
+  const directorWalkieChannelEnabled = directorWalkieSharedEnabled;
+  const directorWalkieUi =
+    walkie.nonUmpireUi ||
+    getNonUmpireWalkieUiState({
+      sharedEnabled: directorWalkieChannelEnabled,
+      localEnabled: directorWalkieOn,
+      isTalking: walkie.isSelfTalking,
+      isFinishing: walkie.isFinishing,
+      requestState: walkie.requestState,
+      hasOwnPendingRequest: walkie.hasOwnPendingRequest,
+    });
+  const directorWalkiePending = Boolean(directorWalkieUi.pendingRequest);
+  const directorWalkieNeedsLocalEnableNotice = Boolean(
+    directorWalkieUi.needsLocalEnableNotice
+  );
+  const walkieStatus = directorWalkiePending
+    ? "Requested"
+    : !directorWalkieChannelEnabled
+    ? "Off"
+    : !directorWalkieOn
+    ? "Off"
+    : walkie.isFinishing
+    ? "Finishing"
+    : walkie.isSelfTalking
+    ? "Director Live"
+    : walkie.snapshot?.activeSpeakerRole === "umpire"
+    ? "Umpire Live"
+    : walkie.snapshot?.activeSpeakerRole === "spectator"
+    ? "Spectator Live"
+    : "Ready";
+  const surfacedDirectorWalkieNotice = directorWalkieNeedsLocalEnableNotice
+    ? directorWalkieUi.notice
+    : directorWalkieChannelEnabled ||
+      directorWalkieOn ||
+      directorWalkieRequestState === "dismissed"
+    ? directorWalkieNotice || walkie.notice
+    : "";
+  const showDirectorWalkieNotice = Boolean(
+    surfacedDirectorWalkieNotice || directorWalkieNeedsLocalEnableNotice
+  );
+  const canManageSession = Boolean(authorized && managedSession?.match?._id);
+
+  return (
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 lg:max-w-[1500px] lg:px-6 2xl:max-w-[1760px]">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            void leaveDirectorMode();
+          }}
+          className="press-feedback inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-white"
+        >
+          <FaArrowLeft />
+          Home
+        </button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {authorized ? (
+            <button
+              type="button"
+              onClick={logout}
+              className="press-feedback inline-flex items-center gap-2 rounded-full border border-rose-400/25 bg-[linear-gradient(135deg,rgba(69,10,10,0.96),rgba(127,29,29,0.92))] px-4 py-2 text-sm font-extrabold uppercase tracking-[0.18em] text-rose-100 shadow-[0_14px_34px_rgba(127,29,29,0.28)]"
+            >
+              <FaPowerOff />
+              Exit
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {managedSession ? (
+        <SessionHeader
+          selectedSession={managedSession}
+          liveMatch={liveMatch}
+          onChangeSession={() => {
+            setManagedSessionId("");
+            setShowPicker(true);
+          }}
+          readCurrentScore={authorized ? readCurrentScore : () => {}}
+        />
+      ) : (
+        <SessionCoverHero
+          imageUrl={
+            selectedSession?.match?.matchImageUrl ||
+            selectedSession?.session?.matchImageUrl ||
+            ""
+          }
+          alt="Director console cover"
+          className="mb-5"
+          priority
+          showImage={false}
+        >
+          <div className="space-y-4 px-5 py-5 sm:px-6">
+            {!authorized ? (
+              <>
+                <div className="space-y-2 text-center sm:text-left">
+                  <div className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-emerald-400/20 bg-emerald-500/12 text-emerald-300 shadow-[0_0_30px_rgba(16,185,129,0.15)]">
+                    <FaBroadcastTower className="text-xl" />
+                  </div>
+                  <LiquidSportText
+                    as="h1"
+                    text="DIRECTOR CONSOLE"
+                    variant="hero-bright"
+                    simplifyMotion
+                    className="text-2xl font-semibold tracking-[-0.03em] sm:text-[2rem]"
+                  />
+                </div>
+                {authError ? (
+                  <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                    {authError}
+                  </div>
+                ) : null}
+                {!showDirectorPinStep ? (
+                  <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,8,11,0.68),rgba(8,8,11,0.4))] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                    <LoadingButton
+                      type="button"
+                      onClick={() => {
+                        setAuthError("");
+                        setShowDirectorPinStep(true);
+                      }}
+                      className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(90deg,#10b981_0%,#22c55e_58%,#34d399_100%)] px-5 py-3.5 font-bold text-black shadow-[0_16px_36px_rgba(16,185,129,0.2)] transition hover:-translate-y-0.5 hover:brightness-105"
+                    >
+                      Get Started
+                    </LoadingButton>
+                  </div>
+                ) : (
+                  <div className="rounded-[24px] border border-white/10 bg-black/30 px-4 py-4">
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500">
+                          Step 1
+                        </p>
+                        <p className="mt-2 text-sm text-zinc-300">
+                          Enter the 4-digit director PIN to join the shared live director console.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDirectorPinStep(false);
+                          setPin("");
+                          setAuthError("");
+                        }}
+                        className="press-feedback inline-flex rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-300"
+                      >
+                        Back
+                      </button>
+                    </div>
+                    <label
+                      htmlFor="director-inline-pin"
+                      className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500"
+                    >
+                      Director PIN
+                    </label>
+                    <input
+                      id="director-inline-pin"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={4}
+                      value={pin}
+                      onChange={(event) =>
+                        setPin(event.target.value.replace(/\D/g, "").slice(0, 4))
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void submitDirectorPin();
+                        }
+                      }}
+                      placeholder="0000"
+                      className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-emerald-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(16,185,129,0.08)]"
+                    />
+                    <LoadingButton
+                      type="button"
+                      onClick={() => void submitDirectorPin()}
+                      disabled={pin.length !== 4}
+                      loading={isSubmittingPin}
+                      pendingLabel="Checking..."
+                      className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(90deg,#10b981_0%,#22c55e_58%,#34d399_100%)] px-5 py-3.5 font-bold text-black shadow-[0_16px_36px_rgba(16,185,129,0.2)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Continue to Match Picker
+                    </LoadingButton>
+                    {!isSubmittingPin && pin.length !== 4 ? (
+                      <p className="mt-3 text-center text-xs text-zinc-500">
+                        Enter all 4 digits to continue.
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+              </>
+            ) : showPicker || !managedSession ? (
+              <div className="space-y-4">
+                <div className="text-center sm:text-left">
+                  <h1 className="text-2xl font-semibold tracking-[-0.03em] text-white sm:text-[2rem]">
+                    Choose a live session
+                  </h1>
+                  <p className="mt-1 text-sm text-zinc-300">
+                    Pick a live match to join. Multiple directors can open the same match at the same time.
+                  </p>
+                </div>
+                <DirectorSessionPicker
+                  sessions={sessions}
+                  onSelect={(item) => {
+                    setSelectedSessionId(item.session._id);
+                    setManagedSessionId(item.session._id);
+                    setShowPicker(false);
+                    setAuthError("");
+                  }}
+                  onQuickStart={(item) => {
+                    setSelectedSessionId(item.session._id);
+                    setManagedSessionId(item.session._id);
+                    setShowPicker(false);
+                    setAuthError("");
+                  }}
+                />
+              </div>
+            ) : null}
+          </div>
+        </SessionCoverHero>
+      )}
+
+      {authorized && consoleError ? (
+        <div className="mb-5 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          {consoleError}
+        </div>
+      ) : null}
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.78fr)] 2xl:grid-cols-[minmax(0,1.48fr)_minmax(380px,0.72fr)]">
+        <div className="flex flex-col gap-5">
+          <div className="order-3 xl:order-1">
+          <Card
+            title="Loudspeaker"
+            subtitle={
+              directorHoldLive || micMonitor.isActive
+                ? "Live on speaker"
+                : micMonitor.isStarting
+                ? "Starting loudspeaker"
+                : directorSpeakerOn
+                ? "Hold to talk over loudspeaker"
+                : "Turn on mic to use hold to talk"
+            }
+            icon={<FaMicrophone />}
+            accent="amber"
+            help={{
+              title: "Loudspeaker",
+              body: "Press and hold to speak over the phone speaker or connected Bluetooth speaker. Music and effects duck automatically while you talk.",
+            }}
+            action={
+              <IosSwitch
+                checked={directorSpeakerOn}
+                label="Loudspeaker mic"
+                onChange={(nextChecked) => {
+                  void handleDirectorSpeakerSwitchChange(nextChecked);
+                }}
+              />
+            }
+          >
+            <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(0,0,0,0.24),rgba(10,10,14,0.46))] px-4 py-5">
+              <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(251,191,36,0.84)_20%,rgba(34,211,238,0.42)_75%,rgba(0,0,0,0))]" />
+              <div
+                className="flex flex-col items-center gap-4 text-center"
+                style={{
+                  userSelect: "none",
+                  WebkitUserSelect: "none",
+                  WebkitTouchCallout: "none",
+                }}
+              >
+                {!directorSpeakerOn ? (
+                  <div className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-zinc-300">
+                    Turn on the loudspeaker mic to use hold to talk.
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={!directorSpeakerOn}
+                  {...HOLD_BUTTON_INTERACTION_PROPS}
+                  onPointerDown={(event) => {
+                    if (!event.isPrimary) return;
+                    if (event.pointerType === "mouse" && event.button !== 0) return;
+                    event.preventDefault();
+                    directorMicPointerIdRef.current = event.pointerId;
+                    event.currentTarget.setPointerCapture?.(event.pointerId);
+                    void handleDirectorMicStart();
+                  }}
+                  onPointerUp={(event) => {
+                    event.currentTarget.releasePointerCapture?.(event.pointerId);
+                  }}
+                  onPointerCancel={(event) => {
+                    event.preventDefault();
+                    event.currentTarget.releasePointerCapture?.(event.pointerId);
+                    directorMicPointerIdRef.current = null;
+                    void handleDirectorMicStop();
+                  }}
+                  className={`relative inline-flex h-28 w-28 items-center justify-center rounded-full border text-3xl transition focus:outline-none focus:ring-2 focus:ring-emerald-400/40 ${
+                    !directorSpeakerOn
+                      ? "cursor-not-allowed border-white/8 bg-white/[0.03] text-zinc-500"
+                      : directorHoldLive || micMonitor.isActive
+                      ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_40px_rgba(16,185,129,0.34)]"
+                      : "border-white/10 bg-white/[0.05] text-white"
+                  }`}
+                  aria-label="Hold to talk on loudspeaker"
+                >
+                  <span
+                    className={`absolute inset-[-8px] rounded-full border ${
+                      directorSpeakerOn && (directorHoldLive || micMonitor.isActive)
+                        ? "animate-pulse border-emerald-300/35"
+                        : "border-transparent"
+                    }`}
+                  />
+                  <FaMicrophone />
+                </button>
+                <div
+                  style={{
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
+                    WebkitTouchCallout: "none",
+                  }}
+                >
+                  <p className="text-lg font-semibold text-white">
+                    {!directorSpeakerOn
+                      ? "Turn on to talk"
+                      : micMonitor.isStarting
+                      ? "Starting..."
+                      : directorHoldLive || micMonitor.isActive
+                      ? "Release to stop"
+                      : "Hold to talk"}
+                  </p>
+                  <p className="mt-1 text-sm text-zinc-400">
+                    {directorSpeakerOn
+                      ? "Music and effects duck while you speak."
+                      : "Mic stays off until you enable it on this device."}
+                  </p>
+                </div>
+                {micMonitor.error ? (
+                  <p className="text-sm text-rose-300">{micMonitor.error}</p>
+                ) : null}
+              </div>
+            </div>
+          </Card>
+          </div>
+
+          <div className="order-1 xl:order-2">
+          <Card
+            title="Walkie with umpire"
+            subtitle="Shared live channel"
+            icon={<FaBroadcastTower />}
+            accent="emerald"
+            help={{
+              title: "Walkie with umpire",
+              body: "Request walkie when it is off. Once it is on, you can talk with the umpire or spectators. Only one person can hold the channel at a time.",
+            }}
+            action={
+              <div className="flex items-center gap-2">
+                {walkieStatus !== "Off" ? (
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                      walkieStatus.includes("Live")
+                        ? "bg-emerald-500/14 text-emerald-200"
+                        : "bg-white/[0.06] text-zinc-300"
+                    }`}
+                  >
+                    {walkieStatus}
+                  </span>
+                ) : null}
+                <IosSwitch
+                  checked={directorWalkieOn}
+                  label="Walkie state"
+                  onChange={(nextChecked) => {
+                    void handleDirectorWalkieSwitchChange(nextChecked);
+                  }}
+                  disabled={!canManageSession}
+                />
+              </div>
+            }
+          >
+            <div className="space-y-4">
+              {showDirectorWalkieNotice ? (
+              <div className="min-h-[72px]">
+                <WalkieNotice
+                  embedded
+                  notice={surfacedDirectorWalkieNotice}
+                  attention={directorWalkieUi.attentionMode}
+                  onDismiss={() => {
+                    setDirectorWalkieNotice("");
+                    walkie.dismissNotice();
+                  }}
+                />
+              </div>
+              ) : null}
+              <div
+                className={
+                  directorWalkieChannelEnabled && directorWalkieOn
+                    ? "grid gap-4 md:grid-cols-[1fr_auto] md:items-center"
+                    : "space-y-3"
+                }
+              >
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-500/8 px-3 py-1 text-sm text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                    <FaBroadcastTower className="text-sky-300" />
+                    {walkie.snapshot?.umpireCount || 0} umpire
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-cyan-500/8 px-3 py-1 text-sm text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                    <FaHeadphones className="text-emerald-300" />
+                    {walkie.snapshot?.directorCount || 0} director
+                  </span>
+                </div>
+                <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(4,20,18,0.68),rgba(10,10,14,0.5))] px-4 py-3 text-center text-sm text-zinc-300">
+                  <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(52,211,153,0.8)_22%,rgba(34,211,238,0.46)_72%,rgba(0,0,0,0))]" />
+                  {!canManageSession
+                    ? "Enter director mode and choose a live session to use walkie."
+                    : walkie.snapshot?.enabled && !directorWalkieOn
+                    ? "Turn on walkie to listen and respond."
+                    : walkie.snapshot?.enabled
+                    ? "Hold to talk with the live channel."
+                    : directorWalkiePending
+                    ? "Requested umpire access. Waiting for approval."
+                    : directorWalkieOn
+                    ? "Walkie is on. Requesting umpire access."
+                    : walkie.requestState === "dismissed"
+                    ? "Umpire dismissed the request."
+                    : "Turn on this device to request access."}
+                </div>
+                {walkie.error ? (
+                  <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                    {walkie.error}
+                  </div>
+                ) : null}
+                {walkie.needsAudioUnlock ? (
+                  <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                    <p>Safari needs one tap to enable walkie audio on this device.</p>
+                    <button
+                      type="button"
+                      onClick={() => void walkie.unlockAudio()}
+                      className="mt-3 rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-amber-300"
+                    >
+                      Enable Audio
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              {directorWalkieChannelEnabled && directorWalkieOn ? (
+              <div className="flex flex-col items-center gap-4">
+                <WalkieTalkButton
+                  active={walkie.isSelfTalking}
+                  finishing={walkie.isFinishing}
+                  disabled={!walkie.canTalk}
+                  countdown={walkie.countdown}
+                  finishDelayLeft={walkie.finishDelayLeft}
+                  onStart={walkie.startTalking}
+                  onStop={walkie.stopTalking}
+                  label="Hold to talk to umpire"
+                />
+              </div>
+              ) : null}
+            </div>
+            </div>
+          </Card>
+          </div>
+
+          <div className="order-2 xl:order-3">
+          <Card
+            title="Audio Library"
+            subtitle="Tap to play audio. Music ducks under effects."
+            icon={<FaBullhorn />}
+            accent="violet"
+            help={{
+              title: "Audio Library",
+              body: "Drop audio files into public/audio/effects and they will show here automatically. Files only load when you tap them.",
+            }}
+            action={
+              <button
+                type="button"
+                onClick={stopAllEffects}
+                className="rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-zinc-200"
+              >
+                Stop audio
+              </button>
+            }
+          >
+            <audio ref={effectsAudioRef} hidden preload="metadata" playsInline />
+            <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,16,30,0.36),rgba(10,10,14,0.32))] p-2">
+              <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(192,132,252,0.84)_18%,rgba(59,130,246,0.42)_76%,rgba(0,0,0,0))]" />
+              {effectsNeedsUnlock ? (
+                <div className="mb-3 rounded-[22px] border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                  <p>Safari needs one quick tap to enable audio playback on this device.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void primeEffectsAudio().then(() => {
+                        setEffectsNeedsUnlock(false);
+                        setConsoleError("");
+                      });
+                    }}
+                    className="mt-3 rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-amber-300"
+                  >
+                    Enable Audio
+                  </button>
+                </div>
+              ) : null}
+              {!effectsNeedsUnlock && iOSSafari && !audioUnlocked ? (
+                <div className="mb-3 rounded-[22px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-zinc-300">
+                  Tap any sound once to enable audio on this iPhone or iPad.
+                </div>
+              ) : null}
+              {orderedLibraryFiles.length ? (
+                <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
+                  {orderedLibraryFiles.map((file) => (
+                    <div
+                      key={file.id}
+                      draggable
+                      onDragStart={(event) => handleLibraryDragStart(event, file.id)}
+                      onDragEnter={() => handleLibraryDragEnter(file.id)}
+                      onDragOver={(event) => handleLibraryDragOver(event, file.id)}
+                      onDrop={(event) => handleLibraryDrop(event, file.id)}
+                      onDragEnd={clearLibraryDragState}
+                      onPointerDown={() => {
+                        void primeEffectsAudio();
+                      }}
+                      onClick={() => void playEffect(file)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          void playEffect(file);
+                        }
+                      }}
+                      className={`group relative min-h-[11.75rem] overflow-hidden rounded-[24px] border px-4 py-4 pb-5 text-left transition cursor-grab active:cursor-grabbing ${
+                        libraryLiveId === file.id
+                          ? "border-emerald-300/30 bg-[linear-gradient(180deg,rgba(18,40,34,0.9),rgba(10,16,18,0.94))] shadow-[0_18px_40px_rgba(16,185,129,0.16)]"
+                          : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                      } ${
+                        draggingLibraryId === file.id
+                          ? "scale-[0.985] opacity-72 shadow-[0_20px_50px_rgba(0,0,0,0.34)]"
+                          : ""
+                      } ${
+                        libraryDropTargetId === file.id
+                          ? "border-emerald-300/40 ring-2 ring-emerald-400/20"
+                          : ""
+                      }`}
+                    >
+                      <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
+                      <div className="flex h-full flex-col justify-between">
+                        <div className="space-y-2">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-white/90">
+                              <FaMusic className="text-sm" />
+                            </div>
+                            <span
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-400"
+                              title="Drag to reorder"
+                            >
+                              <FaGripVertical className="text-sm" />
+                            </span>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="line-clamp-2 text-sm font-semibold leading-5 text-white">
+                              {file.label}
+                            </div>
+                            <div className="truncate text-xs text-zinc-400">{file.fileName}</div>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex items-end justify-between gap-2">
+                          <div className="space-y-1 pb-1 text-xs text-zinc-400">
+                            {libraryLiveId === file.id
+                              ? libraryState === "loading"
+                                ? "Loading..."
+                                : "Playing"
+                              : "Tap to play"}
+                            <div className="text-[11px] text-zinc-500">
+                              {libraryLiveId === file.id
+                                ? `${formatAudioTime(libraryCurrentTime)} / ${formatAudioTime(
+                                    libraryDurations[file.id] || 0
+                                  )}`
+                                : formatAudioTime(libraryDurations[file.id] || 0)}
+                            </div>
+                          </div>
+                          {libraryLiveId === file.id ? (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                stopAllEffects();
+                              }}
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.08] text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)]"
+                              aria-label={`Stop ${file.label}`}
+                            >
+                              {libraryState === "loading" ? (
+                                <FaMusic className="text-xs" />
+                              ) : (
+                                <FaPause className="text-xs" />
+                              )}
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full rounded-[22px] border border-white/10 bg-black/20 px-4 py-5 text-left text-sm text-zinc-400"
+                >
+                  Drop audio files into <span className="font-semibold text-zinc-200">public/audio/effects</span> and they will appear here.
+                </button>
+              )}
+            </div>
+          </Card>
+          </div>
+
+          <div className="order-4 xl:order-4 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
+              <FaHeadphones className="text-zinc-200" />
+              {speakerMessage || "Using phone speaker output."}
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-5">
+          <Card
+            title="Score announcer"
+            subtitle="Live score readout"
+            icon={<FaVolumeUp />}
+            accent="violet"
+            help={{
+              title: "Score announcer",
+              body: "Keep score announcements on for the managed session. Use read current score any time for a quick update.",
+            }}
+            action={
+              <IosSwitch
+                checked={speechSettings.enabled}
+                label="Score announcer"
+                onChange={(nextChecked) =>
+                  setSpeechSettings((current) => ({
+                    ...current,
+                    enabled: nextChecked,
+                  }))
+                }
+              />
+            }
+          >
+            <div className="space-y-4">
+              <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(28,16,46,0.38),rgba(10,10,14,0.52))] px-4 py-4">
+                <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(192,132,252,0.82)_18%,rgba(34,211,238,0.42)_76%,rgba(0,0,0,0))]" />
+                <p className="text-sm text-zinc-300">
+                  {speechSettings.enabled
+                    ? "Score announcer is on."
+                    : "Score announcer is off."}
+                </p>
+                <p className="mt-2 text-sm text-zinc-400">
+                  Tap Read current score any time for a manual update.
+                </p>
+                {speech.needsGesture && !speech.audioUnlocked ? (
+                  <p className="mt-2 text-sm text-amber-200">
+                    Tap Read current score once to enable iPhone audio.
+                  </p>
+                ) : null}
+                {speech.status === "blocked" ? (
+                  <p className="mt-2 text-sm text-rose-200">
+                    Audio is blocked in this browser right now.
+                  </p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={readCurrentScore}
+                disabled={!canManageSession}
+                className="w-full rounded-[22px] border border-amber-400/20 bg-amber-500/10 px-4 py-4 text-left text-sm font-semibold text-amber-100 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-zinc-500 disabled:hover:translate-y-0"
+              >
+                {canManageSession
+                  ? "Read current score"
+                  : "Choose session first"}
+              </button>
+            </div>
+          </Card>
+
+          <Card
+            title="Music Deck"
+            subtitle="Files on this phone"
+            icon={<FaMusic />}
+            accent="cyan"
+            help={{
+              title: "Music Deck",
+              body: "Use audio files from Files, Downloads, or this phone. Connect a Bluetooth speaker first for louder playback. External apps like Spotify or Apple Music cannot be controlled here.",
+            }}
+            action={
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black shadow-[0_10px_30px_rgba(16,185,129,0.2)]">
+                <FaCompactDisc />
+                  Add tracks
+                  <input
+                  type="file"
+                  accept="audio/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleMusicSelection}
+                />
+              </label>
+            }
+          >
+            <audio ref={audioRef} onEnded={handleTrackEnd} hidden />
+            <div className="space-y-4">
+              <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,25,34,0.38),rgba(10,10,14,0.52))] px-4 py-4">
+                <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(34,211,238,0.82)_18%,rgba(59,130,246,0.76)_56%,rgba(250,204,21,0.34)_82%,rgba(0,0,0,0))]" />
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                  Now playing
+                </p>
+                <p className="mt-2 text-lg font-semibold text-white">
+                  {currentTrack ? currentTrack.name : "No track loaded"}
+                </p>
+                <p className="mt-1 text-sm text-zinc-400">
+                  {musicMessage ||
+                    (musicState === "playing"
+                      ? "Playing"
+                      : musicState === "paused"
+                      ? "Paused"
+                      : "Ready")}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handlePlayMusic();
+                  }}
+                  disabled={!currentTrack}
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-black disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+                  aria-label="Play music"
+                >
+                  <FaPlay />
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePauseMusic}
+                  disabled={!currentTrack}
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.06] text-white disabled:cursor-not-allowed disabled:text-zinc-500"
+                  aria-label="Pause music"
+                >
+                  <FaPause />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextMusic}
+                  disabled={!currentTrack || musicTracks.length < 2}
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.06] text-white disabled:cursor-not-allowed disabled:text-zinc-500"
+                  aria-label="Next track"
+                >
+                  <FaForward />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleStopMusic}
+                  disabled={!currentTrack}
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.06] text-white disabled:cursor-not-allowed disabled:text-zinc-500"
+                  aria-label="Stop music"
+                >
+                  <FaStop />
+                </button>
+              </div>
+
+              <label className="space-y-2 pb-1">
+                <span className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                  Music volume
+                </span>
+                <div className="director-gradient-slider">
+                  <div
+                    className="pointer-events-none absolute inset-y-0 left-0 rounded-full bg-[linear-gradient(90deg,#22d3ee_0%,#38bdf8_26%,#3b82f6_52%,#facc15_78%,#f59e0b_100%)]"
+                    style={{ width: `${Math.round(musicVolume * 100)}%` }}
+                  />
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={musicVolume}
+                    onChange={(event) => setMusicVolume(Number(event.target.value))}
+                    className="director-gradient-slider__input"
+                  />
+                </div>
+              </label>
+
+              {musicTracks.length ? (
+                <div className="space-y-2 rounded-[24px] border border-white/10 bg-black/20 p-3">
+                  {musicTracks.map((track, index) => (
+                    <button
+                      key={track.id}
+                      type="button"
+                      onClick={() => setCurrentTrackIndex(index)}
+                      className={`flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left text-sm ${
+                        index === currentTrackIndex
+                          ? "bg-emerald-500/12 text-emerald-100"
+                          : "text-zinc-300 hover:bg-white/[0.04]"
+                      }`}
+                    >
+                      <span className="truncate">{track.name}</span>
+                      {index === currentTrackIndex ? (
+                        <span className="text-xs font-semibold uppercase tracking-[0.16em]">
+                          Live
+                        </span>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-2 rounded-[24px] border border-white/10 bg-black/20 px-4 py-4 text-center text-sm text-zinc-400">
+                  Add audio files from Files, Downloads, or this phone.
+                </div>
+              )}
+            </div>
+          </Card>
+
+          <Card
+            title="Audio output"
+            subtitle="Current playback route"
+            icon={<FaHeadphones />}
+            accent="amber"
+            help={{
+              title: "Audio output",
+              body: "This shows where your audio is playing. Connect the phone to a Bluetooth speaker first for louder PA playback.",
+            }}
+          >
+            <div className="space-y-4">
+              <div className="rounded-[24px] border border-rose-300/16 bg-[radial-gradient(circle_at_top_left,rgba(251,113,133,0.18),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(239,68,68,0.16),transparent_36%),linear-gradient(180deg,rgba(52,18,24,0.34),rgba(18,6,10,0.22))] px-4 py-4">
+                <p className="text-sm font-semibold text-white">How to use it</p>
+                <ul className="mt-3 space-y-2 text-sm leading-6 text-zinc-300">
+                  <li>1. Connect your phone to a Bluetooth speaker.</li>
+                  <li>2. Keep the speaker volume up.</li>
+                  <li>3. Use PA mic, music, or sound effects from this page.</li>
+                </ul>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

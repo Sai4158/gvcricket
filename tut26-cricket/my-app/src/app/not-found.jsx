@@ -1,8 +1,10 @@
 // src/app/not-found.jsx
-"use client"; // This directive is necessary for client-side hooks and Framer Motion
+"use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import LiquidSportText from "./components/home/LiquidSportText";
 
 // Define animation variants for staggered appearance
 const containerVariants = {
@@ -29,77 +31,77 @@ const MotionLink = motion(Link);
 
 export default function NotFound() {
   return (
-    <div className="relative min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-zinc-950 to-black p-4 text-center overflow-hidden">
-      {/* Optional: Subtle background radial gradient for depth */}
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,rgba(127,29,29,0.22),transparent_24%),linear-gradient(180deg,#09090b_0%,#000000_100%)] p-4 text-center">
       <div
         className="absolute inset-0 z-0 opacity-10"
         style={{
           backgroundImage:
-            "radial-gradient(circle at center, rgba(100, 100, 100, 0.1) 0%, transparent 70%)",
+            "radial-gradient(circle at center, rgba(255,255,255,0.08) 0%, transparent 70%)",
         }}
-      ></div>
+      />
 
       <motion.div
-        className="relative z-10 flex flex-col items-center justify-center max-w-2xl mx-auto p-8 md:p-12 bg-zinc-900/40 backdrop-blur-sm rounded-3xl shadow-2xl border border-zinc-800/50"
+        className="relative z-10 mx-auto flex w-full max-w-2xl flex-col items-center justify-center rounded-[2rem] border border-white/10 bg-zinc-900/40 p-8 shadow-2xl shadow-black/40 backdrop-blur-sm md:p-12"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
       >
-        {/* Main Headline (Changed order for 404 to be second, as per your last code's visual order change) */}
+        <motion.div variants={itemVariants} className="mb-6">
+          <Image
+            src="/gvLogo.png"
+            alt="GV Cricket"
+            width={220}
+            height={220}
+            className="mx-auto h-28 w-28 object-contain drop-shadow-[0_0_32px_rgba(220,38,38,0.18)] sm:h-36 sm:w-36"
+            priority
+          />
+        </motion.div>
+
         <motion.h2
-          className="text-4xl md:text-5xl font-bold text-zinc-100 mb-4 tracking-tight"
+          className="mb-2 text-xs font-semibold uppercase tracking-[0.38em] text-rose-200/72"
           variants={itemVariants}
         >
-          That's A Wicket!
+          Page Not Found
         </motion.h2>
 
-        {/* 404 Title with gradient and shadow (Adjusted font size back to normal for 404 per original request) */}
-        <motion.h1
-          className="text-8xl md:text-9xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-yellow-400 via-orange-500 to-red-600 mb-6 drop-shadow-lg"
-          variants={itemVariants}
-        >
-          404!
-        </motion.h1>
+        <motion.div variants={itemVariants} className="mb-4">
+          <LiquidSportText
+            as="h1"
+            text={["THAT PAGE", "IS OUT"]}
+            variant="hero-bright"
+            simplifyMotion
+            className="text-5xl font-black tracking-[-0.05em] sm:text-7xl"
+          />
+        </motion.div>
 
-        {/* Cricket-themed Message */}
         <motion.p
-          className="text-lg md:text-xl text-zinc-100 leading-relaxed max-w-prose mb-10"
+          className="mb-10 max-w-xl text-base leading-relaxed text-zinc-200 sm:text-lg"
           variants={itemVariants}
         >
-          It seems you've wandered off the pitch into an unmapped boundary. This
-          area is strictly reserved for the strategists and statisticians, not
-          for public play. Trying to sneak in? That's a definite **no-ball!**
+          The link may be old, the match may be gone, or this page was never part of the scoreboard.
+          Head back home and jump into a live match, session list, or result screen from there.
         </motion.p>
 
-        {/* Go Back Home Button */}
         <motion.div variants={itemVariants}>
-          {/* FIX: Use the MotionLink component directly, and apply styles and motion props to it.
-              The child of Link should be a plain HTML element or a React component.
-              Next.js 13+ Link component renders the <a> tag automatically.
-          */}
           <MotionLink
             href="/"
-            className="inline-flex items-center px-8 py-4 bg-green-700 text-white font-semibold text-lg rounded-xl shadow-xl
-                       hover:bg-green-600 hover:scale-105 transition-all duration-300 transform
-                       focus:outline-none focus:ring-4 focus:ring-green-500 focus:ring-opacity-50"
+            className="inline-flex items-center rounded-2xl border border-rose-300/16 bg-[linear-gradient(180deg,rgba(127,29,29,0.92),rgba(69,10,10,0.96))] px-8 py-4 text-lg font-semibold text-white shadow-xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-rose-500/35"
             whileHover={{
               scale: 1.05,
-              boxShadow: "0 0 20px rgba(74, 222, 128, 0.6)",
-            }} // Glow effect on hover
-            whileTap={{ scale: 0.95 }} // Click animation
-            aria-label="Go back to the home page" // Accessibility
+              boxShadow: "0 0 20px rgba(248, 113, 113, 0.28)",
+            }}
+            whileTap={{ scale: 0.95 }}
+            aria-label="Go back to the home page"
           >
-            Back to the Home Ground
+            Back to Home
           </MotionLink>
         </motion.div>
 
-        {/* Footer message */}
         <motion.p
-          className="mt-12 text-zinc-300 text-md italic"
+          className="mt-10 text-sm italic text-zinc-400"
           variants={itemVariants}
         >
-          (Even legendary players take a wrong turn sometimes. Best of luck on
-          your next innings!)
+          404
         </motion.p>
       </motion.div>
     </div>
