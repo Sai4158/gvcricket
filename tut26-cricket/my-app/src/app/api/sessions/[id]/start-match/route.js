@@ -133,12 +133,28 @@ export async function POST(req, { params }) {
               outs: 0,
               result: "",
               balls: [],
+              matchImageUrl: session.matchImageUrl || "",
+              matchImagePublicId: session.matchImagePublicId || "",
+              matchImageStorageUrlEnc: session.matchImageStorageUrlEnc || "",
+              matchImageStorageUrlHash: session.matchImageStorageUrlHash || "",
+              matchImageUploadedAt: session.matchImageUploadedAt || null,
+              matchImageUploadedBy: session.matchImageUploadedBy || "",
               innings1: { team: battingFirst, score: 0, history: [] },
               innings2: { team: bowlingFirst, score: 0, history: [] },
             },
           ],
           { session: transactionSession }
         );
+      }
+
+      if (finalMatch) {
+        finalMatch.matchImageUrl = session.matchImageUrl || "";
+        finalMatch.matchImagePublicId = session.matchImagePublicId || "";
+        finalMatch.matchImageStorageUrlEnc = session.matchImageStorageUrlEnc || "";
+        finalMatch.matchImageStorageUrlHash = session.matchImageStorageUrlHash || "";
+        finalMatch.matchImageUploadedAt = session.matchImageUploadedAt || null;
+        finalMatch.matchImageUploadedBy = session.matchImageUploadedBy || "";
+        await finalMatch.save({ session: transactionSession });
       }
 
       session.teamA = teamAPlayers;

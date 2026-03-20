@@ -5,6 +5,8 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FaArrowLeft, FaArrowRight, FaImage, FaPen } from "react-icons/fa";
 import ImagePinModal from "../../components/shared/ImagePinModal";
+import LoadingButton from "../../components/shared/LoadingButton";
+import PendingLink from "../../components/shared/PendingLink";
 import StepFlow from "../../components/shared/StepFlow";
 import {
   compressMatchImage,
@@ -143,17 +145,17 @@ export default function NewSessionPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.12),transparent_32%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.12),transparent_30%),linear-gradient(180deg,#050505_0%,#0b0b11_52%,#050505_100%)] px-4 py-10 text-zinc-200">
+    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.12),transparent_30%),radial-gradient(circle_at_top_right,rgba(251,191,36,0.1),transparent_24%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.1),transparent_28%),linear-gradient(180deg,#050505_0%,#0b0b11_52%,#050505_100%)] px-4 py-10 text-zinc-200">
       <div className="mx-auto w-full max-w-md">
         <div className="mb-5 flex items-center justify-start">
-          <button
-            type="button"
-            onClick={() => router.push("/")}
+          <PendingLink
+            href="/"
+            pendingLabel="Opening home..."
             className="btn-ui-icon"
             aria-label="Go back"
           >
             <FaArrowLeft size={18} />
-          </button>
+          </PendingLink>
         </div>
 
         <div className="mb-5 text-center">
@@ -161,7 +163,11 @@ export default function NewSessionPage() {
         </div>
 
         <div className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,20,24,0.96),rgba(8,8,10,0.98))] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur-sm sm:p-8">
+          <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/60 via-35% via-amber-200/55 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-10 top-0 h-28 rounded-b-[36px] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02)_38%,transparent_78%)] blur-2xl" />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.08),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.08),transparent_26%)]" />
+          <div className="pointer-events-none absolute inset-y-12 left-0 w-px bg-gradient-to-b from-transparent via-cyan-300/14 to-transparent" />
+          <div className="pointer-events-none absolute inset-y-12 right-0 w-px bg-gradient-to-b from-transparent via-amber-300/12 to-transparent" />
           <div className="relative">
             <h1 className="text-center text-4xl font-black leading-[0.98] text-white sm:text-5xl">
               Create New
@@ -184,7 +190,7 @@ export default function NewSessionPage() {
                   <input
                     id="session-name"
                     value={name}
-                    onChange={(event) => setName(event.target.value)}
+                    onChange={(event) => setName(event.target.value.toUpperCase())}
                     placeholder="Game 1, finals, or practice"
                     autoComplete="off"
                     spellCheck={false}
@@ -200,11 +206,12 @@ export default function NewSessionPage() {
                 >
                   Cover Image
                 </label>
-                <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                <div className="relative rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                  <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
                   <div className="flex flex-col items-center gap-3 rounded-[20px] border border-white/8 bg-black/20 px-4 py-4 text-center">
                     <label
                       htmlFor="session-image"
-                      className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.08]"
+                      className="press-feedback inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.08]"
                     >
                       <FaImage className="text-zinc-400" />
                       Upload image
@@ -244,14 +251,18 @@ export default function NewSessionPage() {
               </div>
             )}
 
-            <button
+            <LoadingButton
               onClick={createSession}
-              disabled={saving}
-              className="btn-ui btn-ui-glass-dark mt-8 w-full rounded-[24px] px-6 py-4 text-lg font-semibold"
+              loading={saving}
+              pendingLabel="Creating..."
+              trailingIcon={<FaArrowRight />}
+              className="relative mt-8 w-full rounded-[24px] border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(11,15,24,0.98),rgba(6,8,14,0.98))] px-6 py-4 text-lg font-semibold text-white shadow-[0_18px_40px_rgba(0,0,0,0.28),0_0_0_1px_rgba(34,211,238,0.06)] transition hover:border-cyan-200/24 hover:bg-[linear-gradient(180deg,rgba(12,18,28,0.98),rgba(7,10,16,0.98))]"
             >
-              {saving ? "Creating..." : "Select Teams"}
-              {!saving && <FaArrowRight />}
-            </button>
+              <span className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/82 via-38% via-amber-200/76 to-transparent" />
+              <span className="pointer-events-none absolute inset-x-7 top-0 h-10 rounded-b-[20px] bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.04)_36%,transparent_80%)] blur-xl" />
+              <span className="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-gradient-to-r from-transparent via-sky-400/18 to-transparent" />
+              Select Teams
+            </LoadingButton>
           </div>
         </div>
       </div>

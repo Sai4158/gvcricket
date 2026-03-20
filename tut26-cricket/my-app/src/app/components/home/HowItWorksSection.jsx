@@ -1,11 +1,14 @@
 "use client";
 
-import { useRef } from "react";
+import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion";
 import {
   FaArrowRight,
+  FaBars,
   FaBroadcastTower,
   FaBullhorn,
+  FaBullseye,
   FaCheckCircle,
   FaEye,
   FaImage,
@@ -103,45 +106,51 @@ const previewTitleVariants = {
 const featureCards = [
   {
     title: "Walkie-Talkie",
-    copy: "Multi-user walkie keeps the umpire, spectators, and director on one live channel for fast listen-and-respond audio.",
+    copy: "Keep the umpire, spectators, and director on one shared live channel for faster listen-and-respond audio.",
     accent: "emerald",
     previewType: "walkie",
   },
   {
     title: "Loudspeaker",
-    copy: "Use one phone as a clean hold-to-talk PA mic for score calls, ground updates, and fast in-match announcements.",
+    copy: "Turn one phone into a clean hold-to-talk PA mic for score calls, ground updates, and quick match announcements.",
     accent: "amber",
     previewType: "loudspeaker",
   },
   {
     title: "Score Announcer",
-    copy: "Trigger cleaner score calls with tighter phrasing, better timing, and clearer delivery between balls.",
+    copy: "Queue cleaner score reads with better timing, sharper phrasing, and clearer delivery between balls.",
     accent: "violet",
     previewType: "announcer",
   },
   {
-    title: "Director Console",
-    copy: "Run sound effects, music, walkie, loudspeaker, and score audio from one sharper live control deck.",
-    accent: "cyan",
-    previewType: "director",
-  },
-  {
     title: "Share The Match",
-    copy: "Share the live match in seconds so spectators can open the scoreboard on any phone, tablet, or big screen.",
+    copy: "Share one live match link so spectators can open the scoreboard on any phone, tablet, or big screen in seconds.",
     accent: "orange",
     previewType: "share",
   },
   {
     title: "Match Images",
-    copy: "Upload match images once and carry them across the live scoreboard, spectator page, and final result screen.",
+    copy: "Upload one match image and carry it across the live scoreboard, spectator page, and final result screen.",
     accent: "rose",
     previewType: "cover",
   },
   {
     title: "Result Insights",
-    copy: "Finish with cleaner result screens, sharper winner context, and a better summary of how the match closed out.",
+    copy: "Finish with a cleaner result screen, stronger winner context, and a better closing summary of the match.",
     accent: "yellow",
     previewType: "insights",
+  },
+  {
+    title: "Director Console",
+    copy: "Run effects, music, walkie, loudspeaker, and score audio from one sharper live control deck.",
+    accent: "cyan",
+    previewType: "director",
+  },
+  {
+    title: "Live Match Banner",
+    copy: "Bring the newest live match to the home page so anyone can jump into the scoreboard in one tap.",
+    accent: "emerald",
+    previewType: "livebanner",
   },
 ];
 
@@ -288,13 +297,13 @@ function renderJourneyPreview(card) {
                   <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">
                     Team A
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-white">GV Lions</p>
+                  <p className="mt-2 text-sm font-semibold text-white">Team A</p>
                 </div>
                 <div className="rounded-[14px] border border-white/10 bg-white/[0.03] px-3 py-3">
                   <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">
                     Team B
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-white">GV Tigers</p>
+                  <p className="mt-2 text-sm font-semibold text-white">Team B</p>
                 </div>
               </div>
             </motion.div>
@@ -384,12 +393,23 @@ function renderJourneyPreview(card) {
             <motion.div variants={previewItemVariants} className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xl font-semibold uppercase tracking-tight text-white">Team B</p>
-                <p className="mt-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-amber-200/90">
-                  Target 45
-                </p>
-                <p className="mt-1 text-[12px] font-semibold uppercase tracking-[0.18em] text-amber-200/90">
-                  Need 43
-                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <div className="relative overflow-hidden rounded-[16px] border border-amber-300/18 bg-[linear-gradient(180deg,rgba(245,158,11,0.12),rgba(120,53,15,0.12))] px-3 py-2 shadow-[0_10px_24px_rgba(120,53,15,0.18)]">
+                    <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/44 to-transparent" />
+                    <div className="flex items-center gap-2">
+                      <FaBullseye className="text-[11px] text-amber-200" />
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-100/92">
+                        Target 45
+                      </p>
+                    </div>
+                  </div>
+                  <div className="relative overflow-hidden rounded-[16px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-3 py-2">
+                    <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-white/22 to-transparent" />
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-200">
+                      Need 43
+                    </p>
+                  </div>
+                </div>
               </div>
               <div className="text-right">
                 <p className="text-3xl font-black leading-none text-amber-300">2</p>
@@ -462,7 +482,7 @@ function renderJourneyPreview(card) {
                 Director PIN
               </p>
               <div className="mt-3 rounded-[16px] border border-emerald-300/18 bg-black/20 px-4 py-4 text-center text-xl font-semibold tracking-[0.5em] text-white">
-                0000
+                - - - -
               </div>
             </motion.div>
             <motion.div
@@ -756,77 +776,258 @@ function renderFeaturePreview(card) {
           </div>
         </PreviewSurface>
       );
+    case "livebanner":
+      return (
+        <PreviewSurface accent={card.accent} heading="Live Match Banner">
+          <div className="space-y-3">
+            <motion.div
+              variants={previewItemVariants}
+              className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_36%),linear-gradient(180deg,rgba(22,24,30,0.96),rgba(10,12,16,0.98))] p-3"
+            >
+              <div className="relative overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(40,48,58,0.84),rgba(14,18,24,0.84))] px-3 py-4 shadow-[0_18px_36px_rgba(0,0,0,0.22)]">
+                <Image
+                  src="/Thumb1.png"
+                  alt=""
+                  fill
+                  sizes="(max-width: 768px) 100vw, 420px"
+                  className="object-cover opacity-58"
+                />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(16,18,24,0.16),rgba(10,12,18,0.52))]" />
+                <div className="relative z-10 flex items-center justify-between gap-4">
+                  <div className="liquid-glass relative flex min-w-0 flex-1 items-center gap-3 rounded-[24px] px-3 py-3 text-white shadow-[0_18px_36px_rgba(0,0,0,0.22)]">
+                    <div className="absolute inset-0 rounded-[24px] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.16),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(52,211,153,0.08),transparent_24%)]" />
+                    <div className="relative h-[3.7rem] w-[3.7rem] shrink-0 overflow-hidden rounded-[18px] border border-white/10 bg-white/[0.05]">
+                      <Image
+                        src="/Thumb1.png"
+                        alt="Live match banner preview"
+                        fill
+                        sizes="60px"
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="relative z-10 min-w-0 text-left">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.32em] text-emerald-300">
+                        Live Now
+                      </div>
+                      <div className="truncate text-[14px] font-semibold leading-tight text-white">
+                        TEAM A vs TEAM B
+                      </div>
+                      <div className="mt-1 text-[12px] text-white/72">1/0 - View score now</div>
+                    </div>
+                    <div className="liquid-pill relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] text-white">
+                      <FaArrowRight className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center text-white/96">
+                    <FaBars className="text-[1.85rem] drop-shadow-[0_8px_18px_rgba(0,0,0,0.28)]" />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+            <motion.div
+              variants={previewItemVariants}
+              className="relative overflow-hidden rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-3"
+            >
+              <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/24 to-transparent" />
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                    Home shortcut
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-white">Latest live match opens first</p>
+                </div>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-200/86">
+                  Instant
+                </span>
+              </div>
+            </motion.div>
+          </div>
+        </PreviewSurface>
+      );
     default:
       return null;
   }
 }
 
-function useCardScrollMotion(prefersReducedMotion, accent, index) {
+function renderFeatureDetail(card) {
+  if (card.previewType !== "director") {
+    return null;
+  }
+
+  return (
+    <motion.div
+      variants={previewStaggerVariants}
+      className="mt-4 rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] p-3"
+    >
+      <motion.p
+        variants={previewItemVariants}
+        className="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-200/80"
+      >
+        Deck expansion
+      </motion.p>
+      <div className="mt-3 space-y-3 rounded-[20px] border border-cyan-300/12 bg-[linear-gradient(180deg,rgba(8,14,20,0.94),rgba(7,8,12,0.98))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <motion.div
+          variants={previewItemVariants}
+          className="rounded-[18px] border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(8,24,36,0.96),rgba(9,12,18,0.98))] px-4 py-3"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-white">Live sound bank armed</p>
+              <p className="mt-1 text-[11px] text-zinc-400">
+                Keep the next crowd lift, sixer hit, and horn ready while the live match stays in front.
+              </p>
+            </div>
+            <span className="rounded-full border border-emerald-300/18 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-100/90">
+              On air
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {[
+              ["Next", "SIXER CALL"],
+              ["Back-up", "IPL HORN"],
+              ["Bed", "CROWD RISE"],
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                className="rounded-[14px] border border-white/10 bg-white/[0.04] px-3 py-2"
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                  {label}
+                </p>
+                <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white">
+                  {value}
+                </p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        <motion.div variants={previewStaggerVariants} className="grid grid-cols-2 gap-2">
+          {[
+            ["Sixer Call", FaVolumeUp, "Big moment", "amber"],
+            ["IPL Horn", FaBullhorn, "Start strong", "cyan"],
+            ["Crowd Cheer", FaBroadcastTower, "Lift the room", "emerald"],
+            ["Wicket Sting", FaMicrophoneAlt, "Sharp finish", "violet"],
+          ].map(([label, Icon, meta, tone]) => (
+            <motion.div
+              key={label}
+              variants={previewItemVariants}
+              className={`rounded-[18px] border px-3 py-3 ${
+                tone === "emerald"
+                  ? "border-emerald-300/16 bg-[linear-gradient(180deg,rgba(6,78,59,0.3),rgba(17,24,39,0.92))]"
+                  : tone === "amber"
+                  ? "border-amber-300/16 bg-[linear-gradient(180deg,rgba(146,64,14,0.28),rgba(17,24,39,0.92))]"
+                  : tone === "violet"
+                  ? "border-violet-300/16 bg-[linear-gradient(180deg,rgba(91,33,182,0.24),rgba(17,24,39,0.92))]"
+                  : "border-cyan-300/16 bg-[linear-gradient(180deg,rgba(8,47,73,0.26),rgba(17,24,39,0.92))]"
+              }`}
+            >
+              <Icon className="text-sm text-white" />
+              <p className="mt-3 text-sm font-semibold text-white">{label}</p>
+              <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-zinc-500">{meta}</p>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        <motion.div
+          variants={previewStaggerVariants}
+          className="grid gap-2 rounded-[18px] border border-white/10 bg-white/[0.03] p-3"
+        >
+          {[
+            ["Mic", "84%", "Live voice"],
+            ["Music", "62%", "Under FX"],
+            ["FX", "71%", "Queue hot"],
+          ].map(([label, value, meta]) => (
+            <motion.div
+              key={label}
+              variants={previewItemVariants}
+              className="flex items-center gap-3"
+            >
+              <span className="w-11 text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                {label}
+              </span>
+              <span className="relative h-2 flex-1 overflow-hidden rounded-full bg-white/8">
+                <span
+                  className="absolute inset-y-0 left-0 rounded-full bg-[linear-gradient(90deg,rgba(34,211,238,0.9),rgba(59,130,246,0.95),rgba(251,191,36,0.9))]"
+                  style={{ width: value }}
+                />
+              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
+                {value}
+              </span>
+              <span className="hidden text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500 sm:inline">
+                {meta}
+              </span>
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
+    </motion.div>
+  );
+}
+
+function useUseFlatLaptopMotion() {
+  const [useFlatLaptopMotion, setUseFlatLaptopMotion] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    const syncMotionMode = () => setUseFlatLaptopMotion(mediaQuery.matches);
+
+    syncMotionMode();
+    mediaQuery.addEventListener("change", syncMotionMode);
+    return () => mediaQuery.removeEventListener("change", syncMotionMode);
+  }, []);
+
+  return useFlatLaptopMotion;
+}
+
+function useCardScrollMotion(prefersReducedMotion, accent, index, useFlatLaptopMotion) {
   const ref = useRef(null);
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start 0.94", "end 0.08"],
   });
   const direction = index % 2 === 0 ? -1 : 1;
-  const springConfig = { stiffness: 180, damping: 30, mass: 0.32 };
+  const springConfig = { stiffness: 150, damping: 30, mass: 0.42 };
 
-  const cardY = useSpring(useTransform(scrollYProgress, [0, 0.5, 1], [18, 0, -8]), springConfig);
+  const cardY = useSpring(
+    useTransform(scrollYProgress, [0, 0.5, 1], useFlatLaptopMotion ? [18, 0, -4] : [16, 0, -6]),
+    springConfig
+  );
   const cardX = useSpring(
-    useTransform(scrollYProgress, [0, 0.5, 1], [direction * 30, 0, direction * -12]),
+    useTransform(
+      scrollYProgress,
+      [0, 0.5, 1],
+      useFlatLaptopMotion ? [direction * 10, 0, direction * -2] : [direction * 14, 0, direction * -4]
+    ),
     springConfig
   );
-  const cardRotateZ = useSpring(
-    useTransform(scrollYProgress, [0, 0.5, 1], [direction * 2.1, 0, direction * -0.8]),
-    springConfig
-  );
-  const cardRotateY = useSpring(
-    useTransform(scrollYProgress, [0, 0.5, 1], [direction * 7, 0, direction * -2.5]),
-    springConfig
-  );
-  const cardRotateX = useSpring(
-    useTransform(scrollYProgress, [0, 0.5, 1], [4.5, 0, -1.4]),
-    springConfig
-  );
-  const cardScale = useSpring(
-    useTransform(scrollYProgress, [0, 0.5, 1], [0.972, 1, 0.992]),
+  const cardOpacity = useSpring(
+    useTransform(scrollYProgress, [0, 0.28, 0.55, 1], useFlatLaptopMotion ? [0.76, 0.94, 1, 1] : [0.88, 0.96, 1, 1]),
     springConfig
   );
   const glowOpacity = useSpring(
-    useTransform(scrollYProgress, [0, 0.32, 0.7, 1], [0.36, 0.78, 0.9, 0.52]),
-    springConfig
-  );
-  const previewY = useSpring(useTransform(scrollYProgress, [0, 0.5, 1], [10, 0, -4]), springConfig);
-  const previewX = useSpring(
-    useTransform(scrollYProgress, [0, 0.5, 1], [direction * 20, 0, direction * -6]),
-    springConfig
-  );
-  const previewRotateY = useSpring(
-    useTransform(scrollYProgress, [0, 0.5, 1], [direction * -6, 0, direction * 2]),
-    springConfig
-  );
-  const previewRotateX = useSpring(
-    useTransform(scrollYProgress, [0, 0.5, 1], [-3, 0, 1.2]),
-    springConfig
-  );
-  const previewScale = useSpring(
-    useTransform(scrollYProgress, [0, 0.5, 1], [0.965, 1, 0.995]),
-    springConfig
-  );
-  const contentY = useSpring(useTransform(scrollYProgress, [0, 0.5, 1], [8, 0, -4]), springConfig);
-  const contentX = useSpring(
-    useTransform(scrollYProgress, [0, 0.5, 1], [direction * -12, 0, direction * 4]),
-    springConfig
-  );
-  const contentRotateZ = useSpring(
-    useTransform(scrollYProgress, [0, 0.5, 1], [direction * -0.7, 0, direction * 0.25]),
+    useTransform(
+      scrollYProgress,
+      [0, 0.32, 0.7, 1],
+      useFlatLaptopMotion ? [0.22, 0.42, 0.54, 0.28] : [0.36, 0.78, 0.9, 0.52]
+    ),
     springConfig
   );
   const accentSweepOpacity = useSpring(
-    useTransform(scrollYProgress, [0, 0.35, 0.75, 1], [0.07, 0.16, 0.22, 0.1]),
+    useTransform(
+      scrollYProgress,
+      [0, 0.35, 0.75, 1],
+      useFlatLaptopMotion ? [0.04, 0.08, 0.12, 0.06] : [0.07, 0.16, 0.22, 0.1]
+    ),
     springConfig
   );
   const accentSweepX = useSpring(
-    useTransform(scrollYProgress, [0, 0.5, 1], [direction * -14, 0, direction * 10]),
+    useTransform(
+      scrollYProgress,
+      [0, 0.5, 1],
+      useFlatLaptopMotion ? [direction * -6, 0, direction * 4] : [direction * -14, 0, direction * 10]
+    ),
     springConfig
   );
 
@@ -846,36 +1047,22 @@ function useCardScrollMotion(prefersReducedMotion, accent, index) {
     cardStyle: {
       x: cardX,
       y: cardY,
-      rotateZ: cardRotateZ,
-      rotateX: cardRotateX,
-      rotateY: cardRotateY,
-      scale: cardScale,
-      transformPerspective: 1100,
+      opacity: cardOpacity,
+      scale: 1,
     },
     glowStyle: { opacity: glowOpacity },
-    previewStyle: {
-      x: previewX,
-      y: previewY,
-      rotateY: previewRotateY,
-      rotateX: previewRotateX,
-      scale: previewScale,
-      transformPerspective: 1000,
-    },
-    contentStyle: {
-      x: contentX,
-      y: contentY,
-      rotateZ: contentRotateZ,
-      transformPerspective: 900,
-    },
+    previewStyle: undefined,
+    contentStyle: undefined,
     accentSweepStyle: { opacity: accentSweepOpacity, x: accentSweepX },
   };
 }
 
-function FeatureCard({ card, index, prefersReducedMotion }) {
+function FeatureCard({ card, index, prefersReducedMotion, useFlatLaptopMotion }) {
   const { ref, cardStyle, glowStyle, previewStyle, contentStyle, accentSweepStyle } = useCardScrollMotion(
     prefersReducedMotion,
     card.accent,
-    index
+    index,
+    useFlatLaptopMotion
   );
 
   return (
@@ -886,6 +1073,12 @@ function FeatureCard({ card, index, prefersReducedMotion }) {
       whileHover={
         prefersReducedMotion
           ? undefined
+          : useFlatLaptopMotion
+          ? {
+              y: -4,
+              scale: 1.006,
+              transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] },
+            }
           : {
               y: -6,
               scale: 1.012,
@@ -936,17 +1129,19 @@ function FeatureCard({ card, index, prefersReducedMotion }) {
           >
             {card.copy}
           </motion.p>
+          {renderFeatureDetail(card)}
         </motion.div>
       </div>
     </motion.div>
   );
 }
 
-function JourneyCard({ card, index, prefersReducedMotion }) {
+function JourneyCard({ card, index, prefersReducedMotion, useFlatLaptopMotion }) {
   const { ref, cardStyle, glowStyle, previewStyle, contentStyle, accentSweepStyle } = useCardScrollMotion(
     prefersReducedMotion,
     card.accent,
-    index
+    index,
+    useFlatLaptopMotion
   );
 
   return (
@@ -957,6 +1152,12 @@ function JourneyCard({ card, index, prefersReducedMotion }) {
       whileHover={
         prefersReducedMotion
           ? undefined
+          : useFlatLaptopMotion
+          ? {
+              y: -4,
+              scale: 1.006,
+              transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] },
+            }
           : {
               y: -6,
               scale: 1.012,
@@ -1013,6 +1214,7 @@ function JourneyCard({ card, index, prefersReducedMotion }) {
 
 export default function HowItWorksSection() {
   const prefersReducedMotion = useReducedMotion();
+  const useFlatLaptopMotion = useUseFlatLaptopMotion();
 
   return (
     <AnimatedSection
@@ -1045,7 +1247,7 @@ export default function HowItWorksSection() {
             </p>
             <div className="mt-3">
               <LiquidSportText
-                text={["Explore all the", "latest features"]}
+                text={["New tools for", "live scoring"]}
                 characterTyping
                 characterStagger={0.02}
                 characterLineDelay={0.14}
@@ -1068,6 +1270,7 @@ export default function HowItWorksSection() {
                 card={card}
                 index={index}
                 prefersReducedMotion={prefersReducedMotion}
+                useFlatLaptopMotion={useFlatLaptopMotion}
               />
             ))}
           </motion.div>
@@ -1115,6 +1318,7 @@ export default function HowItWorksSection() {
                 card={card}
                 index={index}
                 prefersReducedMotion={prefersReducedMotion}
+                useFlatLaptopMotion={useFlatLaptopMotion}
               />
             ))}
           </motion.div>

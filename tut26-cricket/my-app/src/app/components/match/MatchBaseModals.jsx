@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { FaTimes } from "react-icons/fa";
+import LoadingButton from "../shared/LoadingButton";
 import { Ball } from "./MatchBallHistory";
 import MatchImageUploader from "./MatchImageUploader";
 
@@ -56,7 +57,7 @@ export function ModalBase({
         {!hideHeader ? (
           <button
             onClick={onExit}
-            className="absolute right-3 top-3 z-20 rounded-full p-2 text-zinc-500 transition-colors hover:text-white"
+            className="press-feedback absolute right-3 top-3 z-20 rounded-full p-2 text-zinc-500 transition-colors hover:text-white"
             aria-label="Close modal"
           >
             <FaTimes size={20} />
@@ -207,14 +208,15 @@ export function InningsEndModal({ match, onNext }) {
           {match.result}
         </p>
       )}
-      <button
+      <LoadingButton
         onClick={onNext}
+        pendingLabel={match.innings === "first" && !match.result ? "Opening..." : "Loading result..."}
         className="mt-6 w-full py-3 text-lg bg-green-600 text-white font-bold rounded-lg hover:bg-green-500 transition"
       >
         {match.innings === "first" && !match.result
           ? "Start Second Innings"
           : "View Final Results"}
-      </button>
+      </LoadingButton>
     </ModalBase>
   );
 }

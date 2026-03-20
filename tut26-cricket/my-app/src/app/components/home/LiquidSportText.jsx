@@ -18,6 +18,13 @@ export default function LiquidSportText({
   once = true,
   viewportAmount = 0.45,
   viewportMargin = "0px 0px -10% 0px",
+  wordFloat = false,
+  wordFloatAmount = 3,
+  wordFloatDuration = 4.8,
+  lineWave = false,
+  lineWaveAmount = 4,
+  lineWaveRotate = 0.8,
+  lineWaveDuration = 6.8,
 }) {
   const prefersReducedMotion = useReducedMotion();
   const lines = Array.isArray(text) ? text : [text];
@@ -51,34 +58,33 @@ export default function LiquidSportText({
         const shouldCharacterType = characterTyping && !prefersReducedMotion;
 
         if (shouldCharacterType) {
+          const words = line.split(" ");
+
           return (
             <motion.span
               key={`${line}-${index}`}
               className="relative block overflow-visible"
               animate={
-                isHeroBright
+                lineWave && !prefersReducedMotion
                   ? {
-                      y: [0, -2, 0],
-                      scale: [1, 1.004, 1],
+                      y: [0, -lineWaveAmount, 0],
+                      rotateZ: [
+                        0,
+                        index % 2 === 0 ? -lineWaveRotate : lineWaveRotate,
+                        0,
+                      ],
                     }
-                  : {
-                      y: [0, -1.2, 0],
-                    }
+                  : undefined
               }
               transition={
-                isHeroBright
+                lineWave && !prefersReducedMotion
                   ? {
-                      duration: 5.4,
+                      duration: lineWaveDuration + index * 0.4,
                       repeat: Infinity,
                       ease: "easeInOut",
                       delay: index * 0.18,
                     }
-                  : {
-                      duration: 6.2,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                      delay: index * 0.14,
-                    }
+                  : undefined
               }
             >
               <span
@@ -91,39 +97,73 @@ export default function LiquidSportText({
                 initial="hidden"
                 whileInView="visible"
                 viewport={{ once, amount: viewportAmount, margin: viewportMargin }}
-                variants={{
-                  hidden: {},
-                  visible: {
-                    transition: {
-                      delayChildren: delay + index * characterLineDelay,
-                      staggerChildren: characterStagger,
-                    },
-                  },
-                }}
                 className={`${baseLineClass} whitespace-pre`}
               >
-                {Array.from(line).map((char, charIndex) => (
+                {words.map((word, wordIndex) => (
                   <motion.span
-                    key={`${line}-${index}-${charIndex}`}
-                    variants={{
-                      hidden: {
-                        opacity: 0,
-                        y: 18,
-                        filter: "blur(8px)",
-                      },
-                      visible: {
-                        opacity: 1,
-                        y: 0,
-                        filter: "blur(0px)",
-                        transition: {
-                          duration: characterDuration,
-                          ease: [0.22, 1, 0.36, 1],
-                        },
-                      },
-                    }}
+                    key={`${line}-${index}-word-${wordIndex}`}
                     className="inline-block"
+                    animate={
+                      wordFloat && !prefersReducedMotion
+                        ? {
+                            y: [0, wordIndex % 2 === 0 ? -wordFloatAmount : wordFloatAmount * 0.7, 0],
+                          }
+                        : undefined
+                    }
+                    transition={
+                      wordFloat && !prefersReducedMotion
+                        ? {
+                            duration: wordFloatDuration,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                            delay:
+                              delay +
+                              index * characterLineDelay +
+                              wordIndex * 0.14 +
+                              wordIndex * characterStagger * 0.4,
+                          }
+                        : undefined
+                    }
                   >
-                    {char === " " ? "\u00A0" : char}
+                    <motion.span
+                      variants={{
+                        hidden: {},
+                        visible: {
+                          transition: {
+                            delayChildren:
+                              delay +
+                              index * characterLineDelay +
+                              wordIndex * (characterStagger * 3 + 0.05),
+                            staggerChildren: characterStagger,
+                          },
+                        },
+                      }}
+                      className="inline-block"
+                    >
+                      {Array.from(word).map((char, charIndex) => (
+                        <motion.span
+                          key={`${line}-${index}-${wordIndex}-${charIndex}`}
+                          variants={{
+                            hidden: {
+                              opacity: 0,
+                              y: 18,
+                            },
+                            visible: {
+                              opacity: 1,
+                              y: 0,
+                              transition: {
+                                duration: characterDuration,
+                                ease: [0.22, 1, 0.36, 1],
+                              },
+                            },
+                          }}
+                          className="inline-block"
+                        >
+                          {char}
+                        </motion.span>
+                      ))}
+                    </motion.span>
+                    {wordIndex < words.length - 1 ? "\u00A0" : null}
                   </motion.span>
                 ))}
               </motion.span>
@@ -153,13 +193,7 @@ export default function LiquidSportText({
                 }}
                 transition={{
                   backgroundPosition: {
-                    duration: isHeroBright ? 3.2 : 4.2,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                    delay: delay + index * characterLineDelay + 0.45,
-                  },
-                  opacity: {
-                    duration: 3.8,
+                    duration: isHeroBright ? 5.2 : 6.2,
                     repeat: Infinity,
                     ease: "easeInOut",
                     delay: delay + index * characterLineDelay + 0.45,
@@ -177,22 +211,26 @@ export default function LiquidSportText({
             key={`${line}-${index}`}
             className="relative block overflow-visible"
             animate={
-              prefersReducedMotion || !isHeroBright
-                ? undefined
-                : {
-                    y: [0, -2, 0],
-                    scale: [1, 1.004, 1],
+              lineWave && !prefersReducedMotion
+                ? {
+                    y: [0, -lineWaveAmount, 0],
+                    rotateZ: [
+                      0,
+                      index % 2 === 0 ? -lineWaveRotate : lineWaveRotate,
+                      0,
+                    ],
                   }
+                : undefined
             }
             transition={
-              prefersReducedMotion || !isHeroBright
-                ? undefined
-                : {
-                    duration: 5.4,
+              lineWave && !prefersReducedMotion
+                ? {
+                    duration: lineWaveDuration + index * 0.4,
                     repeat: Infinity,
                     ease: "easeInOut",
                     delay: index * 0.18,
                   }
+                : undefined
             }
           >
             <motion.span
@@ -265,9 +303,9 @@ export default function LiquidSportText({
                 prefersReducedMotion
                   ? undefined
                   : {
-                      duration: isHeroBright ? 3.4 : 3.1,
+                      duration: isHeroBright ? 5.4 : 4.8,
                       repeat: Infinity,
-                      repeatDelay: isHeroBright ? 0.4 : 0.45,
+                      repeatDelay: isHeroBright ? 1.2 : 1.4,
                       ease: "easeInOut",
                       delay: lineDelay + 0.34,
                     }

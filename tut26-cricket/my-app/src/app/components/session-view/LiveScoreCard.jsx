@@ -1,6 +1,5 @@
 "use client";
 
-import { FaBullseye, FaUser } from "react-icons/fa";
 import { getBattingTeamBundle } from "../../lib/team-utils";
 
 export default function LiveScoreCard({ match }) {
@@ -20,15 +19,29 @@ export default function LiveScoreCard({ match }) {
         <span className="text-red-600">{match.outs}</span>
       </p>
       <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3.5 py-2 text-sm font-semibold text-white">
-          <FaUser className="text-zinc-300" />
-          {battingTeam.players.length}
-        </span>
+        <div className="relative min-w-[92px] overflow-hidden rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.015))] px-3.5 py-2.5 text-center shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
+          <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-white/28 to-transparent" />
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-400">
+              Players
+            </p>
+            <p className="mt-1 text-[1.1rem] font-bold tracking-tight text-white">
+              {battingTeam.players.length}
+            </p>
+          </div>
+        </div>
         {targetRuns > 0 ? (
-          <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-500/10 px-3.5 py-2 text-sm font-semibold text-amber-200">
-            <FaBullseye className="text-amber-300" />
-            Target {targetRuns}
-          </span>
+          <div className="relative min-w-[108px] overflow-hidden rounded-[18px] border border-amber-300/18 bg-[linear-gradient(180deg,rgba(245,158,11,0.1),rgba(120,53,15,0.1))] px-3.5 py-2.5 text-center shadow-[0_10px_24px_rgba(120,53,15,0.16)]">
+            <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/44 to-transparent" />
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-amber-100/72">
+                Target
+              </p>
+              <p className="mt-1 text-[1.1rem] font-bold tracking-tight text-amber-200">
+                {targetRuns}
+              </p>
+            </div>
+          </div>
         ) : null}
       </div>
     </div>

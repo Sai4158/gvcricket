@@ -35,14 +35,20 @@ export const metadata = {
   },
 };
 
-export default async function DirectorPage() {
+export default async function DirectorPage({ searchParams }) {
   const data = await loadDirectorConsoleData();
+  const preferredSessionId =
+    typeof searchParams?.session === "string" ? searchParams.session : "";
+  const autoManage =
+    searchParams?.manage === "1" || searchParams?.manage === "true";
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.1),transparent_22%),linear-gradient(180deg,#050507_0%,#09090d_100%)] text-white">
       <DirectorConsoleClient
         initialAuthorized={data.authorized}
         initialSessions={data.sessions}
+        initialPreferredSessionId={preferredSessionId}
+        initialAutoManage={autoManage}
       />
     </main>
   );

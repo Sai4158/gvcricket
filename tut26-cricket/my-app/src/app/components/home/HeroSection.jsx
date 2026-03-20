@@ -2,12 +2,13 @@
 
 import { useRef } from "react";
 import Image from "next/image";
-import { motion, useScroll, useSpring, useTransform } from "framer-motion";
+import { motion, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion";
 import { FaAngleDown } from "react-icons/fa";
 import LiveNowBanner from "./LiveNowBanner";
 import LiquidSportText from "./LiquidSportText";
 
 export default function HeroSection({ liveMatch = null }) {
+  const prefersReducedMotion = useReducedMotion();
   const sectionRef = useRef(null);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -15,19 +16,19 @@ export default function HeroSection({ liveMatch = null }) {
   });
 
   const logoScrollScale = useSpring(
-    useTransform(scrollYProgress, [0, 1], [1, 1.42]),
+    useTransform(scrollYProgress, [0, 1], [1, 1.1]),
     { stiffness: 180, damping: 30, mass: 0.22 }
   );
   const logoScrollY = useSpring(
-    useTransform(scrollYProgress, [0, 1], [0, 26]),
+    useTransform(scrollYProgress, [0, 1], [0, 12]),
     { stiffness: 180, damping: 30, mass: 0.22 }
   );
   const headingScrollScale = useSpring(
-    useTransform(scrollYProgress, [0, 1], [1, 1.18]),
+    useTransform(scrollYProgress, [0, 1], [1, 1.04]),
     { stiffness: 180, damping: 30, mass: 0.22 }
   );
   const headingScrollY = useSpring(
-    useTransform(scrollYProgress, [0, 1], [0, 18]),
+    useTransform(scrollYProgress, [0, 1], [0, 8]),
     { stiffness: 180, damping: 30, mass: 0.22 }
   );
   const headingGlowOpacity = useSpring(
@@ -56,12 +57,13 @@ export default function HeroSection({ liveMatch = null }) {
       >
         <LiveNowBanner liveMatch={liveMatch} />
         <video
-          className="absolute inset-0 z-0 h-full w-full object-cover bg-black"
+          className="absolute inset-0 z-0 h-full w-full object-cover bg-black [backface-visibility:hidden] [transform:translateZ(0)] will-change-transform"
           autoPlay
           loop
           muted
           playsInline
-          preload="auto"
+          preload="metadata"
+          disablePictureInPicture
         >
           <source src="/videos/Cricket1.mp4" type="video/mp4" />
           Your browser does not support the video tag.
@@ -77,30 +79,46 @@ export default function HeroSection({ liveMatch = null }) {
             <motion.div
               aria-hidden="true"
               className="absolute inset-0 scale-[1.14] rounded-full bg-[radial-gradient(circle,rgba(255,52,90,0.42)_0%,rgba(255,52,90,0.24)_24%,rgba(255,96,96,0.16)_42%,rgba(251,191,36,0.08)_58%,transparent_76%)] blur-2xl"
-              animate={{
-                opacity: [0.62, 0.9, 0.7],
-                scale: [1, 1.04, 1.01],
-              }}
-              transition={{
-                duration: 2.8,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
+              animate={
+                prefersReducedMotion
+                  ? undefined
+                  : {
+                      opacity: [0.52, 0.68, 0.58],
+                      scale: [1, 1.015, 1],
+                    }
+              }
+              transition={
+                prefersReducedMotion
+                  ? undefined
+                  : {
+                      duration: 8.4,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }
+              }
             />
             <motion.div
               style={{ scale: logoScrollScale, y: logoScrollY }}
               className="relative will-change-transform"
             >
               <motion.div
-                animate={{
-                  scale: [1, 1.018, 1],
-                  y: [0, -2, 0],
-                }}
-                transition={{
-                  duration: 3.2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
+                animate={
+                  prefersReducedMotion
+                    ? undefined
+                    : {
+                        scale: [1, 1.006, 1],
+                        y: [0, -0.5, 0],
+                      }
+                }
+                transition={
+                  prefersReducedMotion
+                    ? undefined
+                    : {
+                        duration: 9,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }
+                }
                 className="relative"
               >
                 <Image
@@ -122,34 +140,71 @@ export default function HeroSection({ liveMatch = null }) {
           >
             <motion.span
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-[10%] top-1/2 z-0 h-[72%] -translate-y-1/2 rounded-[32px] bg-[linear-gradient(180deg,rgba(0,0,0,0.2),rgba(0,0,0,0.08))] blur-2xl"
-              animate={{
-                opacity: [0.52, 0.66, 0.56],
-                scale: [1, 1.02, 1],
-              }}
-              transition={{
-                duration: 4.8,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
+              className="pointer-events-none absolute inset-x-[10%] top-1/2 z-0 h-[72%] -translate-y-1/2 rounded-[32px] bg-[radial-gradient(circle_at_top_left,rgba(244,114,182,0.22),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.2),transparent_32%),linear-gradient(180deg,rgba(0,0,0,0.18),rgba(0,0,0,0.06))] blur-2xl"
+              animate={
+                prefersReducedMotion
+                  ? undefined
+                  : {
+                      opacity: [0.38, 0.5, 0.42],
+                      scale: [1, 1.01, 1],
+                    }
+              }
+              transition={
+                prefersReducedMotion
+                  ? undefined
+                  : {
+                      duration: 8.2,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }
+              }
             />
             <motion.span
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 top-1/2 z-0 h-24 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.12)_0%,rgba(251,191,36,0.08)_30%,rgba(244,114,182,0.06)_54%,transparent_78%)] blur-3xl"
+              className="pointer-events-none absolute inset-x-0 top-1/2 z-0 h-24 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.12)_0%,rgba(251,191,36,0.12)_26%,rgba(244,114,182,0.12)_46%,rgba(56,189,248,0.12)_64%,transparent_82%)] blur-3xl"
               style={{ opacity: headingGlowOpacity, scale: headingAuraScale }}
             />
             <motion.span
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-[8%] top-1/2 z-0 h-32 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.18)_0%,rgba(191,219,254,0.12)_34%,rgba(125,211,252,0.08)_54%,transparent_78%)] blur-[56px]"
-              animate={{
-                opacity: [0.34, 0.52, 0.38],
-                scale: [1, 1.05, 1],
-              }}
-              transition={{
-                duration: 4.2,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
+              className="pointer-events-none absolute inset-x-[8%] top-1/2 z-0 h-32 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.16)_0%,rgba(191,219,254,0.14)_26%,rgba(99,102,241,0.1)_42%,rgba(244,114,182,0.12)_58%,transparent_82%)] blur-[56px]"
+              animate={
+                prefersReducedMotion
+                  ? undefined
+                  : {
+                      opacity: [0.22, 0.34, 0.26],
+                      scale: [1, 1.02, 1],
+                    }
+              }
+              transition={
+                prefersReducedMotion
+                  ? undefined
+                  : {
+                      duration: 9.4,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }
+              }
+            />
+            <motion.span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-[16%] top-[58%] z-0 h-6 -translate-y-1/2 rounded-full bg-[linear-gradient(90deg,rgba(244,114,182,0),rgba(244,114,182,0.24),rgba(251,191,36,0.28),rgba(56,189,248,0.24),rgba(244,114,182,0))] blur-xl"
+              animate={
+                prefersReducedMotion
+                  ? undefined
+                  : {
+                      opacity: [0.1, 0.18, 0.12],
+                      scaleX: [0.99, 1.015, 1],
+                    }
+              }
+              transition={
+                prefersReducedMotion
+                  ? undefined
+                  : {
+                      duration: 9.8,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }
+              }
             />
             <motion.div
               style={{
@@ -165,6 +220,10 @@ export default function HeroSection({ liveMatch = null }) {
                 cursor={false}
                 typing={false}
                 characterTyping
+                lineWave
+                lineWaveAmount={2.4}
+                lineWaveRotate={0.45}
+                lineWaveDuration={7.6}
                 characterStagger={0.048}
                 characterLineDelay={0.28}
                 characterDuration={0.54}

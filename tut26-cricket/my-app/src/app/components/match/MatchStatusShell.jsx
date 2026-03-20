@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import LoadingButton from "../shared/LoadingButton";
 import { countLegalBalls } from "../../lib/match-scoring";
 import { getBattingTeamBundle } from "../../lib/team-utils";
 
@@ -41,14 +42,16 @@ export function AccessGate({ onSubmit, isSubmitting, error }) {
             placeholder="0000"
             className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-blue-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(59,130,246,0.08)]"
           />
-          <button
+          <LoadingButton
             type="button"
             onClick={() => onSubmit(pin)}
-            disabled={isSubmitting || pin.length !== 4}
+            disabled={pin.length !== 4}
+            loading={isSubmitting}
+            pendingLabel="Checking..."
             className="w-full rounded-2xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSubmitting ? "Checking..." : "Enter"}
-          </button>
+            Enter
+          </LoadingButton>
         </div>
         {error && <p className="text-red-400 text-sm mt-4 text-center">{error}</p>}
       </div>

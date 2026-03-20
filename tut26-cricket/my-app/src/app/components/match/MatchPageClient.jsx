@@ -442,6 +442,7 @@ export default function MatchPageClient({
           showInningsEnd={showInningsEnd}
           match={match}
           modalType={modal.type}
+          isUpdating={isUpdating}
           micMonitor={micMonitor}
           commentaryProps={
             isLiveMatch

@@ -19,6 +19,7 @@ export default function MatchModalLayer({
   showInningsEnd,
   match,
   modalType,
+  isUpdating,
   micMonitor,
   commentaryProps,
   walkieProps,
@@ -47,7 +48,12 @@ export default function MatchModalLayer({
         <HistoryModal match={match} onClose={onClose} />
       )}
       {modalType === "editTeams" && (
-        <EditTeamsModal match={match} onUpdate={onUpdate} onClose={onClose} />
+        <EditTeamsModal
+          match={match}
+          onUpdate={onUpdate}
+          onClose={onClose}
+          isUpdating={isUpdating}
+        />
       )}
       {modalType === "out" && (
         <RunInputModal
@@ -87,6 +93,7 @@ export default function MatchModalLayer({
           firstInningsOversPlayed={firstInningsOversPlayed}
           onUpdate={onUpdate}
           onClose={onClose}
+          isUpdating={isUpdating}
         />
       )}
       {modalType === "image" && (

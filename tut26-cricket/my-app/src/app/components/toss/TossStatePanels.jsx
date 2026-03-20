@@ -2,6 +2,7 @@
 import { useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FaCircle } from "react-icons/fa";
+import LoadingButton from "../shared/LoadingButton";
 import { CoinHeads, CoinTails, SpinningCoin } from "./CoinArt";
 
 function ChoiceButton({ onClick, tone, children }) {
@@ -168,24 +169,28 @@ export default function TossStatePanels({
 
             <div className="w-full">
               <div className="grid grid-cols-2 gap-4">
-                <button
+                <LoadingButton
                   onClick={() => onDecision("bat")}
-                  disabled={isSubmitting}
+                  disabled={false}
+                  loading={isSubmitting}
                   className="btn-ui btn-ui-glass-dark group rounded-3xl px-4 py-4 text-base font-medium disabled:hover:translate-y-0"
+                  pendingLabel="Saving..."
                 >
                   <span className="block transition-transform group-hover:translate-x-0.5">
-                    {isSubmitting ? "Saving..." : "Bat First"}
+                    Bat First
                   </span>
-                </button>
-                <button
+                </LoadingButton>
+                <LoadingButton
                   onClick={() => onDecision("bowl")}
-                  disabled={isSubmitting}
+                  disabled={false}
+                  loading={isSubmitting}
                   className="btn-ui btn-ui-glass-dark-alt group rounded-3xl px-4 py-4 text-base font-medium disabled:hover:translate-y-0"
+                  pendingLabel="Saving..."
                 >
                   <span className="block transition-transform group-hover:translate-x-0.5">
-                    {isSubmitting ? "Saving..." : "Bowl First"}
+                    Bowl First
                   </span>
-                </button>
+                </LoadingButton>
               </div>
             </div>
           </motion.div>

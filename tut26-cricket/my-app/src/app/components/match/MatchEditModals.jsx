@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { FaMinus, FaPen, FaPlus, FaTrash } from "react-icons/fa";
+import LoadingButton from "../shared/LoadingButton";
 import { getTeamBundle } from "../../lib/team-utils";
 import { ModalBase } from "./MatchBaseModals";
 
@@ -187,7 +188,7 @@ function EditableRoster({
   );
 }
 
-export function EditTeamsModal({ match, onUpdate, onClose }) {
+export function EditTeamsModal({ match, onUpdate, onClose, isUpdating = false }) {
   const initialTeamA = getTeamBundle(match, "teamA");
   const initialTeamB = getTeamBundle(match, "teamB");
   const [teamAName, setTeamAName] = useState(initialTeamA.name);
@@ -203,8 +204,8 @@ export function EditTeamsModal({ match, onUpdate, onClose }) {
       ? `Only ${secondInningsTeamName} can add or remove players right now. Names still work.`
       : "";
 
-  const handleSaveChanges = () => {
-    onUpdate({
+  const handleSaveChanges = async () => {
+    await onUpdate({
       teamAName: teamAName.trim(),
       teamBName: teamBName.trim(),
       teamA: teamAPlayers.map((player) => player.trim()).filter(Boolean),
@@ -237,12 +238,14 @@ export function EditTeamsModal({ match, onUpdate, onClose }) {
           theme="red"
         />
       </div>
-      <button
+      <LoadingButton
         onClick={handleSaveChanges}
+        loading={isUpdating}
+        pendingLabel="Saving..."
         className="mt-6 w-full rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,185,90,0.96),rgba(22,163,74,0.98))] py-3.5 text-base font-semibold tracking-tight text-white shadow-[0_18px_36px_rgba(22,163,74,0.24)] transition-all hover:brightness-105 active:scale-[0.99]"
       >
         Save Changes
-      </button>
+      </LoadingButton>
     </ModalBase>
   );
 }
@@ -254,6 +257,7 @@ export function EditOversModal({
   firstInningsOversPlayed,
   onUpdate,
   onClose,
+  isUpdating = false,
 }) {
   const [overs, setOvers] = useState(currentOvers);
   const minAllowedOvers =
@@ -294,17 +298,19 @@ export function EditOversModal({
           Cannot set total overs below {minAllowedOvers}.
         </p>
       )}
-      <button
-        onClick={() => {
+      <LoadingButton
+        onClick={async () => {
           if (isInvalid) return;
-          onUpdate({ overs: Number(overs) });
+          await onUpdate({ overs: Number(overs) });
           onClose();
         }}
         disabled={isInvalid}
+        loading={isUpdating}
+        pendingLabel="Saving..."
         className="w-full py-3 text-lg bg-green-600 text-white font-bold rounded-xl hover:bg-green-500 transition-all active:scale-95 disabled:bg-zinc-700 disabled:opacity-60 disabled:cursor-not-allowed"
       >
         Save Changes
-      </button>
+      </LoadingButton>
     </ModalBase>
   );
 }

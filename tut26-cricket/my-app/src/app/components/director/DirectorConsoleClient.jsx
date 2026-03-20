@@ -28,6 +28,7 @@ import {
   FaWifi,
 } from "react-icons/fa";
 import SessionCoverHero from "../shared/SessionCoverHero";
+import LoadingButton from "../shared/LoadingButton";
 import DirectorSessionPicker from "./DirectorSessionPicker";
 import useEventSource from "../live/useEventSource";
 import useLocalMicMonitor from "../live/useLocalMicMonitor";
@@ -57,13 +58,18 @@ const DIRECTOR_AUDIO_METADATA_CACHE_KEY = "gv-director-audio-metadata-v1";
 const DIRECTOR_SESSIONS_CACHE_KEY = "gv-director-sessions-v1";
 const DIRECTOR_FORCE_REAUTH_KEY = "gv-director-force-reauth";
 const DIRECTOR_AUDIO_LIBRARY_CACHE_TTL_MS = 10 * 60 * 1000;
+const DIRECTOR_AUDIO_ORDER_SAVE_DELAY_MS = 20_000;
 let directorAudioLibraryMemoryCache = null;
 let directorAudioLibraryPromise = null;
 let directorSessionsMemoryCache = null;
 let directorAudioMetadataMemoryCache = {};
 
+function serializeOrder(order) {
+  return JSON.stringify(Array.isArray(order) ? order : []);
+}
+
 function getDirectorAudioOrderStorageKey(sessionId) {
-  return `gv-director-audio-order:${sessionId || "default"}`;
+  return "gv-director-audio-order:global";
 }
 
 function readCachedDirectorSessions() {
@@ -184,6 +190,17 @@ function buildDirectorScoreLine(match) {
   return `${battingTeam.name} ${match.score || 0}/${match.outs || 0}`;
 }
 
+function getPreferredLiveSessionId(sessions, preferredSessionId = "") {
+  const nextSessions = Array.isArray(sessions) ? sessions : [];
+  const preferredLive = preferredSessionId
+    ? nextSessions.find(
+        (item) => item.session?._id === preferredSessionId && item.isLive
+      )
+    : null;
+  const firstLive = nextSessions.find((item) => item.isLive);
+  return preferredLive?.session?._id || firstLive?.session?._id || "";
+}
+
 function formatAudioTime(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) {
     return "--:--";
@@ -260,6 +277,49 @@ function HelpButton({ title, body }) {
   );
 }
 
+const DIRECTOR_CARD_THEMES = {
+  slate: {
+    shellGlow:
+      "before:bg-[radial-gradient(circle_at_12%_0%,rgba(148,163,184,0.16),transparent_42%)]",
+    strip:
+      "bg-[linear-gradient(90deg,rgba(244,244,245,0),rgba(226,232,240,0.72)_22%,rgba(125,211,252,0.72)_62%,rgba(244,244,245,0))]",
+    icon:
+      "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.11),rgba(255,255,255,0.04))] text-white shadow-[0_10px_26px_rgba(15,23,42,0.22)]",
+  },
+  emerald: {
+    shellGlow:
+      "before:bg-[radial-gradient(circle_at_12%_0%,rgba(16,185,129,0.2),transparent_42%)]",
+    strip:
+      "bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(52,211,153,0.86)_18%,rgba(34,211,238,0.82)_58%,rgba(0,0,0,0))]",
+    icon:
+      "border-emerald-300/14 bg-[linear-gradient(180deg,rgba(16,185,129,0.18),rgba(6,95,70,0.08))] text-emerald-100 shadow-[0_10px_26px_rgba(16,185,129,0.18)]",
+  },
+  amber: {
+    shellGlow:
+      "before:bg-[radial-gradient(circle_at_12%_0%,rgba(245,158,11,0.2),transparent_42%)]",
+    strip:
+      "bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(251,191,36,0.85)_18%,rgba(245,158,11,0.82)_54%,rgba(34,211,238,0.54)_82%,rgba(0,0,0,0))]",
+    icon:
+      "border-amber-300/14 bg-[linear-gradient(180deg,rgba(245,158,11,0.18),rgba(120,53,15,0.08))] text-amber-100 shadow-[0_10px_26px_rgba(245,158,11,0.18)]",
+  },
+  violet: {
+    shellGlow:
+      "before:bg-[radial-gradient(circle_at_12%_0%,rgba(168,85,247,0.2),transparent_42%),radial-gradient(circle_at_88%_100%,rgba(59,130,246,0.12),transparent_34%)]",
+    strip:
+      "bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(192,132,252,0.84)_18%,rgba(99,102,241,0.74)_54%,rgba(34,211,238,0.6)_82%,rgba(0,0,0,0))]",
+    icon:
+      "border-violet-300/14 bg-[linear-gradient(180deg,rgba(139,92,246,0.18),rgba(76,29,149,0.08))] text-violet-100 shadow-[0_10px_26px_rgba(139,92,246,0.18)]",
+  },
+  cyan: {
+    shellGlow:
+      "before:bg-[radial-gradient(circle_at_12%_0%,rgba(34,211,238,0.2),transparent_42%)]",
+    strip:
+      "bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(34,211,238,0.86)_18%,rgba(59,130,246,0.74)_54%,rgba(250,204,21,0.52)_82%,rgba(0,0,0,0))]",
+    icon:
+      "border-cyan-300/14 bg-[linear-gradient(180deg,rgba(34,211,238,0.18),rgba(8,47,73,0.08))] text-cyan-100 shadow-[0_10px_26px_rgba(34,211,238,0.18)]",
+  },
+};
+
 function Card({
   title,
   subtitle = "",
@@ -267,25 +327,32 @@ function Card({
   children,
   action = null,
   help = null,
+  accent = "slate",
 }) {
+  const theme = DIRECTOR_CARD_THEMES[accent] || DIRECTOR_CARD_THEMES.slate;
   return (
-    <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.98),rgba(10,10,14,0.98))] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.35)]">
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-white">
+    <section
+      className={`relative overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.98),rgba(10,10,14,0.98))] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.35)] before:pointer-events-none before:absolute before:inset-0 before:opacity-100 after:pointer-events-none after:absolute after:inset-x-5 after:top-0 after:h-px after:rounded-full ${theme.shellGlow}`}
+    >
+      <div className={`absolute inset-x-5 top-0 h-[2px] rounded-full ${theme.strip}`} />
+      <div className="relative mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <span
+            className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${theme.icon}`}
+          >
             {icon}
           </span>
-          <div>
+          <div className="min-w-0">
             <h3 className="text-lg font-semibold text-white">{title}</h3>
             {subtitle ? <p className="mt-1 text-sm text-zinc-400">{subtitle}</p> : null}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
           {help ? <HelpButton title={help.title} body={help.body} /> : null}
           {action}
         </div>
       </div>
-      {children}
+      <div className="relative">{children}</div>
     </section>
   );
 }
@@ -390,18 +457,28 @@ function SessionHeader({
 export default function DirectorConsoleClient({
   initialAuthorized = false,
   initialSessions = [],
+  initialPreferredSessionId = "",
+  initialAutoManage = false,
 }) {
   const router = useRouter();
-  const [authorized, setAuthorized] = useState(false);
+  const initialTargetSessionId = getPreferredLiveSessionId(
+    initialSessions,
+    initialPreferredSessionId
+  );
+  const [authorized, setAuthorized] = useState(Boolean(initialAuthorized));
   const [sessions, setSessions] = useState(initialSessions || []);
   const [pin, setPin] = useState("");
   const [authError, setAuthError] = useState("");
   const [isSubmittingPin, setIsSubmittingPin] = useState(false);
-  const [selectedSessionId, setSelectedSessionId] = useState(() => {
-    const firstLive = (initialSessions || []).find((item) => item.isLive);
-    return firstLive?.session?._id || "";
-  });
-  const [managedSessionId, setManagedSessionId] = useState("");
+  const [showDirectorPinStep, setShowDirectorPinStep] = useState(
+    Boolean(initialAutoManage && initialTargetSessionId && !initialAuthorized)
+  );
+  const [selectedSessionId, setSelectedSessionId] = useState(initialTargetSessionId);
+  const [managedSessionId, setManagedSessionId] = useState(() =>
+    initialAuthorized && initialAutoManage && initialTargetSessionId
+      ? initialTargetSessionId
+      : ""
+  );
   const [showPicker, setShowPicker] = useState(false);
   const [musicTracks, setMusicTracks] = useState([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
@@ -427,6 +504,11 @@ export default function DirectorConsoleClient({
   const [audioUnlocked, setAudioUnlocked] = useState(() => isUiAudioUnlocked());
   const [draggingLibraryId, setDraggingLibraryId] = useState("");
   const [libraryDropTargetId, setLibraryDropTargetId] = useState("");
+  const preferredSessionIdRef = useRef(initialPreferredSessionId || "");
+  const pendingInitialManageRef = useRef(Boolean(initialAutoManage));
+  const pendingLibraryOrderRef = useRef(null);
+  const libraryOrderSaveTimerRef = useRef(null);
+  const lastPersistedLibraryOrderRef = useRef(serializeOrder([]));
   const audioRef = useRef(null);
   const effectsAudioRef = useRef(null);
   const directorMicPointerIdRef = useRef(null);
@@ -437,10 +519,66 @@ export default function DirectorConsoleClient({
   const effectPlayRequestRef = useRef(0);
   const musicUrlsRef = useRef([]);
   const cachedEffectUrlRef = useRef(new Map());
+  const musicEffectDuckFactorRef = useRef(1);
+  const musicDuckAnimationFrameRef = useRef(0);
   const [speechSettings, setSpeechSettings] = useState(createSpeechSettings);
   const speech = useSpeechAnnouncer(speechSettings);
   const micMonitor = useLocalMicMonitor();
   const iOSSafari = useMemo(() => isIOSSafari(), []);
+
+  const cancelMusicDuckAnimation = useCallback(() => {
+    if (musicDuckAnimationFrameRef.current) {
+      window.cancelAnimationFrame(musicDuckAnimationFrameRef.current);
+      musicDuckAnimationFrameRef.current = 0;
+    }
+  }, []);
+
+  const getBaseMusicVolume = useCallback(() => {
+    const micDuckFactor = micMonitor.isActive ? 0.24 : 1;
+    return Math.max(0, Math.min(1, musicVolume * masterVolume * micDuckFactor));
+  }, [masterVolume, micMonitor.isActive, musicVolume]);
+
+  const getMusicTargetVolume = useCallback(
+    (duckFactor = musicEffectDuckFactorRef.current) =>
+      Math.max(0, Math.min(1, getBaseMusicVolume() * duckFactor)),
+    [getBaseMusicVolume]
+  );
+
+  const applyMusicDuck = useCallback(
+    (duckFactor, { durationMs = 220 } = {}) => {
+      musicEffectDuckFactorRef.current = duckFactor;
+      const audio = audioRef.current;
+      if (!audio) {
+        return;
+      }
+
+      cancelMusicDuckAnimation();
+
+      const targetVolume = getMusicTargetVolume(duckFactor);
+      const startVolume = Number.isFinite(audio.volume) ? audio.volume : targetVolume;
+
+      if (durationMs <= 0 || Math.abs(startVolume - targetVolume) < 0.01) {
+        audio.volume = targetVolume;
+        return;
+      }
+
+      const startTime = performance.now();
+      const step = (now) => {
+        const progress = Math.min(1, (now - startTime) / durationMs);
+        const eased = 0.5 - Math.cos(progress * Math.PI) / 2;
+        audio.volume = startVolume + (targetVolume - startVolume) * eased;
+
+        if (progress < 1) {
+          musicDuckAnimationFrameRef.current = window.requestAnimationFrame(step);
+        } else {
+          musicDuckAnimationFrameRef.current = 0;
+        }
+      };
+
+      musicDuckAnimationFrameRef.current = window.requestAnimationFrame(step);
+    },
+    [cancelMusicDuckAnimation, getMusicTargetVolume]
+  );
 
   const showTemporaryDirectorWalkieNotice = useCallback(
     (message, duration = 2600) => {
@@ -524,10 +662,7 @@ export default function DirectorConsoleClient({
     return sessions.find((item) => item.session?._id === managedSessionId) || null;
   }, [managedSessionId, sessions]);
 
-  const audioOrderStorageKey = useMemo(
-    () => getDirectorAudioOrderStorageKey(managedSession?.session?._id || selectedSession?.session?._id || ""),
-    [managedSession?.session?._id, selectedSession?.session?._id]
-  );
+  const audioOrderStorageKey = useMemo(() => getDirectorAudioOrderStorageKey(), []);
 
   const [liveMatch, setLiveMatch] = useState(managedSession?.match || null);
   useEffect(() => {
@@ -535,23 +670,36 @@ export default function DirectorConsoleClient({
   }, [managedSession]);
 
   useEffect(() => {
-    const effectsAudio = effectsAudioRef.current;
-
-    return () => {
-      musicUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-      if (effectsAudio) {
-        effectsAudio.pause();
-        effectsAudio.src = "";
-      }
-    };
-  }, []);
-
-  useEffect(() => {
     const firstLive = sessions.find((item) => item.isLive);
     if (!selectedSessionId && firstLive) {
       setSelectedSessionId(firstLive.session._id);
     }
   }, [selectedSessionId, sessions]);
+
+  useEffect(() => {
+    const preferredSessionId = preferredSessionIdRef.current;
+    if (!preferredSessionId) {
+      return;
+    }
+
+    const preferredLive = sessions.find(
+      (item) => item.session?._id === preferredSessionId && item.isLive
+    );
+    if (!preferredLive) {
+      return;
+    }
+
+    if (selectedSessionId !== preferredSessionId) {
+      setSelectedSessionId(preferredSessionId);
+    }
+
+    if (authorized && pendingInitialManageRef.current) {
+      setManagedSessionId(preferredSessionId);
+      setShowPicker(false);
+      setAuthError("");
+      pendingInitialManageRef.current = false;
+    }
+  }, [authorized, selectedSessionId, sessions]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -576,6 +724,7 @@ export default function DirectorConsoleClient({
       setAuthorized(false);
       setManagedSessionId("");
       setShowPicker(false);
+      setShowDirectorPinStep(false);
       setPin("");
       setAuthError("");
     };
@@ -597,7 +746,7 @@ export default function DirectorConsoleClient({
       window.removeEventListener("pageshow", handlePageShow);
       window.removeEventListener("pagehide", handlePageHide);
     };
-  }, []);
+  }, [audioOrderStorageKey]);
 
   useEffect(() => {
     if (
@@ -609,18 +758,20 @@ export default function DirectorConsoleClient({
   }, [managedSessionId, sessions]);
 
   useEffect(() => {
-    if (!authorized || sessions.length) {
+    if (!authorized) {
       return;
     }
 
     const cachedSessions = readCachedDirectorSessions();
     if (cachedSessions.length) {
-      setSessions(cachedSessions);
-      const nextLive = cachedSessions.find((item) => item.isLive);
-      if (nextLive) {
-        setSelectedSessionId(nextLive.session._id);
+      setSessions((current) => (current.length ? current : cachedSessions));
+      const cachedLiveSessionId = getPreferredLiveSessionId(
+        cachedSessions,
+        preferredSessionIdRef.current
+      );
+      if (cachedLiveSessionId) {
+        setSelectedSessionId((current) => current || cachedLiveSessionId);
       }
-      return;
     }
 
     let cancelled = false;
@@ -631,19 +782,35 @@ export default function DirectorConsoleClient({
       if (!response.ok || cancelled) {
         return;
       }
-      const nextSessions = payload.sessions || [];
+
+      const nextSessions = Array.isArray(payload.sessions) ? payload.sessions : [];
       writeCachedDirectorSessions(nextSessions);
       setSessions(nextSessions);
-      const nextLive = nextSessions.find((item) => item.isLive);
-      if (nextLive) {
-        setSelectedSessionId(nextLive.session._id);
+
+      const nextLiveSessionId = getPreferredLiveSessionId(
+        nextSessions,
+        preferredSessionIdRef.current
+      );
+
+      if (nextLiveSessionId) {
+        setSelectedSessionId((current) => {
+          if (
+            current &&
+            nextSessions.some(
+              (item) => item.session?._id === current && item.isLive
+            )
+          ) {
+            return current;
+          }
+          return nextLiveSessionId;
+        });
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [authorized, sessions.length]);
+  }, [authorized]);
 
   const fetchAudioLibrary = useCallback(async () => {
     if (directorAudioLibraryPromise) {
@@ -653,14 +820,31 @@ export default function DirectorConsoleClient({
     }
 
     directorAudioLibraryPromise = (async () => {
-      const response = await fetch("/api/director/audio-library");
-      const payload = await response.json().catch(() => ({ files: [] }));
+      const response = await fetch("/api/director/audio-library", { cache: "no-store" });
+      const payload = await response.json().catch(() => ({ files: [], order: [] }));
 
       if (!response.ok) {
         return [];
       }
 
       const nextFiles = Array.isArray(payload.files) ? payload.files : [];
+      const nextOrder = Array.isArray(payload.order) ? payload.order : [];
+      setLibraryOrder(nextOrder);
+      lastPersistedLibraryOrderRef.current = serializeOrder(nextOrder);
+      if (
+        pendingLibraryOrderRef.current &&
+        serializeOrder(pendingLibraryOrderRef.current) ===
+          lastPersistedLibraryOrderRef.current
+      ) {
+        pendingLibraryOrderRef.current = null;
+      }
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(audioOrderStorageKey, JSON.stringify(nextOrder));
+        } catch {
+          // Ignore storage failures and keep the in-memory order.
+        }
+      }
       writeCachedDirectorAudioLibrary(nextFiles);
       return nextFiles;
     })();
@@ -672,7 +856,7 @@ export default function DirectorConsoleClient({
     } finally {
       directorAudioLibraryPromise = null;
     }
-  }, []);
+  }, [audioOrderStorageKey]);
 
   useEffect(() => {
     const cachedFiles = readCachedDirectorAudioLibrary();
@@ -769,7 +953,93 @@ export default function DirectorConsoleClient({
     });
   }, [libraryDurations, libraryFiles, libraryOrder]);
 
-  const handleLibraryReorder = (nextFiles) => {
+  const clearLibraryOrderSaveTimer = useCallback(() => {
+    if (libraryOrderSaveTimerRef.current) {
+      window.clearTimeout(libraryOrderSaveTimerRef.current);
+      libraryOrderSaveTimerRef.current = null;
+    }
+  }, []);
+
+  const persistLibraryOrder = useCallback(async (nextOrder, { keepalive = false } = {}) => {
+    try {
+      const response = await fetch("/api/director/audio-library", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        keepalive,
+        body: JSON.stringify({ order: nextOrder }),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const flushPendingLibraryOrder = useCallback(
+    async ({ useBeacon = false } = {}) => {
+      const nextOrder = pendingLibraryOrderRef.current;
+      if (!nextOrder?.length) {
+        return false;
+      }
+
+      const serializedOrder = serializeOrder(nextOrder);
+      if (serializedOrder === lastPersistedLibraryOrderRef.current) {
+        pendingLibraryOrderRef.current = null;
+        return true;
+      }
+
+      if (
+        useBeacon &&
+        typeof navigator !== "undefined" &&
+        typeof navigator.sendBeacon === "function"
+      ) {
+        try {
+          const payload = new Blob([JSON.stringify({ order: nextOrder })], {
+            type: "application/json",
+          });
+          const queued = navigator.sendBeacon("/api/director/audio-library", payload);
+          if (queued) {
+            lastPersistedLibraryOrderRef.current = serializedOrder;
+            pendingLibraryOrderRef.current = null;
+            return true;
+          }
+        } catch {
+          // Fall through to fetch keepalive.
+        }
+      }
+
+      const persisted = await persistLibraryOrder(nextOrder, {
+        keepalive: useBeacon,
+      });
+      if (persisted) {
+        lastPersistedLibraryOrderRef.current = serializedOrder;
+        pendingLibraryOrderRef.current = null;
+      }
+      return persisted;
+    },
+    [persistLibraryOrder]
+  );
+
+  const scheduleLibraryOrderPersist = useCallback(
+    (nextOrder) => {
+      const serializedOrder = serializeOrder(nextOrder);
+      pendingLibraryOrderRef.current = nextOrder;
+
+      clearLibraryOrderSaveTimer();
+
+      if (serializedOrder === lastPersistedLibraryOrderRef.current) {
+        pendingLibraryOrderRef.current = null;
+        return;
+      }
+
+      libraryOrderSaveTimerRef.current = window.setTimeout(() => {
+        libraryOrderSaveTimerRef.current = null;
+        void flushPendingLibraryOrder();
+      }, DIRECTOR_AUDIO_ORDER_SAVE_DELAY_MS);
+    },
+    [clearLibraryOrderSaveTimer, flushPendingLibraryOrder]
+  );
+
+  const handleLibraryReorder = useCallback((nextFiles) => {
     setLibraryFiles(nextFiles);
     const nextOrder = nextFiles.map((file) => file.id);
     setLibraryOrder(nextOrder);
@@ -781,9 +1051,44 @@ export default function DirectorConsoleClient({
         // Ignore storage failures and keep the in-memory order.
       }
     }
-  };
+    scheduleLibraryOrderPersist(nextOrder);
+  }, [audioOrderStorageKey, scheduleLibraryOrderPersist]);
 
-  const moveLibraryItem = (activeId, targetId) => {
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const flushQueuedOrder = () => {
+      clearLibraryOrderSaveTimer();
+      void flushPendingLibraryOrder({ useBeacon: true });
+    };
+
+    window.addEventListener("pagehide", flushQueuedOrder);
+    window.addEventListener("beforeunload", flushQueuedOrder);
+
+    return () => {
+      window.removeEventListener("pagehide", flushQueuedOrder);
+      window.removeEventListener("beforeunload", flushQueuedOrder);
+    };
+  }, [clearLibraryOrderSaveTimer, flushPendingLibraryOrder]);
+
+  useEffect(() => {
+    const effectsAudio = effectsAudioRef.current;
+
+    return () => {
+      clearLibraryOrderSaveTimer();
+      void flushPendingLibraryOrder({ useBeacon: true });
+      cancelMusicDuckAnimation();
+      musicUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      if (effectsAudio) {
+        effectsAudio.pause();
+        effectsAudio.src = "";
+      }
+    };
+  }, [cancelMusicDuckAnimation, clearLibraryOrderSaveTimer, flushPendingLibraryOrder]);
+
+  const moveLibraryItem = useCallback((activeId, targetId) => {
     if (!activeId || !targetId || activeId === targetId) {
       return;
     }
@@ -799,9 +1104,13 @@ export default function DirectorConsoleClient({
     const [movedItem] = nextFiles.splice(activeIndex, 1);
     nextFiles.splice(targetIndex, 0, movedItem);
     handleLibraryReorder(nextFiles);
-  };
+  }, [handleLibraryReorder, orderedLibraryFiles]);
 
   const handleLibraryDragStart = (event, fileId) => {
+    if (event.target instanceof HTMLElement && event.target.closest("button")) {
+      event.preventDefault();
+      return;
+    }
     setDraggingLibraryId(fileId);
     setLibraryDropTargetId("");
     event.dataTransfer.effectAllowed = "move";
@@ -1023,13 +1332,28 @@ export default function DirectorConsoleClient({
       if (nextSessions.length) {
         writeCachedDirectorSessions(nextSessions);
         setSessions(nextSessions);
+        const preferredLive = preferredSessionIdRef.current
+          ? nextSessions.find(
+              (item) =>
+                item.session?._id === preferredSessionIdRef.current && item.isLive
+            )
+          : null;
         const nextLive = nextSessions.find((item) => item.isLive);
         setSelectedSessionId(
-          nextLive?.session?._id || nextSessions?.[0]?.session?._id || ""
+          preferredLive?.session?._id ||
+            nextLive?.session?._id ||
+            nextSessions?.[0]?.session?._id ||
+            ""
         );
+        if (pendingInitialManageRef.current && preferredLive?.session?._id) {
+          setManagedSessionId(preferredLive.session._id);
+          pendingInitialManageRef.current = false;
+        } else {
+          setManagedSessionId("");
+          setShowPicker(true);
+        }
       }
-      setManagedSessionId("");
-      setShowPicker(false);
+      setShowDirectorPinStep(false);
     } catch {
       setAuthError("Could not verify PIN.");
     } finally {
@@ -1051,6 +1375,7 @@ export default function DirectorConsoleClient({
     setAuthorized(false);
     setManagedSessionId("");
     setShowPicker(false);
+    setShowDirectorPinStep(false);
     setPin("");
     setAuthError("");
   };
@@ -1080,9 +1405,8 @@ export default function DirectorConsoleClient({
       return;
     }
 
-    const duckFactor = micMonitor.isActive ? 0.24 : libraryLiveId ? 0.3 : 1;
-    audio.volume = musicVolume * masterVolume * duckFactor;
-  }, [libraryLiveId, masterVolume, micMonitor.isActive, musicVolume]);
+    applyMusicDuck(musicEffectDuckFactorRef.current, { durationMs: 140 });
+  }, [applyMusicDuck]);
 
   useEffect(() => {
     const nextVolume = Math.max(
@@ -1131,6 +1455,7 @@ export default function DirectorConsoleClient({
       setLibraryLiveId("");
       setLibraryState("idle");
       setLibraryCurrentTime(0);
+      applyMusicDuck(1, { durationMs: 260 });
     };
     const handlePause = () => {
       setLibraryState((current) => (current === "loading" ? current : "paused"));
@@ -1158,6 +1483,7 @@ export default function DirectorConsoleClient({
       setLibraryLiveId("");
       setLibraryState("idle");
       setLibraryCurrentTime(0);
+      applyMusicDuck(1, { durationMs: 200 });
     };
     const handleTimeUpdate = () => {
       setLibraryCurrentTime(audio.currentTime || 0);
@@ -1184,7 +1510,7 @@ export default function DirectorConsoleClient({
       audio.removeEventListener("error", handleError);
       audio.removeEventListener("timeupdate", handleTimeUpdate);
     };
-  }, []);
+  }, [applyMusicDuck]);
 
   useEffect(() => {
     if (!navigator?.mediaDevices?.enumerateDevices) {
@@ -1222,7 +1548,7 @@ export default function DirectorConsoleClient({
   }, []);
 
   const stopAllEffects = (options = {}) => {
-    const { clearSource = true, preserveRequest = false } = options;
+    const { clearSource = true, preserveRequest = false, restoreMusic = !preserveRequest } = options;
     const audio = effectsAudioRef.current;
     if (!audio) {
       return;
@@ -1250,6 +1576,9 @@ export default function DirectorConsoleClient({
     setLibraryLiveId("");
     setLibraryState("idle");
     setLibraryCurrentTime(0);
+    if (restoreMusic) {
+      applyMusicDuck(1, { durationMs: 240 });
+    }
   };
 
   const primeEffectsAudio = useCallback(async () => {
@@ -1319,6 +1648,7 @@ export default function DirectorConsoleClient({
       return;
     }
 
+    applyMusicDuck(0.16, { durationMs: 220 });
     const nextSrc = effectSrc || file.src;
     const sourceChanged = audio.dataset.effectSrc !== nextSrc;
     audio.dataset.effectSrc = nextSrc;
@@ -1363,11 +1693,13 @@ export default function DirectorConsoleClient({
         setEffectsNeedsUnlock(true);
         setLibraryState("idle");
         setLibraryLiveId("");
+        applyMusicDuck(1, { durationMs: 180 });
         return;
       }
       setConsoleError("This audio file could not be played in this browser.");
       setLibraryState("idle");
       setLibraryLiveId("");
+      applyMusicDuck(1, { durationMs: 180 });
     }
   };
 
@@ -1726,7 +2058,7 @@ export default function DirectorConsoleClient({
           onClick={() => {
             void leaveDirectorMode();
           }}
-          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-white"
+          className="press-feedback inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-white"
         >
           <FaArrowLeft />
           Home
@@ -1735,20 +2067,8 @@ export default function DirectorConsoleClient({
           {authorized ? (
             <button
               type="button"
-              onClick={() => {
-                setManagedSessionId("");
-                setShowPicker(true);
-              }}
-              className="rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-white"
-            >
-              Change session
-            </button>
-          ) : null}
-          {authorized ? (
-            <button
-              type="button"
               onClick={logout}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-zinc-200"
+              className="press-feedback inline-flex items-center gap-2 rounded-full border border-rose-400/25 bg-[linear-gradient(135deg,rgba(69,10,10,0.96),rgba(127,29,29,0.92))] px-4 py-2 text-sm font-extrabold uppercase tracking-[0.18em] text-rose-100 shadow-[0_14px_34px_rgba(127,29,29,0.28)]"
             >
               <FaPowerOff />
               Exit
@@ -1787,59 +2107,94 @@ export default function DirectorConsoleClient({
                     <FaBroadcastTower className="text-xl" />
                   </div>
                   <h1 className="text-2xl font-semibold tracking-[-0.03em] text-white sm:text-[2rem]">
-                    Enter Director Mode
+                    Director Console
                   </h1>
-                  <p className="text-sm leading-6 text-zinc-300">
-                    Enter the 4-digit PIN to choose a live session to manage.
-                  </p>
                 </div>
                 {authError ? (
                   <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
                     {authError}
                   </div>
                 ) : null}
-                <div className="rounded-[24px] border border-white/10 bg-black/30 px-4 py-4">
-                  <label
-                    htmlFor="director-inline-pin"
-                    className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500"
-                  >
-                    Director PIN
-                  </label>
-                  <input
-                    id="director-inline-pin"
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={4}
-                    value={pin}
-                    onChange={(event) =>
-                      setPin(event.target.value.replace(/\D/g, "").slice(0, 4))
-                    }
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        void submitDirectorPin();
+                {!showDirectorPinStep ? (
+                  <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,8,11,0.68),rgba(8,8,11,0.4))] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                    <LoadingButton
+                      type="button"
+                      onClick={() => {
+                        setAuthError("");
+                        setShowDirectorPinStep(true);
+                      }}
+                      className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(90deg,#10b981_0%,#22c55e_58%,#34d399_100%)] px-5 py-3.5 font-bold text-black shadow-[0_16px_36px_rgba(16,185,129,0.2)] transition hover:-translate-y-0.5 hover:brightness-105"
+                    >
+                      Get Started
+                    </LoadingButton>
+                  </div>
+                ) : (
+                  <div className="rounded-[24px] border border-white/10 bg-black/30 px-4 py-4">
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500">
+                          Step 1
+                        </p>
+                        <p className="mt-2 text-sm text-zinc-300">
+                          Enter the 4-digit director PIN to continue.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDirectorPinStep(false);
+                          setPin("");
+                          setAuthError("");
+                        }}
+                        className="press-feedback inline-flex rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-300"
+                      >
+                        Back
+                      </button>
+                    </div>
+                    <label
+                      htmlFor="director-inline-pin"
+                      className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500"
+                    >
+                      Director PIN
+                    </label>
+                    <input
+                      id="director-inline-pin"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={4}
+                      value={pin}
+                      onChange={(event) =>
+                        setPin(event.target.value.replace(/\D/g, "").slice(0, 4))
                       }
-                    }}
-                    placeholder="0000"
-                    className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-emerald-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(16,185,129,0.08)]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void submitDirectorPin()}
-                    disabled={isSubmittingPin || pin.length !== 4}
-                    className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(90deg,#10b981_0%,#22c55e_58%,#34d399_100%)] px-5 py-3.5 font-bold text-black shadow-[0_16px_36px_rgba(16,185,129,0.2)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {isSubmittingPin ? "Checking..." : "Enter Director Mode"}
-                  </button>
-                  {!isSubmittingPin && pin.length !== 4 ? (
-                    <p className="mt-3 text-center text-xs text-zinc-500">
-                      Enter all 4 digits to enable Director Mode.
-                    </p>
-                  ) : null}
-                </div>
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void submitDirectorPin();
+                        }
+                      }}
+                      placeholder="0000"
+                      className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-emerald-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(16,185,129,0.08)]"
+                    />
+                    <LoadingButton
+                      type="button"
+                      onClick={() => void submitDirectorPin()}
+                      disabled={pin.length !== 4}
+                      loading={isSubmittingPin}
+                      pendingLabel="Checking..."
+                      className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(90deg,#10b981_0%,#22c55e_58%,#34d399_100%)] px-5 py-3.5 font-bold text-black shadow-[0_16px_36px_rgba(16,185,129,0.2)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Continue to Match Picker
+                    </LoadingButton>
+                    {!isSubmittingPin && pin.length !== 4 ? (
+                      <p className="mt-3 text-center text-xs text-zinc-500">
+                        Enter all 4 digits to continue.
+                      </p>
+                    ) : null}
+                  </div>
+                )}
               </>
-            ) : showPicker || !selectedSession ? (
+            ) : showPicker || !managedSession ? (
               <div className="space-y-4">
                 <div className="text-center sm:text-left">
                   <h1 className="text-2xl font-semibold tracking-[-0.03em] text-white sm:text-[2rem]">
@@ -1853,57 +2208,19 @@ export default function DirectorConsoleClient({
                   sessions={sessions}
                   onSelect={(item) => {
                     setSelectedSessionId(item.session._id);
+                    setManagedSessionId(item.session._id);
                     setShowPicker(false);
                     setAuthError("");
                   }}
                   onQuickStart={(item) => {
                     setSelectedSessionId(item.session._id);
+                    setManagedSessionId(item.session._id);
                     setShowPicker(false);
                     setAuthError("");
                   }}
                 />
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="text-center sm:text-left">
-                  <h1 className="text-2xl font-semibold tracking-[-0.03em] text-white sm:text-[2rem]">
-                    Manage this session?
-                  </h1>
-                  <p className="mt-1 text-sm text-zinc-200">
-                    {selectedSession.session?.name || "Live session"}
-                  </p>
-                  <p className="mt-1 text-sm text-zinc-400">
-                    {selectedSession.match?.teamAName && selectedSession.match?.teamBName
-                      ? `${selectedSession.match.teamAName} vs ${selectedSession.match.teamBName}`
-                      : "Teams pending"}
-                  </p>
-                </div>
-                <div className="rounded-[24px] border border-white/10 bg-black/30 px-4 py-4">
-                  <p className="text-sm text-zinc-300">
-                    Is this the session you want to manage?
-                  </p>
-                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setManagedSessionId(selectedSession.session?._id || "");
-                        setShowPicker(false);
-                      }}
-                      className="inline-flex flex-1 items-center justify-center rounded-2xl bg-[linear-gradient(90deg,#10b981_0%,#22c55e_58%,#34d399_100%)] px-5 py-3.5 font-bold text-black shadow-[0_16px_36px_rgba(16,185,129,0.2)]"
-                    >
-                      Yes, manage
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowPicker(true)}
-                      className="inline-flex flex-1 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] px-5 py-3.5 font-semibold text-white"
-                    >
-                      Choose another
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+            ) : null}
           </div>
         </SessionCoverHero>
       )}
@@ -1929,6 +2246,7 @@ export default function DirectorConsoleClient({
                 : "Turn on mic to use hold to talk"
             }
             icon={<FaMicrophone />}
+            accent="amber"
             help={{
               title: "Loudspeaker",
               body: "Press and hold to speak over the phone speaker or connected Bluetooth speaker. Music and effects duck automatically while you talk.",
@@ -1943,7 +2261,8 @@ export default function DirectorConsoleClient({
               />
             }
           >
-            <div className="rounded-[24px] border border-white/10 bg-black/20 px-4 py-5">
+            <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(0,0,0,0.24),rgba(10,10,14,0.46))] px-4 py-5">
+              <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(251,191,36,0.84)_20%,rgba(34,211,238,0.42)_75%,rgba(0,0,0,0))]" />
               <div
                 className="flex flex-col items-center gap-4 text-center"
                 style={{
@@ -2031,23 +2350,24 @@ export default function DirectorConsoleClient({
             title="Walkie with umpire"
             subtitle="Shared live channel"
             icon={<FaBroadcastTower />}
+            accent="emerald"
             help={{
               title: "Walkie with umpire",
               body: "Request walkie when it is off. Once it is on, you can talk with the umpire or spectators. Only one person can hold the channel at a time.",
             }}
             action={
               <div className="flex items-center gap-2">
-                <span
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                    walkieStatus === "Off"
-                      ? "bg-rose-500/12 text-rose-200"
-                      : walkieStatus.includes("Live")
-                      ? "bg-emerald-500/14 text-emerald-200"
-                      : "bg-white/[0.06] text-zinc-300"
-                  }`}
-                >
-                  {walkieStatus}
-                </span>
+                {walkieStatus !== "Off" ? (
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                      walkieStatus.includes("Live")
+                        ? "bg-emerald-500/14 text-emerald-200"
+                        : "bg-white/[0.06] text-zinc-300"
+                    }`}
+                  >
+                    {walkieStatus}
+                  </span>
+                ) : null}
                 <IosSwitch
                   checked={directorWalkieOn}
                   label="Walkie state"
@@ -2082,16 +2402,17 @@ export default function DirectorConsoleClient({
               >
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-3">
-                  <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-sm text-zinc-300">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-500/8 px-3 py-1 text-sm text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                     <FaBroadcastTower className="text-sky-300" />
                     {walkie.snapshot?.umpireCount || 0} umpire
                   </span>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-sm text-zinc-300">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-cyan-500/8 px-3 py-1 text-sm text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                     <FaHeadphones className="text-emerald-300" />
                     {walkie.snapshot?.directorCount || 0} director
                   </span>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-300">
+                <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(4,20,18,0.68),rgba(10,10,14,0.5))] px-4 py-3 text-center text-sm text-zinc-300">
+                  <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(52,211,153,0.8)_22%,rgba(34,211,238,0.46)_72%,rgba(0,0,0,0))]" />
                   {!canManageSession
                     ? "Enter director mode and choose a live session to use walkie."
                     : walkie.snapshot?.enabled && !directorWalkieOn
@@ -2144,8 +2465,9 @@ export default function DirectorConsoleClient({
           <div className="order-2 xl:order-3">
           <Card
             title="Audio Library"
-            subtitle="Tap to play audio."
+            subtitle="Tap to play audio. Music ducks under effects."
             icon={<FaBullhorn />}
+            accent="violet"
             help={{
               title: "Audio Library",
               body: "Drop audio files into public/audio/effects and they will show here automatically. Files only load when you tap them.",
@@ -2161,7 +2483,8 @@ export default function DirectorConsoleClient({
             }
           >
             <audio ref={effectsAudioRef} hidden preload="metadata" playsInline />
-            <div className="rounded-[28px] border border-white/10 bg-black/15 p-2">
+            <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,16,30,0.36),rgba(10,10,14,0.32))] p-2">
+              <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(192,132,252,0.84)_18%,rgba(59,130,246,0.42)_76%,rgba(0,0,0,0))]" />
               {effectsNeedsUnlock ? (
                 <div className="mb-3 rounded-[22px] border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
                   <p>Safari needs one quick tap to enable audio playback on this device.</p>
@@ -2189,6 +2512,8 @@ export default function DirectorConsoleClient({
                   {orderedLibraryFiles.map((file) => (
                     <div
                       key={file.id}
+                      draggable
+                      onDragStart={(event) => handleLibraryDragStart(event, file.id)}
                       onDragEnter={() => handleLibraryDragEnter(file.id)}
                       onDragOver={(event) => handleLibraryDragOver(event, file.id)}
                       onDrop={(event) => handleLibraryDrop(event, file.id)}
@@ -2205,13 +2530,13 @@ export default function DirectorConsoleClient({
                           void playEffect(file);
                         }
                       }}
-                      className={`group relative min-h-[11.75rem] overflow-hidden rounded-[24px] border px-4 py-4 pb-5 text-left transition cursor-pointer ${
+                      className={`group relative min-h-[11.75rem] overflow-hidden rounded-[24px] border px-4 py-4 pb-5 text-left transition cursor-grab active:cursor-grabbing ${
                         libraryLiveId === file.id
                           ? "border-emerald-300/30 bg-[linear-gradient(180deg,rgba(18,40,34,0.9),rgba(10,16,18,0.94))] shadow-[0_18px_40px_rgba(16,185,129,0.16)]"
                           : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
                       } ${
                         draggingLibraryId === file.id
-                          ? "scale-[0.98] opacity-70 shadow-[0_20px_50px_rgba(0,0,0,0.34)]"
+                          ? "scale-[0.985] opacity-72 shadow-[0_20px_50px_rgba(0,0,0,0.34)]"
                           : ""
                       } ${
                         libraryDropTargetId === file.id
@@ -2227,10 +2552,7 @@ export default function DirectorConsoleClient({
                               <FaMusic className="text-sm" />
                             </div>
                             <span
-                              draggable
-                              onDragStart={(event) => handleLibraryDragStart(event, file.id)}
-                              onDragEnd={clearLibraryDragState}
-                              className="inline-flex h-9 w-9 cursor-grab items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-400 active:cursor-grabbing"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-400"
                               title="Drag to reorder"
                             >
                               <FaGripVertical className="text-sm" />
@@ -2306,6 +2628,7 @@ export default function DirectorConsoleClient({
             title="Score announcer"
             subtitle="Live score readout"
             icon={<FaVolumeUp />}
+            accent="violet"
             help={{
               title: "Score announcer",
               body: "Keep score announcements on for the managed session. Use read current score any time for a quick update.",
@@ -2324,7 +2647,8 @@ export default function DirectorConsoleClient({
             }
           >
             <div className="space-y-4">
-              <div className="rounded-[24px] border border-white/10 bg-black/20 px-4 py-4">
+              <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(28,16,46,0.38),rgba(10,10,14,0.52))] px-4 py-4">
+                <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(192,132,252,0.82)_18%,rgba(34,211,238,0.42)_76%,rgba(0,0,0,0))]" />
                 <p className="text-sm text-zinc-300">
                   {speechSettings.enabled
                     ? "Score announcer is on."
@@ -2360,6 +2684,7 @@ export default function DirectorConsoleClient({
             title="Music Deck"
             subtitle="Files on this phone"
             icon={<FaMusic />}
+            accent="cyan"
             help={{
               title: "Music Deck",
               body: "Use audio files from Files, Downloads, or this phone. Connect a Bluetooth speaker first for louder playback. External apps like Spotify or Apple Music cannot be controlled here.",
@@ -2380,7 +2705,8 @@ export default function DirectorConsoleClient({
           >
             <audio ref={audioRef} onEnded={handleTrackEnd} hidden />
             <div className="space-y-4">
-              <div className="rounded-[24px] border border-white/10 bg-black/20 px-4 py-4">
+              <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,25,34,0.38),rgba(10,10,14,0.52))] px-4 py-4">
+                <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(34,211,238,0.82)_18%,rgba(59,130,246,0.76)_56%,rgba(250,204,21,0.34)_82%,rgba(0,0,0,0))]" />
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
                   Now playing
                 </p>
@@ -2442,15 +2768,21 @@ export default function DirectorConsoleClient({
                 <span className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
                   Music volume
                 </span>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={musicVolume}
-                  onChange={(event) => setMusicVolume(Number(event.target.value))}
-                  className="w-full accent-emerald-400"
-                />
+                <div className="director-gradient-slider">
+                  <div
+                    className="pointer-events-none absolute inset-y-0 left-0 rounded-full bg-[linear-gradient(90deg,#22d3ee_0%,#38bdf8_26%,#3b82f6_52%,#facc15_78%,#f59e0b_100%)]"
+                    style={{ width: `${Math.round(musicVolume * 100)}%` }}
+                  />
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={musicVolume}
+                    onChange={(event) => setMusicVolume(Number(event.target.value))}
+                    className="director-gradient-slider__input"
+                  />
+                </div>
               </label>
 
               {musicTracks.length ? (
@@ -2487,6 +2819,7 @@ export default function DirectorConsoleClient({
             title="Audio output"
             subtitle="Current playback route"
             icon={<FaHeadphones />}
+            accent="cyan"
             help={{
               title: "Audio output",
               body: "This shows where your audio is playing. Connect the phone to a Bluetooth speaker first for louder PA playback.",

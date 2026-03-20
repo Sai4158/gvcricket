@@ -11,7 +11,9 @@ import { useRouter } from "next/navigation";
 import {
   FaArrowLeft,
   FaBluetoothB,
+  FaBullhorn,
   FaCheck,
+  FaMicrophoneAlt,
   FaMicrophone,
   FaMicrophoneSlash,
   FaShareAlt,
@@ -105,6 +107,14 @@ function LoudspeakerIcon() {
         strokeLinecap="round"
       />
     </svg>
+  );
+}
+
+function PaMicSpeakerIcon() {
+  return (
+    <span className="inline-flex h-7 w-7 items-center justify-center text-[1.05rem]" aria-hidden="true">
+      <FaBullhorn />
+    </span>
   );
 }
 
@@ -957,7 +967,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     trackerHistory = reconstructedMatch[inningsKey]?.history || activeInningsHistory;
   }
   const launcherCardClass =
-    "w-full rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] text-left shadow-[0_18px_50px_rgba(0,0,0,0.32)] backdrop-blur-sm transition-transform hover:-translate-y-0.5";
+    "relative w-full overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] text-left shadow-[0_18px_50px_rgba(0,0,0,0.32)] backdrop-blur-sm transition-transform hover:-translate-y-0.5";
   const innings1Complete = match?.innings === "second" || Boolean(match?.result);
   const innings2Complete = match?.innings === "second" && !isLiveMatch;
   const targetRuns = Number(match?.innings1?.score || 0) + 1;
@@ -1064,6 +1074,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         <div className="w-full max-w-4xl mt-1">
           {showWalkieLauncher ? (
             <div className={`${launcherCardClass} mb-4 px-4 py-3`}>
+            <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/50 to-transparent" />
             <div
               className="flex w-full flex-col gap-4"
               style={{
@@ -1088,7 +1099,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                     WebkitTouchCallout: "none",
                   }}
                 >
-                  <span className="block text-base font-semibold text-white">
+                  <span className="block text-[13px] font-semibold uppercase tracking-[0.18em] text-white">
                     Walkie-Talkie
                   </span>
                   <span className="mt-1 block text-sm leading-5 text-zinc-400">
@@ -1195,13 +1206,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
             className={`${launcherCardClass} min-h-34.5 px-4 py-3.5`}
             aria-label="Open loudspeaker"
           >
+            <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/50 to-transparent" />
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between gap-3">
                 <span
                   className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-base text-black shadow-[0_12px_26px_rgba(16,185,129,0.28)]"
                   aria-hidden="true"
                 >
-                  <LoudspeakerIcon />
+                  <PaMicSpeakerIcon />
                 </span>
                 <span className="shrink-0 pt-0.5">
                   <IosGlassSwitch
@@ -1214,7 +1226,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                 </span>
               </div>
               <div className="pt-4">
-                <span className="block text-[15px] font-semibold leading-5 text-white">
+                <span className="block text-[13px] font-semibold uppercase tracking-[0.18em] text-white">
                   Loudspeaker
                 </span>
                 <span className="mt-1.5 block max-w-56 text-[13px] leading-5 text-zinc-400">
@@ -1274,6 +1286,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
             className={`${launcherCardClass} min-h-34.5 px-4 py-3.5`}
             aria-label="Open score announcer"
           >
+            <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/46 to-transparent" />
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between gap-3">
                 <button
@@ -1283,9 +1296,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
                     handleQuickAnnounce();
                   }}
                   aria-label="Announce current score"
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-400/14 text-sm text-amber-200 transition hover:bg-amber-400/20"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-400/14 text-sm text-violet-200 transition hover:bg-violet-400/20"
                 >
-                  <FaVolumeUp />
+                  <FaBullhorn />
                 </button>
                 <span className="shrink-0 pt-0.5">
                   <IosGlassSwitch
@@ -1296,7 +1309,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                 </span>
               </div>
               <div className="pt-4">
-                <span className="block text-[15px] font-semibold leading-5 text-white">
+                <span className="block text-[13px] font-semibold uppercase tracking-[0.18em] text-white">
                   Score Announcer
                 </span>
                 <span className="mt-1.5 block max-w-56 text-[13px] leading-5 text-zinc-400">
@@ -1305,7 +1318,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
               </div>
               <div className="mt-auto flex justify-end pt-3">
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-zinc-400">
-                  <FaVolumeUp className="text-sm" />
+                  <FaBullhorn className="text-sm" />
                 </span>
               </div>
             </div>

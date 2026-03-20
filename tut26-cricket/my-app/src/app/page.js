@@ -1,5 +1,6 @@
 import Image from "next/image";
 import CommunityHighlightsSection from "./components/home/CommunityHighlightsSection";
+import BackToTopButton from "./components/home/BackToTopButton";
 import HeroSection from "./components/home/HeroSection";
 import HomeHeader from "./components/home/HomeHeader";
 import HowItWorksSection from "./components/home/HowItWorksSection";
@@ -52,14 +53,18 @@ export default async function HomePage() {
   return (
     <>
       <HomeHeader />
-      <main className="home-liquid-surface overflow-x-hidden bg-black text-zinc-200 font-sans">
+      <main id="top" className="home-liquid-surface overflow-x-hidden bg-black text-zinc-200 font-sans">
         <HeroSection liveMatch={liveMatch} />
         <div className="relative z-10 bg-[linear-gradient(155deg,theme(colors.red.900)_0%,theme(colors.black)_40%)] px-5 py-20 space-y-14 md:space-y-24 md:py-28">
           <PrimaryActionsSection />
           <HowItWorksSection />
           <CommunityHighlightsSection />
           <LearnCricketCard />
-          <footer className="text-center pt-24 pb-12 border-t border-white/10">
+          <footer className="border-t border-white/10 pt-14 pb-12 text-center">
+            <div className="mb-6 flex justify-center">
+              <BackToTopButton />
+            </div>
+            <div className="mx-auto mb-8 h-px w-full max-w-4xl bg-[linear-gradient(90deg,rgba(255,255,255,0.06),rgba(255,255,255,0.9),rgba(255,255,255,0.06))]" />
             <div className="mb-8 flex justify-center">
               <Image
                 src="/gvLogo.png"

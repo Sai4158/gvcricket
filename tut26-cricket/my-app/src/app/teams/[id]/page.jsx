@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import {
@@ -15,6 +15,11 @@ import TeamRoster, {
   createDefaultRoster,
 } from "../../components/teams/TeamRoster";
 import useSessionStorageState from "../../components/teams/useSessionStorageState";
+import {
+  clearPendingSessionImage,
+  getPendingSessionImage,
+  uploadPendingSessionImageToDraftSession,
+} from "../../lib/pending-session-image";
 import StepFlow from "../../components/shared/StepFlow";
 
 export default function TeamSelectionPage() {
@@ -36,6 +41,49 @@ export default function TeamSelectionPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const [imageUploadState, setImageUploadState] = useState("idle");
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const draftToken = window.sessionStorage.getItem(draftTokenKey) || "";
+    const pendingImage = getPendingSessionImage();
+
+    if (!draftToken || !pendingImage?.dataUrl) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    setImageUploadState("uploading");
+
+    void uploadPendingSessionImageToDraftSession({
+      sessionId,
+      draftToken,
+      pendingImage,
+    })
+      .then((didUpload) => {
+        if (didUpload) {
+          clearPendingSessionImage();
+          if (!isMounted) return;
+          setImageUploadState("done");
+          return;
+        }
+
+        if (!isMounted) return;
+        setImageUploadState("failed");
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setImageUploadState("failed");
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [draftTokenKey, sessionId]);
 
   const deleteDraftSession = async () => {
     if (typeof window === "undefined") return;
@@ -188,6 +236,16 @@ export default function TeamSelectionPage() {
             {isLoading ? "Saving..." : "Proceed to Toss"}
             {!isLoading && <FaArrowRight />}
           </button>
+          {imageUploadState === "uploading" ? (
+            <p className="text-center text-xs font-medium text-cyan-200/80">
+              Cover image is uploading in the background while you set up teams.
+            </p>
+          ) : null}
+          {imageUploadState === "failed" ? (
+            <p className="text-center text-xs font-medium text-zinc-500">
+              Cover image will keep trying later and will not block the match setup.
+            </p>
+          ) : null}
           {error && (
             <p className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-center text-sm text-rose-200">
               {error}

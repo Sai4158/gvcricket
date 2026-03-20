@@ -159,7 +159,9 @@ export default function HomeHeader() {
         whileTap={{ scale: 0.9 }}
         onClick={() => setIsMenuOpen(true)}
         className={`relative inline-flex h-22 w-14 items-center justify-center overflow-hidden text-white drop-shadow-[0_8px_20px_rgba(0,0,0,0.45)] transition-opacity duration-200 ${
-          hidden ? "pointer-events-none opacity-0" : "pointer-events-auto opacity-100"
+          hidden
+            ? "pointer-events-none opacity-0"
+            : "pointer-events-auto opacity-100"
         }`}
         aria-label="Open navigation menu"
       >
@@ -241,7 +243,9 @@ export default function HomeHeader() {
                               onClick={(event) =>
                                 handleNavClick(event, link.onClick)
                               }
-                              className={link.subtext ? featuredLinkStyles : linkStyles}
+                              className={
+                                link.subtext ? featuredLinkStyles : linkStyles
+                              }
                             >
                               <span>
                                 <span className="block">{link.text}</span>
@@ -262,11 +266,16 @@ export default function HomeHeader() {
                               onClick={(event) =>
                                 handleNavClick(event, link.onClick)
                               }
-                              className={link.subtext ? featuredLinkStyles : linkStyles}
+                              className={
+                                link.subtext ? featuredLinkStyles : linkStyles
+                              }
                             >
                               <motion.span
                                 whileHover={{ x: 4 }}
-                                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                                transition={{
+                                  duration: 0.22,
+                                  ease: [0.22, 1, 0.36, 1],
+                                }}
                               >
                                 <span className="block">{link.text}</span>
                                 {link.subtext && (
@@ -279,7 +288,11 @@ export default function HomeHeader() {
                               {!link.icon && link.subtext && (
                                 <motion.span
                                   animate={{ x: [0, 3, 0] }}
-                                  transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+                                  transition={{
+                                    duration: 2.6,
+                                    repeat: Infinity,
+                                    ease: "easeInOut",
+                                  }}
                                 >
                                   <FaArrowRight className="h-4 w-4 text-rose-300" />
                                 </motion.span>
@@ -291,11 +304,16 @@ export default function HomeHeader() {
                             onClick={(event) =>
                               handleNavClick(event, link.onClick)
                             }
-                            className={link.subtext ? featuredLinkStyles : linkStyles}
+                            className={
+                              link.subtext ? featuredLinkStyles : linkStyles
+                            }
                           >
                             <motion.span
                               whileHover={{ x: 4 }}
-                              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                              transition={{
+                                duration: 0.22,
+                                ease: [0.22, 1, 0.36, 1],
+                              }}
                             >
                               <span className="block">{link.text}</span>
                               {link.subtext && (
@@ -308,7 +326,11 @@ export default function HomeHeader() {
                             {!link.icon && link.subtext && (
                               <motion.span
                                 animate={{ x: [0, 3, 0] }}
-                                transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+                                transition={{
+                                  duration: 2.6,
+                                  repeat: Infinity,
+                                  ease: "easeInOut",
+                                }}
                               >
                                 <FaArrowRight className="h-4 w-4 text-rose-300" />
                               </motion.span>

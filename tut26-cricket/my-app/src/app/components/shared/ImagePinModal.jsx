@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FaArrowRight, FaImage, FaTimes } from "react-icons/fa";
+import LoadingButton from "./LoadingButton";
 
 export default function ImagePinModal({
   isOpen,
@@ -125,15 +126,17 @@ export default function ImagePinModal({
               ) : null}
 
               <div className="mt-6 flex flex-col gap-3">
-                <button
+                <LoadingButton
                   type="button"
                   onClick={handleSubmit}
-                  disabled={isSubmitting || pin.length !== 4}
+                  disabled={pin.length !== 4}
+                  loading={isSubmitting}
+                  pendingLabel="Checking..."
+                  trailingIcon={<FaArrowRight />}
                   className="inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-[linear-gradient(90deg,#facc15_0%,#f59e0b_52%,#fb7185_100%)] px-5 py-3.5 font-bold text-black shadow-[0_16px_36px_rgba(245,158,11,0.2)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isSubmitting ? "Checking..." : confirmLabel}
-                  {!isSubmitting ? <FaArrowRight /> : null}
-                </button>
+                  {confirmLabel}
+                </LoadingButton>
                 {showContinueWithout ? (
                   <button
                     type="button"

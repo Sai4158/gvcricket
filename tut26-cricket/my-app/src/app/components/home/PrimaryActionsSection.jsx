@@ -10,6 +10,7 @@ import {
   FaClipboardList,
 } from "react-icons/fa";
 import LiquidSportText from "./LiquidSportText";
+import PendingLink from "../shared/PendingLink";
 
 const sectionVariants = {
   hidden: {},
@@ -58,12 +59,10 @@ const cardItemVariants = {
   hidden: {
     opacity: 0,
     y: 16,
-    filter: "blur(5px)",
   },
   visible: {
     opacity: 1,
     y: 0,
-    filter: "blur(0px)",
     transition: {
       duration: 0.5,
       ease: [0.22, 1, 0.36, 1],
@@ -136,7 +135,12 @@ export default function PrimaryActionsSection() {
         variants={sectionVariants}
         className="grid w-full max-w-3xl gap-4 sm:grid-cols-2"
       >
-        <Link href="/session/new" className="block">
+        <PendingLink
+          href="/session/new"
+          pendingLabel="Opening new session..."
+          pendingClassName="pending-shimmer"
+          className="block"
+        >
           <motion.div
             custom={0}
             variants={cardVariants}
@@ -153,7 +157,7 @@ export default function PrimaryActionsSection() {
               transition={
                 prefersReducedMotion
                   ? undefined
-                  : { duration: 6.4, repeat: Infinity, ease: "easeInOut" }
+                  : { duration: 8.4, repeat: Infinity, ease: "easeInOut" }
               }
               className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(250,204,21,0.12),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_30%)] opacity-90"
             />
@@ -166,7 +170,7 @@ export default function PrimaryActionsSection() {
               transition={
                 prefersReducedMotion
                   ? undefined
-                  : { duration: 5.8, repeat: Infinity, ease: "easeInOut" }
+                  : { duration: 8.6, repeat: Infinity, ease: "easeInOut" }
               }
               className="pointer-events-none absolute right-5 top-5 text-amber-100/15 transition duration-300 group-hover:text-amber-50/20"
             >
@@ -213,7 +217,7 @@ export default function PrimaryActionsSection() {
                   transition={
                     prefersReducedMotion
                       ? undefined
-                      : { duration: 4.8, repeat: Infinity, ease: "easeInOut" }
+                      : { duration: 7.6, repeat: Infinity, ease: "easeInOut" }
                   }
                   className="liquid-pill inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition duration-300 group-hover:border-white/30"
                 >
@@ -222,9 +226,14 @@ export default function PrimaryActionsSection() {
               </motion.div>
             </motion.div>
           </motion.div>
-        </Link>
+        </PendingLink>
 
-        <Link href="/session" className="block">
+        <PendingLink
+          href="/session"
+          pendingLabel="Opening sessions..."
+          pendingClassName="pending-shimmer"
+          className="block"
+        >
           <motion.div
             custom={1}
             variants={cardVariants}
@@ -241,7 +250,7 @@ export default function PrimaryActionsSection() {
               transition={
                 prefersReducedMotion
                   ? undefined
-                  : { duration: 6.6, repeat: Infinity, ease: "easeInOut" }
+                  : { duration: 8.8, repeat: Infinity, ease: "easeInOut" }
               }
               className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.14),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_28%)] opacity-90"
             />
@@ -254,7 +263,7 @@ export default function PrimaryActionsSection() {
               transition={
                 prefersReducedMotion
                   ? undefined
-                  : { duration: 6, repeat: Infinity, ease: "easeInOut" }
+                  : { duration: 8.6, repeat: Infinity, ease: "easeInOut" }
               }
               className="pointer-events-none absolute right-5 top-5 text-sky-100/15 transition duration-300 group-hover:text-sky-50/20"
             >
@@ -301,7 +310,7 @@ export default function PrimaryActionsSection() {
                   transition={
                     prefersReducedMotion
                       ? undefined
-                      : { duration: 4.9, repeat: Infinity, ease: "easeInOut" }
+                      : { duration: 7.8, repeat: Infinity, ease: "easeInOut" }
                   }
                   className="liquid-pill inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition duration-300 group-hover:border-white/30"
                 >
@@ -310,10 +319,15 @@ export default function PrimaryActionsSection() {
               </motion.div>
             </motion.div>
           </motion.div>
-        </Link>
+        </PendingLink>
       </motion.div>
 
-      <Link href="/director" className="block w-full max-w-3xl">
+      <PendingLink
+        href="/director"
+        pendingLabel="Opening director..."
+        pendingClassName="pending-shimmer"
+        className="block w-full max-w-3xl"
+      >
         <motion.div
         initial={
           prefersReducedMotion
@@ -340,7 +354,7 @@ export default function PrimaryActionsSection() {
             transition={
               prefersReducedMotion
                 ? undefined
-                : { duration: 6.2, repeat: Infinity, ease: "easeInOut" }
+                : { duration: 8.4, repeat: Infinity, ease: "easeInOut" }
             }
             className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.06),transparent_28%)]"
           />
@@ -381,14 +395,14 @@ export default function PrimaryActionsSection() {
             transition={
               prefersReducedMotion
                 ? undefined
-                : { duration: 5.1, repeat: Infinity, ease: "easeInOut" }
+                : { duration: 7.8, repeat: Infinity, ease: "easeInOut" }
             }
             className="relative z-10 liquid-pill inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-emerald-50 transition-transform duration-300 group-hover:translate-x-1"
           >
             <FaArrowRight />
           </motion.span>
         </motion.div>
-      </Link>
+      </PendingLink>
     </section>
   );
 }

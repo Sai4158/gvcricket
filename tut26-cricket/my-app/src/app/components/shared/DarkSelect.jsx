@@ -134,7 +134,7 @@ export default function DarkSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={toggleOpen}
-        className={`inline-flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.04] text-left text-sm text-white outline-none transition hover:bg-white/[0.06] focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-400/20 ${
+        className={`press-feedback inline-flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.04] text-left text-sm text-white outline-none transition hover:bg-white/[0.06] focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-400/20 ${
           iconOnly
             ? "h-12 w-12 justify-center px-0 py-0"
             : `w-full ${compact ? "px-4 py-3" : "px-4 py-3.5"}`
@@ -198,7 +198,7 @@ export default function DarkSelect({
                         onChange?.(option.value);
                         setOpen(false);
                       }}
-                      className={`block w-full rounded-xl px-3 py-3 text-left text-sm transition ${
+                      className={`press-feedback block w-full rounded-xl px-3 py-3 text-left text-sm transition ${
                         selected
                           ? "bg-emerald-500/14 text-emerald-200"
                           : "text-zinc-200 hover:bg-white/[0.05]"

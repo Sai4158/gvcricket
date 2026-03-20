@@ -2,16 +2,45 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { FaShieldAlt } from "react-icons/fa";
+import { FaBroadcastTower, FaShieldAlt } from "react-icons/fa";
+import LoadingButton from "../shared/LoadingButton";
+
+const THEME_STYLES = {
+  sky: {
+    icon: "text-sky-300",
+    title: "Umpire Mode PIN",
+    description: "Enter the PIN to access scoring controls.",
+    button:
+      "border-sky-400/20 bg-[linear-gradient(180deg,rgba(37,99,235,0.2),rgba(15,23,42,0.9))] text-sky-50 shadow-[0_16px_38px_rgba(37,99,235,0.16)] hover:border-sky-300/35 hover:bg-[linear-gradient(180deg,rgba(59,130,246,0.24),rgba(15,23,42,0.94))]",
+    focus:
+      "focus:border-sky-300/35 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(37,99,235,0.1)]",
+  },
+  emerald: {
+    icon: "text-emerald-300",
+    title: "Director Mode PIN",
+    description: "Enter the director PIN to start managing this live match.",
+    button:
+      "border-emerald-400/20 bg-[linear-gradient(180deg,rgba(16,185,129,0.18),rgba(6,24,24,0.92))] text-emerald-50 shadow-[0_16px_38px_rgba(16,185,129,0.14)] hover:border-emerald-300/35 hover:bg-[linear-gradient(180deg,rgba(52,211,153,0.2),rgba(7,32,28,0.95))]",
+    focus:
+      "focus:border-emerald-400/35 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(16,185,129,0.09)]",
+  },
+};
 
 export default function PinModal({
   onPinSubmit,
   onExit,
   isSubmitting,
   error,
+  title,
+  description,
+  submitLabel = "Enter",
+  theme = "sky",
+  mode = "umpire",
 }) {
   const [pin, setPin] = useState("");
   const inputRef = useRef(null);
+  const styles = THEME_STYLES[theme] || THEME_STYLES.sky;
+  const Icon = mode === "director" ? FaBroadcastTower : FaShieldAlt;
 
   const handleSubmit = () => {
     onPinSubmit(pin);
@@ -40,10 +69,10 @@ export default function PinModal({
         className="relative w-full max-w-sm bg-zinc-900 p-8 rounded-2xl ring-1 ring-white/10 shadow-2xl text-center"
         onClick={(event) => event.stopPropagation()}
       >
-        <FaShieldAlt className="mx-auto mb-4 text-5xl text-sky-300" />
-        <h2 className="text-2xl font-bold text-white mb-2">Umpire Mode PIN</h2>
-        <p className="text-zinc-400 mb-6">
-          Enter the PIN to access scoring controls.
+        <Icon className={`mx-auto mb-4 text-5xl ${styles.icon}`} />
+        <h2 className="mb-2 text-2xl font-bold text-white">{title || styles.title}</h2>
+        <p className="mb-6 text-zinc-400">
+          {description || styles.description}
         </p>
         <div className="space-y-4">
           <input
@@ -63,16 +92,18 @@ export default function PinModal({
               }
             }}
             placeholder="0000"
-            className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-sky-300/35 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(37,99,235,0.1)]"
+            className={`w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 ${styles.focus}`}
           />
-          <button
+          <LoadingButton
             type="button"
             onClick={handleSubmit}
-            disabled={isSubmitting || pin.length !== 4}
-            className="w-full rounded-2xl border border-sky-400/20 bg-[linear-gradient(180deg,rgba(37,99,235,0.2),rgba(15,23,42,0.9))] py-3 font-semibold text-sky-50 shadow-[0_16px_38px_rgba(37,99,235,0.16)] transition hover:border-sky-300/35 hover:bg-[linear-gradient(180deg,rgba(59,130,246,0.24),rgba(15,23,42,0.94))] disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={pin.length !== 4}
+            loading={isSubmitting}
+            pendingLabel="Checking..."
+            className={`w-full rounded-2xl border py-3 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${styles.button}`}
           >
-            {isSubmitting ? "Checking..." : "Enter"}
-          </button>
+            {submitLabel}
+          </LoadingButton>
         </div>
         {error && <p className="text-red-400 text-sm mt-4">{error}</p>}
       </motion.div>

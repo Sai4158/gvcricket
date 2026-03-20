@@ -4,6 +4,7 @@ let sharedUiAudioUnlocked = false;
 const unlockListeners = new Set();
 const cachedAudioUrlMap = new Map();
 const cachedAudioRequestMap = new Map();
+const UI_AUDIO_CACHE_NAME = "gv-ui-audio-assets-v1";
 
 const SILENT_AUDIO_DATA_URI =
   "data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
@@ -217,16 +218,49 @@ export async function getCachedAudioAssetUrl(src) {
     return cachedAudioRequestMap.get(safeSrc);
   }
 
-  const request = fetch(safeSrc, { cache: "force-cache" })
-    .then(async (response) => {
-      if (!response.ok) {
-        throw new Error("Audio file could not be fetched.");
+  const request = (async () => {
+    if (
+      typeof window !== "undefined" &&
+      "caches" in window &&
+      /^https?:/i.test(window.location?.protocol || "http:")
+    ) {
+      try {
+        const cache = await window.caches.open(UI_AUDIO_CACHE_NAME);
+        const cachedResponse = await cache.match(safeSrc);
+        if (cachedResponse?.ok) {
+          const cachedBlob = await cachedResponse.blob();
+          const cachedObjectUrl = URL.createObjectURL(cachedBlob);
+          cachedAudioUrlMap.set(safeSrc, cachedObjectUrl);
+          return cachedObjectUrl;
+        }
+      } catch {
+        // Fall back to direct fetch if Cache Storage is unavailable or blocked.
       }
-      const blob = await response.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      cachedAudioUrlMap.set(safeSrc, objectUrl);
-      return objectUrl;
-    })
+    }
+
+    const response = await fetch(safeSrc, { cache: "force-cache" });
+    if (!response.ok) {
+      throw new Error("Audio file could not be fetched.");
+    }
+
+    try {
+      if (
+        typeof window !== "undefined" &&
+        "caches" in window &&
+        /^https?:/i.test(window.location?.protocol || "http:")
+      ) {
+        const cache = await window.caches.open(UI_AUDIO_CACHE_NAME);
+        await cache.put(safeSrc, response.clone());
+      }
+    } catch {
+      // Ignore Cache Storage failures and continue with in-memory caching.
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    cachedAudioUrlMap.set(safeSrc, objectUrl);
+    return objectUrl;
+  })()
     .finally(() => {
       cachedAudioRequestMap.delete(safeSrc);
     });

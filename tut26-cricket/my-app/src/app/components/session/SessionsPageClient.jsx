@@ -14,6 +14,7 @@ import {
 import DarkSelect from "../shared/DarkSelect";
 import InfoModal from "./InfoModal";
 import PinModal from "./PinModal";
+import PendingLink from "../shared/PendingLink";
 import SessionCard from "./SessionCard";
 
 const SORT_OPTIONS = [
@@ -84,13 +85,13 @@ function sortSessions(items, sortValue) {
 
 function EmptyState({ title, text, href, label }) {
   return (
-    <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,8,12,0.98))] px-6 py-12 text-center shadow-[0_24px_70px_rgba(0,0,0,0.3)]">
+    <div className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.08),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.08),transparent_28%),linear-gradient(180deg,rgba(18,18,24,0.97),rgba(8,8,12,0.99))] px-6 py-12 text-center shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
       <h2 className="text-2xl font-semibold tracking-[-0.03em] text-white">{title}</h2>
       <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-zinc-400">{text}</p>
       {href && label ? (
         <Link
           href={href}
-          className="mt-6 inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_28px_rgba(37,99,235,0.22)] transition hover:bg-blue-500"
+          className="mt-6 inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-300/18 bg-[linear-gradient(135deg,rgba(10,17,26,0.96),rgba(11,31,41,0.96)_58%,rgba(15,118,110,0.78))] px-5 py-3 text-sm font-semibold text-cyan-50 shadow-[0_16px_30px_rgba(8,47,73,0.22)] transition hover:-translate-y-0.5 hover:border-cyan-200/28 hover:brightness-110"
         >
           <FaPlus />
           {label}
@@ -101,7 +102,7 @@ function EmptyState({ title, text, href, label }) {
 }
 
 export default function SessionsPageClient({ initialSessions }) {
-  const [selectedSession, setSelectedSession] = useState(null);
+  const [pinPrompt, setPinPrompt] = useState(null);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [pinError, setPinError] = useState("");
   const [pinSubmitting, setPinSubmitting] = useState(false);
@@ -180,17 +181,42 @@ export default function SessionsPageClient({ initialSessions }) {
 
   const handleOpenUmpirePin = useCallback((nextSession) => {
     setPinError("");
-    setSelectedSession(nextSession);
+    setPinPrompt({ mode: "umpire", session: nextSession });
+  }, []);
+
+  const handleOpenDirectorPin = useCallback((nextSession) => {
+    setPinError("");
+    setPinPrompt({ mode: "director", session: nextSession });
   }, []);
 
   const handlePinSubmit = async (pin) => {
-    if (!selectedSession?.match || !selectedSession.isLive) return;
+    if (!pinPrompt?.session?.match || !pinPrompt.session.isLive) return;
 
     setPinSubmitting(true);
     setPinError("");
 
     try {
-      const response = await fetch(`/api/matches/${selectedSession.match}/auth`, {
+      if (pinPrompt.mode === "director") {
+        const response = await fetch("/api/director/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pin }),
+        });
+
+        if (!response.ok) {
+          const payload = await response
+            .json()
+            .catch(() => ({ message: "Incorrect PIN." }));
+          throw new Error(payload.message || "Incorrect PIN.");
+        }
+
+        const directorSessionId = pinPrompt.session._id;
+        router.push(`/director?session=${directorSessionId}&manage=1`);
+        setPinPrompt(null);
+        return;
+      }
+
+      const response = await fetch(`/api/matches/${pinPrompt.session.match}/auth`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pin }),
@@ -203,9 +229,11 @@ export default function SessionsPageClient({ initialSessions }) {
         throw new Error(payload.message || "Incorrect PIN.");
       }
 
-      const needsToss = !selectedSession.tossReady;
-      router.push(needsToss ? `/toss/${selectedSession.match}` : `/match/${selectedSession.match}`);
-      setSelectedSession(null);
+      const needsToss = !pinPrompt.session.tossReady;
+      router.push(
+        needsToss ? `/toss/${pinPrompt.session.match}` : `/match/${pinPrompt.session.match}`
+      );
+      setPinPrompt(null);
     } catch (error) {
       setPinError(error.message);
     } finally {
@@ -215,7 +243,7 @@ export default function SessionsPageClient({ initialSessions }) {
 
   if (!sessions.length) {
     return (
-      <main className="min-h-screen bg-[linear-gradient(315deg,#003153_0%,#1B1B1B_74%)] px-5 py-8 text-zinc-100">
+      <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_22%),radial-gradient(circle_at_82%_14%,rgba(14,165,233,0.1),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.08),transparent_20%),linear-gradient(180deg,#16181d_0%,#090a0f_100%)] px-5 py-8 text-zinc-100">
         <div className="mx-auto flex min-h-[80vh] max-w-4xl items-center justify-center">
           <EmptyState
             title="No sessions yet"
@@ -229,38 +257,47 @@ export default function SessionsPageClient({ initialSessions }) {
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(315deg,#003153_0%,#1B1B1B_74%)] px-4 pb-10 pt-6 text-zinc-100 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_20%),radial-gradient(circle_at_86%_10%,rgba(14,165,233,0.1),transparent_20%),radial-gradient(circle_at_16%_88%,rgba(16,185,129,0.08),transparent_20%),linear-gradient(180deg,#1b1d23_0%,#09090d_100%)] px-4 pb-10 pt-6 text-zinc-100 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex items-center justify-between gap-3">
-          <Link
+          <PendingLink
             href="/"
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
+            pendingLabel="Opening home..."
+            pendingClassName="pending-shimmer"
+            className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-cyan-200/18 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))]"
           >
-            <FaArrowLeft />
-            Back
-          </Link>
-          <Link
+            {({ pending, spinner }) => (
+              <>
+                {pending ? spinner : <FaArrowLeft />}
+                <span>{pending ? "Opening..." : "Back"}</span>
+              </>
+            )}
+          </PendingLink>
+          <PendingLink
             href="/session/new"
-            className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(37,99,235,0.22)] transition hover:bg-blue-500"
+            pendingLabel="Opening new session..."
+            pendingClassName="pending-shimmer"
+            className="inline-flex items-center gap-2 rounded-full border border-cyan-300/16 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),transparent_30%),linear-gradient(180deg,rgba(20,22,28,0.96),rgba(9,10,15,0.98))] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(0,0,0,0.26)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-cyan-200/26 hover:bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_34%),linear-gradient(180deg,rgba(24,26,33,0.98),rgba(11,12,18,1))]"
           >
-            <FaPlus />
-            New Session
-          </Link>
+            {({ pending, spinner }) => (
+              <>
+                {pending ? spinner : <FaPlus className="text-sky-300" />}
+                <span>{pending ? "Opening..." : "New Session"}</span>
+              </>
+            )}
+          </PendingLink>
         </div>
 
-        <section className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,8,12,0.98))] px-5 py-6 shadow-[0_28px_80px_rgba(0,0,0,0.34)] sm:px-7">
+        <section className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.06),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.05),transparent_24%),linear-gradient(180deg,rgba(13,14,20,0.98),rgba(8,8,12,0.99))] px-5 py-6 shadow-[0_28px_80px_rgba(0,0,0,0.34)] sm:px-7">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-300">
-                Sessions
-              </div>
               <div className="flex items-center gap-3">
                 <h1 className="text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
                   All Sessions
                 </h1>
                 <button
                   onClick={() => setIsInfoModalOpen(true)}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-400 transition hover:bg-white/[0.08] hover:text-sky-300"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02))] text-zinc-300 shadow-[0_10px_24px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5 hover:border-cyan-300/18 hover:text-cyan-200"
                   aria-label="Session status help"
                 >
                   <FaInfoCircle size={18} />
@@ -272,7 +309,7 @@ export default function SessionsPageClient({ initialSessions }) {
             </div>
           </div>
 
-          <div className="sticky top-4 z-10 mt-6 rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,12,14,0.9),rgba(8,8,12,0.9))] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+          <div className="sticky top-4 z-10 mt-6 rounded-[26px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.06),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(245,158,11,0.05),transparent_22%),linear-gradient(180deg,rgba(16,16,20,0.9),rgba(8,8,12,0.94))] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl">
             <div className="flex items-center gap-3">
               <label className="relative flex min-w-0 flex-1 items-center">
                 <FaSearch className="pointer-events-none absolute left-4 text-zinc-500" />
@@ -281,7 +318,7 @@ export default function SessionsPageClient({ initialSessions }) {
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
                   placeholder="Search sessions, teams, or date"
-                  className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-sky-400/30 focus:bg-white/[0.06]"
+                  className="h-12 w-full rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-cyan-300/24 focus:bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.025))] focus:shadow-[0_0_0_1px_rgba(34,211,238,0.18)]"
                   aria-label="Search sessions"
                   autoComplete="off"
                 />
@@ -316,10 +353,10 @@ export default function SessionsPageClient({ initialSessions }) {
                     setFilterBy(pill.value);
                     setPage(1);
                   }}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  className={`press-feedback rounded-full px-4 py-2 text-sm font-semibold transition ${
                     filterBy === pill.value
-                      ? "bg-white text-black"
-                      : "border border-white/10 bg-white/[0.04] text-zinc-300 hover:bg-white/[0.08]"
+                      ? "border border-cyan-200/24 bg-[linear-gradient(135deg,rgba(245,252,255,0.96),rgba(211,238,248,0.9)_60%,rgba(245,158,11,0.26))] text-black shadow-[0_10px_20px_rgba(255,255,255,0.14)]"
+                      : "border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.018))] text-zinc-300 hover:-translate-y-0.5 hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.025))]"
                   }`}
                 >
                   {pill.label}
@@ -349,11 +386,12 @@ export default function SessionsPageClient({ initialSessions }) {
                     key={session._id}
                     session={session}
                     onUmpireClick={handleOpenUmpirePin}
+                    onDirectorClick={handleOpenDirectorPin}
                   />
                 ))}
               </div>
 
-              <section className="mt-8 rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,8,12,0.98))] px-5 py-5 shadow-[0_22px_60px_rgba(0,0,0,0.28)]">
+              <section className="mt-8 rounded-[26px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.06),transparent_20%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.05),transparent_22%),linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,8,12,0.98))] px-5 py-5 shadow-[0_22px_60px_rgba(0,0,0,0.28)]">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <p className="text-sm font-medium text-zinc-200">
@@ -382,7 +420,7 @@ export default function SessionsPageClient({ initialSessions }) {
                         type="button"
                         onClick={() => setPage((current) => Math.max(1, current - 1))}
                         disabled={currentPage <= 1}
-                        className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
+                        className="press-feedback rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         Previous
                       </button>
@@ -390,7 +428,7 @@ export default function SessionsPageClient({ initialSessions }) {
                         type="button"
                         onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
                         disabled={currentPage >= totalPages}
-                        className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
+                        className="press-feedback rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         Next
                       </button>
@@ -404,15 +442,28 @@ export default function SessionsPageClient({ initialSessions }) {
       </div>
 
       <AnimatePresence>
-        {selectedSession ? (
+        {pinPrompt ? (
           <PinModal
             onPinSubmit={handlePinSubmit}
             onExit={() => {
-              setSelectedSession(null);
+              setPinPrompt(null);
               setPinError("");
             }}
             isSubmitting={pinSubmitting}
             error={pinError}
+            mode={pinPrompt.mode}
+            theme={pinPrompt.mode === "director" ? "emerald" : "sky"}
+            title={
+              pinPrompt.mode === "director" ? "Director Mode PIN" : "Umpire Mode PIN"
+            }
+            description={
+              pinPrompt.mode === "director"
+                ? "Enter the director PIN to start directing this live match."
+                : "Enter the PIN to access scoring controls."
+            }
+            submitLabel={
+              pinPrompt.mode === "director" ? "Start Directing" : "Enter Umpire Mode"
+            }
           />
         ) : null}
         {isInfoModalOpen ? (

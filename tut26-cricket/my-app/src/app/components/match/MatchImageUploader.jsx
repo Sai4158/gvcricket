@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FaImage } from "react-icons/fa";
 import ImagePinModal from "../shared/ImagePinModal";
+import LoadingButton from "../shared/LoadingButton";
 import { getAcceptedMatchImageTypes, compressMatchImage } from "./match-image-client";
 
 export default function MatchImageUploader({
@@ -163,7 +164,7 @@ export default function MatchImageUploader({
             </span>
             <label
               htmlFor={`match-image-upload-${matchId}`}
-              className="inline-flex shrink-0 cursor-pointer items-center rounded-full bg-white/[0.08] px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/[0.12]"
+              className="press-feedback inline-flex shrink-0 cursor-pointer items-center rounded-full bg-white/[0.08] px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/[0.12]"
             >
               Choose file
             </label>
@@ -182,13 +183,15 @@ export default function MatchImageUploader({
             />
           </div>
         </div>
-        <button
+        <LoadingButton
           onClick={handleUpload}
-          disabled={!selectedFile || isUploading}
+          disabled={!selectedFile}
+          loading={isUploading}
+          pendingLabel="Uploading..."
           className="w-full rounded-full bg-[linear-gradient(90deg,#10b981_0%,#059669_100%)] px-5 py-3 font-semibold text-black shadow-[0_16px_36px_rgba(16,185,129,0.22)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isUploading ? "Uploading..." : primaryLabel}
-        </button>
+          {primaryLabel}
+        </LoadingButton>
         <p className="text-xs text-zinc-500">
           Images are optional and compressed before upload.
         </p>
@@ -203,7 +206,7 @@ export default function MatchImageUploader({
         {onSkip && (
           <button
             onClick={onSkip}
-            className="rounded-full border border-white/10 px-5 py-2.5 font-semibold text-zinc-200 transition hover:bg-white/5"
+            className="press-feedback rounded-full border border-white/10 px-5 py-2.5 font-semibold text-zinc-200 transition hover:bg-white/5"
           >
             {secondaryLabel}
           </button>

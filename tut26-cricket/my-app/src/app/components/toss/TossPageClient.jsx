@@ -5,12 +5,17 @@ import { useRouter } from "next/navigation";
 import { FaArrowLeft, FaRedo } from "react-icons/fa";
 import { AccessGate, Splash } from "../match/MatchStatusShell";
 import useMatchAccess from "../match/useMatchAccess";
+import LoadingButton from "../shared/LoadingButton";
 import TossStatePanels from "./TossStatePanels";
 import { getTeamBundle } from "../../lib/team-utils";
 import { getStartedMatchFromPayload, getStartedMatchId } from "../../lib/match-start";
+import {
+  clearPendingSessionImage,
+  getPendingSessionImage,
+  uploadPendingSessionImageToMatch,
+} from "../../lib/pending-session-image";
 import StepFlow from "../shared/StepFlow";
 
-const PENDING_SESSION_IMAGE_KEY = "gv-pending-session-image";
 const getDraftTokenKey = (sessionId) => `session_${sessionId}_draftToken`;
 
 function createActionId(prefix) {
@@ -19,19 +24,6 @@ function createActionId(prefix) {
   }
 
   return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function getPendingSessionImage() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    const rawPendingImage = window.sessionStorage.getItem(PENDING_SESSION_IMAGE_KEY);
-    return rawPendingImage ? JSON.parse(rawPendingImage) : null;
-  } catch {
-    return null;
-  }
 }
 
 async function uploadPendingSessionImage(matchId, pendingImage) {
@@ -43,21 +35,9 @@ async function uploadPendingSessionImage(matchId, pendingImage) {
   const timeoutId = window.setTimeout(() => controller.abort(), 12000);
 
   try {
-    const imageResponse = await fetch(pendingImage.dataUrl, {
-      signal: controller.signal,
-    });
-    const imageBlob = await imageResponse.blob();
-    const uploadForm = new FormData();
-    uploadForm.append(
-      "image",
-      new File([imageBlob], pendingImage.fileName || "session-cover.jpg", {
-        type: pendingImage.type || imageBlob.type || "image/jpeg",
-      })
-    );
-
-    await fetch(`/api/matches/${matchId}/image`, {
-      method: "POST",
-      body: uploadForm,
+    await uploadPendingSessionImageToMatch({
+      matchId,
+      pendingImage,
       signal: controller.signal,
     });
   } catch {
@@ -201,7 +181,7 @@ export default function TossPageClient({
 
       const pendingImage = getPendingSessionImage();
       if (typeof window !== "undefined") {
-        window.sessionStorage.removeItem(PENDING_SESSION_IMAGE_KEY);
+        clearPendingSessionImage();
       }
 
       if (pendingImage && finalMatchId) {
@@ -239,12 +219,12 @@ export default function TossPageClient({
       <main className="min-h-screen grid place-content-center bg-zinc-950 px-6">
         <div className="max-w-sm rounded-[28px] border border-rose-500/30 bg-rose-950/30 px-6 py-5 text-center text-rose-200 shadow-2xl shadow-black/40">
           <p className="text-lg font-semibold">{error}</p>
-          <button
+          <LoadingButton
             onClick={redoToss}
             className="mt-5 rounded-full bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
           >
             Try Toss Again
-          </button>
+          </LoadingButton>
         </div>
       </main>
     );
@@ -285,7 +265,7 @@ export default function TossPageClient({
             <div className="mb-6 flex items-start justify-between gap-4">
               <button
                 onClick={handleBack}
-                className="mt-1 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
+                className="press-feedback mt-1 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
                 aria-label="Go back"
               >
                 <FaArrowLeft />
@@ -293,7 +273,7 @@ export default function TossPageClient({
 
               <button
                 onClick={redoToss}
-                className="mt-1 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
+                className="press-feedback mt-1 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
                 aria-label="Redo Toss"
               >
                 <FaRedo />

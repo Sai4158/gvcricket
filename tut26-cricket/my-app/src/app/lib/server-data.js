@@ -309,8 +309,7 @@ export async function loadDirectorSessionsList() {
       select:
         "teamA teamB teamAName teamBName score outs innings innings1 innings2 isOngoing result _id updatedAt sessionId matchImageUrl",
     })
-    .sort({ createdAt: -1, _id: -1 })
-    .limit(16))
+    .sort({ createdAt: -1, _id: -1 }))
     .filter((session) => !session?.isDraft);
 
   const fallbackMatchesBySessionId = await resolveSessionMatches(sessions);

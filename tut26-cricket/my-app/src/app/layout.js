@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SmoothScroll from "./components/SmoothScroll";
+import RouteFeedbackProvider from "./components/shared/RouteFeedbackProvider";
 import { Analytics } from "@vercel/analytics/next";
 import { absoluteUrl, getSiteUrl, siteConfig } from "./lib/site-metadata";
 
@@ -127,7 +128,9 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}
       >
-        <SmoothScroll>{children}</SmoothScroll>
+        <RouteFeedbackProvider>
+          <SmoothScroll>{children}</SmoothScroll>
+        </RouteFeedbackProvider>
         {shouldRenderAnalytics ? <Analytics /> : null}
       </body>
     </html>
