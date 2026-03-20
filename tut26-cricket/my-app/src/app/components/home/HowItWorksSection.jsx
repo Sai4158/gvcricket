@@ -19,6 +19,7 @@ import {
   FaVolumeUp,
 } from "react-icons/fa";
 import StepFlow from "../shared/StepFlow";
+import SafeMatchImage from "../shared/SafeMatchImage";
 import AnimatedSection from "./AnimatedSection";
 import LiquidSportText from "./LiquidSportText";
 
@@ -782,45 +783,40 @@ function renderFeaturePreview(card) {
           <div className="space-y-3">
             <motion.div
               variants={previewItemVariants}
-              className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_36%),linear-gradient(180deg,rgba(22,24,30,0.96),rgba(10,12,16,0.98))] p-3"
+              className="relative overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_36%),linear-gradient(180deg,rgba(22,24,30,0.96),rgba(10,12,16,0.98))] px-3 py-3"
             >
-              <div className="relative overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(40,48,58,0.84),rgba(14,18,24,0.84))] px-3 py-4 shadow-[0_18px_36px_rgba(0,0,0,0.22)]">
-                <Image
-                  src="/Thumb1.png"
-                  alt=""
-                  fill
-                  sizes="(max-width: 768px) 100vw, 420px"
-                  className="object-cover opacity-58"
-                />
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(16,18,24,0.16),rgba(10,12,18,0.52))]" />
-                <div className="relative z-10 flex items-center justify-between gap-4">
-                  <div className="liquid-glass relative flex min-w-0 flex-1 items-center gap-3 rounded-[24px] px-3 py-3 text-white shadow-[0_18px_36px_rgba(0,0,0,0.22)]">
-                    <div className="absolute inset-0 rounded-[24px] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.16),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(52,211,153,0.08),transparent_24%)]" />
-                    <div className="relative h-[3.7rem] w-[3.7rem] shrink-0 overflow-hidden rounded-[18px] border border-white/10 bg-white/[0.05]">
-                      <Image
+              <div className="relative z-10 flex items-center justify-between gap-2.5">
+                <div className="liquid-glass relative flex min-w-0 flex-1 items-center justify-between gap-2 rounded-[22px] px-3 py-2.5 text-white shadow-[0_18px_34px_rgba(0,0,0,0.2)]">
+                  <div className="absolute inset-0 rounded-[22px] bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.1),transparent_40%)]" />
+                  <div className="relative z-10 flex min-w-0 items-center gap-2">
+                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-[14px]">
+                      <SafeMatchImage
                         src="/Thumb1.png"
                         alt="Live match banner preview"
                         fill
-                        sizes="60px"
+                        sizes="40px"
                         className="object-cover"
+                        fallbackClassName="object-contain p-0 opacity-100 scale-[1.38]"
                       />
                     </div>
-                    <div className="relative z-10 min-w-0 text-left">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.32em] text-emerald-300">
+                    <div className="min-w-0 flex-1 text-left">
+                      <div className="text-[8px] font-bold uppercase tracking-[0.28em] text-emerald-300">
                         Live Now
                       </div>
-                      <div className="truncate text-[14px] font-semibold leading-tight text-white">
+                      <div className="truncate text-[11px] font-semibold leading-tight text-white">
                         TEAM A vs TEAM B
                       </div>
-                      <div className="mt-1 text-[12px] text-white/72">1/0 - View score now</div>
-                    </div>
-                    <div className="liquid-pill relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] text-white">
-                      <FaArrowRight className="h-4 w-4" />
+                      <div className="truncate text-[9px] leading-tight text-white/72">
+                        1/0 - View score now
+                      </div>
                     </div>
                   </div>
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center text-white/96">
-                    <FaBars className="text-[1.85rem] drop-shadow-[0_8px_18px_rgba(0,0,0,0.28)]" />
+                  <div className="liquid-pill relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-[14px] text-white">
+                    <FaArrowRight className="h-3 w-3" />
                   </div>
+                </div>
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center text-white/96">
+                  <FaBars className="text-[1.35rem] drop-shadow-[0_8px_18px_rgba(0,0,0,0.24)]" />
                 </div>
               </div>
             </motion.div>
@@ -849,121 +845,8 @@ function renderFeaturePreview(card) {
   }
 }
 
-function renderFeatureDetail(card) {
-  if (card.previewType !== "director") {
-    return null;
-  }
-
-  return (
-    <motion.div
-      variants={previewStaggerVariants}
-      className="mt-4 rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] p-3"
-    >
-      <motion.p
-        variants={previewItemVariants}
-        className="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-200/80"
-      >
-        Deck expansion
-      </motion.p>
-      <div className="mt-3 space-y-3 rounded-[20px] border border-cyan-300/12 bg-[linear-gradient(180deg,rgba(8,14,20,0.94),rgba(7,8,12,0.98))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-        <motion.div
-          variants={previewItemVariants}
-          className="rounded-[18px] border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(8,24,36,0.96),rgba(9,12,18,0.98))] px-4 py-3"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-white">Live sound bank armed</p>
-              <p className="mt-1 text-[11px] text-zinc-400">
-                Keep the next crowd lift, sixer hit, and horn ready while the live match stays in front.
-              </p>
-            </div>
-            <span className="rounded-full border border-emerald-300/18 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-100/90">
-              On air
-            </span>
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            {[
-              ["Next", "SIXER CALL"],
-              ["Back-up", "IPL HORN"],
-              ["Bed", "CROWD RISE"],
-            ].map(([label, value]) => (
-              <div
-                key={label}
-                className="rounded-[14px] border border-white/10 bg-white/[0.04] px-3 py-2"
-              >
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                  {label}
-                </p>
-                <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white">
-                  {value}
-                </p>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        <motion.div variants={previewStaggerVariants} className="grid grid-cols-2 gap-2">
-          {[
-            ["Sixer Call", FaVolumeUp, "Big moment", "amber"],
-            ["IPL Horn", FaBullhorn, "Start strong", "cyan"],
-            ["Crowd Cheer", FaBroadcastTower, "Lift the room", "emerald"],
-            ["Wicket Sting", FaMicrophoneAlt, "Sharp finish", "violet"],
-          ].map(([label, Icon, meta, tone]) => (
-            <motion.div
-              key={label}
-              variants={previewItemVariants}
-              className={`rounded-[18px] border px-3 py-3 ${
-                tone === "emerald"
-                  ? "border-emerald-300/16 bg-[linear-gradient(180deg,rgba(6,78,59,0.3),rgba(17,24,39,0.92))]"
-                  : tone === "amber"
-                  ? "border-amber-300/16 bg-[linear-gradient(180deg,rgba(146,64,14,0.28),rgba(17,24,39,0.92))]"
-                  : tone === "violet"
-                  ? "border-violet-300/16 bg-[linear-gradient(180deg,rgba(91,33,182,0.24),rgba(17,24,39,0.92))]"
-                  : "border-cyan-300/16 bg-[linear-gradient(180deg,rgba(8,47,73,0.26),rgba(17,24,39,0.92))]"
-              }`}
-            >
-              <Icon className="text-sm text-white" />
-              <p className="mt-3 text-sm font-semibold text-white">{label}</p>
-              <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-zinc-500">{meta}</p>
-            </motion.div>
-          ))}
-        </motion.div>
-
-        <motion.div
-          variants={previewStaggerVariants}
-          className="grid gap-2 rounded-[18px] border border-white/10 bg-white/[0.03] p-3"
-        >
-          {[
-            ["Mic", "84%", "Live voice"],
-            ["Music", "62%", "Under FX"],
-            ["FX", "71%", "Queue hot"],
-          ].map(([label, value, meta]) => (
-            <motion.div
-              key={label}
-              variants={previewItemVariants}
-              className="flex items-center gap-3"
-            >
-              <span className="w-11 text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                {label}
-              </span>
-              <span className="relative h-2 flex-1 overflow-hidden rounded-full bg-white/8">
-                <span
-                  className="absolute inset-y-0 left-0 rounded-full bg-[linear-gradient(90deg,rgba(34,211,238,0.9),rgba(59,130,246,0.95),rgba(251,191,36,0.9))]"
-                  style={{ width: value }}
-                />
-              </span>
-              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
-                {value}
-              </span>
-              <span className="hidden text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500 sm:inline">
-                {meta}
-              </span>
-            </motion.div>
-          ))}
-        </motion.div>
-      </div>
-    </motion.div>
-  );
+function renderFeatureDetail() {
+  return null;
 }
 
 function useUseFlatLaptopMotion() {
@@ -1057,6 +940,37 @@ function useCardScrollMotion(prefersReducedMotion, accent, index, useFlatLaptopM
   };
 }
 
+function getFeatureCardWideSpan(previewType) {
+  return "2xl:col-span-3";
+}
+
+function getJourneyCardWideSpan() {
+  return "2xl:col-span-4";
+}
+
+function getFeatureCardWideOrder(previewType) {
+  switch (previewType) {
+    case "walkie":
+      return "2xl:order-1";
+    case "loudspeaker":
+      return "2xl:order-2";
+    case "director":
+      return "2xl:order-3";
+    case "announcer":
+      return "2xl:order-4";
+    case "share":
+      return "2xl:order-5";
+    case "cover":
+      return "2xl:order-6";
+    case "insights":
+      return "2xl:order-7";
+    case "livebanner":
+      return "2xl:order-8";
+    default:
+      return "";
+  }
+}
+
 function FeatureCard({ card, index, prefersReducedMotion, useFlatLaptopMotion }) {
   const { ref, cardStyle, glowStyle, previewStyle, contentStyle, accentSweepStyle } = useCardScrollMotion(
     prefersReducedMotion,
@@ -1090,7 +1004,7 @@ function FeatureCard({ card, index, prefersReducedMotion, useFlatLaptopMotion })
       style={cardStyle}
       className={`liquid-glass-soft group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 ${
         card.previewType === "director" ? "md:col-span-2 xl:col-span-2" : ""
-      } will-change-transform [transform-style:preserve-3d]`}
+      } xl:p-5 2xl:p-6 ${getFeatureCardWideSpan(card.previewType)} ${getFeatureCardWideOrder(card.previewType)} will-change-transform [transform-style:preserve-3d]`}
     >
       <motion.div
         style={glowStyle}
@@ -1119,13 +1033,13 @@ function FeatureCard({ card, index, prefersReducedMotion, useFlatLaptopMotion })
         >
           <motion.h3
             variants={previewTitleVariants}
-            className="text-[1.45rem] font-semibold leading-[1.04] tracking-[-0.04em] text-white drop-shadow-[0_10px_22px_rgba(255,255,255,0.08)] sm:text-[1.6rem]"
+            className="text-[1.45rem] font-semibold leading-[1.04] tracking-[-0.04em] text-white drop-shadow-[0_10px_22px_rgba(255,255,255,0.08)] sm:text-[1.6rem] xl:text-[1.32rem] 2xl:text-[1.45rem]"
           >
             {card.title}
           </motion.h3>
           <motion.p
             variants={previewItemVariants}
-            className="mt-3 text-[15px] leading-7 text-white/86 drop-shadow-[0_6px_18px_rgba(0,0,0,0.18)]"
+            className="mt-3 text-[15px] leading-7 text-white/86 drop-shadow-[0_6px_18px_rgba(0,0,0,0.18)] xl:text-[13px] xl:leading-6 2xl:text-[15px] 2xl:leading-7"
           >
             {card.copy}
           </motion.p>
@@ -1167,7 +1081,7 @@ function JourneyCard({ card, index, prefersReducedMotion, useFlatLaptopMotion })
             }
       }
       style={cardStyle}
-      className="liquid-glass-soft group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] will-change-transform [transform-style:preserve-3d] sm:p-6"
+      className={`liquid-glass-soft group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] will-change-transform [transform-style:preserve-3d] sm:p-6 xl:p-5 2xl:p-6 ${getJourneyCardWideSpan()}`}
     >
       <motion.div
         style={glowStyle}
@@ -1196,13 +1110,13 @@ function JourneyCard({ card, index, prefersReducedMotion, useFlatLaptopMotion })
         >
           <motion.h3
             variants={previewTitleVariants}
-            className="text-[1.45rem] font-semibold leading-[1.04] tracking-[-0.04em] text-white drop-shadow-[0_10px_22px_rgba(255,255,255,0.08)] sm:text-[1.6rem]"
+            className="text-[1.45rem] font-semibold leading-[1.04] tracking-[-0.04em] text-white drop-shadow-[0_10px_22px_rgba(255,255,255,0.08)] sm:text-[1.6rem] xl:text-[1.32rem] 2xl:text-[1.45rem]"
           >
             {card.title}
           </motion.h3>
           <motion.p
             variants={previewItemVariants}
-            className="mt-3 text-[15px] leading-7 text-white/86 drop-shadow-[0_6px_18px_rgba(0,0,0,0.18)]"
+            className="mt-3 text-[15px] leading-7 text-white/86 drop-shadow-[0_6px_18px_rgba(0,0,0,0.18)] xl:text-[13px] xl:leading-6 2xl:text-[15px] 2xl:leading-7"
           >
             {card.copy}
           </motion.p>
@@ -1220,7 +1134,7 @@ export default function HowItWorksSection() {
     <AnimatedSection
       id="updates"
       direction="left"
-      className="mx-auto w-full max-w-7xl scroll-mt-28 overflow-hidden 2xl:max-w-[96rem]"
+      className="mx-auto w-full max-w-7xl scroll-mt-28 overflow-hidden xl:max-w-[88rem] 2xl:max-w-[108rem]"
     >
       <div className="space-y-8">
         <motion.div
@@ -1236,7 +1150,7 @@ export default function HowItWorksSection() {
           }
           viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
           transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1] }}
-          className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10"
+          className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10"
         >
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex rounded-full border border-amber-200/22 bg-[linear-gradient(180deg,rgba(251,191,36,0.2),rgba(120,53,15,0.16))] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.32em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_12px_28px_rgba(245,158,11,0.18)]">
@@ -1262,7 +1176,7 @@ export default function HowItWorksSection() {
             whileInView="visible"
             viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
             variants={gridVariants}
-            className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4"
+            className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4 xl:gap-4 2xl:grid-cols-12 2xl:gap-5"
           >
             {featureCards.map((card, index) => (
               <FeatureCard
@@ -1289,7 +1203,7 @@ export default function HowItWorksSection() {
           }
           viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
           transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1], delay: 0.03 }}
-          className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10"
+          className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10"
         >
           <div className="mx-auto max-w-3xl text-center">
             <LiquidSportText
@@ -1310,7 +1224,7 @@ export default function HowItWorksSection() {
             whileInView="visible"
             viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
             variants={gridVariants}
-            className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3"
+            className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3 xl:gap-4 2xl:grid-cols-12 2xl:gap-5"
           >
             {journeyCards.map((card, index) => (
               <JourneyCard

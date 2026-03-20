@@ -83,7 +83,7 @@ export default function PrimaryActionsSection() {
   return (
     <section
       id="quick-start"
-      className="mx-auto flex w-full max-w-4xl scroll-mt-24 flex-col items-center gap-10 text-center"
+      className="mx-auto flex w-full max-w-4xl scroll-mt-24 flex-col items-center gap-10 text-center 2xl:max-w-6xl"
     >
       <motion.div
         initial={
@@ -133,7 +133,7 @@ export default function PrimaryActionsSection() {
         whileInView="visible"
         viewport={{ once: true, amount: 0.16, margin: "0px 0px -6% 0px" }}
         variants={sectionVariants}
-        className="grid w-full max-w-3xl gap-4 sm:grid-cols-2"
+        className="grid w-full max-w-3xl gap-4 sm:grid-cols-2 2xl:max-w-5xl"
       >
         <PendingLink
           href="/session/new"

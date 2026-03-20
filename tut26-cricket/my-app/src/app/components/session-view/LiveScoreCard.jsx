@@ -10,8 +10,11 @@ export default function LiveScoreCard({ match }) {
     match?.innings === "second" ? Number(match?.innings1?.score || 0) + 1 : 0;
 
   return (
-    <div className="w-full max-w-xl bg-black/30 backdrop-blur-sm ring-1 ring-white/10 rounded-3xl p-6 text-center space-y-2 shadow-2xl shadow-zinc-900">
-      <p className="text-5xl font-bold text-amber-300 tracking-wide mb-5">
+    <div className="relative w-full max-w-xl overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.05),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.1),transparent_30%),linear-gradient(180deg,rgba(10,12,18,0.96),rgba(6,8,14,0.98))] p-6 text-center shadow-[0_22px_54px_rgba(0,0,0,0.34)] backdrop-blur-sm">
+      <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/64 via-35% via-amber-200/56 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-10 top-0 h-16 rounded-b-[30px] bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.02)_40%,transparent_78%)] blur-xl" />
+      <div className="relative space-y-2">
+      <p className="mb-5 text-5xl font-bold tracking-wide text-amber-300">
         {battingTeam.name}
       </p>
       <p className="text-6xl font-extrabold text-white">
@@ -43,6 +46,7 @@ export default function LiveScoreCard({ match }) {
             </div>
           </div>
         ) : null}
+      </div>
       </div>
     </div>
   );

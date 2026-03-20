@@ -15,6 +15,7 @@ import TeamRoster, {
   createDefaultRoster,
 } from "../../components/teams/TeamRoster";
 import useSessionStorageState from "../../components/teams/useSessionStorageState";
+import LoadingButton from "../../components/shared/LoadingButton";
 import {
   clearPendingSessionImage,
   getPendingSessionImage,
@@ -228,14 +229,18 @@ export default function TeamSelectionPage() {
             </div>
           </div>
 
-          <button
+          <LoadingButton
             onClick={handleSubmit}
-            disabled={isLoading}
-            className="btn-ui btn-ui-glass-dark w-full rounded-[28px] py-5 text-xl font-semibold"
+            loading={isLoading}
+            pendingLabel="Saving..."
+            trailingIcon={<FaArrowRight />}
+            className="relative inline-flex w-full items-center justify-center gap-3 rounded-[28px] border border-rose-300/16 bg-[linear-gradient(180deg,rgba(11,15,24,0.98),rgba(6,8,14,0.98))] px-6 py-5 text-xl font-semibold text-white shadow-[0_18px_40px_rgba(0,0,0,0.28),0_0_0_1px_rgba(244,63,94,0.06)] transition hover:border-rose-200/24 hover:bg-[linear-gradient(180deg,rgba(12,18,28,0.98),rgba(7,10,16,0.98))]"
           >
-            {isLoading ? "Saving..." : "Proceed to Toss"}
-            {!isLoading && <FaArrowRight />}
-          </button>
+            <span className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-rose-200/82 via-38% via-amber-200/76 to-transparent" />
+            <span className="pointer-events-none absolute inset-x-7 top-0 h-10 rounded-b-[20px] bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.04)_36%,transparent_80%)] blur-xl" />
+            <span className="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-gradient-to-r from-transparent via-rose-400/18 to-transparent" />
+            Proceed to Toss
+          </LoadingButton>
           {imageUploadState === "uploading" ? (
             <p className="text-center text-xs font-medium text-cyan-200/80">
               Cover image is uploading in the background while you set up teams.

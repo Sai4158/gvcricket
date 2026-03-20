@@ -4,12 +4,10 @@ import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   FaArrowUpRightFromSquare,
-  FaCircleDot,
   FaGripLinesVertical,
-  FaTableCellsLarge,
-  FaUsers,
 } from "react-icons/fa6";
-import { GiCricketBat, GiPodiumWinner } from "react-icons/gi";
+import { FaCircleDot } from "react-icons/fa6";
+import { GiCricketBat } from "react-icons/gi";
 import LiquidSportText from "./LiquidSportText";
 
 export default function LearnCricketCard() {
@@ -18,32 +16,22 @@ export default function LearnCricketCard() {
     {
       title: "1. Two teams play",
       copy: "One team bats to score runs while the other team bowls and fields.",
-      Icon: FaUsers,
-      tone: "text-cyan-200",
     },
     {
       title: "2. Each ball is a chance",
       copy: "The batter tries to hit the ball and run. More runs means a better total.",
-      Icon: GiCricketBat,
-      tone: "text-amber-200",
     },
     {
       title: "3. Bowlers fight back",
       copy: "The bowler tries to get the batter out or stop runs with accurate balls.",
-      Icon: FaCircleDot,
-      tone: "text-rose-200",
     },
     {
       title: "4. Overs keep the game moving",
       copy: "Six legal balls make one over. The score tracks runs, wickets, and overs.",
-      Icon: FaTableCellsLarge,
-      tone: "text-emerald-200",
     },
     {
       title: "5. Highest score wins",
       copy: "After both teams bat, the team with more runs wins the match.",
-      Icon: GiPodiumWinner,
-      tone: "text-yellow-200",
     },
   ];
 
@@ -62,7 +50,7 @@ export default function LearnCricketCard() {
       }
       viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
       transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1] }}
-      className="mx-auto w-full max-w-6xl scroll-mt-28"
+      className="mx-auto w-full max-w-6xl scroll-mt-28 2xl:max-w-[108rem]"
     >
       <motion.a
         href="https://usacricket.org/what-is-cricket/"
@@ -184,7 +172,7 @@ export default function LearnCricketCard() {
             </motion.div>
 
             <div className="grid gap-3 pt-1 sm:grid-cols-2 lg:grid-cols-3">
-              {learnSteps.map(({ title, copy, Icon, tone }) => (
+              {learnSteps.map(({ title, copy }) => (
                 <motion.div
                   key={title}
                   initial={
@@ -201,10 +189,7 @@ export default function LearnCricketCard() {
                   transition={{ duration: 0.46, ease: [0.22, 1, 0.36, 1] }}
                   className="rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-4 lg:min-h-[168px]"
                 >
-                  <span className="flex items-start gap-2 text-sm font-semibold text-white">
-                    <Icon className={`mt-0.5 shrink-0 ${tone}`} />
-                    {title}
-                  </span>
+                  <span className="block text-sm font-semibold text-white">{title}</span>
                   <p className="mt-2 text-[12px] leading-5 text-zinc-300/86">{copy}</p>
                 </motion.div>
               ))}

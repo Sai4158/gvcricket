@@ -967,7 +967,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     trackerHistory = reconstructedMatch[inningsKey]?.history || activeInningsHistory;
   }
   const launcherCardClass =
-    "relative w-full overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] text-left shadow-[0_18px_50px_rgba(0,0,0,0.32)] backdrop-blur-sm transition-transform hover:-translate-y-0.5";
+    "relative w-full overflow-hidden rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.05),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.06),transparent_28%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] text-left shadow-[0_18px_50px_rgba(0,0,0,0.32)] backdrop-blur-sm transition-transform hover:-translate-y-0.5";
   const innings1Complete = match?.innings === "second" || Boolean(match?.result);
   const innings2Complete = match?.innings === "second" && !isLiveMatch;
   const targetRuns = Number(match?.innings1?.score || 0) + 1;
@@ -1073,7 +1073,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       >
         <div className="w-full max-w-4xl mt-1">
           {showWalkieLauncher ? (
-            <div className={`${launcherCardClass} mb-4 px-4 py-3`}>
+            <div className={`${launcherCardClass} mb-4 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.08),transparent_26%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-3`}>
             <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/50 to-transparent" />
             <div
               className="flex w-full flex-col gap-4"
@@ -1203,7 +1203,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                 setActivePanel("mic");
               }
             }}
-            className={`${launcherCardClass} min-h-34.5 px-4 py-3.5`}
+            className={`${launcherCardClass} min-h-34.5 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.11),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-3.5`}
             aria-label="Open loudspeaker"
           >
             <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/50 to-transparent" />
@@ -1283,7 +1283,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                 setActivePanel("announce");
               }
             }}
-            className={`${launcherCardClass} min-h-34.5 px-4 py-3.5`}
+            className={`${launcherCardClass} min-h-34.5 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.08),transparent_24%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-3.5`}
             aria-label="Open score announcer"
           >
             <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/46 to-transparent" />

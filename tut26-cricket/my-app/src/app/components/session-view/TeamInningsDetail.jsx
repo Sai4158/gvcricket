@@ -68,7 +68,7 @@ export default function TeamInningsDetail({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(12,14,22,0.96),rgba(8,9,15,0.98))] p-6 ${glowClass} before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-gradient-to-br before:blur-2xl before:content-['']`}
+      className={`relative overflow-hidden rounded-[26px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.045),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.08),transparent_28%),linear-gradient(180deg,rgba(12,14,22,0.96),rgba(8,9,15,0.98))] p-6 ${glowClass} before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-gradient-to-br before:blur-2xl before:content-[''] ${panelGlowClass}`}
     >
       <div
         className={`absolute inset-x-0 top-0 h-[4px] bg-gradient-to-r ${accentStripClass}`}
@@ -103,13 +103,14 @@ export default function TeamInningsDetail({
           </p>
         ) : null}
       </div>
-      <div className="relative mb-5 text-sm font-medium text-zinc-200">
+      <div className="relative mb-5 rounded-[16px] border border-white/8 bg-white/[0.03] px-3 py-2 text-sm font-medium text-zinc-200">
         Run Rate: {runRate}
       </div>
       <div className="space-y-4 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
         {inningsData.history.length > 0 ? (
           [...inningsData.history].reverse().map((over) => (
-            <div key={over.overNumber} className="relative rounded-2xl border border-white/6 bg-white/[0.02] px-4 py-3">
+            <div key={over.overNumber} className="relative overflow-hidden rounded-2xl border border-white/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] px-4 py-3">
+              <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
               <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-zinc-300">
                 Over {over.overNumber}
               </p>

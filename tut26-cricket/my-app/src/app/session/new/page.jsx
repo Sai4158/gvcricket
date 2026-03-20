@@ -256,7 +256,7 @@ export default function NewSessionPage() {
               loading={saving}
               pendingLabel="Creating..."
               trailingIcon={<FaArrowRight />}
-              className="relative mt-8 w-full rounded-[24px] border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(11,15,24,0.98),rgba(6,8,14,0.98))] px-6 py-4 text-lg font-semibold text-white shadow-[0_18px_40px_rgba(0,0,0,0.28),0_0_0_1px_rgba(34,211,238,0.06)] transition hover:border-cyan-200/24 hover:bg-[linear-gradient(180deg,rgba(12,18,28,0.98),rgba(7,10,16,0.98))]"
+              className="relative mt-8 inline-flex w-full items-center justify-center gap-3 rounded-[24px] border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(11,15,24,0.98),rgba(6,8,14,0.98))] px-6 py-4 text-lg font-semibold text-white shadow-[0_18px_40px_rgba(0,0,0,0.28),0_0_0_1px_rgba(34,211,238,0.06)] transition hover:border-cyan-200/24 hover:bg-[linear-gradient(180deg,rgba(12,18,28,0.98),rgba(7,10,16,0.98))]"
             >
               <span className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/82 via-38% via-amber-200/76 to-transparent" />
               <span className="pointer-events-none absolute inset-x-7 top-0 h-10 rounded-b-[20px] bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.04)_36%,transparent_80%)] blur-xl" />

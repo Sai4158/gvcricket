@@ -21,7 +21,7 @@ function buildStatusMeta(session) {
     return {
       badge: "Live now",
       tone: "live",
-      summary: "Live score available",
+      summary: "Live score is ready.",
     };
   }
 
@@ -132,8 +132,7 @@ function SessionCard({ session, onUmpireClick, onDirectorClick }) {
             Session state
           </p>
           <p className="mt-2 text-[14px] leading-6 text-zinc-200">
-            {statusMeta.summary}
-            {isLive && session.match ? " Open it now or switch to Umpire Mode." : ""}
+            {isLive && session.match ? "Open live score or enter umpire mode." : statusMeta.summary}
           </p>
         </div>
 
@@ -166,7 +165,7 @@ function SessionCard({ session, onUmpireClick, onDirectorClick }) {
                   className="inline-flex min-w-0 items-center justify-center gap-2 rounded-2xl border border-emerald-300/16 bg-[linear-gradient(135deg,rgba(8,25,24,0.96),rgba(13,36,32,0.96)_58%,rgba(5,150,105,0.72))] px-4 py-3 text-sm font-semibold text-emerald-50 shadow-[0_16px_38px_rgba(4,120,87,0.18)] transition hover:-translate-y-0.5 hover:border-emerald-200/26 hover:brightness-110"
                 >
                   <FaTowerBroadcast />
-                  <span>Direct This Match</span>
+                  <span>Director Mode</span>
                 </button>
               </div>
             </>

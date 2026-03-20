@@ -5,6 +5,7 @@ import { FaTimes } from "react-icons/fa";
 import LoadingButton from "../shared/LoadingButton";
 import { Ball } from "./MatchBallHistory";
 import MatchImageUploader from "./MatchImageUploader";
+import { countLegalBalls } from "../../lib/match-scoring";
 
 export function ModalBase({
   children,
@@ -192,6 +193,20 @@ export function RulesModal({ onClose }) {
 }
 
 export function InningsEndModal({ match, onNext }) {
+  const isFirstInningsBreak = match.innings === "first" && !match.result;
+  const firstInningsTeam = match?.innings1?.team || "Innings 1";
+  const firstInningsScore = Number(match?.score || 0);
+  const firstInningsOuts = Number(match?.outs || 0);
+  const target = firstInningsScore + 1;
+  const firstInningsLegalBalls = countLegalBalls(match?.innings1?.history || []);
+  const firstInningsOvers =
+    firstInningsLegalBalls > 0
+      ? `${Math.floor(firstInningsLegalBalls / 6)}.${firstInningsLegalBalls % 6}`
+      : "0.0";
+  const inningsOvers = Number(match?.overs || 0);
+  const requiredRunRate =
+    inningsOvers > 0 ? (target / inningsOvers).toFixed(2) : "0.00";
+
   return (
     <ModalBase
       title={match.result ? "Match Over" : "Innings Over"}
@@ -208,6 +223,42 @@ export function InningsEndModal({ match, onNext }) {
           {match.result}
         </p>
       )}
+      {isFirstInningsBreak ? (
+        <div className="mt-4 rounded-2xl border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-emerald-300/14 bg-[linear-gradient(180deg,rgba(6,95,70,0.16),rgba(12,18,22,0.92))] px-3 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-200/76">
+                Target
+              </p>
+              <p className="mt-1 text-xl font-semibold text-white">{target}</p>
+              <p className="mt-1 text-xs text-zinc-400">Need {target} to win</p>
+            </div>
+            <div className="rounded-2xl border border-cyan-300/14 bg-[linear-gradient(180deg,rgba(8,47,73,0.16),rgba(12,18,22,0.92))] px-3 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-200/76">
+                Req. Rate
+              </p>
+              <p className="mt-1 text-xl font-semibold text-white">{requiredRunRate}</p>
+              <p className="mt-1 text-xs text-zinc-400">Per over to chase</p>
+            </div>
+          </div>
+          <div className="mt-3 rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+              Innings 1
+            </p>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-white">{firstInningsTeam}</p>
+                <p className="mt-1 text-xs text-zinc-400">
+                  {firstInningsOvers} overs · {firstInningsOuts} down
+                </p>
+              </div>
+              <p className="shrink-0 text-lg font-semibold text-amber-300">
+                {firstInningsScore}/{firstInningsOuts}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <LoadingButton
         onClick={onNext}
         pendingLabel={match.innings === "first" && !match.result ? "Opening..." : "Loading result..."}
