@@ -37,6 +37,31 @@ function buildStatusMeta(session) {
   };
 }
 
+function formatSessionDateLabel(session) {
+  if (session.date) {
+    const parsed = new Date(session.date);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleString([], {
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    }
+
+    return session.date.replace(/:\d{2}(?=\s*[AP]M|\s*$)/i, "");
+  }
+
+  return new Date(session.createdAt).toLocaleString([], {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function SessionCard({ session, onUmpireClick, onDirectorClick }) {
   const isLive = session.isLive;
   const statusMeta = buildStatusMeta(session);
@@ -51,7 +76,7 @@ function SessionCard({ session, onUmpireClick, onDirectorClick }) {
     session.teamAName && session.teamBName
       ? `${session.teamAName} vs ${session.teamBName}`
       : "";
-  const dateLabel = session.date || new Date(session.createdAt).toLocaleString();
+  const dateLabel = formatSessionDateLabel(session);
 
   return (
     <div
@@ -115,7 +140,7 @@ function SessionCard({ session, onUmpireClick, onDirectorClick }) {
               <h2 className="text-[1.25rem] leading-[1.08] font-medium tracking-[-0.035em] text-white [overflow-wrap:break-word] sm:text-[1.45rem] md:text-[1.58rem]">
                 {session.name || "Untitled Session"}
               </h2>
-              <p className="mt-3 text-[13px] font-medium tracking-[0.01em] text-zinc-400">
+              <p className="mt-4 text-[13px] font-medium tracking-[0.01em] text-zinc-400">
                 {dateLabel}
               </p>
               {teamLine ? (

@@ -1,15 +1,82 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { motion, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion";
 import { FaAngleDown } from "react-icons/fa";
 import LiveNowBanner from "./LiveNowBanner";
 import LiquidSportText from "./LiquidSportText";
 
+const HERO_VIDEO_PATH = "/videos/Cricket1.mp4";
+const HERO_VIDEO_CACHE_NAME = "gv-home-media-v1";
+
+let cachedHeroVideoUrl = null;
+let cachedHeroVideoPromise = null;
+
+async function loadHeroVideoUrl() {
+  if (cachedHeroVideoUrl) {
+    return cachedHeroVideoUrl;
+  }
+
+  if (cachedHeroVideoPromise) {
+    return cachedHeroVideoPromise;
+  }
+
+  cachedHeroVideoPromise = (async () => {
+    try {
+      let response = null;
+
+      if (typeof window !== "undefined" && "caches" in window) {
+        const mediaCache = await window.caches.open(HERO_VIDEO_CACHE_NAME);
+        response = await mediaCache.match(HERO_VIDEO_PATH);
+
+        if (!response) {
+          const fetchedResponse = await fetch(HERO_VIDEO_PATH, {
+            cache: "force-cache",
+          });
+
+          if (fetchedResponse.ok) {
+            await mediaCache.put(HERO_VIDEO_PATH, fetchedResponse.clone());
+            response = fetchedResponse;
+          }
+        }
+      }
+
+      if (!response) {
+        response = await fetch(HERO_VIDEO_PATH, {
+          cache: "force-cache",
+        });
+      }
+
+      if (!response?.ok) {
+        throw new Error(`Hero video request failed: ${response?.status || "unknown"}`);
+      }
+
+      const blob = await response.blob();
+      cachedHeroVideoUrl = URL.createObjectURL(blob);
+      return cachedHeroVideoUrl;
+    } catch {
+      cachedHeroVideoUrl = HERO_VIDEO_PATH;
+      return HERO_VIDEO_PATH;
+    } finally {
+      cachedHeroVideoPromise = null;
+    }
+  })();
+
+  return cachedHeroVideoPromise;
+}
+
 export default function HeroSection({ liveMatch = null }) {
   const prefersReducedMotion = useReducedMotion();
   const sectionRef = useRef(null);
+  const videoRef = useRef(null);
+  const [heroLines, setHeroLines] = useState([
+    "End-to-end",
+    "cricket scoring,",
+    "made simple.",
+  ]);
+  const [videoSource, setVideoSource] = useState(cachedHeroVideoUrl);
+  const [videoReady, setVideoReady] = useState(false);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start start", "end start"],
@@ -40,6 +107,93 @@ export default function HeroSection({ liveMatch = null }) {
     { stiffness: 180, damping: 30, mass: 0.22 }
   );
 
+  useEffect(() => {
+    const xlQuery = window.matchMedia("(min-width: 1024px)");
+
+    const syncHeroLines = () => {
+      if (xlQuery.matches) {
+        setHeroLines(["End-to-end cricket scoring,", "made simple."]);
+        return;
+      }
+
+      setHeroLines(["End-to-end", "cricket scoring,", "made simple."]);
+    };
+
+    syncHeroLines();
+    xlQuery.addEventListener("change", syncHeroLines);
+
+    return () => {
+      xlQuery.removeEventListener("change", syncHeroLines);
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadHeroVideoUrl().then((resolvedUrl) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setVideoSource(resolvedUrl);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+
+    if (!video || !videoSource) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    const markReady = () => {
+      if (!isMounted) return;
+      setVideoReady(true);
+    };
+
+    const tryPlay = () => {
+      const playPromise = video.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => {});
+      }
+    };
+
+    if (video.readyState >= 2) {
+      markReady();
+    }
+
+    video.addEventListener("loadeddata", markReady);
+    video.addEventListener("canplay", markReady);
+    video.addEventListener("canplaythrough", markReady);
+    video.addEventListener("playing", markReady);
+
+    video.load();
+    tryPlay();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        tryPlay();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      isMounted = false;
+      video.removeEventListener("loadeddata", markReady);
+      video.removeEventListener("canplay", markReady);
+      video.removeEventListener("canplaythrough", markReady);
+      video.removeEventListener("playing", markReady);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [videoSource]);
+
   const handleScrollToStart = () => {
     const target = document.getElementById("quick-start");
     if (target) {
@@ -56,20 +210,26 @@ export default function HeroSection({ liveMatch = null }) {
         className="sticky top-0 flex h-[100svh] min-h-[100svh] flex-col items-center justify-center text-center"
       >
         <LiveNowBanner liveMatch={liveMatch} />
-        <video
-          className="absolute inset-0 z-0 h-full w-full object-cover bg-black [backface-visibility:hidden] [transform:translateZ(0)] will-change-transform"
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="metadata"
-          disablePictureInPicture
-        >
-          <source src="/videos/Cricket1.mp4" type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
+        <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_24%),linear-gradient(180deg,rgba(7,8,10,0.92),rgba(0,0,0,0.98))]" />
+        {videoSource ? (
+          <video
+            ref={videoRef}
+            src={videoSource}
+            className={`absolute inset-0 z-0 h-full w-full object-cover bg-black transition-opacity duration-500 [backface-visibility:hidden] [transform:translateZ(0)] will-change-transform ${
+              videoReady ? "opacity-100" : "opacity-0"
+            }`}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="auto"
+            disablePictureInPicture
+          >
+            Your browser does not support the video tag.
+          </video>
+        ) : null}
         <div className="absolute inset-0 z-10 bg-[linear-gradient(180deg,rgba(0,0,0,0.42)_0%,rgba(0,0,0,0.56)_48%,rgba(0,0,0,0.72)_100%)]" />
-        <div className="relative z-20 flex flex-col items-center px-4 pt-24 sm:pt-28 md:pt-20">
+        <div className="relative z-20 flex flex-col items-center px-4 pt-24 sm:pt-28 md:pt-18 lg:pt-16">
           <motion.div
             initial={{ y: 26, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -136,7 +296,7 @@ export default function HeroSection({ liveMatch = null }) {
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.46, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
-            className="relative mt-3 max-w-[min(92vw,58rem)]"
+            className="relative mt-3 max-w-[min(92vw,58rem)] lg:max-w-[min(92vw,70rem)] 2xl:max-w-[min(94vw,88rem)]"
           >
             <motion.span
               aria-hidden="true"
@@ -215,7 +375,7 @@ export default function HeroSection({ liveMatch = null }) {
             >
               <LiquidSportText
                 as="span"
-                text={["End-to-end", "cricket scoring,", "made simple."]}
+                text={heroLines}
                 variant="hero-bright"
                 cursor={false}
                 typing={false}
@@ -227,7 +387,7 @@ export default function HeroSection({ liveMatch = null }) {
                 characterStagger={0.048}
                 characterLineDelay={0.28}
                 characterDuration={0.54}
-                className="block text-[3rem] font-semibold tracking-[-0.058em] sm:text-[4.8rem] md:text-[6.85rem]"
+                className="block text-[3rem] font-semibold tracking-[-0.058em] sm:text-[4.8rem] md:text-[5.9rem] lg:text-[5.6rem] xl:text-[6.2rem] 2xl:text-[6.85rem]"
                 lineClassName="leading-[0.94]"
               />
             </motion.div>
@@ -240,7 +400,7 @@ export default function HeroSection({ liveMatch = null }) {
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.28, duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
-          className="absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-2 text-white outline-none transition hover:text-white focus-visible:text-white"
+          className="absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-2 text-white outline-none transition hover:text-white focus-visible:text-white md:bottom-10 lg:bottom-12"
         >
           <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-white drop-shadow-[0_4px_14px_rgba(0,0,0,0.55)]">
             Explore more

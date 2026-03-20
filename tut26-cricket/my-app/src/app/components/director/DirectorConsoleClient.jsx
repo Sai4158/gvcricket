@@ -2764,7 +2764,7 @@ export default function DirectorConsoleClient({
                 </button>
               </div>
 
-              <label className="space-y-2">
+              <label className="space-y-2 pb-1">
                 <span className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
                   Music volume
                 </span>
@@ -2808,7 +2808,7 @@ export default function DirectorConsoleClient({
                   ))}
                 </div>
               ) : (
-                <div className="rounded-[24px] border border-white/10 bg-black/20 px-4 py-4 text-sm text-zinc-400">
+                <div className="mt-2 rounded-[24px] border border-white/10 bg-black/20 px-4 py-4 text-center text-sm text-zinc-400">
                   Add audio files from Files, Downloads, or this phone.
                 </div>
               )}
@@ -2819,14 +2819,14 @@ export default function DirectorConsoleClient({
             title="Audio output"
             subtitle="Current playback route"
             icon={<FaHeadphones />}
-            accent="cyan"
+            accent="amber"
             help={{
               title: "Audio output",
               body: "This shows where your audio is playing. Connect the phone to a Bluetooth speaker first for louder PA playback.",
             }}
           >
             <div className="space-y-4">
-              <div className="rounded-[24px] border border-white/10 bg-black/20 px-4 py-4">
+              <div className="rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.12),transparent_42%),linear-gradient(180deg,rgba(20,14,6,0.34),rgba(0,0,0,0.2))] px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
                   Current output
                 </p>
@@ -2839,7 +2839,7 @@ export default function DirectorConsoleClient({
                   {speakerMessage || "Using your phone or current browser output."}
                 </p>
               </div>
-              <div className="rounded-[24px] border border-white/10 bg-black/20 px-4 py-4">
+              <div className="rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_bottom_right,rgba(251,191,36,0.1),transparent_38%),linear-gradient(180deg,rgba(28,16,6,0.28),rgba(0,0,0,0.2))] px-4 py-4">
                 <p className="text-sm font-semibold text-white">How to use it</p>
                 <ul className="mt-3 space-y-2 text-sm leading-6 text-zinc-300">
                   <li>1. Connect your phone to a Bluetooth speaker.</li>

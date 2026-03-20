@@ -175,6 +175,24 @@ const journeyCards = [
     previewType: "umpire",
   },
   {
+    title: "In-Match Walkie",
+    copy: "Keep the umpire, director, and spectators on one quick live talk channel during the match.",
+    accent: "emerald",
+    previewType: "match-walkie",
+  },
+  {
+    title: "Ball History",
+    copy: "Track the latest over at a glance with a clean live ball history strip and current match context.",
+    accent: "cyan",
+    previewType: "history",
+  },
+  {
+    title: "Loudspeaker And Announcer",
+    copy: "Use the PA mic for live calls and keep the score announcer ready for the next update.",
+    accent: "violet",
+    previewType: "match-audio",
+  },
+  {
     title: "Spectator View",
     copy: "Keep phones and shared screens in sync with the live score, target, over, and match situation.",
     accent: "emerald",
@@ -380,6 +398,142 @@ function renderJourneyPreview(card) {
                   {action.label}
                 </motion.div>
               ))}
+            </motion.div>
+          </div>
+        </PreviewSurface>
+      );
+    case "match-walkie":
+      return (
+        <PreviewSurface accent={card.accent} heading="In Match Walkie">
+          <div className="space-y-3">
+            <motion.div
+              variants={previewItemVariants}
+              className="flex items-center justify-between gap-3 rounded-[18px] border border-emerald-400/18 bg-[linear-gradient(180deg,rgba(8,28,22,0.94),rgba(8,12,16,0.98))] px-4 py-3"
+            >
+              <div>
+                <p className="text-sm font-semibold text-white">Walkie live</p>
+                <p className="mt-1 text-[11px] text-zinc-400">Tap and hold to answer fast.</p>
+              </div>
+              <div className="inline-flex h-6 w-11 rounded-full border border-emerald-300/30 bg-emerald-400/18">
+                <span className="mt-0.5 inline-flex h-5 w-5 translate-x-5 rounded-full bg-white" />
+              </div>
+            </motion.div>
+            <motion.div variants={previewStaggerVariants} className="grid grid-cols-3 gap-2">
+              {[
+                ["Umpire", "1 live"],
+                ["Director", "ready"],
+                ["Spectators", "2 joined"],
+              ].map(([label, meta]) => (
+                <motion.div
+                  key={label}
+                  variants={previewItemVariants}
+                  className="rounded-[16px] border border-white/10 bg-white/[0.03] px-3 py-3"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                    {label}
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-white">{meta}</p>
+                </motion.div>
+              ))}
+            </motion.div>
+            <motion.div
+              variants={previewItemVariants}
+              className="flex items-center justify-center gap-2 rounded-[16px] border border-emerald-300/16 bg-emerald-400/10 px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/90"
+            >
+              <FaBroadcastTower className="text-sm" />
+              Press and hold
+            </motion.div>
+          </div>
+        </PreviewSurface>
+      );
+    case "history":
+      return (
+        <PreviewSurface accent={card.accent} heading="Ball History">
+          <div className="space-y-3">
+            <motion.div
+              variants={previewItemVariants}
+              className="flex items-start justify-between gap-3 rounded-[18px] border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(8,20,34,0.94),rgba(7,8,12,0.98))] px-4 py-3"
+            >
+              <div>
+                <p className="text-lg font-semibold text-white">OVER 8</p>
+                <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-zinc-500">
+                  Team A 52/3
+                </p>
+              </div>
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-300">
+                Live
+              </span>
+            </motion.div>
+            <motion.div
+              variants={previewItemVariants}
+              className="rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3"
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-400">
+                This over
+              </p>
+              <motion.div variants={previewStaggerVariants} className="mt-3 flex flex-wrap gap-2">
+                <MiniBall label="1" />
+                <MiniBall label="4" tone="amber" />
+                <MiniBall label="Wd" tone="amber" />
+                <MiniBall label="W" tone="rose" />
+                <MiniBall label="2" />
+                <MiniBall label="1" />
+              </motion.div>
+            </motion.div>
+            <motion.div
+              variants={previewItemVariants}
+              className="flex items-center justify-between gap-3 rounded-[16px] border border-white/10 bg-white/[0.03] px-3 py-3 text-[12px]"
+            >
+              <span className="font-semibold text-white">Recent balls stay in view</span>
+              <span className="text-zinc-400">Latest first</span>
+            </motion.div>
+          </div>
+        </PreviewSurface>
+      );
+    case "match-audio":
+      return (
+        <PreviewSurface accent={card.accent} heading="Match Audio">
+          <div className="space-y-3">
+            <motion.div variants={previewStaggerVariants} className="grid grid-cols-2 gap-2">
+              <motion.div
+                variants={previewItemVariants}
+                className="rounded-[18px] border border-amber-300/16 bg-[linear-gradient(180deg,rgba(120,53,15,0.16),rgba(15,12,16,0.98))] px-3 py-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <FaBullhorn className="text-sm text-amber-200" />
+                  <div className="inline-flex h-5 w-9 rounded-full border border-white/10 bg-white/[0.06]">
+                    <span className="mt-0.5 inline-flex h-4 w-4 translate-x-4 rounded-full bg-white" />
+                  </div>
+                </div>
+                <p className="mt-3 text-sm font-semibold text-white">Loudspeaker</p>
+                <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+                  Hold live
+                </p>
+              </motion.div>
+              <motion.div
+                variants={previewItemVariants}
+                className="rounded-[18px] border border-violet-300/16 bg-[linear-gradient(180deg,rgba(76,29,149,0.18),rgba(15,12,18,0.98))] px-3 py-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <FaVolumeUp className="text-sm text-violet-200" />
+                  <div className="inline-flex h-5 w-9 rounded-full border border-emerald-300/30 bg-emerald-400/18">
+                    <span className="mt-0.5 inline-flex h-4 w-4 translate-x-4 rounded-full bg-white" />
+                  </div>
+                </div>
+                <p className="mt-3 text-sm font-semibold text-white">Announcer</p>
+                <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+                  Ready
+                </p>
+              </motion.div>
+            </motion.div>
+            <motion.div
+              variants={previewItemVariants}
+              className="rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-3"
+            >
+              <p className="text-sm font-semibold text-white">Next call queued</p>
+              <p className="mt-2 text-[12px] text-zinc-400">
+                Team A 52 for 3 after 8.2 overs.
+              </p>
             </motion.div>
           </div>
         </PreviewSurface>
@@ -940,6 +1094,135 @@ function useCardScrollMotion(prefersReducedMotion, accent, index, useFlatLaptopM
   };
 }
 
+function useJourneySwipeMotion(prefersReducedMotion, index, useFlatLaptopMotion) {
+  const ref = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start 0.92", "end 0.08"],
+  });
+  const direction = index % 2 === 0 ? -1 : 1;
+  const springConfig = { stiffness: 120, damping: 24, mass: 0.46 };
+
+  const cardY = useSpring(
+    useTransform(
+      scrollYProgress,
+      [0, 0.2, 0.5, 0.8, 1],
+      useFlatLaptopMotion ? [18, 8, 0, -3, -8] : [34, 18, 0, -10, -26]
+    ),
+    springConfig
+  );
+  const cardX = useSpring(
+    useTransform(
+      scrollYProgress,
+      [0, 0.2, 0.5, 0.8, 1],
+      useFlatLaptopMotion
+        ? [direction * 10, direction * 4, 0, direction * -2, direction * -6]
+        : [direction * 44, direction * 18, 0, direction * -12, direction * -34]
+    ),
+    springConfig
+  );
+  const cardRotate = useSpring(
+    useTransform(
+      scrollYProgress,
+      [0, 0.2, 0.5, 0.8, 1],
+      useFlatLaptopMotion
+        ? [0.8 * direction, 0.3 * direction, 0, -0.1 * direction, -0.4 * direction]
+        : [direction * 5.5, direction * 2.5, 0, direction * -1.8, direction * -4]
+    ),
+    springConfig
+  );
+  const cardScale = useSpring(
+    useTransform(
+      scrollYProgress,
+      [0, 0.22, 0.5, 0.82, 1],
+      useFlatLaptopMotion ? [0.985, 0.995, 1, 0.995, 0.988] : [0.94, 0.975, 1, 0.985, 0.96]
+    ),
+    springConfig
+  );
+  const cardOpacity = useSpring(
+    useTransform(
+      scrollYProgress,
+      [0, 0.18, 0.45, 0.8, 1],
+      useFlatLaptopMotion ? [0.82, 0.92, 1, 0.96, 0.88] : [0.62, 0.82, 1, 0.94, 0.78]
+    ),
+    springConfig
+  );
+  const glowOpacity = useSpring(
+    useTransform(
+      scrollYProgress,
+      [0, 0.35, 0.65, 1],
+      useFlatLaptopMotion ? [0.22, 0.42, 0.54, 0.24] : [0.18, 0.48, 0.58, 0.2]
+    ),
+    springConfig
+  );
+  const accentSweepOpacity = useSpring(
+    useTransform(
+      scrollYProgress,
+      [0, 0.28, 0.6, 1],
+      useFlatLaptopMotion ? [0.03, 0.08, 0.1, 0.04] : [0.05, 0.16, 0.2, 0.04]
+    ),
+    springConfig
+  );
+  const accentSweepX = useSpring(
+    useTransform(
+      scrollYProgress,
+      [0, 0.5, 1],
+      useFlatLaptopMotion ? [direction * -6, 0, direction * 4] : [direction * -18, 0, direction * 14]
+    ),
+    springConfig
+  );
+  const previewX = useSpring(
+    useTransform(
+      scrollYProgress,
+      [0, 0.2, 0.5, 0.8, 1],
+      useFlatLaptopMotion
+        ? [direction * 3, direction * 1, 0, direction * -1, direction * -2]
+        : [direction * 16, direction * 7, 0, direction * -4, direction * -10]
+    ),
+    springConfig
+  );
+  const previewY = useSpring(
+    useTransform(scrollYProgress, [0, 0.5, 1], useFlatLaptopMotion ? [2, 0, -1] : [8, 0, -4]),
+    springConfig
+  );
+  const contentX = useSpring(
+    useTransform(
+      scrollYProgress,
+      [0, 0.2, 0.5, 0.8, 1],
+      useFlatLaptopMotion
+        ? [direction * 2, direction * 1, 0, direction * -1, direction * -2]
+        : [direction * 10, direction * 4, 0, direction * -3, direction * -8]
+    ),
+    springConfig
+  );
+
+  if (prefersReducedMotion) {
+    return {
+      ref,
+      cardStyle: undefined,
+      glowStyle: undefined,
+      previewStyle: undefined,
+      contentStyle: undefined,
+      accentSweepStyle: undefined,
+    };
+  }
+
+  return {
+    ref,
+    cardStyle: {
+      x: cardX,
+      y: cardY,
+      rotateZ: cardRotate,
+      scale: cardScale,
+      opacity: cardOpacity,
+    },
+    glowStyle: { opacity: glowOpacity },
+    previewStyle: { x: previewX, y: previewY },
+    contentStyle: { x: contentX },
+    accentSweepStyle: { opacity: accentSweepOpacity, x: accentSweepX },
+  };
+}
+
 function getFeatureCardWideSpan(previewType) {
   return "2xl:col-span-3";
 }
@@ -1051,12 +1334,8 @@ function FeatureCard({ card, index, prefersReducedMotion, useFlatLaptopMotion })
 }
 
 function JourneyCard({ card, index, prefersReducedMotion, useFlatLaptopMotion }) {
-  const { ref, cardStyle, glowStyle, previewStyle, contentStyle, accentSweepStyle } = useCardScrollMotion(
-    prefersReducedMotion,
-    card.accent,
-    index,
-    useFlatLaptopMotion
-  );
+  const { ref, cardStyle, glowStyle, previewStyle, contentStyle, accentSweepStyle } =
+    useJourneySwipeMotion(prefersReducedMotion, index, useFlatLaptopMotion);
 
   return (
     <motion.div
@@ -1073,11 +1352,10 @@ function JourneyCard({ card, index, prefersReducedMotion, useFlatLaptopMotion })
               transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] },
             }
           : {
-              y: -6,
-              scale: 1.012,
-              rotateX: -1.5,
-              rotateY: index % 2 === 0 ? -2.2 : 2.2,
-              transition: { duration: 0.26, ease: [0.22, 1, 0.36, 1] },
+              y: -5,
+              scale: 1.01,
+              rotateZ: index % 2 === 0 ? -1.2 : 1.2,
+              transition: { duration: 0.24, ease: [0.22, 1, 0.36, 1] },
             }
       }
       style={cardStyle}
@@ -1154,7 +1432,7 @@ export default function HowItWorksSection() {
         >
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex rounded-full border border-amber-200/22 bg-[linear-gradient(180deg,rgba(251,191,36,0.2),rgba(120,53,15,0.16))] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.32em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_12px_28px_rgba(245,158,11,0.18)]">
-              Latest Features
+              New Update
             </span>
             <p className="mt-5 text-[12px] font-semibold uppercase tracking-[0.34em] text-white/48">
               GV Cricket 2.0

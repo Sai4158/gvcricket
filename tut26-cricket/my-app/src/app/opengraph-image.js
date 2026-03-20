@@ -3,7 +3,7 @@ import { ImageResponse } from "next/og";
 import { absoluteUrl, siteConfig } from "./lib/site-metadata";
 
 export const runtime = "nodejs";
-export const alt = "GV Cricket - free cricket scoring app";
+export const alt = "GV Cricket live cricket scoring social card";
 export const size = {
   width: 1200,
   height: 630,
@@ -89,7 +89,7 @@ export default function OpenGraphImage() {
                 color: "#fbbf24",
               }}
             >
-              GV Cricket 2.0
+              Live Score And Match Control
             </div>
           </div>
         </div>

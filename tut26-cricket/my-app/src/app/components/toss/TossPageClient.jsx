@@ -273,10 +273,11 @@ export default function TossPageClient({
 
               <button
                 onClick={redoToss}
-                className="press-feedback mt-1 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
+                className="press-feedback mt-1 inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 text-sm font-semibold uppercase tracking-[0.22em] text-zinc-200 transition hover:bg-white/10"
                 aria-label="Redo Toss"
               >
                 <FaRedo />
+                <span>Redo</span>
               </button>
             </div>
 
@@ -285,7 +286,7 @@ export default function TossPageClient({
             </div>
 
             <div className="mb-6 text-center">
-              <h1 className="text-4xl font-black tracking-tight text-white">
+              <h1 className="bg-[linear-gradient(90deg,rgba(255,255,255,0.98)_0%,rgba(226,232,240,0.96)_24%,rgba(165,243,252,0.94)_54%,rgba(253,224,71,0.9)_100%)] bg-clip-text text-[2.35rem] font-extrabold uppercase leading-[0.94] tracking-[-0.05em] text-transparent drop-shadow-[0_8px_24px_rgba(0,0,0,0.34)] sm:text-[3.1rem]">
                 {titleText}
               </h1>
               <p className="mt-2 text-sm text-zinc-400">{subtitleText}</p>

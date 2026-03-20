@@ -12,11 +12,11 @@ export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
     ? false
     : {
         opacity: 0,
-        scale: 0.99,
-        x: index % 2 === 0 ? -30 : 30,
-        y: 18,
-        rotate: index % 2 === 0 ? -0.5 : 0.5,
-        filter: "blur(6px)",
+        scale: 0.94,
+        x: index % 2 === 0 ? -88 : 88,
+        y: 10,
+        rotate: index % 2 === 0 ? -4.5 : 4.5,
+        filter: "blur(10px)",
       };
   const visibleMotion = prefersReducedMotion
     ? undefined
@@ -34,8 +34,25 @@ export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
       initial={initialMotion}
       whileInView={visibleMotion}
       viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
-      transition={{ duration: prefersReducedMotion ? 0 : 0.66, ease: [0.22, 1, 0.36, 1] }}
-      whileHover={prefersReducedMotion ? undefined : { scale: 1.01 }}
+      transition={
+        prefersReducedMotion
+          ? undefined
+          : {
+              type: "spring",
+              stiffness: 210,
+              damping: 22,
+              mass: 0.72,
+            }
+      }
+      whileHover={
+        prefersReducedMotion
+          ? undefined
+          : {
+              scale: 1.014,
+              y: -4,
+              transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] },
+            }
+      }
       className="liquid-glass group relative overflow-hidden rounded-[30px] p-2.5 transition-all duration-300 hover:border-white/28 hover:shadow-[0_18px_48px_rgba(0,0,0,0.32)]"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.16),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,210,130,0.12),transparent_30%)] opacity-90" />

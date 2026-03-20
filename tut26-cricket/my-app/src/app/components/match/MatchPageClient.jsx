@@ -138,6 +138,9 @@ export default function MatchPageClient({
     if (!next) return;
 
     pendingUmpireAnnouncementRef.current = null;
+    if (!umpireSettings.enabled || umpireSettings.mode === "silent") {
+      return;
+    }
     localAnnouncementIdRef.current += 1;
     speak(next.text, {
       key: `umpire-${localAnnouncementIdRef.current}`,
@@ -145,11 +148,14 @@ export default function MatchPageClient({
       minGapMs: 0,
       userGesture: true,
       interrupt: true,
-      ignoreEnabled: true,
     });
   };
 
   const announceUmpireAction = (runs, isOut = false, extraType = null) => {
+    if (!umpireSettings.enabled || umpireSettings.mode === "silent" || !isLiveMatch) {
+      return;
+    }
+
     const nextMatch = match
       ? {
           ...match,
@@ -207,14 +213,15 @@ export default function MatchPageClient({
     const undoEvent = createUndoLiveEvent(match);
     const undoText = buildUmpireTapAnnouncement(undoEvent, umpireSettings.mode) || "Undo.";
 
-    speak(undoText, {
-      key: `umpire-undo-${localAnnouncementIdRef.current}`,
-      rate: 0.92,
-      minGapMs: 0,
-      userGesture: true,
-      interrupt: true,
-      ignoreEnabled: true,
-    });
+    if (umpireSettings.enabled && umpireSettings.mode !== "silent") {
+      speak(undoText, {
+        key: `umpire-undo-${localAnnouncementIdRef.current}`,
+        rate: 0.92,
+        minGapMs: 0,
+        userGesture: true,
+        interrupt: true,
+      });
+    }
 
     await handleUndo();
   };
@@ -454,6 +461,14 @@ export default function MatchPageClient({
                   settings: umpireSettings,
                   updateSetting: updateUmpireSetting,
                   onToggleEnabled: (nextEnabled) => {
+                    if (!nextEnabled) {
+                      if (umpireAnnouncementTimerRef.current) {
+                        window.clearTimeout(umpireAnnouncementTimerRef.current);
+                        umpireAnnouncementTimerRef.current = null;
+                      }
+                      pendingUmpireAnnouncementRef.current = null;
+                    }
+
                     if (nextEnabled) {
                       try {
                         prime();

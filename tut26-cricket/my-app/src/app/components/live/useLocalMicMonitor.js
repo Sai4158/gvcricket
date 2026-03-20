@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { duckPageMedia, playUiTone, restorePageMedia } from "../../lib/page-audio";
+import {
+  duckPageMedia,
+  playUiTone,
+  primeUiAudio,
+  restorePageMedia,
+} from "../../lib/page-audio";
 
 function getMicErrorMessage(error) {
   const name = String(error?.name || "");
@@ -134,6 +139,7 @@ export default function useLocalMicMonitor() {
 
     startPromiseRef.current = (async () => {
       try {
+        await primeUiAudio();
         await stop({ resumeMedia: false, preserveGeneration: true });
 
         const currentGeneration = sessionGenerationRef.current + 1;

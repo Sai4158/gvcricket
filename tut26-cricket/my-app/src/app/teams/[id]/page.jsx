@@ -29,11 +29,11 @@ export default function TeamSelectionPage() {
   const draftTokenKey = `session_${sessionId}_draftToken`;
   const [teamA, setTeamA] = useSessionStorageState(
     `session_${sessionId}_teamA_v2`,
-    createDefaultRoster("Team A")
+    createDefaultRoster("Team Blue")
   );
   const [teamB, setTeamB] = useSessionStorageState(
     `session_${sessionId}_teamB_v2`,
-    createDefaultRoster("Team B")
+    createDefaultRoster("Team Red")
   );
   const [overs, setOvers] = useSessionStorageState(
     `session_${sessionId}_overs_v2`,
@@ -188,7 +188,7 @@ export default function TeamSelectionPage() {
             <StepFlow currentStep={2} />
           </div>
           <div className="text-center">
-            <h1 className="text-4xl font-black tracking-[-0.04em] text-white sm:text-5xl">
+            <h1 className="bg-[linear-gradient(90deg,rgba(255,255,255,0.98)_0%,rgba(226,232,240,0.96)_24%,rgba(165,243,252,0.94)_54%,rgba(253,224,71,0.9)_100%)] bg-clip-text text-[2.35rem] font-extrabold uppercase tracking-[-0.05em] text-transparent drop-shadow-[0_8px_24px_rgba(0,0,0,0.34)] sm:text-[3.1rem]">
               Team Selection
             </h1>
           </div>

@@ -4,18 +4,21 @@ export const siteConfig = {
   url: "https://www.gvcricket.com",
   logoPath: "/gvLogo.png",
   description:
-    "Free cricket scoring app with live score updates, umpire mode, spectator view, score announcer, walkie-talkie, match images, and final stats in one simple mobile-friendly flow.",
+    "GV Cricket is a live cricket scoring app with umpire mode, spectator scoreboards, director controls, walkie-talkie, loudspeaker, match images, and instant results in one fast mobile flow.",
   defaultTitle:
-    "GV Cricket - Free Cricket Scoring App with Live Score, Umpire Mode and Walkie-Talkie",
+    "GV Cricket | Live Cricket Scoring, Umpire Mode, Director Controls",
   ogTitle:
-    "Free Cricket Scoring App with Live Score, Umpire Mode and Walkie-Talkie",
+    "GV Cricket | Live Cricket Scoring and Match Control",
   keywords: [
-    "free cricket scoring app",
-    "free live cricket scoring app",
+    "gv cricket 2.0",
+    "gv cricket",
+    "live cricket scoring app",
     "free cricket scorer",
     "cricket score app",
+    "cricket umpire scoring app",
+    "cricket director console",
     "cricket walkie talkie app",
-    "free umpire mode cricket app",
+    "cricket loudspeaker app",
     "live cricket scorekeeper app",
     "cricket scoring app for local matches",
     "cricket scoring app for umpires and spectators",

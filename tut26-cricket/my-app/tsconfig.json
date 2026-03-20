@@ -25,9 +25,11 @@
   },
   "include": [
     "next-env.d.ts",
-    ".next/types/**/*.ts",
+    ".next/types/routes.d.ts",
+    ".next/types/validator.ts",
     "**/*.ts",
     "**/*.tsx",
+    ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [

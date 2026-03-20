@@ -19,7 +19,7 @@ export default function CommunityHighlightsSection() {
     <AnimatedSection
       id="product-demo"
       direction="right"
-      className="w-full max-w-6xl mx-auto flex flex-col items-center"
+      className="mx-auto flex w-full max-w-6xl flex-col items-center xl:max-w-7xl 2xl:max-w-[108rem]"
     >
       <motion.div
         initial={
@@ -62,7 +62,7 @@ export default function CommunityHighlightsSection() {
       >
         It all started in 2022 with a few friends who loved the game. Today, GV Cricket is actively being used by a friendly league of over 50+ members who meet for fun, competitive cricket.
       </motion.p>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-2 gap-8 w-full">
+      <div className="grid w-full gap-8 sm:grid-cols-2 lg:grid-cols-2 xl:gap-10 2xl:gap-12">
         {demoVideos.map((video, index) => (
           <YouTubeVideoPlayer
             key={video.videoId}

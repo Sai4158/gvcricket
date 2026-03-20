@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { FaEye, FaLock, FaTimes } from "react-icons/fa";
+import { FaTowerBroadcast } from "react-icons/fa6";
 
 export default function InfoModal({ onExit }) {
   return (
@@ -20,7 +21,7 @@ export default function InfoModal({ onExit }) {
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-white">Legend and Controls</h2>
+          <h2 className="text-2xl font-bold text-white">Live Sessions Guide</h2>
           <button
             onClick={onExit}
             className="text-zinc-500 hover:text-white transition-colors"
@@ -38,17 +39,16 @@ export default function InfoModal({ onExit }) {
               <div>
                 <h4 className="font-semibold text-zinc-100">LIVE NOW</h4>
                 <p className="text-zinc-400 text-sm">
-                  This match is currently in progress.
+                  This session is active right now. Open Live Score to follow it, or enter a protected control mode.
                 </p>
               </div>
             </div>
             <div className="flex items-start gap-4">
               <div className="w-3 h-3 rounded-full bg-red-500 mt-1.5 flex-shrink-0"></div>
               <div>
-                <h4 className="font-semibold text-zinc-100">Ended Recently</h4>
+                <h4 className="font-semibold text-zinc-100">ENDED</h4>
                 <p className="text-zinc-400 text-sm">
-                  This match is finished. The timestamp reflects the last score
-                  update.
+                  This session is complete. Open See Final Score to view the finished result and summary.
                 </p>
               </div>
             </div>
@@ -62,7 +62,18 @@ export default function InfoModal({ onExit }) {
               <div>
                 <h4 className="font-semibold text-zinc-100">Umpire Mode</h4>
                 <p className="text-zinc-400 text-sm">
-                  Continue scoring a live match. Requires the server PIN.
+                  Continue scoring a live match. Requires the match PIN and only appears for live sessions.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4 mb-3">
+              <div className="text-emerald-400 mt-0.5 flex-shrink-0">
+                <FaTowerBroadcast size={20} />
+              </div>
+              <div>
+                <h4 className="font-semibold text-zinc-100">Director Mode</h4>
+                <p className="text-zinc-400 text-sm">
+                  Open the director console for a live match. Requires the director PIN.
                 </p>
               </div>
             </div>
@@ -71,9 +82,9 @@ export default function InfoModal({ onExit }) {
                 <FaEye size={20} />
               </div>
               <div>
-                <h4 className="font-semibold text-zinc-100">View Score</h4>
+                <h4 className="font-semibold text-zinc-100">Live Score / Final Score</h4>
                 <p className="text-zinc-400 text-sm">
-                  Open the spectator or final score view for a session.
+                  Open the live scoreboard for active sessions, or the final score screen for completed matches.
                 </p>
               </div>
             </div>

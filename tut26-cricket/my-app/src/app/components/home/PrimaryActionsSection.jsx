@@ -83,7 +83,7 @@ export default function PrimaryActionsSection() {
   return (
     <section
       id="quick-start"
-      className="mx-auto flex w-full max-w-4xl scroll-mt-24 flex-col items-center gap-10 text-center 2xl:max-w-6xl"
+      className="mx-auto flex w-full max-w-4xl scroll-mt-24 flex-col items-center gap-10 text-center xl:max-w-6xl xl:gap-12 2xl:max-w-7xl"
     >
       <motion.div
         initial={
@@ -98,7 +98,7 @@ export default function PrimaryActionsSection() {
         }
         viewport={{ once: true, amount: 0.18, margin: "0px 0px -6% 0px" }}
         transition={{ duration: 0.64, ease: [0.22, 1, 0.36, 1] }}
-        className="max-w-2xl space-y-4"
+        className="max-w-2xl space-y-4 xl:max-w-3xl"
       >
         <div className="mx-auto inline-flex items-center rounded-full border border-amber-300/16 bg-amber-300/8 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.34em] text-amber-100">
           GV Cricket 2.0
@@ -133,7 +133,7 @@ export default function PrimaryActionsSection() {
         whileInView="visible"
         viewport={{ once: true, amount: 0.16, margin: "0px 0px -6% 0px" }}
         variants={sectionVariants}
-        className="grid w-full max-w-3xl gap-4 sm:grid-cols-2 2xl:max-w-5xl"
+        className="grid w-full max-w-3xl gap-4 sm:grid-cols-2 xl:max-w-6xl xl:gap-5 2xl:max-w-7xl"
       >
         <PendingLink
           href="/session/new"
@@ -326,7 +326,7 @@ export default function PrimaryActionsSection() {
         href="/director"
         pendingLabel="Opening director..."
         pendingClassName="pending-shimmer"
-        className="block w-full max-w-3xl"
+        className="block w-full max-w-3xl xl:max-w-6xl 2xl:max-w-7xl"
       >
         <motion.div
         initial={

@@ -112,7 +112,6 @@ export default function SessionsPageClient({ initialSessions }) {
   const [filterBy, setFilterBy] = useState("all");
   const [pageSizeValue, setPageSizeValue] = useState("20");
   const [page, setPage] = useState(1);
-  const [hasManualPageSize, setHasManualPageSize] = useState(false);
   const router = useRouter();
   const sessions = useMemo(() => initialSessions ?? [], [initialSessions]);
   const deferredSearchQuery = useDeferredValue(searchInput.trim().toLowerCase());
@@ -121,21 +120,6 @@ export default function SessionsPageClient({ initialSessions }) {
     setSearchQuery(deferredSearchQuery);
     setPage(1);
   }, [deferredSearchQuery]);
-
-  useEffect(() => {
-    if (hasManualPageSize) {
-      return undefined;
-    }
-
-    const mediaQuery = window.matchMedia("(min-width: 1024px)");
-    const syncPageSize = () => {
-      setPageSizeValue(mediaQuery.matches ? "50" : "20");
-    };
-
-    syncPageSize();
-    mediaQuery.addEventListener("change", syncPageSize);
-    return () => mediaQuery.removeEventListener("change", syncPageSize);
-  }, [hasManualPageSize]);
 
   const indexedSessions = useMemo(
     () =>
@@ -377,6 +361,8 @@ export default function SessionsPageClient({ initialSessions }) {
                   ? "No live sessions right now. Completed matches will still appear in All."
                   : "There are no completed sessions yet."
               }
+              href="/session/new"
+              label="Create New Match"
             />
           ) : (
             <>
@@ -407,7 +393,6 @@ export default function SessionsPageClient({ initialSessions }) {
                       <DarkSelect
                         value={pageSizeValue}
                         onChange={(value) => {
-                          setHasManualPageSize(true);
                           setPageSizeValue(value);
                           setPage(1);
                         }}

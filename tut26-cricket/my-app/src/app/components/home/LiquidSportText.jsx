@@ -38,22 +38,22 @@ export default function LiquidSportText({
         const baseLineClass = isDarkOutline
           ? `relative z-10 block text-[#050505] [text-rendering:geometricPrecision] [paint-order:stroke_fill] [WebkitTextStroke:1.7px_rgba(255,255,255,0.54)] drop-shadow-[0_8px_22px_rgba(0,0,0,0.42)] [text-shadow:0_0_24px_rgba(196,181,253,0.16),0_2px_0_rgba(255,255,255,0.2)] ${lineClassName}`
           : isHeroBright
-          ? `relative z-10 block text-white [text-rendering:geometricPrecision] drop-shadow-[0_20px_44px_rgba(0,0,0,0.46)] [text-shadow:0_2px_0_rgba(0,0,0,0.22),0_0_22px_rgba(255,255,255,0.22),0_0_42px_rgba(191,219,254,0.12)] ${lineClassName}`
+          ? `relative z-10 block bg-[linear-gradient(94deg,rgba(255,255,255,0.98)_0%,rgba(255,245,245,0.98)_24%,rgba(254,202,202,0.96)_52%,rgba(251,113,133,0.96)_76%,rgba(255,255,255,0.98)_100%)] bg-clip-text text-transparent [text-rendering:geometricPrecision] drop-shadow-[0_18px_40px_rgba(0,0,0,0.48)] [text-shadow:0_2px_0_rgba(0,0,0,0.24),0_0_22px_rgba(255,255,255,0.14),0_0_30px_rgba(248,113,113,0.18)] ${lineClassName}`
           : `relative z-10 block text-white [text-rendering:geometricPrecision] drop-shadow-[0_10px_26px_rgba(0,0,0,0.48)] [text-shadow:0_2px_0_rgba(0,0,0,0.34),0_0_22px_rgba(255,255,255,0.1)] ${lineClassName}`;
         const revealOverlayClass = isDarkOutline
           ? `pointer-events-none absolute inset-0 z-20 block bg-[linear-gradient(108deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.1)_22%,rgba(244,114,182,0.18)_40%,rgba(196,181,253,0.2)_52%,rgba(255,255,255,0.08)_64%,rgba(255,255,255,0)_84%)] bg-clip-text text-transparent ${lineClassName}`
           : isHeroBright
-          ? `pointer-events-none absolute inset-0 z-20 block bg-[linear-gradient(108deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.1)_18%,rgba(255,255,255,0.34)_32%,rgba(253,224,71,0.18)_44%,rgba(191,219,254,0.24)_56%,rgba(255,255,255,0.1)_68%,rgba(255,255,255,0)_84%)] bg-clip-text text-transparent ${lineClassName}`
+          ? `pointer-events-none absolute inset-0 z-20 block bg-clip-text text-transparent opacity-0 ${lineClassName}`
           : `pointer-events-none absolute inset-0 z-20 block bg-[linear-gradient(112deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.08)_24%,rgba(255,246,196,0.28)_40%,rgba(125,211,252,0.16)_54%,rgba(255,255,255,0.08)_64%,rgba(255,255,255,0)_84%)] bg-clip-text text-transparent ${lineClassName}`;
         const shimmerClass = isDarkOutline
           ? `pointer-events-none absolute inset-0 z-30 block bg-[linear-gradient(108deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.1)_22%,rgba(255,255,255,0.24)_32%,rgba(192,132,252,0.42)_46%,rgba(255,255,255,0.16)_56%,rgba(255,255,255,0)_74%)] bg-[length:220%_100%] bg-clip-text text-transparent mix-blend-screen ${lineClassName}`
           : isHeroBright
-          ? `pointer-events-none absolute inset-0 z-30 block bg-[linear-gradient(108deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.14)_22%,rgba(255,255,255,0.46)_34%,rgba(253,224,71,0.24)_46%,rgba(191,219,254,0.28)_58%,rgba(255,255,255,0.12)_70%,rgba(255,255,255,0)_84%)] bg-[length:255%_100%] bg-clip-text text-transparent mix-blend-screen ${lineClassName}`
+          ? `pointer-events-none absolute inset-0 z-30 block bg-[linear-gradient(108deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.12)_26%,rgba(255,255,255,0.32)_38%,rgba(254,202,202,0.22)_52%,rgba(251,113,133,0.18)_64%,rgba(255,255,255,0.08)_74%,rgba(255,255,255,0)_86%)] bg-[length:240%_100%] bg-clip-text text-transparent mix-blend-screen ${lineClassName}`
           : `pointer-events-none absolute inset-0 z-30 block bg-[linear-gradient(112deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.16)_26%,rgba(255,246,196,0.36)_40%,rgba(167,139,250,0.28)_54%,rgba(255,255,255,0.12)_66%,rgba(255,255,255,0)_82%)] bg-[length:220%_100%] bg-clip-text text-transparent mix-blend-screen ${lineClassName}`;
         const offsetShadowClass = isDarkOutline
           ? `pointer-events-none absolute inset-0 z-0 block translate-x-[2px] translate-y-[2px] text-fuchsia-300/28 ${lineClassName}`
           : isHeroBright
-          ? `pointer-events-none absolute inset-0 z-0 block translate-x-[1px] translate-y-[1px] text-sky-100/10 ${lineClassName}`
+          ? `pointer-events-none absolute inset-0 z-0 block text-transparent ${lineClassName}`
           : `pointer-events-none absolute inset-0 z-0 block translate-x-[3px] translate-y-[3px] ${typing ? "text-neutral-950/42" : "text-neutral-950/26"} ${lineClassName}`;
         const shouldCharacterType = characterTyping && !prefersReducedMotion;
 
@@ -170,7 +170,7 @@ export default function LiquidSportText({
               <motion.span
                 aria-hidden="true"
                 initial={{ opacity: 0 }}
-                whileInView={{ opacity: isHeroBright ? 0.34 : 0.24 }}
+                whileInView={{ opacity: isHeroBright ? 0 : 0.24 }}
                 viewport={{ once, amount: viewportAmount, margin: viewportMargin }}
                 transition={{
                   duration: 0.82,
@@ -189,11 +189,11 @@ export default function LiquidSportText({
                 viewport={{ once, amount: viewportAmount, margin: viewportMargin }}
                 animate={{
                   backgroundPosition: ["120% 50%", "-20% 50%"],
-                  opacity: isHeroBright ? [0.18, 0.32, 0.2] : [0.1, 0.18, 0.12],
+                  opacity: isHeroBright ? [0.08, 0.18, 0.1] : [0.1, 0.18, 0.12],
                 }}
                 transition={{
                   backgroundPosition: {
-                    duration: isHeroBright ? 5.2 : 6.2,
+                    duration: isHeroBright ? 5.8 : 6.2,
                     repeat: Infinity,
                     ease: "easeInOut",
                     delay: delay + index * characterLineDelay + 0.45,
@@ -271,7 +271,7 @@ export default function LiquidSportText({
               whileInView={
                 prefersReducedMotion
                   ? undefined
-                  : { clipPath: "inset(0 0% 0 0)", opacity: 0.52 }
+                  : { clipPath: "inset(0 0% 0 0)", opacity: isHeroBright ? 0 : 0.52 }
               }
               viewport={{ once, amount: viewportAmount, margin: viewportMargin }}
               transition={{
@@ -295,7 +295,7 @@ export default function LiquidSportText({
                       opacity: isDarkOutline
                         ? [0.2, 0.48, 0.24]
                         : isHeroBright
-                        ? [0.14, 0.3, 0.18]
+                        ? [0.08, 0.18, 0.1]
                         : [0.18, 0.42, 0.24],
                     }
               }

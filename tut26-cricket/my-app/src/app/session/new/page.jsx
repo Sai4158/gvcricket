@@ -145,7 +145,7 @@ export default function NewSessionPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.12),transparent_30%),radial-gradient(circle_at_top_right,rgba(251,191,36,0.1),transparent_24%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.1),transparent_28%),linear-gradient(180deg,#050505_0%,#0b0b11_52%,#050505_100%)] px-4 py-10 text-zinc-200">
+    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_28%),radial-gradient(circle_at_top_right,rgba(251,191,36,0.14),transparent_22%),radial-gradient(circle_at_50%_35%,rgba(244,114,182,0.1),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.14),transparent_24%),linear-gradient(180deg,#050505_0%,#0b0b11_52%,#050505_100%)] px-4 py-10 text-zinc-200">
       <div className="mx-auto w-full max-w-md">
         <div className="mb-5 flex items-center justify-start">
           <PendingLink
@@ -165,13 +165,13 @@ export default function NewSessionPage() {
         <div className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,20,24,0.96),rgba(8,8,10,0.98))] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur-sm sm:p-8">
           <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/60 via-35% via-amber-200/55 to-transparent" />
           <div className="pointer-events-none absolute inset-x-10 top-0 h-28 rounded-b-[36px] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02)_38%,transparent_78%)] blur-2xl" />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.08),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.08),transparent_26%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.1),transparent_34%),radial-gradient(circle_at_18%_38%,rgba(34,211,238,0.08),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.1),transparent_26%),radial-gradient(circle_at_bottom_left,rgba(244,114,182,0.08),transparent_22%)]" />
           <div className="pointer-events-none absolute inset-y-12 left-0 w-px bg-gradient-to-b from-transparent via-cyan-300/14 to-transparent" />
           <div className="pointer-events-none absolute inset-y-12 right-0 w-px bg-gradient-to-b from-transparent via-amber-300/12 to-transparent" />
           <div className="relative">
-            <h1 className="text-center text-4xl font-black leading-[0.98] text-white sm:text-5xl">
+            <h1 className="bg-[linear-gradient(90deg,rgba(255,255,255,0.98)_0%,rgba(226,232,240,0.96)_24%,rgba(165,243,252,0.94)_54%,rgba(253,224,71,0.9)_100%)] bg-clip-text text-center text-[2.35rem] font-extrabold uppercase leading-[0.94] tracking-[-0.05em] text-transparent drop-shadow-[0_8px_24px_rgba(0,0,0,0.34)] sm:text-[3.1rem]">
               Create New
-              <span className="mt-1 block text-white">Session</span>
+              <span className="mt-1 block">Session</span>
             </h1>
             <p className="mx-auto mt-4 max-w-xs text-center text-sm leading-6 text-zinc-400">
               Name the match to continue.
@@ -186,6 +186,7 @@ export default function NewSessionPage() {
                   Session Name
                 </label>
                 <div className="group relative">
+                  <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.1),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.08),transparent_34%)] opacity-70" />
                   <FaPen className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 transition-colors group-focus-within:text-amber-300" />
                   <input
                     id="session-name"
@@ -204,17 +205,18 @@ export default function NewSessionPage() {
                   htmlFor="session-image"
                   className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500"
                 >
-                  Cover Image
+                  Team Picture
                 </label>
                 <div className="relative rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                   <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
+                  <div className="pointer-events-none absolute inset-0 rounded-[24px] bg-[radial-gradient(circle_at_top_left,rgba(244,114,182,0.08),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.08),transparent_26%)]" />
                   <div className="flex flex-col items-center gap-3 rounded-[20px] border border-white/8 bg-black/20 px-4 py-4 text-center">
                     <label
                       htmlFor="session-image"
                       className="press-feedback inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.08]"
                     >
                       <FaImage className="text-zinc-400" />
-                      Upload image
+                      Add team picture
                     </label>
                     {selectedFileName ? (
                       <div className="w-full min-w-0">
@@ -246,7 +248,7 @@ export default function NewSessionPage() {
             </div>
 
             {error && (
-              <div className="mt-6 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-center text-sm text-rose-200">
+              <div className="mt-6 rounded-2xl border border-rose-500/20 bg-[linear-gradient(180deg,rgba(190,24,93,0.16),rgba(127,29,29,0.12))] px-4 py-3 text-center text-sm text-rose-200 shadow-[0_14px_28px_rgba(190,24,93,0.08)]">
                 {error}
               </div>
             )}
@@ -268,7 +270,7 @@ export default function NewSessionPage() {
       </div>
       <ImagePinModal
         isOpen={isPinModalOpen}
-        title="Upload image"
+        title="Add team picture"
         subtitle="Enter the 4-digit PIN before adding a session cover image."
         confirmLabel="Use this image"
         showContinueWithout={true}

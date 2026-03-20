@@ -172,30 +172,58 @@ export default function LearnCricketCard() {
             </motion.div>
 
             <div className="grid gap-3 pt-1 sm:grid-cols-2 lg:grid-cols-3">
-              {learnSteps.map(({ title, copy }) => (
+              {learnSteps.map(({ title, copy }, index) => (
                 <motion.div
                   key={title}
                   initial={
                     prefersReducedMotion
                       ? false
-                      : { opacity: 0, y: 10, filter: "blur(4px)" }
+                      : { opacity: 0, y: 22, scale: 0.985, filter: "blur(5px)" }
                   }
                   whileInView={
                     prefersReducedMotion
                       ? undefined
-                      : { opacity: 1, y: 0, filter: "blur(0px)" }
+                      : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
                   }
-                  viewport={{ once: true, amount: 0.3, margin: "0px 0px 12% 0px" }}
-                  transition={{ duration: 0.46, ease: [0.22, 1, 0.36, 1] }}
+                  viewport={{ once: true, amount: 0.42, margin: "0px 0px -6% 0px" }}
+                  transition={{
+                    duration: 0.48,
+                    delay: prefersReducedMotion ? 0 : index * 0.08,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
                   className="rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-4 lg:min-h-[168px]"
                 >
                   <span className="block text-sm font-semibold text-white">{title}</span>
                   <p className="mt-2 text-[12px] leading-5 text-zinc-300/86">{copy}</p>
                 </motion.div>
               ))}
+              <motion.div
+                initial={
+                  prefersReducedMotion
+                    ? false
+                    : { opacity: 0, y: 22, scale: 0.985, filter: "blur(5px)" }
+                }
+                whileInView={
+                  prefersReducedMotion
+                    ? undefined
+                    : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
+                }
+                viewport={{ once: true, amount: 0.42, margin: "0px 0px -6% 0px" }}
+                transition={{
+                  duration: 0.48,
+                  delay: prefersReducedMotion ? 0 : learnSteps.length * 0.08,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+                className="hidden rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-4 lg:flex lg:min-h-[168px] lg:items-center lg:justify-center"
+              >
+                <div className="inline-flex items-center gap-2 text-center text-sm font-semibold text-white">
+                  <span>Open guide</span>
+                  <FaArrowUpRightFromSquare className="text-sm text-white/90" />
+                </div>
+              </motion.div>
             </div>
 
-            <div className="flex items-center gap-3 pt-1 lg:pt-2">
+            <div className="flex items-center gap-3 pt-1 lg:hidden lg:pt-2">
               <span className="liquid-pill inline-flex items-center gap-3 rounded-full px-4 py-3 text-sm font-medium text-white">
                 Open guide
                 <FaArrowUpRightFromSquare className="text-sm text-white/90" />

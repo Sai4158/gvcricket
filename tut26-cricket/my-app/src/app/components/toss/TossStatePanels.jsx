@@ -173,7 +173,7 @@ export default function TossStatePanels({
                   onClick={() => onDecision("bat")}
                   disabled={false}
                   loading={isSubmitting}
-                  className="btn-ui btn-ui-glass-dark group rounded-3xl px-4 py-4 text-base font-medium disabled:hover:translate-y-0"
+                  className="btn-ui btn-ui-glass-dark toss-decision-button group rounded-3xl px-4 py-4 text-base font-medium disabled:hover:translate-y-0"
                   pendingLabel="Saving..."
                 >
                   <span className="block transition-transform group-hover:translate-x-0.5">
@@ -184,7 +184,7 @@ export default function TossStatePanels({
                   onClick={() => onDecision("bowl")}
                   disabled={false}
                   loading={isSubmitting}
-                  className="btn-ui btn-ui-glass-dark-alt group rounded-3xl px-4 py-4 text-base font-medium disabled:hover:translate-y-0"
+                  className="btn-ui btn-ui-glass-dark-alt toss-decision-button group rounded-3xl px-4 py-4 text-base font-medium disabled:hover:translate-y-0"
                   pendingLabel="Saving..."
                 >
                   <span className="block transition-transform group-hover:translate-x-0.5">

@@ -13,30 +13,30 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata = {
-  title: "Free Cricket Scoring, Made Simple",
+  title: "GV Cricket | Live Cricket Scoring, Umpire Mode, Match Control",
   description:
-    "Free cricket scoring app with live score updates, umpire mode, spectator view, score announcer, walkie-talkie, and match results in one fast mobile-friendly flow.",
+    "Score every match from toss to result with live score, umpire mode, spectator view, director controls, walkie-talkie, loudspeaker, match images, and final results in one fast mobile flow.",
   alternates: {
     canonical: absoluteUrl("/"),
   },
   openGraph: {
-    title: "Free Cricket Scoring, Made Simple | GV Cricket",
+    title: "GV Cricket | Live Cricket Scoring, Umpire Mode, Match Control",
     description:
-      "Score every match from toss to result with live updates, umpire mode, spectator view, score announcer, and built-in walkie-talkie.",
+      "Live cricket scoring with umpire mode, spectator scoreboards, director controls, walkie-talkie, loudspeaker, match images, and instant results.",
     url: absoluteUrl("/"),
     images: [
       {
         url: absoluteUrl(siteConfig.ogImagePath),
         width: 1200,
         height: 630,
-        alt: "GV Cricket free cricket scoring app preview",
+        alt: "GV Cricket live cricket scoring preview",
       },
     ],
   },
   twitter: {
-    title: "GV Cricket",
+    title: "GV Cricket | Live Cricket Scoring, Umpire Mode, Match Control",
     description:
-      "Live cricket score, umpire mode, spectator view, score announcer, walkie-talkie, and results in one free app.",
+      "Live cricket scoring with umpire mode, spectator scoreboards, director controls, walkie-talkie, loudspeaker, match images, and final results.",
     images: [absoluteUrl(siteConfig.twitterImagePath)],
   },
 };
@@ -55,7 +55,7 @@ export default async function HomePage() {
       <HomeHeader />
       <main id="top" className="home-liquid-surface overflow-x-hidden bg-black text-zinc-200 font-sans">
         <HeroSection liveMatch={liveMatch} />
-        <div className="relative z-10 bg-[linear-gradient(155deg,theme(colors.red.900)_0%,theme(colors.black)_40%)] px-5 py-20 space-y-14 md:space-y-24 md:py-28">
+        <div className="relative z-10 space-y-14 bg-[linear-gradient(155deg,theme(colors.red.900)_0%,theme(colors.black)_40%)] px-5 py-20 md:space-y-24 md:py-28 xl:px-8 xl:py-24 xl:space-y-20 2xl:px-10 2xl:py-28">
           <PrimaryActionsSection />
           <HowItWorksSection />
           <CommunityHighlightsSection />
@@ -79,7 +79,7 @@ export default async function HomePage() {
               &copy; {new Date().getFullYear()} GV Cricket. All rights reserved.
             </p>
             <p className="mt-2 text-sm text-zinc-500">
-              Free cricket scoring app for live score, umpire mode, spectator view, walkie-talkie, and match results.
+              GV Cricket brings live score, umpire mode, spectator view, director controls, walkie-talkie, and results into one fast mobile flow.
             </p>
             <a
               href="https://gvcricket.com"
