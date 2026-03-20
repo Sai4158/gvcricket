@@ -3,7 +3,7 @@ export const siteConfig = {
   shortName: "GV Cricket",
   url: "https://www.gvcricket.com",
   logoPath: "/gvLogo.png",
-  shareLogoPath: "/gv.png",
+  shareLogoPath: "/gvLogo.png",
   description:
     "GV Cricket is a live cricket scoring app with umpire mode, spectator scoreboards, director controls, walkie-talkie, loudspeaker, match images, and instant results in one fast mobile flow.",
   defaultTitle:

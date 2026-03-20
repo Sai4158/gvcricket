@@ -50,6 +50,7 @@ import {
   getCachedAudioAssetUrl,
   isIOSSafari,
   isUiAudioUnlocked,
+  playBufferedUiAudio,
   playUiTone,
   primeUiAudio,
   restorePreferredAudioSessionType,
@@ -557,6 +558,8 @@ export default function DirectorConsoleClient({
   const lastPersistedLibraryOrderRef = useRef(serializeOrder([]));
   const audioRef = useRef(null);
   const effectsAudioRef = useRef(null);
+  const bufferedEffectPlaybackRef = useRef(null);
+  const bufferedEffectTimerRef = useRef(null);
   const directorMicPointerIdRef = useRef(null);
   const directorMicHoldingRef = useRef(false);
   const previousDirectorWalkieEnabledRef = useRef(false);
@@ -1561,7 +1564,7 @@ export default function DirectorConsoleClient({
   const stopAllEffects = (options = {}) => {
     const { clearSource = true, preserveRequest = false, restoreMusic = !preserveRequest } = options;
     const audio = effectsAudioRef.current;
-    if (!audio) {
+    if (!audio && !bufferedEffectPlaybackRef.current) {
       return;
     }
 
@@ -1571,18 +1574,28 @@ export default function DirectorConsoleClient({
 
     setConsoleError("");
     setEffectsNeedsUnlock(false);
-    audio.pause();
-    try {
-      audio.currentTime = 0;
-    } catch {
-      // Ignore stubborn Safari currentTime resets while the element is settling.
+    if (bufferedEffectTimerRef.current) {
+      window.clearInterval(bufferedEffectTimerRef.current);
+      bufferedEffectTimerRef.current = null;
     }
-    if (clearSource) {
-      audio.src = "";
-      audio.removeAttribute("src");
-      delete audio.dataset.effectSrc;
-      delete audio.dataset.effectId;
-      audio.load();
+    if (bufferedEffectPlaybackRef.current) {
+      bufferedEffectPlaybackRef.current.stop();
+      bufferedEffectPlaybackRef.current = null;
+    }
+    if (audio) {
+      audio.pause();
+      try {
+        audio.currentTime = 0;
+      } catch {
+        // Ignore stubborn Safari currentTime resets while the element is settling.
+      }
+      if (clearSource) {
+        audio.src = "";
+        audio.removeAttribute("src");
+        delete audio.dataset.effectSrc;
+        delete audio.dataset.effectId;
+        audio.load();
+      }
     }
     setLibraryLiveId("");
     setLibraryState("idle");
@@ -1615,7 +1628,7 @@ export default function DirectorConsoleClient({
 
   const playEffect = async (file) => {
     const audio = effectsAudioRef.current;
-    if (!audio || !file?.src) {
+    if (!file?.src) {
       return;
     }
 
@@ -1662,6 +1675,87 @@ export default function DirectorConsoleClient({
     }
 
     applyMusicDuck(0.16, { durationMs: 220 });
+
+    if (iOSSafari) {
+      try {
+        const playback = await playBufferedUiAudio(file.src, {
+          volume: Math.max(
+            0,
+            Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume)
+          ),
+          onEnded: () => {
+            bufferedEffectPlaybackRef.current = null;
+            if (bufferedEffectTimerRef.current) {
+              window.clearInterval(bufferedEffectTimerRef.current);
+              bufferedEffectTimerRef.current = null;
+            }
+            setLibraryLiveId("");
+            setLibraryState("idle");
+            setLibraryCurrentTime(0);
+            applyMusicDuck(1, { durationMs: 260 });
+          },
+        });
+
+        if (!playback) {
+          throw new Error("Buffered audio playback is unavailable.");
+        }
+
+        bufferedEffectPlaybackRef.current = playback;
+        setLibraryState("playing");
+        setLibraryCurrentTime(0);
+        setLibraryDurations((current) => {
+          if (Number.isFinite(current[file.id])) {
+            return current;
+          }
+          const next = { ...current, [file.id]: playback.duration || 0 };
+          directorAudioMetadataMemoryCache = next;
+          if (typeof window !== "undefined") {
+            try {
+              window.sessionStorage.setItem(
+                DIRECTOR_AUDIO_METADATA_CACHE_KEY,
+                JSON.stringify(next)
+              );
+            } catch {
+              // Ignore storage failures.
+            }
+          }
+          return next;
+        });
+
+        if (bufferedEffectTimerRef.current) {
+          window.clearInterval(bufferedEffectTimerRef.current);
+        }
+        bufferedEffectTimerRef.current = window.setInterval(() => {
+          const currentPlayback = bufferedEffectPlaybackRef.current;
+          if (!currentPlayback) {
+            return;
+          }
+          setLibraryCurrentTime(currentPlayback.getCurrentTime());
+        }, 90);
+        return;
+      } catch {
+        if (requestId !== effectPlayRequestRef.current) {
+          return;
+        }
+        setConsoleError(
+          "This sound could not be played right now. Try Enable Audio and tap again."
+        );
+        setEffectsNeedsUnlock(true);
+        setLibraryState("idle");
+        setLibraryLiveId("");
+        applyMusicDuck(1, { durationMs: 180 });
+        return;
+      }
+    }
+
+    if (!audio) {
+      setConsoleError("This audio file could not be played in this browser.");
+      setLibraryState("idle");
+      setLibraryLiveId("");
+      applyMusicDuck(1, { durationMs: 180 });
+      return;
+    }
+
     const nextSrc = effectSrc || file.src;
     const sourceChanged = audio.dataset.effectSrc !== nextSrc;
     audio.dataset.effectSrc = nextSrc;
@@ -1753,6 +1847,14 @@ export default function DirectorConsoleClient({
       effectsAudioRef.current.src = "";
       delete effectsAudioRef.current.dataset.effectSrc;
       delete effectsAudioRef.current.dataset.effectId;
+    }
+    if (bufferedEffectTimerRef.current) {
+      window.clearInterval(bufferedEffectTimerRef.current);
+      bufferedEffectTimerRef.current = null;
+    }
+    if (bufferedEffectPlaybackRef.current) {
+      bufferedEffectPlaybackRef.current.stop();
+      bufferedEffectPlaybackRef.current = null;
     }
 
     if (audioRef.current) {
