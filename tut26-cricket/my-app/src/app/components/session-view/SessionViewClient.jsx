@@ -32,6 +32,7 @@ import useSpeechAnnouncer from "../live/useSpeechAnnouncer";
 import LiveScoreCard from "./LiveScoreCard";
 import SplashMsg from "./SplashMsg";
 import TeamInningsDetail from "./TeamInningsDetail";
+import LiquidSportText from "../home/LiquidSportText";
 import {
   buildCurrentScoreAnnouncement,
   buildSpectatorAnnouncement,
@@ -1076,9 +1077,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
         <div className="px-5 py-7 sm:px-7">
           <header className="w-full text-center">
             <div>
-              <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-[2.15rem]">
-                {sessionData.name}
-              </h1>
+              <LiquidSportText
+                as="h1"
+                text={sessionData.name}
+                variant="hero-bright"
+                simplifyMotion
+                className="text-3xl font-semibold tracking-tight sm:text-[2.15rem]"
+                lineClassName="leading-[0.94]"
+              />
             </div>
           </header>
 

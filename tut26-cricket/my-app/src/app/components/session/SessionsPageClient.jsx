@@ -17,6 +17,7 @@ import PinModal from "./PinModal";
 import LoadingButton from "../shared/LoadingButton";
 import PendingLink from "../shared/PendingLink";
 import SessionCard from "./SessionCard";
+import LiquidSportText from "../home/LiquidSportText";
 
 const SORT_OPTIONS = [
   { value: "live-newest", label: "Live first" },
@@ -280,9 +281,14 @@ export default function SessionsPageClient({ initialSessions }) {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
-                  All Sessions
-                </h1>
+                <LiquidSportText
+                  as="h1"
+                  text="All Sessions"
+                  variant="hero-bright"
+                  simplifyMotion
+                  className="text-4xl font-semibold tracking-[-0.04em] sm:text-5xl"
+                  lineClassName="leading-[0.94]"
+                />
                 <button
                   onClick={() => setIsInfoModalOpen(true)}
                   className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02))] text-zinc-300 shadow-[0_10px_24px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5 hover:border-cyan-300/18 hover:text-cyan-200"

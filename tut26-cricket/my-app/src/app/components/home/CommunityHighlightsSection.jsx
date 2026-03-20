@@ -39,6 +39,7 @@ export default function CommunityHighlightsSection() {
       >
         <LiquidSportText
           text={["From the", "Community"]}
+          variant="hero-bright"
           characterTyping
           characterStagger={0.022}
           characterLineDelay={0.16}
