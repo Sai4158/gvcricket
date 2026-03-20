@@ -168,6 +168,18 @@ function buildResultLine(resultText) {
   return `${winnerName} wins by ${margin}.`;
 }
 
+function getWinnerName(resultText) {
+  const result = String(resultText || "").trim();
+  if (!result) return "";
+  const winnerMatch = result.match(/^(.+?) won by /i);
+  return winnerMatch ? winnerMatch[1] : "";
+}
+
+function buildWinnerCelebrationLine(resultText) {
+  const winnerName = getWinnerName(resultText);
+  return winnerName ? `Congratulations ${winnerName}.` : "";
+}
+
 export function buildSpectatorBallAnnouncement(event) {
   if (!event) return "";
 
@@ -191,6 +203,7 @@ export function buildSpectatorScoreAnnouncement(event, match) {
 
   if (event.type === "match_end") {
     return [
+      buildWinnerCelebrationLine(event.result),
       buildResultLine(event.result),
       `Final score is ${scoreLine(event.score, event.outs)}.`,
     ]
@@ -202,7 +215,25 @@ export function buildSpectatorScoreAnnouncement(event, match) {
     return [
       buildScoreSentence(event.score, event.outs),
       "Match over.",
+      buildWinnerCelebrationLine(event.result),
       buildResultLine(event.result),
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  if (event.type === "innings_change") {
+    const target = safeNumber(match?.innings1?.score) + 1;
+    const runsNeeded = Math.max(0, target - safeNumber(match?.score));
+    const requiredRate =
+      safeNumber(match?.overs) > 0
+        ? (target / safeNumber(match?.overs)).toFixed(2)
+        : "0.00";
+
+    return [
+      runsNeeded > 0 ? `${runsNeeded} runs needed from ${formatRemainingOvers(match)}.` : "",
+      `Required rate is ${requiredRate} per over.`,
+      "Best of luck to both teams.",
     ]
       .filter(Boolean)
       .join(" ");
@@ -311,7 +342,21 @@ export function buildSpectatorAnnouncement(event, match, mode = "full") {
   }
 
   if (event.type === "innings_change") {
-    return event.summaryText || "";
+    const firstInningsTeam = match?.innings1?.team || "Innings 1";
+    const chaseTeam = match?.innings2?.team || getBattingTeamBundle(match).name;
+    const firstInningsScore = scoreLine(
+      safeNumber(match?.innings1?.score),
+      safeNumber(match?.innings1?.outs)
+    );
+    const target = safeNumber(match?.innings1?.score) + 1;
+
+    return [
+      "First innings complete.",
+      `${firstInningsTeam} finished on ${firstInningsScore}.`,
+      `${chaseTeam} needs ${target} to win.`,
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
 
   if (event.type === "image_update") {

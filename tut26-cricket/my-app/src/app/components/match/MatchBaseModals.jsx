@@ -7,6 +7,12 @@ import { Ball } from "./MatchBallHistory";
 import MatchImageUploader from "./MatchImageUploader";
 import { countLegalBalls } from "../../lib/match-scoring";
 
+function parseWinnerName(resultText) {
+  const result = String(resultText || "").trim();
+  const match = result.match(/^(.+?) won by /i);
+  return match ? match[1] : "";
+}
+
 export function ModalBase({
   children,
   title,
@@ -206,63 +212,104 @@ export function InningsEndModal({ match, onNext }) {
   const inningsOvers = Number(match?.overs || 0);
   const requiredRunRate =
     inningsOvers > 0 ? (target / inningsOvers).toFixed(2) : "0.00";
+  const winnerName = parseWinnerName(match?.result);
+  const confettiPieces = [
+    "left-[8%] top-5 bg-emerald-400/80",
+    "left-[18%] top-10 bg-cyan-300/80",
+    "left-[30%] top-4 bg-amber-300/85",
+    "left-[42%] top-11 bg-rose-400/80",
+    "right-[32%] top-6 bg-violet-400/80",
+    "right-[20%] top-12 bg-sky-300/80",
+    "right-[10%] top-5 bg-orange-300/85",
+  ];
 
   return (
     <ModalBase
       title={match.result ? "Match Over" : "Innings Over"}
       onExit={onNext}
+      panelClassName="max-w-md"
     >
-      <p className="text-2xl mb-2 text-center">
-        Final Score:{" "}
-        <strong className="text-amber-300">
-          {match.score} / {match.outs}
-        </strong>
-      </p>
-      {match.result && (
-        <p className="text-lg text-green-400 font-bold mb-6 text-center">
-          {match.result}
-        </p>
-      )}
-      {isFirstInningsBreak ? (
-        <div className="mt-4 rounded-2xl border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-emerald-300/14 bg-[linear-gradient(180deg,rgba(6,95,70,0.16),rgba(12,18,22,0.92))] px-3 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-200/76">
-                Target
+      <div className="relative overflow-hidden rounded-[28px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_26%),linear-gradient(180deg,rgba(18,18,24,0.98),rgba(9,10,14,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+        <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/24 to-transparent" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.08),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.08),transparent_28%)]" />
+        {match.result
+          ? confettiPieces.map((pieceClass, index) => (
+              <motion.span
+                key={pieceClass}
+                className={`pointer-events-none absolute h-2.5 w-2.5 rounded-full ${pieceClass}`}
+                animate={{ y: [0, 18, 0], rotate: [0, index % 2 === 0 ? 16 : -16, 0], opacity: [0.65, 1, 0.72] }}
+                transition={{ duration: 2.8 + index * 0.18, repeat: Infinity, ease: "easeInOut" }}
+              />
+            ))
+          : null}
+
+        <div className="relative z-10 text-center">
+          {match.result ? (
+            <>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-emerald-200/78">
+                Winning Result
               </p>
-              <p className="mt-1 text-xl font-semibold text-white">{target}</p>
-              <p className="mt-1 text-xs text-zinc-400">Need {target} to win</p>
-            </div>
-            <div className="rounded-2xl border border-cyan-300/14 bg-[linear-gradient(180deg,rgba(8,47,73,0.16),rgba(12,18,22,0.92))] px-3 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-200/76">
-                Req. Rate
+              <h3 className="mt-3 text-[2rem] font-black uppercase tracking-[-0.05em] text-white sm:text-[2.3rem]">
+                {winnerName || "MATCH WON"}
+              </h3>
+              <p className="mt-1 text-lg font-semibold text-emerald-300">
+                {match.result}
               </p>
-              <p className="mt-1 text-xl font-semibold text-white">{requiredRunRate}</p>
-              <p className="mt-1 text-xs text-zinc-400">Per over to chase</p>
-            </div>
-          </div>
-          <div className="mt-3 rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
+            </>
+          ) : (
+            <>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-200/78">
+                Second Innings Ready
+              </p>
+              <h3 className="mt-3 text-[1.95rem] font-black uppercase tracking-[-0.05em] text-white sm:text-[2.2rem]">
+                Target {target}
+              </h3>
+              <p className="mt-1 text-base font-medium text-cyan-200">
+                {firstInningsTeam} posted {firstInningsScore}/{firstInningsOuts}
+              </p>
+            </>
+          )}
+
+          <div className="mt-4 rounded-[22px] border border-white/8 bg-black/20 px-4 py-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-              Innings 1
+              {match.result ? "Final Score" : "Innings 1 Summary"}
             </p>
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">{firstInningsTeam}</p>
-                <p className="mt-1 text-xs text-zinc-400">
-                  {firstInningsOvers} overs · {firstInningsOuts} down
-                </p>
-              </div>
-              <p className="shrink-0 text-lg font-semibold text-amber-300">
-                {firstInningsScore}/{firstInningsOuts}
-              </p>
-            </div>
+            <p className="mt-2 text-2xl font-semibold text-amber-300">
+              {match.score} / {match.outs}
+            </p>
+            <p className="mt-1 text-sm text-zinc-400">
+              {isFirstInningsBreak
+                ? `${firstInningsOvers} overs · ${firstInningsOuts} down`
+                : winnerName
+                ? `${winnerName} closed the chase in style.`
+                : "The match result is locked in."}
+            </p>
           </div>
+
+          {isFirstInningsBreak ? (
+            <div className="mt-3 grid grid-cols-2 gap-3 text-left">
+              <div className="rounded-[20px] border border-emerald-300/14 bg-[linear-gradient(180deg,rgba(6,95,70,0.16),rgba(12,18,22,0.92))] px-3 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-200/76">
+                  Runs To Win
+                </p>
+                <p className="mt-1 text-xl font-semibold text-white">{target}</p>
+                <p className="mt-1 text-xs text-zinc-400">Need {target} for the win</p>
+              </div>
+              <div className="rounded-[20px] border border-cyan-300/14 bg-[linear-gradient(180deg,rgba(8,47,73,0.16),rgba(12,18,22,0.92))] px-3 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-200/76">
+                  Req. Rate
+                </p>
+                <p className="mt-1 text-xl font-semibold text-white">{requiredRunRate}</p>
+                <p className="mt-1 text-xs text-zinc-400">Per over to chase</p>
+              </div>
+            </div>
+          ) : null}
         </div>
-      ) : null}
+      </div>
       <LoadingButton
         onClick={onNext}
         pendingLabel={match.innings === "first" && !match.result ? "Opening..." : "Loading result..."}
-        className="mt-6 w-full py-3 text-lg bg-green-600 text-white font-bold rounded-lg hover:bg-green-500 transition"
+        className="mt-5 w-full rounded-[22px] border border-emerald-300/18 bg-[linear-gradient(180deg,rgba(16,185,129,0.96),rgba(5,150,105,0.96))] py-3.5 text-lg font-bold text-white shadow-[0_18px_32px_rgba(5,150,105,0.18)] transition hover:brightness-105"
       >
         {match.innings === "first" && !match.result
           ? "Start Second Innings"

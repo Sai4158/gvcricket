@@ -427,7 +427,15 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
   useEffect(() => {
     const event = match?.lastLiveEvent;
-    if (!event || !isLiveMatch || !settings.enabled || settings.mode === "silent") {
+    const isTerminalEvent =
+      event?.type === "match_end" || event?.type === "target_chased";
+
+    if (
+      !event ||
+      (!isLiveMatch && !isTerminalEvent) ||
+      !settings.enabled ||
+      settings.mode === "silent"
+    ) {
       return;
     }
     if (lastAnnouncedEventRef.current === event.id) return;
@@ -480,10 +488,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
   ]);
 
   useEffect(() => {
-    if (!isLiveMatch) {
+    const terminalEvent =
+      match?.lastLiveEvent?.type === "match_end" ||
+      match?.lastLiveEvent?.type === "target_chased";
+
+    if (!isLiveMatch && !terminalEvent) {
       stop();
     }
-  }, [isLiveMatch, stop]);
+  }, [isLiveMatch, match?.lastLiveEvent?.type, stop]);
 
   useEffect(() => {
     return () => {
