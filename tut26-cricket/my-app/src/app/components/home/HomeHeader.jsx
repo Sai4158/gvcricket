@@ -2,10 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion, useScroll } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion, useScroll } from "framer-motion";
 import { FaArrowRight, FaBars, FaTimes } from "react-icons/fa";
+import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 
 export default function HomeHeader() {
+  const prefersReducedMotion = useReducedMotion();
+  const isAppleMobileSafari = useAppleMobileSafari();
+  const simplifyMotion = prefersReducedMotion || isAppleMobileSafari;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
   const { scrollY } = useScroll();
@@ -148,14 +152,10 @@ export default function HomeHeader() {
     >
       <motion.button
         animate={{
-          y: hidden ? 0 : [0, -2, 0],
-          scale: hidden ? 1 : [1, 1.02, 1],
+          y: simplifyMotion ? 0 : hidden ? 0 : [0, -2, 0],
+          scale: simplifyMotion ? 1 : hidden ? 1 : [1, 1.02, 1],
         }}
-        transition={{
-          duration: 3.8,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
+        transition={simplifyMotion ? undefined : { duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
         whileTap={{ scale: 0.9 }}
         onClick={() => setIsMenuOpen(true)}
         className={`relative inline-flex h-22 w-14 items-center justify-center overflow-hidden text-white drop-shadow-[0_8px_20px_rgba(0,0,0,0.45)] transition-opacity duration-200 ${
@@ -175,7 +175,9 @@ export default function HomeHeader() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ ease: "easeOut", duration: 0.28 }}
-            className="pointer-events-auto fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
+            className={`pointer-events-auto fixed inset-0 z-50 ${
+              simplifyMotion ? "bg-black/60" : "bg-black/40 backdrop-blur-sm"
+            }`}
             onTap={closeMenu}
           >
             <motion.div
@@ -193,7 +195,11 @@ export default function HomeHeader() {
               dragConstraints={{ left: 0, right: 0 }}
               dragElastic={{ left: 0, right: 0.14 }}
               onDragEnd={handleDrawerDragEnd}
-              className="pointer-events-auto fixed top-0 right-0 bottom-0 w-[min(84vw,22rem)] bg-zinc-900/72 backdrop-blur-xl px-5 py-6 sm:px-6 flex flex-col shadow-2xl border-l border-zinc-700/80 will-change-transform"
+              className={`pointer-events-auto fixed top-0 right-0 bottom-0 w-[min(84vw,22rem)] px-5 py-6 sm:px-6 flex flex-col shadow-2xl border-l border-zinc-700/80 ${
+                simplifyMotion
+                  ? "bg-zinc-950/96"
+                  : "bg-zinc-900/72 backdrop-blur-xl will-change-transform"
+              }`}
               onClick={(event) => event.stopPropagation()}
               onPointerDown={(event) => event.stopPropagation()}
               onTap={(event) => event.stopPropagation()}
@@ -271,8 +277,8 @@ export default function HomeHeader() {
                               }
                             >
                               <motion.span
-                                whileHover={{ x: 4 }}
-                                transition={{
+                                whileHover={simplifyMotion ? undefined : { x: 4 }}
+                                transition={simplifyMotion ? undefined : {
                                   duration: 0.22,
                                   ease: [0.22, 1, 0.36, 1],
                                 }}
@@ -287,8 +293,8 @@ export default function HomeHeader() {
                               {link.icon && <link.icon className="h-5 w-5" />}
                               {!link.icon && link.subtext && (
                                 <motion.span
-                                  animate={{ x: [0, 3, 0] }}
-                                  transition={{
+                                  animate={simplifyMotion ? undefined : { x: [0, 3, 0] }}
+                                  transition={simplifyMotion ? undefined : {
                                     duration: 2.6,
                                     repeat: Infinity,
                                     ease: "easeInOut",
@@ -309,8 +315,8 @@ export default function HomeHeader() {
                             }
                           >
                             <motion.span
-                              whileHover={{ x: 4 }}
-                              transition={{
+                              whileHover={simplifyMotion ? undefined : { x: 4 }}
+                              transition={simplifyMotion ? undefined : {
                                 duration: 0.22,
                                 ease: [0.22, 1, 0.36, 1],
                               }}
@@ -325,8 +331,8 @@ export default function HomeHeader() {
                             {link.icon && <link.icon className="h-5 w-5" />}
                             {!link.icon && link.subtext && (
                               <motion.span
-                                animate={{ x: [0, 3, 0] }}
-                                transition={{
+                                animate={simplifyMotion ? undefined : { x: [0, 3, 0] }}
+                                transition={simplifyMotion ? undefined : {
                                   duration: 2.6,
                                   repeat: Infinity,
                                   ease: "easeInOut",

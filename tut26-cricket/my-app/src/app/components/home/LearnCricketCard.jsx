@@ -8,10 +8,13 @@ import {
 } from "react-icons/fa6";
 import { FaCircleDot } from "react-icons/fa6";
 import { GiCricketBat } from "react-icons/gi";
+import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 import LiquidSportText from "./LiquidSportText";
 
 export default function LearnCricketCard() {
   const prefersReducedMotion = useReducedMotion();
+  const isAppleMobileSafari = useAppleMobileSafari();
+  const shouldReduceMotion = prefersReducedMotion || isAppleMobileSafari;
   const learnSteps = [
     {
       title: "1. Two teams play",
@@ -39,12 +42,12 @@ export default function LearnCricketCard() {
     <motion.section
       id="learn-cricket"
       initial={
-        prefersReducedMotion
+        shouldReduceMotion
           ? false
           : { opacity: 0, y: 22, scale: 0.992, filter: "blur(6px)" }
       }
       whileInView={
-        prefersReducedMotion
+        shouldReduceMotion
           ? undefined
           : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
       }
@@ -57,7 +60,7 @@ export default function LearnCricketCard() {
         target="_blank"
         rel="noopener noreferrer"
         whileHover={
-          prefersReducedMotion
+          shouldReduceMotion
             ? undefined
             : { y: -6, scale: 1.008, transition: { duration: 0.26 } }
         }
@@ -74,12 +77,12 @@ export default function LearnCricketCard() {
         <div className="relative z-10 grid items-start gap-7 lg:grid-cols-[minmax(320px,0.84fr)_minmax(0,1.16fr)] lg:gap-9 xl:grid-cols-[minmax(360px,0.88fr)_minmax(0,1.12fr)]">
           <motion.div
             initial={
-              prefersReducedMotion
+              shouldReduceMotion
                 ? false
                 : { opacity: 0, x: -34, y: 16, rotate: -0.4, filter: "blur(6px)" }
             }
             whileInView={
-              prefersReducedMotion
+              shouldReduceMotion
                 ? undefined
                 : { opacity: 1, x: 0, y: 0, rotate: 0, filter: "blur(0px)" }
             }
@@ -109,12 +112,12 @@ export default function LearnCricketCard() {
 
           <motion.div
             initial={
-              prefersReducedMotion
+              shouldReduceMotion
                 ? false
                 : { opacity: 0, x: -30, y: 14, filter: "blur(5px)" }
             }
             whileInView={
-              prefersReducedMotion
+              shouldReduceMotion
                 ? undefined
                 : { opacity: 1, x: 0, y: 0, filter: "blur(0px)" }
             }
@@ -132,6 +135,7 @@ export default function LearnCricketCard() {
                 characterTyping
                 characterStagger={0.02}
                 characterLineDelay={0.14}
+                simplifyMotion={shouldReduceMotion}
                 className="max-w-xl text-3xl font-semibold tracking-tight md:text-4xl lg:max-w-2xl"
                 lineClassName="leading-[1.02]"
               />
@@ -139,12 +143,12 @@ export default function LearnCricketCard() {
 
             <motion.div
               initial={
-                prefersReducedMotion
+                shouldReduceMotion
                   ? false
                   : { opacity: 0, x: 34, y: 16, rotate: 0.5, filter: "blur(6px)" }
               }
               whileInView={
-                prefersReducedMotion
+                shouldReduceMotion
                   ? undefined
                   : { opacity: 1, x: 0, y: 0, rotate: 0, filter: "blur(0px)" }
               }
@@ -176,19 +180,19 @@ export default function LearnCricketCard() {
                 <motion.div
                   key={title}
                   initial={
-                    prefersReducedMotion
+                    shouldReduceMotion
                       ? false
                       : { opacity: 0, y: 22, scale: 0.985, filter: "blur(5px)" }
                   }
                   whileInView={
-                    prefersReducedMotion
+                    shouldReduceMotion
                       ? undefined
                       : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
                   }
                   viewport={{ once: true, amount: 0.42, margin: "0px 0px -6% 0px" }}
                   transition={{
                     duration: 0.48,
-                    delay: prefersReducedMotion ? 0 : index * 0.08,
+                    delay: shouldReduceMotion ? 0 : index * 0.08,
                     ease: [0.22, 1, 0.36, 1],
                   }}
                   className="rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-4 lg:min-h-[168px]"
@@ -199,19 +203,19 @@ export default function LearnCricketCard() {
               ))}
               <motion.div
                 initial={
-                  prefersReducedMotion
+                  shouldReduceMotion
                     ? false
                     : { opacity: 0, y: 22, scale: 0.985, filter: "blur(5px)" }
                 }
                 whileInView={
-                  prefersReducedMotion
+                  shouldReduceMotion
                     ? undefined
                     : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
                 }
                 viewport={{ once: true, amount: 0.42, margin: "0px 0px -6% 0px" }}
                 transition={{
                   duration: 0.48,
-                  delay: prefersReducedMotion ? 0 : learnSteps.length * 0.08,
+                  delay: shouldReduceMotion ? 0 : learnSteps.length * 0.08,
                   ease: [0.22, 1, 0.36, 1],
                 }}
                 className="hidden rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-4 lg:flex lg:min-h-[168px] lg:items-center lg:justify-center"

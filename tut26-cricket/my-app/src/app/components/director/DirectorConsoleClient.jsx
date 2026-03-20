@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   FaArrowLeft,
@@ -50,6 +51,8 @@ import {
   isUiAudioUnlocked,
   playUiTone,
   primeUiAudio,
+  restorePreferredAudioSessionType,
+  setPreferredAudioSessionType,
   subscribeUiAudioUnlock,
 } from "../../lib/page-audio";
 
@@ -239,27 +242,63 @@ function IosSwitch({ checked, onChange, label, disabled = false }) {
 function HelpButton({ title, body }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
+  const buttonRef = useRef(null);
+  const panelRef = useRef(null);
+  const [panelStyle, setPanelStyle] = useState(null);
 
   useEffect(() => {
     if (!open) {
       return undefined;
     }
 
+    const updatePanelPosition = () => {
+      const buttonRect = buttonRef.current?.getBoundingClientRect();
+      if (!buttonRect || typeof window === "undefined") {
+        return;
+      }
+
+      const panelWidth = Math.min(288, Math.max(220, window.innerWidth - 24));
+      const top = Math.min(
+        buttonRect.bottom + 10,
+        window.innerHeight - 24
+      );
+      const left = Math.min(
+        Math.max(12, buttonRect.right - panelWidth),
+        Math.max(12, window.innerWidth - panelWidth - 12)
+      );
+
+      setPanelStyle({
+        top: `${top}px`,
+        left: `${left}px`,
+        width: `${panelWidth}px`,
+      });
+    };
+
     const handlePointerDown = (event) => {
-      if (!containerRef.current?.contains(event.target)) {
+      if (
+        !containerRef.current?.contains(event.target) &&
+        !panelRef.current?.contains(event.target)
+      ) {
         setOpen(false);
       }
     };
 
+    updatePanelPosition();
     document.addEventListener("pointerdown", handlePointerDown, true);
+    window.addEventListener("resize", updatePanelPosition);
+    window.addEventListener("scroll", updatePanelPosition, true);
+
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("resize", updatePanelPosition);
+      window.removeEventListener("scroll", updatePanelPosition, true);
     };
   }, [open]);
 
   return (
     <div ref={containerRef} className="relative shrink-0">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((current) => !current)}
         className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-200 transition hover:bg-white/[0.1] focus:outline-none focus:ring-2 focus:ring-emerald-400/35"
@@ -267,12 +306,19 @@ function HelpButton({ title, body }) {
       >
         <FaInfoCircle />
       </button>
-      {open ? (
-        <div className="absolute right-0 top-12 z-30 w-[min(18rem,calc(100vw-3rem))] max-w-[18rem] rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(26,26,32,0.98),rgba(11,11,16,0.98))] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.45)] max-sm:right-0">
-          <p className="text-sm font-semibold text-white">{title}</p>
-          <p className="mt-2 text-sm leading-6 text-zinc-300">{body}</p>
-        </div>
-      ) : null}
+      {open && panelStyle && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={panelRef}
+              style={panelStyle}
+              className="fixed z-[140] rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(26,26,32,0.98),rgba(11,11,16,0.98))] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
+            >
+              <p className="text-sm font-semibold text-white">{title}</p>
+              <p className="mt-2 text-sm leading-6 text-zinc-300">{body}</p>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }
@@ -521,6 +567,7 @@ export default function DirectorConsoleClient({
   const cachedEffectUrlRef = useRef(new Map());
   const musicEffectDuckFactorRef = useRef(1);
   const musicDuckAnimationFrameRef = useRef(0);
+  const ambientAudioSessionTypeRef = useRef("");
   const [speechSettings, setSpeechSettings] = useState(createSpeechSettings);
   const speech = useSpeechAnnouncer(speechSettings);
   const micMonitor = useLocalMicMonitor();
@@ -747,6 +794,22 @@ export default function DirectorConsoleClient({
       window.removeEventListener("pagehide", handlePageHide);
     };
   }, [audioOrderStorageKey]);
+
+  useEffect(() => {
+    if (!iOSSafari) {
+      return undefined;
+    }
+
+    ambientAudioSessionTypeRef.current =
+      setPreferredAudioSessionType("ambient") || "";
+
+    return () => {
+      if (ambientAudioSessionTypeRef.current) {
+        restorePreferredAudioSessionType(ambientAudioSessionTypeRef.current);
+        ambientAudioSessionTypeRef.current = "";
+      }
+    };
+  }, [iOSSafari]);
 
   useEffect(() => {
     if (
@@ -1203,7 +1266,15 @@ export default function DirectorConsoleClient({
 
       setDirectorWalkieOn(true);
 
-      if (action === "enable" || action === "pending") {
+      if (action === "enable") {
+        return;
+      }
+
+      if (action === "pending") {
+        showTemporaryDirectorWalkieNotice(
+          "Requested umpire access. Waiting for approval.",
+          3200
+        );
         return;
       }
 
@@ -1212,16 +1283,25 @@ export default function DirectorConsoleClient({
         return;
       }
 
+      showTemporaryDirectorWalkieNotice("Requesting umpire access...", 3200);
       const requested = await walkie.requestEnable();
       if (!requested) {
         setDirectorWalkieOn(false);
+        setDirectorWalkieNotice("");
+        return;
       }
+
+      showTemporaryDirectorWalkieNotice(
+        "Requested umpire access. Waiting for approval.",
+        3200
+      );
     },
     [
       authorized,
       directorWalkieRequestState,
       directorWalkieSharedEnabled,
       managedSession?.match?._id,
+      showTemporaryDirectorWalkieNotice,
       walkie,
     ]
   );
@@ -1293,16 +1373,20 @@ export default function DirectorConsoleClient({
 
   const readCurrentScore = () => {
     const targetMatch = liveMatch || managedSession?.match;
-    if (!targetMatch || !speechSettings.enabled) {
+    const announcement = buildCurrentScoreAnnouncement(targetMatch);
+    if (!targetMatch || !announcement) {
       return;
     }
 
-    void primeUiAudio({ mediaElements: [effectsAudioRef.current, audioRef.current] });
+    void primeUiAudio();
+    speech.stop();
     speech.prime();
-    speech.speak(buildCurrentScoreAnnouncement(targetMatch), {
+    speech.speak(announcement, {
       key: `director-score-${targetMatch._id}`,
       userGesture: true,
       ignoreEnabled: true,
+      interrupt: true,
+      priority: 5,
       rate: 0.9,
     });
   };
@@ -1583,9 +1667,11 @@ export default function DirectorConsoleClient({
 
   const primeEffectsAudio = useCallback(async () => {
     const audio = effectsAudioRef.current;
-    const unlocked = await primeUiAudio({
-      mediaElements: [audio, audioRef.current],
-    });
+    const unlocked = isUiAudioUnlocked()
+      ? true
+      : await primeUiAudio({
+          mediaElements: audio ? [audio] : [],
+        });
 
     if (!audio) {
       return unlocked;
@@ -1949,9 +2035,17 @@ export default function DirectorConsoleClient({
       return;
     }
 
-    if (!currentTrack) {
+    if (iOSSafari || !currentTrack || musicState !== "playing") {
       navigator.mediaSession.metadata = null;
       navigator.mediaSession.playbackState = "none";
+      try {
+        navigator.mediaSession.setActionHandler("play", null);
+        navigator.mediaSession.setActionHandler("pause", null);
+        navigator.mediaSession.setActionHandler("nexttrack", null);
+        navigator.mediaSession.setActionHandler("stop", null);
+      } catch {
+        // Ignore unsupported action cleanup.
+      }
       return;
     }
 
@@ -2006,7 +2100,7 @@ export default function DirectorConsoleClient({
         // Ignore unsupported action cleanup.
       }
     };
-  }, [currentTrack, musicState, musicTracks.length]);
+  }, [currentTrack, iOSSafari, musicState, musicTracks.length]);
 
   const directorWalkieChannelEnabled = directorWalkieSharedEnabled;
   const directorWalkieUi =
@@ -2420,7 +2514,9 @@ export default function DirectorConsoleClient({
                     : walkie.snapshot?.enabled
                     ? "Hold to talk with the live channel."
                     : directorWalkiePending
-                    ? "Request sent. Waiting for the umpire."
+                    ? "Requested umpire access. Waiting for approval."
+                    : directorWalkieOn
+                    ? "Walkie is on. Requesting umpire access."
                     : walkie.requestState === "dismissed"
                     ? "Umpire dismissed the request."
                     : "Turn on this device to request access."}
@@ -2654,6 +2750,9 @@ export default function DirectorConsoleClient({
                     ? "Score announcer is on."
                     : "Score announcer is off."}
                 </p>
+                <p className="mt-2 text-sm text-zinc-400">
+                  Tap Read current score any time for a manual update.
+                </p>
                 {speech.needsGesture && !speech.audioUnlocked ? (
                   <p className="mt-2 text-sm text-amber-200">
                     Tap Read current score once to enable iPhone audio.
@@ -2668,13 +2767,11 @@ export default function DirectorConsoleClient({
               <button
                 type="button"
                 onClick={readCurrentScore}
-                disabled={!canManageSession || !speechSettings.enabled}
+                disabled={!canManageSession}
                 className="w-full rounded-[22px] border border-amber-400/20 bg-amber-500/10 px-4 py-4 text-left text-sm font-semibold text-amber-100 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-zinc-500 disabled:hover:translate-y-0"
               >
                 {canManageSession
-                  ? speechSettings.enabled
-                    ? "Read current score"
-                    : "Turn announcer on first"
+                  ? "Read current score"
                   : "Choose session first"}
               </button>
             </div>

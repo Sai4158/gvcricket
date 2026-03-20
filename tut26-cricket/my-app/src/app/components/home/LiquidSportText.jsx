@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 
 export default function LiquidSportText({
   as: Component = "h2",
@@ -25,8 +26,12 @@ export default function LiquidSportText({
   lineWaveAmount = 4,
   lineWaveRotate = 0.8,
   lineWaveDuration = 6.8,
+  simplifyMotion = false,
 }) {
   const prefersReducedMotion = useReducedMotion();
+  const isAppleMobileSafari = useAppleMobileSafari();
+  const shouldSimplifyMotion =
+    prefersReducedMotion || simplifyMotion || isAppleMobileSafari;
   const lines = Array.isArray(text) ? text : [text];
   const isDarkOutline = variant === "dark-outline";
   const isHeroBright = variant === "hero-bright";
@@ -55,7 +60,7 @@ export default function LiquidSportText({
           : isHeroBright
           ? `pointer-events-none absolute inset-0 z-0 block text-transparent ${lineClassName}`
           : `pointer-events-none absolute inset-0 z-0 block translate-x-[3px] translate-y-[3px] ${typing ? "text-neutral-950/42" : "text-neutral-950/26"} ${lineClassName}`;
-        const shouldCharacterType = characterTyping && !prefersReducedMotion;
+        const shouldCharacterType = characterTyping && !shouldSimplifyMotion;
 
         if (shouldCharacterType) {
           const words = line.split(" ");
@@ -65,7 +70,7 @@ export default function LiquidSportText({
               key={`${line}-${index}`}
               className="relative block overflow-visible"
               animate={
-                lineWave && !prefersReducedMotion
+                lineWave && !shouldSimplifyMotion
                   ? {
                       y: [0, -lineWaveAmount, 0],
                       rotateZ: [
@@ -77,7 +82,7 @@ export default function LiquidSportText({
                   : undefined
               }
               transition={
-                lineWave && !prefersReducedMotion
+                lineWave && !shouldSimplifyMotion
                   ? {
                       duration: lineWaveDuration + index * 0.4,
                       repeat: Infinity,
@@ -104,14 +109,14 @@ export default function LiquidSportText({
                     key={`${line}-${index}-word-${wordIndex}`}
                     className="inline-block"
                     animate={
-                      wordFloat && !prefersReducedMotion
+                      wordFloat && !shouldSimplifyMotion
                         ? {
                             y: [0, wordIndex % 2 === 0 ? -wordFloatAmount : wordFloatAmount * 0.7, 0],
                           }
                         : undefined
                     }
                     transition={
-                      wordFloat && !prefersReducedMotion
+                      wordFloat && !shouldSimplifyMotion
                         ? {
                             duration: wordFloatDuration,
                             repeat: Infinity,
@@ -211,7 +216,7 @@ export default function LiquidSportText({
             key={`${line}-${index}`}
             className="relative block overflow-visible"
             animate={
-              lineWave && !prefersReducedMotion
+              lineWave && !shouldSimplifyMotion
                 ? {
                     y: [0, -lineWaveAmount, 0],
                     rotateZ: [
@@ -223,7 +228,7 @@ export default function LiquidSportText({
                 : undefined
             }
             transition={
-              lineWave && !prefersReducedMotion
+              lineWave && !shouldSimplifyMotion
                 ? {
                     duration: lineWaveDuration + index * 0.4,
                     repeat: Infinity,
@@ -235,14 +240,14 @@ export default function LiquidSportText({
           >
             <motion.span
               initial={
-                prefersReducedMotion
+                shouldSimplifyMotion
                   ? false
                   : typing
                   ? { clipPath: "inset(0 100% 0 0)", opacity: 0.78 }
                   : { opacity: 1 }
               }
               whileInView={
-                prefersReducedMotion
+                shouldSimplifyMotion
                   ? undefined
                   : typing
                   ? { clipPath: "inset(0 0% 0 0)", opacity: 1 }
@@ -250,8 +255,8 @@ export default function LiquidSportText({
               }
               viewport={{ once, amount: viewportAmount, margin: viewportMargin }}
               transition={{
-                duration: prefersReducedMotion ? 0 : typing ? 0.92 : 0,
-                delay: prefersReducedMotion ? 0 : lineDelay,
+                duration: shouldSimplifyMotion ? 0 : typing ? 0.92 : 0,
+                delay: shouldSimplifyMotion ? 0 : lineDelay,
                 ease: [0.22, 1, 0.36, 1],
               }}
               className={baseLineClass}
@@ -259,60 +264,50 @@ export default function LiquidSportText({
               {line}
             </motion.span>
 
-            <motion.span
-              aria-hidden="true"
-              initial={
-                prefersReducedMotion
-                  ? false
-                  : typing
-                  ? { clipPath: "inset(0 100% 0 0)", opacity: 0.08 }
-                  : { clipPath: "inset(0 100% 0 0)", opacity: 0.12 }
-              }
-              whileInView={
-                prefersReducedMotion
-                  ? undefined
-                  : { clipPath: "inset(0 0% 0 0)", opacity: isHeroBright ? 0 : 0.52 }
-              }
-              viewport={{ once, amount: viewportAmount, margin: viewportMargin }}
-              transition={{
-                duration: prefersReducedMotion ? 0 : 0.84,
-                delay: prefersReducedMotion ? 0 : lineDelay,
-                ease: [0.22, 1, 0.36, 1],
-              }}
-              className={revealOverlayClass}
-            >
-              {line}
-            </motion.span>
+            {!shouldSimplifyMotion ? (
+              <motion.span
+                aria-hidden="true"
+                initial={
+                  typing
+                    ? { clipPath: "inset(0 100% 0 0)", opacity: 0.08 }
+                    : { clipPath: "inset(0 100% 0 0)", opacity: 0.12 }
+                }
+                whileInView={{ clipPath: "inset(0 0% 0 0)", opacity: isHeroBright ? 0 : 0.52 }}
+                viewport={{ once, amount: viewportAmount, margin: viewportMargin }}
+                transition={{
+                  duration: 0.84,
+                  delay: lineDelay,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+                className={revealOverlayClass}
+              >
+                {line}
+              </motion.span>
+            ) : null}
 
-            <motion.span
-              aria-hidden="true"
-              className={shimmerClass}
-              animate={
-                prefersReducedMotion
-                  ? undefined
-                  : {
-                      backgroundPosition: ["120% 50%", "-20% 50%"],
-                      opacity: isDarkOutline
-                        ? [0.2, 0.48, 0.24]
-                        : isHeroBright
-                        ? [0.08, 0.18, 0.1]
-                        : [0.18, 0.42, 0.24],
-                    }
-              }
-              transition={
-                prefersReducedMotion
-                  ? undefined
-                  : {
-                      duration: isHeroBright ? 5.4 : 4.8,
-                      repeat: Infinity,
-                      repeatDelay: isHeroBright ? 1.2 : 1.4,
-                      ease: "easeInOut",
-                      delay: lineDelay + 0.34,
-                    }
-              }
-            >
-              {line}
-            </motion.span>
+            {!shouldSimplifyMotion ? (
+              <motion.span
+                aria-hidden="true"
+                className={shimmerClass}
+                animate={{
+                  backgroundPosition: ["120% 50%", "-20% 50%"],
+                  opacity: isDarkOutline
+                    ? [0.2, 0.48, 0.24]
+                    : isHeroBright
+                    ? [0.08, 0.18, 0.1]
+                    : [0.18, 0.42, 0.24],
+                }}
+                transition={{
+                  duration: isHeroBright ? 5.4 : 4.8,
+                  repeat: Infinity,
+                  repeatDelay: isHeroBright ? 1.2 : 1.4,
+                  ease: "easeInOut",
+                  delay: lineDelay + 0.34,
+                }}
+              >
+                {line}
+              </motion.span>
+            ) : null}
 
             <span
               aria-hidden="true"
@@ -321,22 +316,20 @@ export default function LiquidSportText({
               {line}
             </span>
 
-            {cursor ? (
+            {cursor && !shouldSimplifyMotion ? (
               <motion.span
                 aria-hidden="true"
-                initial={prefersReducedMotion ? false : { left: "0%", opacity: 0 }}
+                initial={{ left: "0%", opacity: 0 }}
                 whileInView={
-                  prefersReducedMotion
-                    ? undefined
-                    : {
-                        left: "100%",
-                        opacity: [0, 1, 1, 0],
-                      }
+                  {
+                    left: "100%",
+                    opacity: [0, 1, 1, 0],
+                  }
                 }
                 viewport={{ once, amount: viewportAmount, margin: viewportMargin }}
                 transition={{
-                  duration: prefersReducedMotion ? 0 : 0.9,
-                  delay: prefersReducedMotion ? 0 : lineDelay,
+                  duration: 0.9,
+                  delay: lineDelay,
                   ease: [0.22, 1, 0.36, 1],
                 }}
                 className={`pointer-events-none absolute top-[10%] z-30 h-[78%] w-[2px] -translate-x-1/2 rounded-full ${

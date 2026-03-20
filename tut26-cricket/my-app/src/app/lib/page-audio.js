@@ -5,6 +5,14 @@ const unlockListeners = new Set();
 const cachedAudioUrlMap = new Map();
 const cachedAudioRequestMap = new Map();
 const UI_AUDIO_CACHE_NAME = "gv-ui-audio-assets-v1";
+const SUPPORTED_AUDIO_SESSION_TYPES = new Set([
+  "auto",
+  "ambient",
+  "playback",
+  "play-and-record",
+  "transient",
+  "transient-solo",
+]);
 
 const SILENT_AUDIO_DATA_URI =
   "data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
@@ -75,6 +83,19 @@ function getUiAudioContext() {
   }
 
   return sharedUiAudioContext;
+}
+
+function getNavigatorAudioSession() {
+  if (typeof navigator === "undefined") {
+    return null;
+  }
+
+  const session = navigator.audioSession;
+  if (!session || typeof session.type !== "string") {
+    return null;
+  }
+
+  return session;
 }
 
 async function warmAudioContext(context) {
@@ -267,6 +288,47 @@ export async function getCachedAudioAssetUrl(src) {
 
   cachedAudioRequestMap.set(safeSrc, request);
   return request;
+}
+
+export function getPreferredAudioSessionType() {
+  const session = getNavigatorAudioSession();
+  return session?.type || "";
+}
+
+export function setPreferredAudioSessionType(nextType) {
+  const session = getNavigatorAudioSession();
+  if (!session || !SUPPORTED_AUDIO_SESSION_TYPES.has(nextType)) {
+    return "";
+  }
+
+  const previousType = session.type || "auto";
+  if (previousType === nextType) {
+    return previousType;
+  }
+
+  try {
+    session.type = nextType;
+  } catch {
+    return previousType;
+  }
+
+  return previousType;
+}
+
+export function restorePreferredAudioSessionType(previousType) {
+  const session = getNavigatorAudioSession();
+  if (!session || !SUPPORTED_AUDIO_SESSION_TYPES.has(previousType)) {
+    return false;
+  }
+
+  try {
+    if (session.type !== previousType) {
+      session.type = previousType;
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function preloadCachedAudioAssets(sources = []) {

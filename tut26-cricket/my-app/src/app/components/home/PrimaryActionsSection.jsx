@@ -11,6 +11,7 @@ import {
 } from "react-icons/fa";
 import LiquidSportText from "./LiquidSportText";
 import PendingLink from "../shared/PendingLink";
+import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 
 const sectionVariants = {
   hidden: {},
@@ -72,6 +73,8 @@ const cardItemVariants = {
 
 export default function PrimaryActionsSection() {
   const prefersReducedMotion = useReducedMotion();
+  const isAppleMobileSafari = useAppleMobileSafari();
+  const shouldReduceMotion = prefersReducedMotion || isAppleMobileSafari;
   const handleScrollToUpdates = (event) => {
     event.preventDefault();
     const target = document.getElementById("updates");
@@ -87,12 +90,12 @@ export default function PrimaryActionsSection() {
     >
       <motion.div
         initial={
-          prefersReducedMotion
+          shouldReduceMotion
             ? false
             : { opacity: 0, y: 24, scale: 0.992, filter: "blur(6px)" }
         }
         whileInView={
-          prefersReducedMotion
+          shouldReduceMotion
             ? undefined
             : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
         }
@@ -108,12 +111,13 @@ export default function PrimaryActionsSection() {
           characterTyping
           characterStagger={0.02}
           characterLineDelay={0.14}
+          simplifyMotion={shouldReduceMotion}
           className="text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl"
           lineClassName="leading-[1.02]"
         />
         <motion.div
-          initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
-          whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 10 }}
+          whileInView={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.7 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.04 }}
         >
@@ -129,7 +133,7 @@ export default function PrimaryActionsSection() {
       </motion.div>
 
       <motion.div
-        initial={prefersReducedMotion ? false : "hidden"}
+        initial={shouldReduceMotion ? false : "hidden"}
         whileInView="visible"
         viewport={{ once: true, amount: 0.16, margin: "0px 0px -6% 0px" }}
         variants={sectionVariants}
@@ -144,18 +148,18 @@ export default function PrimaryActionsSection() {
           <motion.div
             custom={0}
             variants={cardVariants}
-            whileHover={prefersReducedMotion ? undefined : { scale: 1.015 }}
+            whileHover={shouldReduceMotion ? undefined : { scale: 1.015 }}
             whileTap={{ scale: 0.99 }}
             className="liquid-glass group rounded-[30px] p-5 text-left transition duration-300 hover:border-white/28"
           >
             <motion.div
               animate={
-                prefersReducedMotion
+                shouldReduceMotion
                   ? undefined
                   : { opacity: [0.84, 0.94, 0.88], x: [0, 4, 0] }
               }
               transition={
-                prefersReducedMotion
+                shouldReduceMotion
                   ? undefined
                   : { duration: 8.4, repeat: Infinity, ease: "easeInOut" }
               }
@@ -163,12 +167,12 @@ export default function PrimaryActionsSection() {
             />
             <motion.div
               animate={
-                prefersReducedMotion
+                shouldReduceMotion
                   ? undefined
                   : { y: [0, -2, 0], opacity: [0.12, 0.18, 0.12] }
               }
               transition={
-                prefersReducedMotion
+                shouldReduceMotion
                   ? undefined
                   : { duration: 8.6, repeat: Infinity, ease: "easeInOut" }
               }
@@ -177,7 +181,7 @@ export default function PrimaryActionsSection() {
               <FaClipboardList className="text-[64px]" />
             </motion.div>
             <motion.div
-              initial={prefersReducedMotion ? false : "hidden"}
+              initial={shouldReduceMotion ? false : "hidden"}
               whileInView="visible"
               viewport={{ once: true, amount: 0.4 }}
               variants={cardContentVariants}
@@ -210,12 +214,12 @@ export default function PrimaryActionsSection() {
                 <span className="text-sm font-medium text-white/88">Start now</span>
                 <motion.span
                   animate={
-                    prefersReducedMotion
+                    shouldReduceMotion
                       ? undefined
                       : { x: [0, 2, 0], opacity: [0.92, 1, 0.92] }
                   }
                   transition={
-                    prefersReducedMotion
+                    shouldReduceMotion
                       ? undefined
                       : { duration: 7.6, repeat: Infinity, ease: "easeInOut" }
                   }
@@ -237,18 +241,18 @@ export default function PrimaryActionsSection() {
           <motion.div
             custom={1}
             variants={cardVariants}
-            whileHover={prefersReducedMotion ? undefined : { scale: 1.015 }}
+            whileHover={shouldReduceMotion ? undefined : { scale: 1.015 }}
             whileTap={{ scale: 0.99 }}
             className="liquid-glass group rounded-[30px] p-5 text-left transition duration-300 hover:border-white/28"
           >
             <motion.div
               animate={
-                prefersReducedMotion
+                shouldReduceMotion
                   ? undefined
                   : { opacity: [0.84, 0.94, 0.88], x: [0, 4, 0] }
               }
               transition={
-                prefersReducedMotion
+                shouldReduceMotion
                   ? undefined
                   : { duration: 8.8, repeat: Infinity, ease: "easeInOut" }
               }
@@ -256,12 +260,12 @@ export default function PrimaryActionsSection() {
             />
             <motion.div
               animate={
-                prefersReducedMotion
+                shouldReduceMotion
                   ? undefined
                   : { y: [0, -2, 0], opacity: [0.12, 0.18, 0.12] }
               }
               transition={
-                prefersReducedMotion
+                shouldReduceMotion
                   ? undefined
                   : { duration: 8.6, repeat: Infinity, ease: "easeInOut" }
               }
@@ -270,7 +274,7 @@ export default function PrimaryActionsSection() {
               <FaChartLine className="text-[60px]" />
             </motion.div>
             <motion.div
-              initial={prefersReducedMotion ? false : "hidden"}
+              initial={shouldReduceMotion ? false : "hidden"}
               whileInView="visible"
               viewport={{ once: true, amount: 0.4 }}
               variants={cardContentVariants}
@@ -303,12 +307,12 @@ export default function PrimaryActionsSection() {
                 <span className="text-sm font-medium text-white/88">Browse all</span>
                 <motion.span
                   animate={
-                    prefersReducedMotion
+                    shouldReduceMotion
                       ? undefined
                       : { x: [0, 2, 0], opacity: [0.92, 1, 0.92] }
                   }
                   transition={
-                    prefersReducedMotion
+                    shouldReduceMotion
                       ? undefined
                       : { duration: 7.8, repeat: Infinity, ease: "easeInOut" }
                   }
@@ -330,36 +334,36 @@ export default function PrimaryActionsSection() {
       >
         <motion.div
         initial={
-          prefersReducedMotion
+          shouldReduceMotion
               ? false
               : { opacity: 0, x: -38, y: 16, scale: 0.988, filter: "blur(6px)" }
         }
         whileInView={
-          prefersReducedMotion
+          shouldReduceMotion
               ? undefined
               : { opacity: 1, x: 0, y: 0, scale: 1, filter: "blur(0px)" }
         }
           viewport={{ once: true, amount: 0.16, margin: "0px 0px -6% 0px" }}
           transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
-          whileHover={prefersReducedMotion ? undefined : { scale: 1.012 }}
+          whileHover={shouldReduceMotion ? undefined : { scale: 1.012 }}
           whileTap={{ scale: 0.99 }}
           className="liquid-glass group flex w-full items-center gap-4 rounded-[28px] px-6 py-5 text-left transition duration-300 hover:border-white/28 sm:gap-5"
         >
           <motion.div
             animate={
-              prefersReducedMotion
+              shouldReduceMotion
                 ? undefined
                 : { opacity: [0.84, 0.94, 0.88], x: [0, 4, 0] }
             }
             transition={
-              prefersReducedMotion
+              shouldReduceMotion
                 ? undefined
                 : { duration: 8.4, repeat: Infinity, ease: "easeInOut" }
             }
             className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.06),transparent_28%)]"
           />
           <motion.div
-            initial={prefersReducedMotion ? false : "hidden"}
+            initial={shouldReduceMotion ? false : "hidden"}
             whileInView="visible"
             viewport={{ once: true, amount: 0.45 }}
             variants={cardContentVariants}
@@ -388,12 +392,12 @@ export default function PrimaryActionsSection() {
           </motion.div>
           <motion.span
             animate={
-              prefersReducedMotion
+              shouldReduceMotion
                 ? undefined
                 : { x: [0, 2, 0], opacity: [0.92, 1, 0.92] }
             }
             transition={
-              prefersReducedMotion
+              shouldReduceMotion
                 ? undefined
                 : { duration: 7.8, repeat: Infinity, ease: "easeInOut" }
             }

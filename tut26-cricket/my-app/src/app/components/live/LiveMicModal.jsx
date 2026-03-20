@@ -40,7 +40,14 @@ export default function LiveMicModal({
   monitor,
 }) {
   const fallbackMonitor = useLocalMicMonitor();
-  const { isActive, isStarting, error, start, stop } = monitor ?? fallbackMonitor;
+  const {
+    isActive,
+    isStarting,
+    error,
+    start,
+    stop,
+    prepare = async () => true,
+  } = monitor ?? fallbackMonitor;
 
   const statusLabel = isStarting ? "STARTING" : isActive ? "LIVE" : "OFF";
 
@@ -54,7 +61,14 @@ export default function LiveMicModal({
       return;
     }
 
-    void start({ pauseMedia: false });
+    void (async () => {
+      const prepared = await prepare({ requestPermission: true });
+      if (!prepared) {
+        return;
+      }
+
+      await start({ pauseMedia: false });
+    })();
   };
 
   return (

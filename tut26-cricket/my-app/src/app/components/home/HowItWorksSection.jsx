@@ -22,6 +22,7 @@ import StepFlow from "../shared/StepFlow";
 import SafeMatchImage from "../shared/SafeMatchImage";
 import AnimatedSection from "./AnimatedSection";
 import LiquidSportText from "./LiquidSportText";
+import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 
 const gridVariants = {
   hidden: {},
@@ -1406,6 +1407,8 @@ function JourneyCard({ card, index, prefersReducedMotion, useFlatLaptopMotion })
 
 export default function HowItWorksSection() {
   const prefersReducedMotion = useReducedMotion();
+  const isAppleMobileSafari = useAppleMobileSafari();
+  const shouldReduceMotion = prefersReducedMotion || isAppleMobileSafari;
   const useFlatLaptopMotion = useUseFlatLaptopMotion();
 
   return (
@@ -1416,16 +1419,16 @@ export default function HowItWorksSection() {
     >
       <div className="space-y-8">
         <motion.div
-          initial={
-            prefersReducedMotion
-              ? false
-              : { opacity: 0, x: -34, y: 18, scale: 0.992, filter: "blur(6px)" }
-          }
-          whileInView={
-            prefersReducedMotion
-              ? undefined
-              : { opacity: 1, x: 0, y: 0, scale: 1, filter: "blur(0px)" }
-          }
+            initial={
+              shouldReduceMotion
+                ? false
+                : { opacity: 0, x: -34, y: 18, scale: 0.992, filter: "blur(6px)" }
+            }
+            whileInView={
+              shouldReduceMotion
+                ? undefined
+                : { opacity: 1, x: 0, y: 0, scale: 1, filter: "blur(0px)" }
+            }
           viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
           transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1] }}
           className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10"
@@ -1443,6 +1446,7 @@ export default function HowItWorksSection() {
                 characterTyping
                 characterStagger={0.02}
                 characterLineDelay={0.14}
+                simplifyMotion={shouldReduceMotion}
                 className="text-4xl font-semibold tracking-[-0.04em] md:text-5xl"
                 lineClassName="leading-[0.98]"
               />
@@ -1450,7 +1454,7 @@ export default function HowItWorksSection() {
           </div>
 
           <motion.div
-            initial={prefersReducedMotion ? false : "hidden"}
+            initial={shouldReduceMotion ? false : "hidden"}
             whileInView="visible"
             viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
             variants={gridVariants}
@@ -1461,7 +1465,7 @@ export default function HowItWorksSection() {
                 key={card.title}
                 card={card}
                 index={index}
-                prefersReducedMotion={prefersReducedMotion}
+                prefersReducedMotion={shouldReduceMotion}
                 useFlatLaptopMotion={useFlatLaptopMotion}
               />
             ))}
@@ -1469,16 +1473,16 @@ export default function HowItWorksSection() {
         </motion.div>
 
         <motion.div
-          initial={
-            prefersReducedMotion
-              ? false
-              : { opacity: 0, x: 34, y: 18, scale: 0.992, filter: "blur(6px)" }
-          }
-          whileInView={
-            prefersReducedMotion
-              ? undefined
-              : { opacity: 1, x: 0, y: 0, scale: 1, filter: "blur(0px)" }
-          }
+            initial={
+              shouldReduceMotion
+                ? false
+                : { opacity: 0, x: 34, y: 18, scale: 0.992, filter: "blur(6px)" }
+            }
+            whileInView={
+              shouldReduceMotion
+                ? undefined
+                : { opacity: 1, x: 0, y: 0, scale: 1, filter: "blur(0px)" }
+            }
           viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
           transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1], delay: 0.03 }}
           className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10"
@@ -1489,6 +1493,7 @@ export default function HowItWorksSection() {
               characterTyping
               characterStagger={0.02}
               characterLineDelay={0.14}
+              simplifyMotion={shouldReduceMotion}
               className="text-4xl font-semibold tracking-[-0.04em] md:text-5xl"
               lineClassName="leading-[0.98]"
             />
@@ -1498,7 +1503,7 @@ export default function HowItWorksSection() {
           </div>
 
           <motion.div
-            initial={prefersReducedMotion ? false : "hidden"}
+            initial={shouldReduceMotion ? false : "hidden"}
             whileInView="visible"
             viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
             variants={gridVariants}
@@ -1509,7 +1514,7 @@ export default function HowItWorksSection() {
                 key={card.title}
                 card={card}
                 index={index}
-                prefersReducedMotion={prefersReducedMotion}
+                prefersReducedMotion={shouldReduceMotion}
                 useFlatLaptopMotion={useFlatLaptopMotion}
               />
             ))}

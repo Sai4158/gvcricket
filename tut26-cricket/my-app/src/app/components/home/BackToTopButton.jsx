@@ -4,8 +4,13 @@ import { FaArrowUp } from "react-icons/fa";
 
 export default function BackToTopButton() {
   const handleBackToTop = () => {
-    window.scrollTo(0, 0);
-    window.location.reload();
+    const topElement = document.getElementById("top");
+    if (topElement) {
+      topElement.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (

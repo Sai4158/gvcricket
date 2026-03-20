@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 
 export default function AnimatedSection({
   children,
@@ -13,7 +14,9 @@ export default function AnimatedSection({
   viewportMargin = "0px 0px 12% 0px",
 }) {
   const prefersReducedMotion = useReducedMotion();
-  const hiddenMotion = prefersReducedMotion
+  const isAppleMobileSafari = useAppleMobileSafari();
+  const shouldReduceMotion = prefersReducedMotion || isAppleMobileSafari;
+  const hiddenMotion = shouldReduceMotion
     ? false
     : {
         opacity: 0,
@@ -31,7 +34,7 @@ export default function AnimatedSection({
             ? -distance
             : 0,
       };
-  const visibleMotion = prefersReducedMotion
+  const visibleMotion = shouldReduceMotion
     ? undefined
     : {
         opacity: 1,
@@ -48,12 +51,12 @@ export default function AnimatedSection({
       viewport={{ once: true, amount: viewportAmount, margin: viewportMargin }}
       transition={{
         delay,
-        duration: prefersReducedMotion ? 0 : 0.66,
+        duration: shouldReduceMotion ? 0 : 0.66,
         ease: [0.22, 1, 0.36, 1],
       }}
       className={`relative ${className}`}
     >
-      {!prefersReducedMotion ? (
+      {!shouldReduceMotion ? (
         <>
           <motion.div
             aria-hidden="true"

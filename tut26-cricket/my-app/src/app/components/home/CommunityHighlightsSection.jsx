@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 import AnimatedSection from "./AnimatedSection";
 import LiquidSportText from "./LiquidSportText";
 import YouTubeVideoPlayer from "./YouTubeVideoPlayer";
@@ -14,6 +15,8 @@ const demoVideos = [
 
 export default function CommunityHighlightsSection() {
   const prefersReducedMotion = useReducedMotion();
+  const isAppleMobileSafari = useAppleMobileSafari();
+  const shouldReduceMotion = prefersReducedMotion || isAppleMobileSafari;
 
   return (
     <AnimatedSection
@@ -23,12 +26,12 @@ export default function CommunityHighlightsSection() {
     >
       <motion.div
         initial={
-          prefersReducedMotion
+          shouldReduceMotion
             ? false
             : { opacity: 0, y: 22, scale: 0.992, filter: "blur(6px)" }
         }
         whileInView={
-          prefersReducedMotion
+          shouldReduceMotion
             ? undefined
             : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
         }
@@ -41,18 +44,19 @@ export default function CommunityHighlightsSection() {
           characterTyping
           characterStagger={0.022}
           characterLineDelay={0.16}
+          simplifyMotion={shouldReduceMotion}
           className="text-center text-5xl font-bold tracking-tight md:text-7xl"
           lineClassName="leading-[0.96]"
         />
       </motion.div>
       <motion.p
         initial={
-          prefersReducedMotion
+          shouldReduceMotion
             ? false
             : { opacity: 0, y: 18, filter: "blur(5px)" }
         }
         whileInView={
-          prefersReducedMotion
+          shouldReduceMotion
             ? undefined
             : { opacity: 1, y: 0, filter: "blur(0px)" }
         }

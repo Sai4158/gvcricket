@@ -177,7 +177,7 @@ export default function TossStatePanels({
                   pendingLabel="Saving..."
                 >
                   <span className="block transition-transform group-hover:translate-x-0.5">
-                    Bat First
+                    BAT FIRST
                   </span>
                 </LoadingButton>
                 <LoadingButton
@@ -188,7 +188,7 @@ export default function TossStatePanels({
                   pendingLabel="Saving..."
                 >
                   <span className="block transition-transform group-hover:translate-x-0.5">
-                    Bowl First
+                    BOWL FIRST
                   </span>
                 </LoadingButton>
               </div>

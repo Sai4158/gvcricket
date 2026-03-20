@@ -5,7 +5,9 @@ import {
   duckPageMedia,
   playUiTone,
   primeUiAudio,
+  restorePreferredAudioSessionType,
   restorePageMedia,
+  setPreferredAudioSessionType,
 } from "../../lib/page-audio";
 
 function getMicErrorMessage(error) {
@@ -33,8 +35,11 @@ export default function useLocalMicMonitor() {
   const gainNodeRef = useRef(null);
   const audioContextRef = useRef(null);
   const startPromiseRef = useRef(null);
+  const preparePromiseRef = useRef(null);
   const gainLevelRef = useRef(2);
   const pausedMediaRef = useRef([]);
+  const audioSessionTypeRef = useRef("");
+  const permissionPrimedRef = useRef(false);
   const isActiveRef = useRef(false);
   const isPausedRef = useRef(false);
   const [isActive, setIsActive] = useState(false);
@@ -106,12 +111,100 @@ export default function useLocalMicMonitor() {
         restorePageMedia(pausedMediaRef);
       }
 
+      if (audioSessionTypeRef.current) {
+        restorePreferredAudioSessionType(audioSessionTypeRef.current);
+        audioSessionTypeRef.current = "";
+      }
+
       if (wasLive) {
         playUiTone({ frequency: 640, durationMs: 140, type: "triangle", volume: 0.035 });
       }
     },
     []
   );
+
+  const prepare = useCallback(async ({ requestPermission = false } = {}) => {
+    if (preparePromiseRef.current) {
+      return preparePromiseRef.current;
+    }
+
+    if (
+      typeof window === "undefined" ||
+      !navigator?.mediaDevices?.getUserMedia
+    ) {
+      return false;
+    }
+
+    const AudioContextClass =
+      window.AudioContext || window.webkitAudioContext;
+
+    if (!AudioContextClass) {
+      return false;
+    }
+
+    setError("");
+
+    preparePromiseRef.current = (async () => {
+      let prepared = await primeUiAudio();
+
+      try {
+        let audioContext = audioContextRef.current;
+        if (!audioContext || audioContext.state === "closed") {
+          audioContext = new AudioContextClass({ latencyHint: "interactive" });
+          audioContextRef.current = audioContext;
+        }
+
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
+
+        if (audioContext.state === "running") {
+          await audioContext.suspend();
+        }
+
+        prepared = true;
+      } catch {
+        // Keep best-effort prewarm only.
+      }
+
+      if (
+        !requestPermission ||
+        permissionPrimedRef.current ||
+        isActiveRef.current ||
+        isPausedRef.current
+      ) {
+        return prepared;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: false,
+            autoGainControl: false,
+            channelCount: 1,
+            latency: 0,
+            sampleRate: 48000,
+          },
+          video: false,
+        });
+
+        for (const track of stream.getTracks()) {
+          track.stop();
+        }
+
+        permissionPrimedRef.current = true;
+        return true;
+      } catch (nextError) {
+        setError(getMicErrorMessage(nextError));
+        return false;
+      }
+    })().finally(() => {
+      preparePromiseRef.current = null;
+    });
+
+    return preparePromiseRef.current;
+  }, []);
 
   const start = async ({ pauseMedia = false } = {}) => {
     if (startPromiseRef.current) {
@@ -139,7 +232,7 @@ export default function useLocalMicMonitor() {
 
     startPromiseRef.current = (async () => {
       try {
-        await primeUiAudio();
+        await prepare();
         await stop({ resumeMedia: false, preserveGeneration: true });
 
         const currentGeneration = sessionGenerationRef.current + 1;
@@ -148,6 +241,9 @@ export default function useLocalMicMonitor() {
         if (pauseMedia) {
           duckPageMedia(pausedMediaRef, 0.18);
         }
+
+        audioSessionTypeRef.current =
+          setPreferredAudioSessionType("play-and-record") || "";
 
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
@@ -193,6 +289,7 @@ export default function useLocalMicMonitor() {
         streamRef.current = stream;
         sourceRef.current = source;
         gainNodeRef.current = gainNode;
+        permissionPrimedRef.current = true;
         setIsActive(true);
         setIsPaused(false);
         playUiTone({ frequency: 880, durationMs: 140, type: "sine", volume: 0.04 });
@@ -287,6 +384,7 @@ export default function useLocalMicMonitor() {
     gainLevel,
     error,
     start,
+    prepare,
     pause,
     resume,
     stop,

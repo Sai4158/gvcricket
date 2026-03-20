@@ -214,6 +214,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const previousEnabledRef = useRef(false);
   const previousWalkieEnabledRef = useRef(false);
   const previousWalkieRequestStateRef = useRef("idle");
+  const micPrepareRequestedRef = useRef(false);
   const lastStreamUpdateRef = useRef(initialData?.updatedAt || "");
   const announcerAutoEnabledMatchRef = useRef("");
   const announcerInitialSummaryRef = useRef("");
@@ -628,6 +629,20 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
   }, [match, router]);
 
+  useEffect(() => {
+    if (activePanel !== "mic") {
+      micPrepareRequestedRef.current = false;
+      return;
+    }
+
+    if (micPrepareRequestedRef.current) {
+      return;
+    }
+
+    micPrepareRequestedRef.current = true;
+    void micMonitor.prepare({ requestPermission: true });
+  }, [activePanel, micMonitor]);
+
   const handleShare = async () => {
     try {
       if (navigator.share) {
@@ -845,6 +860,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const handleSpeakerSwitchChange = useCallback(
     async (nextChecked) => {
       if (nextChecked) {
+        micPrepareRequestedRef.current = true;
+        void micMonitor.prepare({ requestPermission: true });
         setActivePanel("mic");
         return;
       }

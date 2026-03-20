@@ -3,12 +3,15 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { FaPlay } from "react-icons/fa";
+import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 
 export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const prefersReducedMotion = useReducedMotion();
+  const isAppleMobileSafari = useAppleMobileSafari();
+  const shouldReduceMotion = prefersReducedMotion || isAppleMobileSafari;
   const thumbnailUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-  const initialMotion = prefersReducedMotion
+  const initialMotion = shouldReduceMotion
     ? false
     : {
         opacity: 0,
@@ -18,7 +21,7 @@ export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
         rotate: index % 2 === 0 ? -4.5 : 4.5,
         filter: "blur(10px)",
       };
-  const visibleMotion = prefersReducedMotion
+  const visibleMotion = shouldReduceMotion
     ? undefined
     : {
         opacity: 1,
@@ -35,7 +38,7 @@ export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
       whileInView={visibleMotion}
       viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
       transition={
-        prefersReducedMotion
+        shouldReduceMotion
           ? undefined
           : {
               type: "spring",
@@ -45,7 +48,7 @@ export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
             }
       }
       whileHover={
-        prefersReducedMotion
+        shouldReduceMotion
           ? undefined
           : {
               scale: 1.014,
