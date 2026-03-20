@@ -39,7 +39,7 @@ export default function PendingLink({
       prefetch={prefetch}
       aria-disabled={pending ? "true" : undefined}
       data-pending={pending ? "true" : "false"}
-      className={`${className} ${pending ? pendingClassName : ""}`.trim()}
+      className={`press-feedback ${className} ${pending ? pendingClassName : ""}`.trim()}
       onClick={(event) => {
         onClick?.(event);
         if (event.defaultPrevented || isModifiedEvent(event) || pending) {

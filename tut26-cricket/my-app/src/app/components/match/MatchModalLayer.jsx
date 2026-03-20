@@ -88,6 +88,7 @@ export default function MatchModalLayer({
       {modalType === "editOvers" && (
         <EditOversModal
           currentOvers={match.overs}
+          currentLegalBalls={countLegalBalls(match[match.innings === "second" ? "innings2" : "innings1"]?.history || [])}
           currentOverNumber={currentOverNumber}
           innings={match.innings}
           firstInningsOversPlayed={firstInningsOversPlayed}

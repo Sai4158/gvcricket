@@ -176,7 +176,7 @@ export default function PrimaryActionsSection() {
                   ? undefined
                   : { duration: 8.6, repeat: Infinity, ease: "easeInOut" }
               }
-              className="pointer-events-none absolute right-5 top-5 text-amber-100/15 transition duration-300 group-hover:text-amber-50/20"
+              className="pointer-events-none absolute right-5 top-5 z-[1] text-white/44 drop-shadow-[0_4px_12px_rgba(255,255,255,0.08)] transition duration-300 group-hover:text-white/56"
             >
               <FaClipboardList className="text-[64px]" />
             </motion.div>
@@ -190,7 +190,7 @@ export default function PrimaryActionsSection() {
               <div className="space-y-4">
                 <motion.div
                   variants={cardItemVariants}
-                  className="liquid-icon inline-flex h-11 w-11 items-center justify-center rounded-2xl text-amber-50 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:-rotate-3"
+                  className="liquid-icon inline-flex h-11 w-11 items-center justify-center rounded-2xl text-white transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:-rotate-3"
                 >
                   <FaClipboardList />
                 </motion.div>
@@ -269,7 +269,7 @@ export default function PrimaryActionsSection() {
                   ? undefined
                   : { duration: 8.6, repeat: Infinity, ease: "easeInOut" }
               }
-              className="pointer-events-none absolute right-5 top-5 text-sky-100/15 transition duration-300 group-hover:text-sky-50/20"
+              className="pointer-events-none absolute right-5 top-5 z-[1] text-white/44 drop-shadow-[0_4px_12px_rgba(255,255,255,0.08)] transition duration-300 group-hover:text-white/56"
             >
               <FaChartLine className="text-[60px]" />
             </motion.div>
@@ -283,7 +283,7 @@ export default function PrimaryActionsSection() {
               <div className="space-y-4">
                 <motion.div
                   variants={cardItemVariants}
-                  className="liquid-icon inline-flex h-11 w-11 items-center justify-center rounded-2xl text-sky-50 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:rotate-3"
+                  className="liquid-icon inline-flex h-11 w-11 items-center justify-center rounded-2xl text-white transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:rotate-3"
                 >
                   <FaChartLine />
                 </motion.div>

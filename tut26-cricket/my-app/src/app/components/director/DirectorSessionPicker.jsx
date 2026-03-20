@@ -142,7 +142,7 @@ export default function DirectorSessionPicker({
 
         {showHelp ? (
           <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-6 text-zinc-300">
-            Pick the live session you want to manage, then open it to start directing audio and controls.
+            Pick the live session you want to join. Director mode is shared, so multiple directors can open the same live match together.
           </div>
         ) : null}
 

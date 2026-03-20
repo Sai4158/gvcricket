@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion, useScroll } from "framer-motion";
 import { FaArrowRight, FaBars, FaTimes } from "react-icons/fa";
 import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
+import PendingLink from "../shared/PendingLink";
 
 export default function HomeHeader() {
   const prefersReducedMotion = useReducedMotion();
@@ -143,6 +144,16 @@ export default function HomeHeader() {
     onClick?.(event);
   };
 
+  const getPendingLabel = (text) => {
+    if (text === "All Sessions") {
+      return "Opening sessions...";
+    }
+    if (text === "Start Match") {
+      return "Starting new game...";
+    }
+    return "Opening...";
+  };
+
   return (
     <motion.header
       initial={{ opacity: 0, y: -12 }}
@@ -267,8 +278,10 @@ export default function HomeHeader() {
                               )}
                             </a>
                           ) : (
-                            <Link
+                            <PendingLink
                               href={link.href}
+                              pendingLabel={getPendingLabel(link.text)}
+                              pendingClassName="pending-shimmer"
                               onClick={(event) =>
                                 handleNavClick(event, link.onClick)
                               }
@@ -303,7 +316,7 @@ export default function HomeHeader() {
                                   <FaArrowRight className="h-4 w-4 text-rose-300" />
                                 </motion.span>
                               )}
-                            </Link>
+                            </PendingLink>
                           )
                         ) : (
                           <button

@@ -14,6 +14,7 @@ import {
 import DarkSelect from "../shared/DarkSelect";
 import InfoModal from "./InfoModal";
 import PinModal from "./PinModal";
+import LoadingButton from "../shared/LoadingButton";
 import PendingLink from "../shared/PendingLink";
 import SessionCard from "./SessionCard";
 
@@ -112,6 +113,7 @@ export default function SessionsPageClient({ initialSessions }) {
   const [filterBy, setFilterBy] = useState("all");
   const [pageSizeValue, setPageSizeValue] = useState("20");
   const [page, setPage] = useState(1);
+  const [isGoingHome, setIsGoingHome] = useState(false);
   const router = useRouter();
   const sessions = useMemo(() => initialSessions ?? [], [initialSessions]);
   const deferredSearchQuery = useDeferredValue(searchInput.trim().toLowerCase());
@@ -172,6 +174,11 @@ export default function SessionsPageClient({ initialSessions }) {
     setPinError("");
     setPinPrompt({ mode: "director", session: nextSession });
   }, []);
+
+  const handleGoHome = useCallback(() => {
+    setIsGoingHome(true);
+    router.replace("/");
+  }, [router]);
 
   const handlePinSubmit = async (pin) => {
     if (!pinPrompt?.session?.match || !pinPrompt.session.isLive) return;
@@ -244,19 +251,16 @@ export default function SessionsPageClient({ initialSessions }) {
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_20%),radial-gradient(circle_at_86%_10%,rgba(14,165,233,0.1),transparent_20%),radial-gradient(circle_at_16%_88%,rgba(16,185,129,0.08),transparent_20%),linear-gradient(180deg,#1b1d23_0%,#09090d_100%)] px-4 pb-10 pt-6 text-zinc-100 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex items-center justify-between gap-3">
-          <PendingLink
-            href="/"
-            pendingLabel="Opening home..."
-            pendingClassName="pending-shimmer"
+          <LoadingButton
+            type="button"
+            onClick={handleGoHome}
+            loading={isGoingHome}
+            pendingLabel="Opening..."
             className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-cyan-200/18 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))]"
           >
-            {({ pending, spinner }) => (
-              <>
-                {pending ? spinner : <FaArrowLeft />}
-                <span>{pending ? "Opening..." : "Back"}</span>
-              </>
-            )}
-          </PendingLink>
+            <FaArrowLeft />
+            <span>Back</span>
+          </LoadingButton>
           <PendingLink
             href="/session/new"
             pendingLabel="Opening new session..."
@@ -302,7 +306,7 @@ export default function SessionsPageClient({ initialSessions }) {
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
                   placeholder="Search sessions, teams, or date"
-                  className="h-12 w-full rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-cyan-300/24 focus:bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.025))] focus:shadow-[0_0_0_1px_rgba(34,211,238,0.18)]"
+                  className="h-12 w-full rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] pl-11 pr-4 text-base text-white outline-none transition placeholder:text-zinc-500 focus:border-cyan-300/24 focus:bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.025))] focus:shadow-[0_0_0_1px_rgba(34,211,238,0.18)] sm:text-sm"
                   aria-label="Search sessions"
                   autoComplete="off"
                 />
@@ -443,11 +447,11 @@ export default function SessionsPageClient({ initialSessions }) {
             }
             description={
               pinPrompt.mode === "director"
-                ? "Enter the director PIN to start directing this live match."
+                ? "Enter the director PIN to join director mode for this live match. More than one director can open the same match."
                 : "Enter the PIN to access scoring controls."
             }
             submitLabel={
-              pinPrompt.mode === "director" ? "Start Directing" : "Enter Umpire Mode"
+              pinPrompt.mode === "director" ? "Join Director Mode" : "Enter Umpire Mode"
             }
           />
         ) : null}

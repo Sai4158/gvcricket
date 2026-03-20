@@ -59,7 +59,6 @@ import {
 const DIRECTOR_AUDIO_LIBRARY_CACHE_KEY = "gv-director-audio-library-v1";
 const DIRECTOR_AUDIO_METADATA_CACHE_KEY = "gv-director-audio-metadata-v1";
 const DIRECTOR_SESSIONS_CACHE_KEY = "gv-director-sessions-v1";
-const DIRECTOR_FORCE_REAUTH_KEY = "gv-director-force-reauth";
 const DIRECTOR_AUDIO_LIBRARY_CACHE_TTL_MS = 10 * 60 * 1000;
 const DIRECTOR_AUDIO_ORDER_SAVE_DELAY_MS = 20_000;
 let directorAudioLibraryMemoryCache = null;
@@ -669,30 +668,6 @@ export default function DirectorConsoleClient({
     }
   }, [initialSessions]);
 
-  const markDirectorReauthRequired = () => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    try {
-      window.localStorage.setItem(DIRECTOR_FORCE_REAUTH_KEY, "1");
-    } catch {
-      // Ignore storage failures and fall back to in-memory state reset.
-    }
-  };
-
-  const clearDirectorReauthRequired = () => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    try {
-      window.localStorage.removeItem(DIRECTOR_FORCE_REAUTH_KEY);
-    } catch {
-      // Ignore storage failures.
-    }
-  };
-
   const selectedSession = useMemo(() => {
     return (
       sessions.find((item) => item.session?._id === selectedSessionId) ||
@@ -747,53 +722,6 @@ export default function DirectorConsoleClient({
       pendingInitialManageRef.current = false;
     }
   }, [authorized, selectedSessionId, sessions]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return undefined;
-    }
-
-    const resetDirectorMode = () => {
-      let shouldReset = false;
-
-      try {
-        shouldReset =
-          window.localStorage.getItem(DIRECTOR_FORCE_REAUTH_KEY) === "1";
-      } catch {
-        shouldReset = false;
-      }
-
-      if (!shouldReset) {
-        return;
-      }
-
-      clearDirectorReauthRequired();
-      setAuthorized(false);
-      setManagedSessionId("");
-      setShowPicker(false);
-      setShowDirectorPinStep(false);
-      setPin("");
-      setAuthError("");
-    };
-
-    resetDirectorMode();
-
-    const handlePageShow = () => {
-      resetDirectorMode();
-    };
-
-    const handlePageHide = () => {
-      markDirectorReauthRequired();
-    };
-
-    window.addEventListener("pageshow", handlePageShow);
-    window.addEventListener("pagehide", handlePageHide);
-
-    return () => {
-      window.removeEventListener("pageshow", handlePageShow);
-      window.removeEventListener("pagehide", handlePageHide);
-    };
-  }, [audioOrderStorageKey]);
 
   useEffect(() => {
     if (!iOSSafari) {
@@ -1408,7 +1336,6 @@ export default function DirectorConsoleClient({
         return;
       }
 
-      clearDirectorReauthRequired();
       setConsoleError("");
       setAuthorized(true);
       setPin("");
@@ -1452,7 +1379,6 @@ export default function DirectorConsoleClient({
   }, [authorized]);
 
   const logout = async () => {
-    markDirectorReauthRequired();
     await fetch("/api/director/auth", {
       method: "DELETE",
     }).catch(() => {});
@@ -2230,7 +2156,7 @@ export default function DirectorConsoleClient({
                           Step 1
                         </p>
                         <p className="mt-2 text-sm text-zinc-300">
-                          Enter the 4-digit director PIN to continue.
+                          Enter the 4-digit director PIN to join the shared live director console.
                         </p>
                       </div>
                       <button
@@ -2295,7 +2221,7 @@ export default function DirectorConsoleClient({
                     Choose a live session
                   </h1>
                   <p className="mt-1 text-sm text-zinc-300">
-                    Pick the session you want to manage.
+                    Pick a live match to join. Multiple directors can open the same match at the same time.
                   </p>
                 </div>
                 <DirectorSessionPicker
@@ -2916,27 +2842,14 @@ export default function DirectorConsoleClient({
             title="Audio output"
             subtitle="Current playback route"
             icon={<FaHeadphones />}
-            accent="amber"
+            accent="violet"
             help={{
               title: "Audio output",
               body: "This shows where your audio is playing. Connect the phone to a Bluetooth speaker first for louder PA playback.",
             }}
           >
             <div className="space-y-4">
-              <div className="rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.12),transparent_42%),linear-gradient(180deg,rgba(20,14,6,0.34),rgba(0,0,0,0.2))] px-4 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                  Current output
-                </p>
-                <p className="mt-2 text-lg font-semibold text-white">
-                  {speakerDevices.length
-                    ? "Phone / selected speaker output"
-                    : "Phone speaker output"}
-                </p>
-                <p className="mt-1 text-sm text-zinc-400">
-                  {speakerMessage || "Using your phone or current browser output."}
-                </p>
-              </div>
-              <div className="rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_bottom_right,rgba(251,191,36,0.1),transparent_38%),linear-gradient(180deg,rgba(28,16,6,0.28),rgba(0,0,0,0.2))] px-4 py-4">
+              <div className="rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.14),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.12),transparent_36%),linear-gradient(180deg,rgba(24,12,38,0.28),rgba(0,0,0,0.2))] px-4 py-4">
                 <p className="text-sm font-semibold text-white">How to use it</p>
                 <ul className="mt-3 space-y-2 text-sm leading-6 text-zinc-300">
                   <li>1. Connect your phone to a Bluetooth speaker.</li>

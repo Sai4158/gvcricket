@@ -252,6 +252,7 @@ export function EditTeamsModal({ match, onUpdate, onClose, isUpdating = false })
 
 export function EditOversModal({
   currentOvers,
+  currentLegalBalls,
   currentOverNumber,
   innings,
   firstInningsOversPlayed,
@@ -260,11 +261,34 @@ export function EditOversModal({
   isUpdating = false,
 }) {
   const [overs, setOvers] = useState(currentOvers);
+  const nextOvers = Number(overs) || 0;
   const minAllowedOvers =
     innings === "first"
       ? Math.max(1, currentOverNumber)
       : Math.max(1, firstInningsOversPlayed, currentOverNumber);
-  const isInvalid = Number(overs) < minAllowedOvers;
+  const isInvalid = nextOvers < minAllowedOvers;
+  const isShortened = nextOvers < currentOvers;
+  const nextTotalBalls = nextOvers * 6;
+  const ballsLeftAfterSave = Math.max(0, nextTotalBalls - currentLegalBalls);
+  const willEndNow = !isInvalid && isShortened && ballsLeftAfterSave === 0;
+  const inningsLabel = innings === "second" ? "match" : "innings";
+  const ballsLabel =
+    ballsLeftAfterSave === 1 ? "1 ball" : `${ballsLeftAfterSave} balls`;
+  const oversLabel =
+    ballsLeftAfterSave > 0
+      ? `${Math.floor(ballsLeftAfterSave / 6)}.${ballsLeftAfterSave % 6} overs`
+      : "0.0 overs";
+  const shouldShowShortenWarning = !isInvalid && isShortened;
+  const shortenWarningText = willEndNow
+    ? `Saving this will end the ${inningsLabel} now.`
+    : innings === "second"
+    ? `Saving this leaves ${ballsLabel} (${oversLabel}) before the match ends on overs if the target is not reached sooner.`
+    : `Saving this leaves ${ballsLabel} (${oversLabel}) before the innings ends on overs.`;
+  const saveLabel = willEndNow
+    ? innings === "second"
+      ? "Save And End Match"
+      : "Save And End Innings"
+    : "Save Changes";
 
   return (
     <ModalBase title="Edit Match Overs" onExit={onClose}>
@@ -298,10 +322,31 @@ export function EditOversModal({
           Cannot set total overs below {minAllowedOvers}.
         </p>
       )}
+      {shouldShowShortenWarning ? (
+        <div
+          className={`mb-4 rounded-[22px] border px-4 py-3 text-left ${
+            willEndNow
+              ? "border-rose-400/25 bg-[linear-gradient(180deg,rgba(127,29,29,0.28),rgba(68,12,12,0.2))]"
+              : "border-amber-400/20 bg-[linear-gradient(180deg,rgba(113,63,18,0.24),rgba(68,40,10,0.16))]"
+          }`}
+        >
+          <p
+            className={`text-sm font-semibold ${
+              willEndNow ? "text-rose-100" : "text-amber-100"
+            }`}
+          >
+            {shortenWarningText}
+          </p>
+          <p className="mt-1 text-xs text-zinc-300">
+            Current progress: {Math.floor(currentLegalBalls / 6)}.
+            {currentLegalBalls % 6} overs bowled.
+          </p>
+        </div>
+      ) : null}
       <LoadingButton
         onClick={async () => {
           if (isInvalid) return;
-          await onUpdate({ overs: Number(overs) });
+          await onUpdate({ overs: nextOvers });
           onClose();
         }}
         disabled={isInvalid}
@@ -309,7 +354,7 @@ export function EditOversModal({
         pendingLabel="Saving..."
         className="w-full py-3 text-lg bg-green-600 text-white font-bold rounded-xl hover:bg-green-500 transition-all active:scale-95 disabled:bg-zinc-700 disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        Save Changes
+        {saveLabel}
       </LoadingButton>
     </ModalBase>
   );
