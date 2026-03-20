@@ -1,7 +1,6 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 import AnimatedSection from "./AnimatedSection";
 import LiquidSportText from "./LiquidSportText";
 import YouTubeVideoPlayer from "./YouTubeVideoPlayer";
@@ -15,8 +14,7 @@ const demoVideos = [
 
 export default function CommunityHighlightsSection() {
   const prefersReducedMotion = useReducedMotion();
-  const isAppleMobileSafari = useAppleMobileSafari();
-  const shouldReduceMotion = prefersReducedMotion || isAppleMobileSafari;
+  const shouldReduceMotion = prefersReducedMotion;
 
   return (
     <AnimatedSection

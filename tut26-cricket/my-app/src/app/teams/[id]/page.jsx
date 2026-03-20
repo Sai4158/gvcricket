@@ -16,6 +16,7 @@ import TeamRoster, {
 } from "../../components/teams/TeamRoster";
 import useSessionStorageState from "../../components/teams/useSessionStorageState";
 import LoadingButton from "../../components/shared/LoadingButton";
+import LiquidSportText from "../../components/home/LiquidSportText";
 import {
   clearPendingSessionImage,
   getPendingSessionImage,
@@ -188,9 +189,14 @@ export default function TeamSelectionPage() {
             <StepFlow currentStep={2} />
           </div>
           <div className="text-center">
-            <h1 className="bg-[linear-gradient(90deg,rgba(255,255,255,0.98)_0%,rgba(226,232,240,0.96)_24%,rgba(165,243,252,0.94)_54%,rgba(253,224,71,0.9)_100%)] bg-clip-text text-[2.35rem] font-extrabold uppercase tracking-[-0.05em] text-transparent drop-shadow-[0_8px_24px_rgba(0,0,0,0.34)] sm:text-[3.1rem]">
-              Team Selection
-            </h1>
+            <LiquidSportText
+              as="h1"
+              text="TEAM SELECTION"
+              variant="hero-bright"
+              simplifyMotion
+              className="text-[2.2rem] font-semibold uppercase tracking-[-0.045em] sm:text-[2.95rem]"
+              lineClassName="leading-[0.94]"
+            />
           </div>
           <p className="mx-auto mt-4 max-w-xl text-center text-sm leading-6 text-zinc-400 sm:text-base">
             Set team names, squad size, and overs before the toss.

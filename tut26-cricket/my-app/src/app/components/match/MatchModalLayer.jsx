@@ -5,6 +5,7 @@ import AnnouncementControls from "../live/AnnouncementControls";
 import LiveMicModal from "../live/LiveMicModal";
 import WalkiePanel from "../live/WalkiePanel";
 import OptionalFeatureBoundary from "../shared/OptionalFeatureBoundary";
+import { countLegalBalls } from "../../lib/match-scoring";
 import {
   HistoryModal,
   InningsEndModal,

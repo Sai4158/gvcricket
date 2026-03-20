@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { motion, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion";
 import { FaAngleDown } from "react-icons/fa";
-import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 import LiveNowBanner from "./LiveNowBanner";
 import LiquidSportText from "./LiquidSportText";
 
@@ -12,8 +11,7 @@ const HERO_VIDEO_PATH = "/videos/Cricket1.mp4";
 
 export default function HeroSection({ liveMatch = null }) {
   const prefersReducedMotion = useReducedMotion();
-  const isAppleMobileSafari = useAppleMobileSafari();
-  const shouldSimplifyMotion = prefersReducedMotion || isAppleMobileSafari;
+  const shouldSimplifyMotion = prefersReducedMotion;
   const sectionRef = useRef(null);
   const videoRef = useRef(null);
   const [heroLines, setHeroLines] = useState([

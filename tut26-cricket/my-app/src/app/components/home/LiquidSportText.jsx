@@ -1,7 +1,6 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 
 export default function LiquidSportText({
   as: Component = "h2",
@@ -29,9 +28,7 @@ export default function LiquidSportText({
   simplifyMotion = false,
 }) {
   const prefersReducedMotion = useReducedMotion();
-  const isAppleMobileSafari = useAppleMobileSafari();
-  const shouldSimplifyMotion =
-    prefersReducedMotion || simplifyMotion || isAppleMobileSafari;
+  const shouldSimplifyMotion = prefersReducedMotion || simplifyMotion;
   const lines = Array.isArray(text) ? text : [text];
   const isDarkOutline = variant === "dark-outline";
   const isHeroBright = variant === "hero-bright";

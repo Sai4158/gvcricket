@@ -4,13 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion, useScroll } from "framer-motion";
 import { FaArrowRight, FaBars, FaTimes } from "react-icons/fa";
-import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 import PendingLink from "../shared/PendingLink";
 
 export default function HomeHeader() {
   const prefersReducedMotion = useReducedMotion();
-  const isAppleMobileSafari = useAppleMobileSafari();
-  const simplifyMotion = prefersReducedMotion || isAppleMobileSafari;
+  const simplifyMotion = prefersReducedMotion;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
   const { scrollY } = useScroll();

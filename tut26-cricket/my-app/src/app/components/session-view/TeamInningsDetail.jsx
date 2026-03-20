@@ -33,7 +33,7 @@ function Ball({ runs, isOut, extraType }) {
 
   return (
     <div
-      className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shadow-md ${style}`}
+      className={`flex h-9 w-9 items-center justify-center rounded-full font-bold text-sm shadow-md ${style}`}
     >
       {label}
     </div>
@@ -49,8 +49,15 @@ export default function TeamInningsDetail({
   if (!inningsData) return null;
 
   const runRate = calculateRunRate(inningsData.score, inningsData.history);
-  const formattedTargetSummary = String(targetSummary || "").replace(/\s*•\s*/g, "\n");
-  const isRedSide = /red|team b/i.test(title || "");
+  const formattedTargetSummary = String(targetSummary || "").replace(
+    /\s*(?:•|â€¢|Ã¢â‚¬Â¢)\s*/g,
+    "\n"
+  );
+  const normalizedTitle = String(title || "").trim().toLowerCase();
+  const isBlueSide = /\bblue\b/.test(normalizedTitle);
+  const isRedSide =
+    /\bred\b/.test(normalizedTitle) ||
+    (!isBlueSide && /\bteam b\b/.test(normalizedTitle));
   const accentStripClass = isRedSide
     ? "from-rose-500 via-red-500 to-orange-400"
     : "from-cyan-400 via-sky-500 to-blue-500";
@@ -60,6 +67,14 @@ export default function TeamInningsDetail({
   const panelGlowClass = isRedSide
     ? "before:from-rose-500/18 before:via-red-500/8 before:to-transparent"
     : "before:from-cyan-400/18 before:via-sky-500/8 before:to-transparent";
+  const surfaceClass = isRedSide
+    ? "bg-[radial-gradient(circle_at_top_left,rgba(244,63,94,0.08),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(249,115,22,0.08),transparent_28%),linear-gradient(180deg,rgba(22,14,18,0.96),rgba(8,9,15,0.98))]"
+    : "bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.09),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(37,99,235,0.12),transparent_28%),linear-gradient(180deg,rgba(10,16,28,0.96),rgba(8,10,18,0.98))]";
+  const scoreToneClass = isRedSide ? "text-amber-300" : "text-sky-300";
+  const targetToneClass = isRedSide ? "text-amber-200/90" : "text-sky-200/90";
+  const runRateClass = isRedSide
+    ? "border-amber-300/12 bg-[linear-gradient(180deg,rgba(245,158,11,0.07),rgba(255,255,255,0.03))] text-zinc-100"
+    : "border-sky-300/12 bg-[linear-gradient(180deg,rgba(59,130,246,0.08),rgba(255,255,255,0.03))] text-sky-50";
   const statusToneClass = /live/i.test(statusLabel)
     ? "border-emerald-400/25 bg-emerald-500/12 text-emerald-100"
     : /completed/i.test(statusLabel)
@@ -68,7 +83,7 @@ export default function TeamInningsDetail({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-[26px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.045),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.08),transparent_28%),linear-gradient(180deg,rgba(12,14,22,0.96),rgba(8,9,15,0.98))] p-6 ${glowClass} before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-gradient-to-br before:blur-2xl before:content-[''] ${panelGlowClass}`}
+      className={`relative overflow-hidden rounded-[26px] border border-white/10 p-6 ${surfaceClass} ${glowClass} before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-gradient-to-br before:blur-2xl before:content-[''] ${panelGlowClass}`}
     >
       <div
         className={`absolute inset-x-0 top-0 h-[4px] bg-gradient-to-r ${accentStripClass}`}
@@ -90,31 +105,42 @@ export default function TeamInningsDetail({
           </div>
         </div>
         <div className="relative shrink-0 self-start text-right">
-          <div className="text-[2.1rem] font-black leading-none tracking-tight text-amber-300">
+          <div
+            className={`text-[2.1rem] font-black leading-none tracking-tight ${scoreToneClass}`}
+          >
             {inningsData.score ?? 0}
           </div>
-          <div className="mt-1 text-[1rem] font-black uppercase leading-none tracking-tight text-amber-300">
+          <div
+            className={`mt-1 text-[1rem] font-black uppercase leading-none tracking-tight ${scoreToneClass}`}
+          >
             Runs
           </div>
         </div>
         {formattedTargetSummary ? (
-          <p className="col-span-2 whitespace-pre-line text-xs font-medium uppercase leading-5 tracking-[0.14em] text-amber-200/90">
+          <p
+            className={`col-span-2 whitespace-pre-line text-xs font-medium uppercase leading-5 tracking-[0.14em] ${targetToneClass}`}
+          >
             {formattedTargetSummary}
           </p>
         ) : null}
       </div>
-      <div className="relative mb-5 rounded-[16px] border border-white/8 bg-white/[0.03] px-3 py-2 text-sm font-medium text-zinc-200">
+      <div
+        className={`relative mb-5 rounded-[16px] border px-3 py-2 text-sm font-medium ${runRateClass}`}
+      >
         Run Rate: {runRate}
       </div>
-      <div className="space-y-4 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
+      <div className="custom-scrollbar max-h-72 space-y-4 overflow-y-auto pr-2">
         {inningsData.history.length > 0 ? (
           [...inningsData.history].reverse().map((over) => (
-            <div key={over.overNumber} className="relative overflow-hidden rounded-2xl border border-white/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] px-4 py-3">
+            <div
+              key={over.overNumber}
+              className="relative overflow-hidden rounded-2xl border border-white/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] px-4 py-3"
+            >
               <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
               <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-zinc-300">
                 Over {over.overNumber}
               </p>
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex flex-wrap gap-2">
                 {over.balls.map((ball, index) => (
                   <Ball key={index} {...ball} />
                 ))}
@@ -122,7 +148,9 @@ export default function TeamInningsDetail({
             </div>
           ))
         ) : (
-          <p className="relative text-sm font-bold text-yellow-200">
+          <p
+            className={`relative text-sm font-bold ${isRedSide ? "text-yellow-200" : "text-sky-200"}`}
+          >
             No overs bowled yet.
           </p>
         )}

@@ -8,13 +8,11 @@ import {
 } from "react-icons/fa6";
 import { FaCircleDot } from "react-icons/fa6";
 import { GiCricketBat } from "react-icons/gi";
-import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 import LiquidSportText from "./LiquidSportText";
 
 export default function LearnCricketCard() {
   const prefersReducedMotion = useReducedMotion();
-  const isAppleMobileSafari = useAppleMobileSafari();
-  const shouldReduceMotion = prefersReducedMotion || isAppleMobileSafari;
+  const shouldReduceMotion = prefersReducedMotion;
   const learnSteps = [
     {
       title: "1. Two teams play",

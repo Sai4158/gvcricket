@@ -1,4 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
+import path from "node:path";
+import { readFileSync } from "node:fs";
 import { ImageResponse } from "next/og";
 import { absoluteUrl, siteConfig } from "./site-metadata";
 
@@ -7,7 +9,30 @@ export const SOCIAL_IMAGE_SIZE = {
   height: 630,
 };
 
+let embeddedLogoDataUrl = null;
+
+function getEmbeddedLogoSource() {
+  if (embeddedLogoDataUrl) {
+    return embeddedLogoDataUrl;
+  }
+
+  try {
+    const logoPath = path.join(
+      process.cwd(),
+      "public",
+      siteConfig.logoPath.replace(/^\//, "")
+    );
+    const logoBuffer = readFileSync(logoPath);
+    embeddedLogoDataUrl = `data:image/png;base64,${logoBuffer.toString("base64")}`;
+    return embeddedLogoDataUrl;
+  } catch {
+    return absoluteUrl(siteConfig.logoPath);
+  }
+}
+
 export function createLogoOnlySocialImage() {
+  const logoSource = getEmbeddedLogoSource();
+
   return new ImageResponse(
     (
       <div
@@ -35,7 +60,7 @@ export function createLogoOnlySocialImage() {
           }}
         />
         <img
-          src={absoluteUrl(siteConfig.logoPath)}
+          src={logoSource}
           alt="GV Cricket"
           width="420"
           height="420"

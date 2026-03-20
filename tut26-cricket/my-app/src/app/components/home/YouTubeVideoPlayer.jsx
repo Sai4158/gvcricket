@@ -3,13 +3,11 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { FaPlay } from "react-icons/fa";
-import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 
 export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const prefersReducedMotion = useReducedMotion();
-  const isAppleMobileSafari = useAppleMobileSafari();
-  const shouldReduceMotion = prefersReducedMotion || isAppleMobileSafari;
+  const shouldReduceMotion = prefersReducedMotion;
   const thumbnailUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
   const initialMotion = shouldReduceMotion
     ? false

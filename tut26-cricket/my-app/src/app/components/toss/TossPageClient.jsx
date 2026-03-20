@@ -15,6 +15,7 @@ import {
   uploadPendingSessionImageToMatch,
 } from "../../lib/pending-session-image";
 import StepFlow from "../shared/StepFlow";
+import LiquidSportText from "../home/LiquidSportText";
 
 const getDraftTokenKey = (sessionId) => `session_${sessionId}_draftToken`;
 
@@ -286,9 +287,14 @@ export default function TossPageClient({
             </div>
 
             <div className="mb-6 text-center">
-              <h1 className="bg-[linear-gradient(90deg,rgba(255,255,255,0.98)_0%,rgba(226,232,240,0.96)_24%,rgba(165,243,252,0.94)_54%,rgba(253,224,71,0.9)_100%)] bg-clip-text text-[2.35rem] font-extrabold uppercase leading-[0.94] tracking-[-0.05em] text-transparent drop-shadow-[0_8px_24px_rgba(0,0,0,0.34)] sm:text-[3.1rem]">
-                {titleText}
-              </h1>
+              <LiquidSportText
+                as="h1"
+                text={titleText.toUpperCase()}
+                variant="hero-bright"
+                simplifyMotion
+                className="text-[2.2rem] font-semibold uppercase tracking-[-0.045em] sm:text-[2.95rem]"
+                lineClassName="leading-[0.94]"
+              />
               <p className="mt-2 text-sm text-zinc-400">{subtitleText}</p>
             </div>
 

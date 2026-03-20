@@ -143,10 +143,16 @@ function isRtcUidConflictError(error) {
 }
 
 function walkieConsole(level, event, details = {}) {
+  const effectiveLevel =
+    level === "error" &&
+    typeof window !== "undefined" &&
+    process.env.NODE_ENV !== "production"
+      ? "warn"
+      : level;
   const logger =
-    level === "error"
+    effectiveLevel === "error"
       ? console.error
-      : level === "warn"
+      : effectiveLevel === "warn"
       ? console.warn
       : console.info;
   logger(`[GV Walkie] ${event}`, details);

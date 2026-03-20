@@ -22,7 +22,6 @@ import StepFlow from "../shared/StepFlow";
 import SafeMatchImage from "../shared/SafeMatchImage";
 import AnimatedSection from "./AnimatedSection";
 import LiquidSportText from "./LiquidSportText";
-import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 
 const gridVariants = {
   hidden: {},
@@ -1407,8 +1406,7 @@ function JourneyCard({ card, index, prefersReducedMotion, useFlatLaptopMotion })
 
 export default function HowItWorksSection() {
   const prefersReducedMotion = useReducedMotion();
-  const isAppleMobileSafari = useAppleMobileSafari();
-  const shouldReduceMotion = prefersReducedMotion || isAppleMobileSafari;
+  const shouldReduceMotion = prefersReducedMotion;
   const useFlatLaptopMotion = useUseFlatLaptopMotion();
 
   return (

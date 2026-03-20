@@ -1,7 +1,6 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 
 export default function AnimatedSection({
   children,
@@ -14,8 +13,7 @@ export default function AnimatedSection({
   viewportMargin = "0px 0px 12% 0px",
 }) {
   const prefersReducedMotion = useReducedMotion();
-  const isAppleMobileSafari = useAppleMobileSafari();
-  const shouldReduceMotion = prefersReducedMotion || isAppleMobileSafari;
+  const shouldReduceMotion = prefersReducedMotion;
   const hiddenMotion = shouldReduceMotion
     ? false
     : {

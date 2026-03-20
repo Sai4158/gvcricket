@@ -11,7 +11,6 @@ import {
 } from "react-icons/fa";
 import LiquidSportText from "./LiquidSportText";
 import PendingLink from "../shared/PendingLink";
-import useAppleMobileSafari from "../../lib/useAppleMobileSafari";
 
 const sectionVariants = {
   hidden: {},
@@ -73,8 +72,7 @@ const cardItemVariants = {
 
 export default function PrimaryActionsSection() {
   const prefersReducedMotion = useReducedMotion();
-  const isAppleMobileSafari = useAppleMobileSafari();
-  const shouldReduceMotion = prefersReducedMotion || isAppleMobileSafari;
+  const shouldReduceMotion = prefersReducedMotion;
   const handleScrollToUpdates = (event) => {
     event.preventDefault();
     const target = document.getElementById("updates");
