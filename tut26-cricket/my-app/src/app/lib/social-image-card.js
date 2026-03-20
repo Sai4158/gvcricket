@@ -20,13 +20,13 @@ function getEmbeddedLogoSource() {
     const logoPath = path.join(
       process.cwd(),
       "public",
-      siteConfig.logoPath.replace(/^\//, "")
+      (siteConfig.shareLogoPath || siteConfig.logoPath).replace(/^\//, "")
     );
     const logoBuffer = readFileSync(logoPath);
     embeddedLogoDataUrl = `data:image/png;base64,${logoBuffer.toString("base64")}`;
     return embeddedLogoDataUrl;
   } catch {
-    return absoluteUrl(siteConfig.logoPath);
+    return absoluteUrl(siteConfig.shareLogoPath || siteConfig.logoPath);
   }
 }
 
@@ -59,15 +59,26 @@ export function createLogoOnlySocialImage() {
             boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
           }}
         />
+        <div
+          style={{
+            position: "absolute",
+            width: 900,
+            height: 520,
+            borderRadius: 48,
+            background:
+              "radial-gradient(circle at 50% 44%, rgba(255, 58, 58, 0.26), rgba(255, 58, 58, 0.08) 36%, rgba(0, 0, 0, 0) 76%)",
+            filter: "blur(18px)",
+          }}
+        />
         <img
           src={logoSource}
           alt="GV Cricket"
-          width="420"
-          height="420"
+          width="860"
+          height="646"
           style={{
             position: "relative",
             objectFit: "contain",
-            filter: "drop-shadow(0 22px 54px rgba(220, 38, 38, 0.28))",
+            filter: "drop-shadow(0 24px 62px rgba(220, 38, 38, 0.34))",
           }}
         />
       </div>

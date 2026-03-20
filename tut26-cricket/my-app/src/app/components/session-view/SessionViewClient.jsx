@@ -201,6 +201,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const [activePanel, setActivePanel] = useState(null);
   const [localWalkieNotice, setLocalWalkieNotice] = useState("");
   const [streamError, setStreamError] = useState("");
+  const [sharedWalkieEnabled, setSharedWalkieEnabled] = useState(false);
   const [spectatorWalkieEnabled, setSpectatorWalkieEnabled] = useState(false);
   const [quickWalkieTalking, setQuickWalkieTalking] = useState(false);
   const [quickSpeakerTalking, setQuickSpeakerTalking] = useState(false);
@@ -247,9 +248,17 @@ export default function SessionViewClient({ sessionId, initialData }) {
       }
 
       lastStreamUpdateRef.current = payload.updatedAt || "";
+      const liveEventType = String(payload?.match?.lastLiveEvent?.type || "");
+
       startTransition(() => {
         setData(payload);
         setStreamError("");
+        if (liveEventType === "walkie_enabled") {
+          setSharedWalkieEnabled(true);
+        } else if (liveEventType === "walkie_disabled") {
+          setSharedWalkieEnabled(false);
+          setSpectatorWalkieEnabled(false);
+        }
       });
     },
     onError: () => {
@@ -267,7 +276,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     role: "spectator",
     displayName: sessionData?.name ? `${sessionData.name} Spectator` : "Spectator",
     autoConnectAudio: spectatorWalkieEnabled,
-    signalingActive: Boolean(match?._id && isLiveMatch),
+    signalingActive: Boolean(match?._id && isLiveMatch && (sharedWalkieEnabled || spectatorWalkieEnabled)),
   });
 
   const speakSequenceWithDuck = useCallback(
@@ -351,6 +360,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     announcerAutoEnabledMatchRef.current = "";
     announcerInitialSummaryRef.current = "";
     queueMicrotask(() => {
+      setSharedWalkieEnabled(false);
       setSpectatorWalkieEnabled(false);
       setLocalWalkieNotice("");
       setQuickWalkieTalking(false);
@@ -358,6 +368,44 @@ export default function SessionViewClient({ sessionId, initialData }) {
     clearAnnouncementTimers();
     stop();
   }, [clearAnnouncementTimers, match?._id, stop]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSharedWalkieState() {
+      if (!match?._id || !isLiveMatch) {
+        setSharedWalkieEnabled(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/matches/${match._id}/walkie`, {
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = await response.json().catch(() => null);
+        if (cancelled) {
+          return;
+        }
+
+        const nextEnabled = Boolean(payload?.walkie?.enabled);
+        setSharedWalkieEnabled(nextEnabled);
+        if (!nextEnabled) {
+          setSpectatorWalkieEnabled(false);
+        }
+      } catch {
+      }
+    }
+
+    void loadSharedWalkieState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLiveMatch, match?._id]);
 
   useEffect(() => {
     if (!match?._id || !isLiveMatch) {

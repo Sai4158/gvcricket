@@ -1,13 +1,15 @@
+import nextDynamic from "next/dynamic";
 import Image from "next/image";
-import CommunityHighlightsSection from "./components/home/CommunityHighlightsSection";
 import BackToTopButton from "./components/home/BackToTopButton";
 import HeroSection from "./components/home/HeroSection";
 import HomeHeader from "./components/home/HomeHeader";
-import HowItWorksSection from "./components/home/HowItWorksSection";
-import LearnCricketCard from "./components/home/LearnCricketCard";
 import PrimaryActionsSection from "./components/home/PrimaryActionsSection";
 import { absoluteUrl, siteConfig } from "./lib/site-metadata";
 import { loadHomeLiveBannerData } from "./lib/server-data";
+
+const HowItWorksSection = nextDynamic(() => import("./components/home/HowItWorksSection"), { ssr: true });
+const CommunityHighlightsSection = nextDynamic(() => import("./components/home/CommunityHighlightsSection"), { ssr: true });
+const LearnCricketCard = nextDynamic(() => import("./components/home/LearnCricketCard"), { ssr: true });
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

@@ -56,17 +56,13 @@ export default function AnimatedSection({
     >
       {!shouldReduceMotion ? (
         <>
-          <motion.div
+          <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-[8%] top-4 z-0 h-28 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.09)_0%,rgba(168,85,247,0.08)_32%,rgba(14,165,233,0.06)_54%,transparent_76%)] blur-3xl"
-            animate={{ opacity: [0.12, 0.2, 0.14] }}
-            transition={{ duration: 7.5, repeat: Infinity, ease: "easeInOut" }}
+            className="home-ambient-glow home-ambient-glow-primary pointer-events-none absolute inset-x-[8%] top-4 z-0 h-28 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.09)_0%,rgba(168,85,247,0.08)_32%,rgba(14,165,233,0.06)_54%,transparent_76%)] blur-3xl"
           />
-          <motion.div
+          <div
             aria-hidden="true"
-            className="pointer-events-none absolute bottom-0 left-[8%] z-0 h-24 w-40 rounded-full bg-[radial-gradient(circle,rgba(251,191,36,0.08)_0%,rgba(255,255,255,0.04)_44%,transparent_74%)] blur-3xl"
-            animate={{ opacity: [0.08, 0.14, 0.1] }}
-            transition={{ duration: 8.2, repeat: Infinity, ease: "easeInOut" }}
+            className="home-ambient-glow home-ambient-glow-secondary pointer-events-none absolute bottom-0 left-[8%] z-0 h-24 w-40 rounded-full bg-[radial-gradient(circle,rgba(251,191,36,0.08)_0%,rgba(255,255,255,0.04)_44%,transparent_74%)] blur-3xl"
           />
         </>
       ) : null}

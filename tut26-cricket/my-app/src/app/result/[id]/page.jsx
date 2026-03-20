@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import ResultPageClient from "../../components/result/ResultPageClient";
 import {
   absoluteUrl,
@@ -11,6 +12,16 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }) {
   const { id } = await params;
   const match = await loadPublicMatchData(id);
+  if (!match) {
+    return {
+      title: "Result Not Found",
+      description: "This match result could not be found.",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
   const matchup = getMatchupLabel({
     sessionName: "",
     teamAName: match?.teamAName,
@@ -43,6 +54,9 @@ export async function generateMetadata({ params }) {
 export default async function ResultPage({ params }) {
   const { id } = await params;
   const initialMatch = await loadPublicMatchData(id);
+  if (!initialMatch) {
+    notFound();
+  }
 
   return <ResultPageClient matchId={id} initialMatch={initialMatch} />;
 }

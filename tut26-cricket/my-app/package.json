@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "tsx --test tests",
-    "typecheck": "next typegen && tsc --noEmit --incremental false"
+    "typecheck": "node scripts/typecheck.mjs"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^4.22.0",

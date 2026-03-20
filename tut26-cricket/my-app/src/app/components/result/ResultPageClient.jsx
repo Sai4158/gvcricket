@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { FaArrowLeft, FaImage } from "react-icons/fa";
 import useEventSource from "../live/useEventSource";
+import LiquidSportText from "../home/LiquidSportText";
 import MatchHeroBackdrop from "../match/MatchHeroBackdrop";
 import MatchImageUploader from "../match/MatchImageUploader";
 import { ModalBase } from "../match/MatchBaseModals";
@@ -192,7 +193,6 @@ export default function ResultPageClient({ matchId, initialMatch }) {
                     }}
                   />
                 ))}
-                <div className="absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.18))]" />
               </div>
             ) : null}
             <header className="text-center space-y-4">
@@ -200,9 +200,13 @@ export default function ResultPageClient({ matchId, initialMatch }) {
                 <p className="text-xs font-semibold uppercase tracking-[0.35em] text-amber-300/90">
                   Match Complete
                 </p>
-                <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
-                  Match Result
-                </h1>
+                <LiquidSportText
+                  as="h1"
+                  text="MATCH RESULT"
+                  variant="hero-bright"
+                  simplifyMotion
+                  className="text-4xl font-extrabold tracking-tight sm:text-5xl"
+                />
                 <p className="text-sm text-zinc-300">
                   {match.innings1.team} vs {match.innings2.team}
                 </p>

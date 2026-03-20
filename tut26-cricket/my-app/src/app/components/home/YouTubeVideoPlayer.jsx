@@ -81,6 +81,8 @@ export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
               src={thumbnailUrl}
               alt={title}
               loading="lazy"
+              decoding="async"
+              fetchPriority="low"
               className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.035]"
             />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(0,0,0,0.4))]" />

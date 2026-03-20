@@ -23,21 +23,11 @@ const sectionVariants = {
 };
 
 const cardVariants = {
-  hidden: (index) => ({
+  hidden: () => ({
     opacity: 0,
-    scale: 0.985,
-    x: index % 2 === 0 ? -34 : 34,
-    y: 20,
-    rotate: index % 2 === 0 ? -0.8 : 0.8,
-    filter: "blur(6px)",
   }),
   visible: {
     opacity: 1,
-    scale: 1,
-    x: 0,
-    y: 0,
-    rotate: 0,
-    filter: "blur(0px)",
     transition: {
       duration: 0.68,
       ease: [0.22, 1, 0.36, 1],
@@ -334,12 +324,12 @@ export default function PrimaryActionsSection() {
         initial={
           shouldReduceMotion
               ? false
-              : { opacity: 0, x: -38, y: 16, scale: 0.988, filter: "blur(6px)" }
+              : { opacity: 0 }
         }
         whileInView={
           shouldReduceMotion
               ? undefined
-              : { opacity: 1, x: 0, y: 0, scale: 1, filter: "blur(0px)" }
+              : { opacity: 1 }
         }
           viewport={{ once: true, amount: 0.16, margin: "0px 0px -6% 0px" }}
           transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}

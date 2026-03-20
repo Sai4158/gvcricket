@@ -16,18 +16,18 @@ export default function CongratulationsCard({ result }) {
       initial={{ opacity: 0, y: -50 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="relative overflow-hidden rounded-[28px] border border-amber-200/20 bg-[linear-gradient(180deg,#f6b400_0%,#e39d00_100%)] px-6 py-8 text-center text-white shadow-[0_28px_80px_rgba(217,144,10,0.22)] sm:px-8 sm:py-10"
+      className="relative overflow-hidden rounded-[28px] border border-amber-200/20 bg-[linear-gradient(180deg,#f6b400_0%,#e39d00_100%)] px-6 py-8 text-white shadow-[0_28px_80px_rgba(217,144,10,0.22)] sm:px-8 sm:py-10"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.24),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.08),transparent_40%)]" />
-      <div className="relative z-10 mx-auto max-w-xl">
-        <FaTrophy className="mx-auto mb-4 text-5xl text-yellow-100 sm:text-6xl" />
-        <h2 className="text-4xl font-black tracking-[-0.04em] text-yellow-50 sm:text-5xl">
-          Congratulations,
+      <div className="relative z-10 mx-auto max-w-[22rem] text-center">
+        <FaTrophy className="mx-auto mb-4 text-5xl text-yellow-50 sm:text-6xl" />
+        <h2 className="mx-auto max-w-[12ch] text-[2rem] font-black uppercase leading-[0.95] tracking-[-0.05em] text-white [text-shadow:0_1px_0_rgba(255,255,255,0.16),0_0_18px_rgba(255,255,255,0.12)] sm:text-[2.65rem]">
+          Congratulations
         </h2>
-        <p className="mt-3 text-4xl font-black tracking-[-0.04em] text-white sm:text-5xl">
+        <p className="mx-auto mt-3 max-w-[10ch] text-[2.15rem] font-black uppercase leading-[0.95] tracking-[-0.05em] text-rose-100 [text-shadow:0_1px_0_rgba(255,255,255,0.18),0_0_20px_rgba(251,113,133,0.2)] sm:text-[3rem]">
           {winnerName}
         </p>
-        <p className="mt-4 text-2xl font-semibold text-yellow-50 sm:text-3xl">
+        <p className="mt-4 text-center text-2xl font-semibold text-white/95 sm:text-3xl">
           {summaryText}
         </p>
       </div>

@@ -28,6 +28,7 @@ import {
   FaVolumeUp,
   FaWifi,
 } from "react-icons/fa";
+import LiquidSportText from "../home/LiquidSportText";
 import SessionCoverHero from "../shared/SessionCoverHero";
 import LoadingButton from "../shared/LoadingButton";
 import DirectorSessionPicker from "./DirectorSessionPicker";
@@ -2126,9 +2127,13 @@ export default function DirectorConsoleClient({
                   <div className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-emerald-400/20 bg-emerald-500/12 text-emerald-300 shadow-[0_0_30px_rgba(16,185,129,0.15)]">
                     <FaBroadcastTower className="text-xl" />
                   </div>
-                  <h1 className="text-2xl font-semibold tracking-[-0.03em] text-white sm:text-[2rem]">
-                    Director Console
-                  </h1>
+                  <LiquidSportText
+                    as="h1"
+                    text="DIRECTOR CONSOLE"
+                    variant="hero-bright"
+                    simplifyMotion
+                    className="text-2xl font-semibold tracking-[-0.03em] sm:text-[2rem]"
+                  />
                 </div>
                 {authError ? (
                   <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
@@ -2842,14 +2847,14 @@ export default function DirectorConsoleClient({
             title="Audio output"
             subtitle="Current playback route"
             icon={<FaHeadphones />}
-            accent="violet"
+            accent="amber"
             help={{
               title: "Audio output",
               body: "This shows where your audio is playing. Connect the phone to a Bluetooth speaker first for louder PA playback.",
             }}
           >
             <div className="space-y-4">
-              <div className="rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.14),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.12),transparent_36%),linear-gradient(180deg,rgba(24,12,38,0.28),rgba(0,0,0,0.2))] px-4 py-4">
+              <div className="rounded-[24px] border border-rose-300/16 bg-[radial-gradient(circle_at_top_left,rgba(251,113,133,0.18),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(239,68,68,0.16),transparent_36%),linear-gradient(180deg,rgba(52,18,24,0.34),rgba(18,6,10,0.22))] px-4 py-4">
                 <p className="text-sm font-semibold text-white">How to use it</p>
                 <ul className="mt-3 space-y-2 text-sm leading-6 text-zinc-300">
                   <li>1. Connect your phone to a Bluetooth speaker.</li>

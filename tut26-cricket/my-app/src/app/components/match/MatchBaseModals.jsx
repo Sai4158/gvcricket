@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { FaTimes } from "react-icons/fa";
+import LiquidSportText from "../home/LiquidSportText";
 import LoadingButton from "../shared/LoadingButton";
 import { Ball } from "./MatchBallHistory";
 import MatchImageUploader from "./MatchImageUploader";
@@ -55,7 +56,13 @@ export function ModalBase({
       >
         {!hideHeader ? (
           <div className="sticky top-0 z-10 border-b border-white/6 bg-zinc-900/95 px-5 pb-3 pt-5 backdrop-blur">
-            <h2 className="text-center text-2xl font-bold text-white">{title}</h2>
+            <LiquidSportText
+              as="h2"
+              text={String(title || "").toUpperCase()}
+              variant="hero-bright"
+              simplifyMotion
+              className="text-center text-2xl font-bold"
+            />
           </div>
         ) : null}
         <div className={bodyClasses}>
@@ -249,9 +256,13 @@ export function InningsEndModal({ match, onNext }) {
               <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-emerald-200/78">
                 Winning Result
               </p>
-              <h3 className="mt-3 text-[2rem] font-black uppercase tracking-[-0.05em] text-white sm:text-[2.3rem]">
-                {winnerName || "MATCH WON"}
-              </h3>
+              <LiquidSportText
+                as="h3"
+                text={String(winnerName || "MATCH WON").toUpperCase()}
+                variant="hero-bright"
+                simplifyMotion
+                className="mt-3 text-[2rem] font-black tracking-[-0.05em] sm:text-[2.3rem]"
+              />
               <p className="mt-1 text-lg font-semibold text-emerald-300">
                 {match.result}
               </p>
@@ -261,9 +272,13 @@ export function InningsEndModal({ match, onNext }) {
               <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-200/78">
                 Second Innings Ready
               </p>
-              <h3 className="mt-3 text-[1.95rem] font-black uppercase tracking-[-0.05em] text-white sm:text-[2.2rem]">
-                Target {target}
-              </h3>
+              <LiquidSportText
+                as="h3"
+                text={`TARGET ${target}`}
+                variant="hero-bright"
+                simplifyMotion
+                className="mt-3 text-[1.95rem] font-black tracking-[-0.05em] sm:text-[2.2rem]"
+              />
               <p className="mt-1 text-base font-medium text-cyan-200">
                 {firstInningsTeam} posted {firstInningsScore}/{firstInningsOuts}
               </p>

@@ -110,6 +110,7 @@ export default function HomeHeader() {
   const navLinks = [
     { href: "/session/new", text: "Start Match", icon: FaArrowRight },
     { href: "/session", text: "All Sessions" },
+    { href: "/director", text: "Director Mode" },
     { type: "divider" },
     {
       href: "/#updates",
@@ -148,6 +149,9 @@ export default function HomeHeader() {
     }
     if (text === "Start Match") {
       return "Starting new game...";
+    }
+    if (text === "Director Mode") {
+      return "Opening director mode...";
     }
     return "Opening...";
   };

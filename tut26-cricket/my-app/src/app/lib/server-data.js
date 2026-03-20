@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { isValidObjectId } from "mongoose";
 import Match from "../../models/Match";
 import Session from "../../models/Session";
 import { connectDB } from "./db";
@@ -111,10 +112,17 @@ export async function loadSessionViewData(sessionId) {
 }
 
 export async function loadPublicMatchData(matchId) {
+  if (!isValidObjectId(matchId)) {
+    return null;
+  }
+
   await connectDB();
   const match = await Match.findById(matchId).lean();
+  if (!match) {
+    return null;
+  }
   const fallbackSession =
-    match && match.sessionId
+    match.sessionId
       ? await Session.findById(match.sessionId)
           .select("tossWinner tossDecision teamAName teamBName teamA teamB")
           .lean()

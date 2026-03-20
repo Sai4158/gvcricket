@@ -443,6 +443,28 @@ button:disabled,
   }
 }
 
+@keyframes home-ambient-glow-primary {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+
+  50% {
+    opacity: 0.2;
+  }
+}
+
+@keyframes home-ambient-glow-secondary {
+  0%,
+  100% {
+    opacity: 0.08;
+  }
+
+  50% {
+    opacity: 0.14;
+  }
+}
+
 .pending-shimmer {
   position: relative;
   overflow: hidden;
@@ -463,6 +485,22 @@ button:disabled,
   background-size: 220% 100%;
   animation: soft-pulse-shimmer 1.4s linear infinite;
   pointer-events: none;
+}
+
+.home-ambient-glow {
+  will-change: opacity;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.home-ambient-glow-primary {
+  animation-name: home-ambient-glow-primary;
+  animation-duration: 7.5s;
+}
+
+.home-ambient-glow-secondary {
+  animation-name: home-ambient-glow-secondary;
+  animation-duration: 8.2s;
 }
 
 .liquid-glass {

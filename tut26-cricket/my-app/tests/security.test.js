@@ -883,9 +883,12 @@ test("sensitive image moderation flags explicit predictions and allows neutral o
 
 test("middleware adds core security headers", () => {
   const response = middleware();
+  const contentSecurityPolicy = response.headers.get("content-security-policy") || "";
   assert.equal(response.headers.get("x-frame-options"), "DENY");
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
-  assert.match(response.headers.get("content-security-policy"), /frame-ancestors 'none'/);
+  assert.match(contentSecurityPolicy, /frame-ancestors 'none'/);
+  assert.match(contentSecurityPolicy, /wss:\/\/\*\.edge\.agora\.io:\*/);
+  assert.match(contentSecurityPolicy, /wss:\/\/\*\.edge\.sd-rtn\.com:\*/);
   assert.match(response.headers.get("permissions-policy"), /camera=\(\)/);
 });
 
