@@ -859,7 +859,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         setLocalWalkieNotice("");
         setActivePanel((current) => (current === "walkie" ? null : current));
         walkie.dismissNotice();
-        await walkie.deactivateAudio();
+        await walkie.deactivateAudio({ restartSignaling: true });
         return;
       }
 

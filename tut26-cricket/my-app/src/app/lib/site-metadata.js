@@ -4,7 +4,7 @@ export const siteConfig = {
   url: "https://www.gvcricket.com",
   logoPath: "/gvLogo.png",
   shareLogoPath: "/gvLogo.png",
-  socialImageVersion: "2026-03-20-logo",
+  socialImageVersion: "2026-03-21-gvLogo",
   description:
     "GV Cricket is a live cricket scoring app with umpire mode, spectator scoreboards, director controls, walkie-talkie, loudspeaker, match images, and instant results in one fast mobile flow.",
   defaultTitle:
@@ -26,8 +26,8 @@ export const siteConfig = {
     "cricket scoring app for umpires and spectators",
     "mobile cricket scoring app",
   ],
-  ogImagePath: "/opengraph-image?v=2026-03-20-logo",
-  twitterImagePath: "/twitter-image?v=2026-03-20-logo",
+  ogImagePath: "/opengraph-image?v=2026-03-21-gvLogo",
+  twitterImagePath: "/twitter-image?v=2026-03-21-gvLogo",
 };
 
 function normalizeSiteUrl(value = "") {

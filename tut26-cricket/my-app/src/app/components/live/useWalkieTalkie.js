@@ -44,6 +44,7 @@ const SIGNALING_RETRY_MAX_MS = 12000;
 const SIGNALING_RETRY_COOLDOWN_MS = 45000;
 const SIGNALING_MAX_RECOVERABLE_RETRIES = 4;
 const SIGNALING_SYNC_REQUEST_MIN_GAP_MS = 15000;
+const PRESENCE_REFRESH_DEBOUNCE_MS = 180;
 const AGORA_CHANNEL_NAME_MAX = 64;
 const AGORA_USER_ID_MAX = 64;
 const TALK_RETRY_MESSAGES = [
@@ -393,16 +394,14 @@ export function shouldMaintainWalkieAudioTransport({
   if (!enabled || !snapshot?.enabled || !participantId || !hasWalkieToken) {
     return false;
   }
+  const remoteSpeakerActive = shouldReceiveWalkieAudio({ participantId, snapshot });
   if (manualAudioReady || isSelfTalking || isFinishing) {
     return true;
   }
-  if (autoConnectAudio) {
+  if (autoConnectAudio && remoteSpeakerActive) {
     return true;
   }
-  if (
-    listeningGraceActive &&
-    shouldReceiveWalkieAudio({ participantId, snapshot })
-  ) {
+  if (listeningGraceActive) {
     return true;
   }
   return false;
@@ -487,6 +486,9 @@ export default function useWalkieTalkie({
   const audioRetryTimerRef = useRef(null);
   const signalingRetryTimerRef = useRef(null);
   const remoteAudioLingerTimerRef = useRef(null);
+  const presenceRefreshTimerRef = useRef(null);
+  const presenceRefreshInFlightRef = useRef(false);
+  const presenceRefreshPendingRef = useRef(false);
   const mountedRef = useRef(false);
   const shouldMaintainSignalingRef = useRef(false);
   const signalingPropActiveRef = useRef(Boolean(signalingActive));
@@ -720,6 +722,18 @@ export default function useWalkieTalkie({
     rtcSessionIdRef.current = next;
     return next;
   }, [ensureParticipantId, matchId, role]);
+
+  const resetRtcSessionForReload = useCallback(() => {
+    const participant = participantIdRef.current || ensureParticipantId();
+    if (!matchId || !role || !participant) {
+      return;
+    }
+
+    clearStoredWalkieToken("rtc", matchId, role, participant);
+    rtcTokenRef.current = null;
+    rtcTokenPromiseRef.current = null;
+    rotateRtcSessionId();
+  }, [ensureParticipantId, matchId, role, rotateRtcSessionId]);
 
   const ensureAudioUnlock = useCallback(async () => {
     if (!isSafari) return true;
@@ -1174,6 +1188,39 @@ export default function useWalkieTalkie({
     [applyPresenceSnapshot]
   );
 
+  const schedulePresenceRefresh = useCallback(
+    (client = rtmClientRef.current, delayMs = PRESENCE_REFRESH_DEBOUNCE_MS) => {
+      if (!client || !signalingChannelRef.current) {
+        return;
+      }
+
+      presenceRefreshPendingRef.current = true;
+      if (presenceRefreshTimerRef.current) {
+        return;
+      }
+
+      presenceRefreshTimerRef.current = window.setTimeout(async () => {
+        presenceRefreshTimerRef.current = null;
+        if (presenceRefreshInFlightRef.current) {
+          schedulePresenceRefresh(client, delayMs);
+          return;
+        }
+
+        presenceRefreshPendingRef.current = false;
+        presenceRefreshInFlightRef.current = true;
+        try {
+          await refreshPresenceSnapshot(client);
+        } finally {
+          presenceRefreshInFlightRef.current = false;
+          if (presenceRefreshPendingRef.current) {
+            schedulePresenceRefresh(client, delayMs);
+          }
+        }
+      }, Math.max(0, Number(delayMs || 0)));
+    },
+    [refreshPresenceSnapshot]
+  );
+
   const refreshRuntimeState = useCallback(
     async (client = rtmClientRef.current) => {
       try {
@@ -1272,7 +1319,7 @@ export default function useWalkieTalkie({
             );
             return;
           }
-          void refreshPresenceSnapshot(client);
+          schedulePresenceRefresh(client);
         };
 
         const onLock = () => {};
@@ -1537,9 +1584,9 @@ export default function useWalkieTalkie({
     ensureParticipantId,
     fetchSignalingToken,
     matchId,
-    refreshPresenceSnapshot,
     refreshRuntimeState,
     role,
+    schedulePresenceRefresh,
     scheduleRequestReset,
     syncSnapshot,
     updateNotice,
@@ -1605,6 +1652,9 @@ export default function useWalkieTalkie({
       return;
     }
     clearTimer(requestResetRef);
+    clearTimer(presenceRefreshTimerRef);
+    presenceRefreshInFlightRef.current = false;
+    presenceRefreshPendingRef.current = false;
     signalingGenerationRef.current += 1;
     const cleanupTask = (async () => {
       const client = rtmClientRef.current;
@@ -2250,12 +2300,41 @@ export default function useWalkieTalkie({
     }
   }, [enableManualSignaling, ensureAudioUnlock, joinRtc, participantId]);
 
-  const deactivateAudio = useCallback(async () => {
+  const deactivateAudio = useCallback(async ({ restartSignaling = false } = {}) => {
+    clearTimer(audioRetryTimerRef);
+    clearTimer(signalingRetryTimerRef);
+    clearTimer(remoteAudioLingerTimerRef);
+    cancelPendingStartRef.current = true;
     setManualAudioReady(false);
     setManualSignalingActive(false);
+    setListeningGraceActive(false);
+    setRecoveringAudio(false);
+    setRecoveringSignaling(Boolean(restartSignaling));
+    setError("");
+    if (noticeRef.current && TALK_RETRY_MESSAGES.includes(noticeRef.current)) {
+      updateNotice("");
+    }
     await stopTalking("deactivated");
     await cleanupTransport();
-  }, [cleanupTransport, setManualSignalingActive, stopTalking]);
+    resetRtcSessionForReload();
+    if (!restartSignaling) {
+      return;
+    }
+
+    await cleanupSignaling();
+    if (mountedRef.current && shouldMaintainSignalingRef.current) {
+      setSignalingReconnectTick((current) => current + 1);
+      return;
+    }
+    setRecoveringSignaling(false);
+  }, [
+    cleanupSignaling,
+    cleanupTransport,
+    resetRtcSessionForReload,
+    setManualSignalingActive,
+    stopTalking,
+    updateNotice,
+  ]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -2328,6 +2407,9 @@ export default function useWalkieTalkie({
       clearTimer(cooldownTimerRef, window.clearInterval);
       clearTimer(requestResetRef);
       clearTimer(signalingRetryTimerRef);
+      clearTimer(presenceRefreshTimerRef);
+      presenceRefreshInFlightRef.current = false;
+      presenceRefreshPendingRef.current = false;
       void cleanupTransport();
       void cleanupSignaling();
       return;
@@ -2512,16 +2594,28 @@ export default function useWalkieTalkie({
   ]);
 
   useEffect(() => {
-    if (!enabled || !participantId || !shouldMaintainAudioTransport) {
+    const shouldPrefetchRtcToken = Boolean(
+      enabled &&
+        participantId &&
+        snapshot.enabled &&
+        hasWalkieToken &&
+        (autoConnectAudio || manualAudioReady || canTalk)
+    );
+
+    if (!shouldPrefetchRtcToken) {
       return;
     }
 
     void fetchRtcToken().catch(() => {});
   }, [
+    autoConnectAudio,
+    canTalk,
     enabled,
     fetchRtcToken,
+    hasWalkieToken,
+    manualAudioReady,
     participantId,
-    shouldMaintainAudioTransport,
+    snapshot.enabled,
   ]);
 
   useEffect(() => {
@@ -2643,14 +2737,38 @@ export default function useWalkieTalkie({
     }
 
     const onPageHide = () => {
+      resetRtcSessionForReload();
       if (isSelfTalking || isFinishing) {
         void stopTalking("backgrounded");
+        return;
       }
+      void cleanupTransport();
+      void cleanupSignaling();
     };
 
     window.addEventListener("pagehide", onPageHide);
     return () => window.removeEventListener("pagehide", onPageHide);
-  }, [isFinishing, isSelfTalking, stopTalking]);
+  }, [
+    cleanupSignaling,
+    cleanupTransport,
+    isFinishing,
+    isSelfTalking,
+    resetRtcSessionForReload,
+    stopTalking,
+  ]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const onBeforeUnload = () => {
+      resetRtcSessionForReload();
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [resetRtcSessionForReload]);
 
   useEffect(
     () => () => {
@@ -2658,6 +2776,7 @@ export default function useWalkieTalkie({
       clearTimer(audioRetryTimerRef);
       clearTimer(signalingRetryTimerRef);
       clearTimer(remoteAudioLingerTimerRef);
+      clearTimer(presenceRefreshTimerRef);
       void cleanupTransport();
       void cleanupSignaling();
     },
