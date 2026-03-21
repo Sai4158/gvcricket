@@ -198,6 +198,7 @@ const HOLD_BUTTON_INTERACTION_PROPS = {
 };
 
 const ANNOUNCER_AUTO_RESET_DELAY_MS = 1500;
+const ANNOUNCER_GESTURE_READ_DELAY_MS = 2000;
 
 export default function SessionViewClient({ sessionId, initialData }) {
   const [copied, setCopied] = useState(false);
@@ -225,6 +226,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const announcerAutoEnabledMatchRef = useRef("");
   const announcerInitialSummaryRef = useRef("");
   const announcerGestureReplayRef = useRef("");
+  const announcerAutoReadTimerRef = useRef(null);
   const router = useRouter();
   const sessionData = data?.session;
   const match = data?.match;
@@ -355,6 +357,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
   }, []);
 
   useEffect(() => {
+    if (announcerAutoReadTimerRef.current) {
+      window.clearTimeout(announcerAutoReadTimerRef.current);
+      announcerAutoReadTimerRef.current = null;
+    }
     if (announcerResetTimerRef.current) {
       window.clearTimeout(announcerResetTimerRef.current);
       announcerResetTimerRef.current = null;
@@ -514,7 +520,54 @@ export default function SessionViewClient({ sessionId, initialData }) {
     if (
       !announcerEnabled ||
       !initialSummaryKey ||
-      announcerStatus !== "waiting_for_gesture" ||
+      announcerInitialSummaryRef.current === initialSummaryKey
+    ) {
+      return undefined;
+    }
+
+    if (announcerAutoReadTimerRef.current) {
+      window.clearTimeout(announcerAutoReadTimerRef.current);
+      announcerAutoReadTimerRef.current = null;
+    }
+
+    announcerAutoReadTimerRef.current = window.setTimeout(() => {
+      announcerAutoReadTimerRef.current = null;
+      if (announcerInitialSummaryRef.current === initialSummaryKey) {
+        return;
+      }
+      const spoke = announceCurrentScore({ interrupt: true });
+      if (spoke) {
+        announcerInitialSummaryRef.current = initialSummaryKey;
+      }
+    }, ANNOUNCER_GESTURE_READ_DELAY_MS);
+
+    return () => {
+      if (announcerAutoReadTimerRef.current) {
+        window.clearTimeout(announcerAutoReadTimerRef.current);
+        announcerAutoReadTimerRef.current = null;
+      }
+    };
+  }, [
+    announceCurrentScore,
+    currentLiveEventId,
+    isLiveMatch,
+    match,
+    settings.enabled,
+    settings.mode,
+  ]);
+
+  useEffect(() => {
+    const announcerEnabled = Boolean(
+      match && isLiveMatch && settings.enabled && settings.mode !== "silent"
+    );
+    const initialSummaryKey = match?._id
+      ? `${match._id}:${currentLiveEventId || "snapshot"}`
+      : "";
+
+    if (
+      !announcerEnabled ||
+      !initialSummaryKey ||
+      announcerInitialSummaryRef.current === initialSummaryKey ||
       announcerGestureReplayRef.current === initialSummaryKey
     ) {
       return undefined;
@@ -525,6 +578,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
         return;
       }
       announcerGestureReplayRef.current = initialSummaryKey;
+      if (announcerAutoReadTimerRef.current) {
+        window.clearTimeout(announcerAutoReadTimerRef.current);
+        announcerAutoReadTimerRef.current = null;
+      }
       prime({ userGesture: true });
       const spoke = announceCurrentScore({ userGesture: true, interrupt: true });
       if (spoke) {
@@ -543,7 +600,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
     };
   }, [
     announceCurrentScore,
-    announcerStatus,
     currentLiveEventId,
     isLiveMatch,
     match,
@@ -635,6 +691,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
   useEffect(() => {
     return () => {
+      if (announcerAutoReadTimerRef.current) {
+        window.clearTimeout(announcerAutoReadTimerRef.current);
+        announcerAutoReadTimerRef.current = null;
+      }
       if (announcerResetTimerRef.current) {
         window.clearTimeout(announcerResetTimerRef.current);
         announcerResetTimerRef.current = null;

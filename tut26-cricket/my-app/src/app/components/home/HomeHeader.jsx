@@ -284,6 +284,7 @@ export default function HomeHeader() {
                               href={link.href}
                               pendingLabel={getPendingLabel(link.text)}
                               pendingClassName="pending-shimmer"
+                              primeAudioOnClick={link.text === "All Sessions"}
                               onClick={(event) =>
                                 handleNavClick(event, link.onClick)
                               }

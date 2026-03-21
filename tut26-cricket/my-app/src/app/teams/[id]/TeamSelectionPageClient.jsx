@@ -20,6 +20,7 @@ import {
   getPendingSessionImage,
   uploadPendingSessionImageToDraftSession,
 } from "../../lib/pending-session-image";
+import { primeUiAudio } from "../../lib/page-audio";
 import StepFlow from "../../components/shared/StepFlow";
 
 export default function TeamSelectionPageClient() {
@@ -130,6 +131,7 @@ export default function TeamSelectionPageClient() {
 
     setIsLoading(true);
     setError("");
+    await primeUiAudio().catch(() => false);
 
     try {
       const response = await fetch(`/api/sessions/${sessionId}/setup-match`, {

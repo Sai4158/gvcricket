@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { primeUiAudio } from "../../lib/page-audio";
 import InlineSpinner from "./InlineSpinner";
 import { useRouteFeedback } from "./RouteFeedbackProvider";
 
@@ -25,6 +26,7 @@ export default function PendingLink({
   prefetch = false,
   replace = false,
   scroll,
+  primeAudioOnClick = false,
   onClick,
   spinner = null,
   ...props
@@ -47,6 +49,9 @@ export default function PendingLink({
         }
 
         event.preventDefault();
+        if (primeAudioOnClick) {
+          void primeUiAudio().catch(() => {});
+        }
         setPending(true);
         startNavigation(pendingLabel);
 

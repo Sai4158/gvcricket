@@ -224,6 +224,7 @@ export default function PrimaryActionsSection() {
           href="/session"
           pendingLabel="Opening sessions..."
           pendingClassName="pending-shimmer"
+          primeAudioOnClick
           className="block"
         >
           <motion.div

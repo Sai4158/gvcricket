@@ -855,6 +855,14 @@ export default function useSpeechAnnouncer(settings) {
   }, [ensureVoicesReady, queueSequence]);
 
   useEffect(() => {
+    if (!audioUnlocked || isPrimedRef.current || status === "unsupported") {
+      return;
+    }
+
+    prime();
+  }, [audioUnlocked, prime, status]);
+
+  useEffect(() => {
     if (!canUseSpeechSynthesis()) return undefined;
 
     const primeFromGesture = () => {
