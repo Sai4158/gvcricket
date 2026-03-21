@@ -553,22 +553,12 @@ function SessionHeader({
     match?.teamAName && match?.teamBName
       ? `${match.teamAName} vs ${match.teamBName}`
       : session?.teamAName && session?.teamBName
-<<<<<<< Updated upstream
-        ? `${session.teamAName} vs ${session.teamBName}`
-        : "Teams pending";
-=======
-<<<<<<< Updated upstream
-      ? `${session.teamAName} vs ${session.teamBName}`
-      : "Teams pending";
-=======
         ? `${session.teamAName} vs ${session.teamBName}`
         : "Teams pending";
   const score = Number(match?.score || 0);
   const outs = Number(match?.outs || 0);
   const oversDisplay = getDirectorOversDisplay(match);
   const chaseSummary = getDirectorChaseSummary(match);
->>>>>>> Stashed changes
->>>>>>> Stashed changes
 
   return (
     <SessionCoverHero
@@ -581,17 +571,8 @@ function SessionHeader({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 text-center sm:text-left">
             <div className="mb-2 flex items-center justify-center gap-2 sm:justify-start">
-<<<<<<< Updated upstream
-              {match?.isOngoing && !match?.result ? (
-<<<<<<< Updated upstream
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/8 px-3 py-1 text-xs font-medium text-white">
-=======
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.08] px-3 py-1 text-xs font-medium text-white">
-=======
               {isLive ? (
                 <span className="inline-flex items-center gap-2 rounded-full bg-white/8 px-3 py-1 text-xs font-medium text-white">
->>>>>>> Stashed changes
->>>>>>> Stashed changes
                   <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                   Live
                 </span>
@@ -626,23 +607,6 @@ function SessionHeader({
           </div>
         </div>
 
-<<<<<<< Updated upstream
-        <div className="rounded-3xl border border-white/10 bg-black/30 px-4 py-4">
-          <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">
-            Score
-          </p>
-=======
-<<<<<<< Updated upstream
-        <div className="rounded-[24px] border border-white/10 bg-black/30 px-4 py-4">
-          <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">Score</p>
->>>>>>> Stashed changes
-          <p className="mt-2 text-xl font-semibold text-white sm:text-2xl">
-            {buildDirectorScoreLine(match)}
-          </p>
-          <p className="mt-1 text-sm text-emerald-200">
-            {match?.result ? "Match finished" : "Managing live"}
-          </p>
-=======
         <div className="rounded-3xl border border-white/10 bg-black/30 px-4 py-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -677,7 +641,6 @@ function SessionHeader({
                   : "Waiting for live updates"}
             </span>
           </div>
->>>>>>> Stashed changes
         </div>
       </div>
     </SessionCoverHero>
@@ -757,22 +720,13 @@ export default function DirectorConsoleClient({
   const musicEffectDuckFactorRef = useRef(1);
   const musicDuckAnimationFrameRef = useRef(0);
   const ambientAudioSessionTypeRef = useRef("");
-<<<<<<< Updated upstream
-=======
-<<<<<<< Updated upstream
-=======
   const lastDirectorAnnouncedLiveEventRef = useRef("");
   const pendingDirectorAnnouncementRef = useRef(null);
->>>>>>> Stashed changes
   const libraryPointerDragRef = useRef({
     pointerId: null,
     activeId: "",
     targetId: "",
   });
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
->>>>>>> Stashed changes
   const [speechSettings, setSpeechSettings] = useState(createSpeechSettings);
   const speech = useSpeechAnnouncer(speechSettings);
   const micMonitor = useLocalMicMonitor();
@@ -1047,49 +1001,14 @@ export default function DirectorConsoleClient({
     if (!authorized) {
       return [];
     }
-
-<<<<<<< Updated upstream
-    const cachedSessions = readCachedDirectorSessions();
-    if (cachedSessions.length) {
-      setSessions((current) => (current.length ? current : cachedSessions));
-      const cachedLiveSessionId = getPreferredLiveSessionId(
-        cachedSessions,
-        preferredSessionIdRef.current,
-      );
-      if (cachedLiveSessionId) {
-        setSelectedSessionId((current) => current || cachedLiveSessionId);
-      }
-    }
-
-    let cancelled = false;
-
-    void (async () => {
-<<<<<<< Updated upstream
-      const response = await fetch("/api/director/sessions", {
-        cache: "no-store",
-      });
-=======
-      const response = await fetch("/api/director/sessions", { cache: "no-store" });
-=======
     try {
       const response = await fetch("/api/director/sessions", {
         cache: "no-store",
       });
->>>>>>> Stashed changes
->>>>>>> Stashed changes
       const payload = await response.json().catch(() => ({ sessions: [] }));
       if (!response.ok) {
         return [];
       }
-
-<<<<<<< Updated upstream
-      const nextSessions = Array.isArray(payload.sessions)
-        ? payload.sessions
-        : [];
-=======
-<<<<<<< Updated upstream
-      const nextSessions = Array.isArray(payload.sessions) ? payload.sessions : [];
-=======
       const nextSessions = Array.isArray(payload.sessions)
         ? payload.sessions
         : [];
@@ -1100,9 +1019,6 @@ export default function DirectorConsoleClient({
             (item) => item.session?._id === managedSessionId && item.isLive,
           ),
       );
-
->>>>>>> Stashed changes
->>>>>>> Stashed changes
       writeCachedDirectorSessions(nextSessions);
       setSessions(nextSessions);
 
