@@ -26,6 +26,7 @@ export default function TossStatePanels({
   status,
   countdown,
   teamName,
+  tossChoicePrompt,
   tossResult,
   isSubmitting,
   onChoice,
@@ -78,7 +79,9 @@ export default function TossStatePanels({
           >
             <div className="text-center">
               <h2 className="text-[2.15rem] font-semibold tracking-tight text-white">{teamName}</h2>
-              <p className="mt-2 text-sm text-zinc-400">Choose heads or tails.</p>
+              <p className="mt-2 text-sm text-zinc-400">
+                {tossChoicePrompt || "What do you want to choose, heads or tails?"}
+              </p>
             </div>
 
             <div className="py-8 flex justify-center">
@@ -164,6 +167,9 @@ export default function TossStatePanels({
               </h2>
               <p className="mt-2 text-sm text-zinc-400">
                 Landed on <span className="capitalize text-white">{side}</span>.
+              </p>
+              <p className="mt-2 text-sm text-zinc-300">
+                Do you want to bat or bowl first?
               </p>
             </div>
 

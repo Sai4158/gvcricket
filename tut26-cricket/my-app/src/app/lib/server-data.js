@@ -95,16 +95,21 @@ export async function loadSessionsIndexData() {
 }
 
 export async function loadSessionViewData(sessionId) {
+  if (!isValidObjectId(sessionId)) {
+    return { found: false, session: null, match: null, updatedAt: "" };
+  }
+
   await connectDB();
 
   const session = await Session.findById(sessionId).lean();
   if (!session) {
-    return { session: null, match: null, updatedAt: "" };
+    return { found: false, session: null, match: null, updatedAt: "" };
   }
 
   const match = await findMatchForSession(session);
 
   return {
+    found: true,
     session: serializePublicSession(session),
     match: serializePublicMatch(match, session),
     updatedAt: new Date(match?.updatedAt || session.updatedAt || Date.now()).toISOString(),
@@ -131,6 +136,17 @@ export async function loadPublicMatchData(matchId) {
 }
 
 export async function loadTossPageData(matchId) {
+  if (!isValidObjectId(matchId)) {
+    return {
+      found: false,
+      authStatus: "locked",
+      match: null,
+      sessionId: "",
+      hasCreatedMatch: false,
+      actualMatchId: "",
+    };
+  }
+
   await connectDB();
   const match = await Match.findById(matchId)
     .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
@@ -146,6 +162,7 @@ export async function loadTossPageData(matchId) {
     );
 
       return {
+        found: true,
         authStatus: authorized ? "granted" : "locked",
         match: serializePublicMatch(match, null, {
           includeActionHistory: true,
@@ -161,7 +178,14 @@ export async function loadTossPageData(matchId) {
     .lean();
 
   if (!session) {
-    return { authStatus: "locked", match: null, sessionId: "", hasCreatedMatch: false, actualMatchId: "" };
+    return {
+      found: false,
+      authStatus: "locked",
+      match: null,
+      sessionId: "",
+      hasCreatedMatch: false,
+      actualMatchId: "",
+    };
   }
 
   if (session.match) {
@@ -179,6 +203,7 @@ export async function loadTossPageData(matchId) {
       );
 
       return {
+        found: true,
         authStatus: authorized ? "granted" : "locked",
         match: serializePublicMatch(linkedMatch, session, {
           includeActionHistory: true,
@@ -191,6 +216,7 @@ export async function loadTossPageData(matchId) {
   }
 
   return {
+    found: true,
     authStatus: "granted",
     match: {
       _id: String(session._id),
@@ -221,13 +247,17 @@ export async function loadTossPageData(matchId) {
 }
 
 export async function loadMatchAccessData(matchId) {
+  if (!isValidObjectId(matchId)) {
+    return { found: false, authStatus: "locked", match: null };
+  }
+
   await connectDB();
   const match = await Match.findById(matchId)
     .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
     ;
 
   if (!match) {
-    return { authStatus: "locked", match: null };
+    return { found: false, authStatus: "locked", match: null };
   }
 
   const cookieStore = await cookies();
@@ -250,6 +280,7 @@ export async function loadMatchAccessData(matchId) {
   }
 
   return {
+    found: true,
     authStatus: authorized ? "granted" : "locked",
     match: authorized
       ? serializePublicMatch(match, fallbackSession, {

@@ -1,7 +1,7 @@
 import MatchPageClient from "../../components/match/MatchPageClient";
 import { absoluteUrl, siteConfig } from "../../lib/site-metadata";
 import { loadMatchAccessData } from "../../lib/server-data";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +37,11 @@ export const metadata = {
 
 export default async function MatchPage({ params }) {
   const { id } = await params;
-  const { authStatus, match } = await loadMatchAccessData(id);
+  const { found, authStatus, match } = await loadMatchAccessData(id);
+
+  if (!found) {
+    notFound();
+  }
 
   if (authStatus === "granted" && match && !match.tossReady) {
     redirect(`/toss/${id}`);

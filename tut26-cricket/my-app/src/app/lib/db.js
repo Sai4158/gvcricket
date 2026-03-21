@@ -13,7 +13,7 @@ if (!cached) {
   cached = global.mongoose = { conn: null, promise: null };
 }
 
-const DEFAULT_MAX_POOL_SIZE = 5;
+const DEFAULT_MAX_POOL_SIZE = 30;
 const DEFAULT_MAX_IDLE_MS = 20_000;
 const DEFAULT_SERVER_SELECTION_TIMEOUT_MS = 5_000;
 

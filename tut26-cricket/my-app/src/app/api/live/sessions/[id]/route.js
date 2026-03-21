@@ -23,7 +23,7 @@ function sseHeaders() {
   return {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache, no-transform",
-    Connection: "keep-alive",
+    Connection: "close",
     "X-Accel-Buffering": "no",
     "Content-Encoding": "none",
   };
@@ -48,6 +48,7 @@ export async function GET(request, { params }) {
   let didCleanup = false;
   let lastSerializedPayload = "";
   let catchupDone = false;
+  let liveUpdatesReady = false;
 
   const finalize = () => {
     if (didCleanup) {
@@ -112,7 +113,7 @@ export async function GET(request, { params }) {
   };
 
   const scheduleCatchup = (delay = 1200) => {
-    if (closed || catchupDone) {
+    if (closed) {
       return;
     }
     if (catchup) {
@@ -138,7 +139,7 @@ export async function GET(request, { params }) {
     return Match.findOne({ sessionId: session._id }).sort({ updatedAt: -1 }).lean();
   };
 
-  const pushSessionPayload = async () => {
+  const pushSessionPayload = async ({ force = false } = {}) => {
     if (closed) {
       return null;
     }
@@ -170,7 +171,7 @@ export async function GET(request, { params }) {
     };
     const nextSerializedPayload = JSON.stringify(payload);
 
-    if (nextSerializedPayload === lastSerializedPayload) {
+    if (!force && nextSerializedPayload === lastSerializedPayload) {
       return { session, match };
     }
 
@@ -208,16 +209,18 @@ export async function GET(request, { params }) {
   };
 
   const catchupLoop = async () => {
-    if (closed || catchupDone) {
+    if (closed) {
       return;
     }
 
     try {
-      await pushSessionPayload();
+      await pushSessionPayload({ force: !catchupDone });
     } catch (error) {
       console.error("Session SSE catchup failed:", error);
     }
+
     catchupDone = true;
+    scheduleCatchup(liveUpdatesReady ? 12000 : 1000);
   };
 
   void (async () => {
@@ -234,6 +237,7 @@ export async function GET(request, { params }) {
       try {
         await ensureLiveUpdates();
         if (!closed) {
+          liveUpdatesReady = true;
           cleanupSession = subscribeToSession(id, async () => {
             try {
               await pushSessionPayload();
@@ -247,7 +251,7 @@ export async function GET(request, { params }) {
       }
 
       scheduleHeartbeat();
-      scheduleCatchup();
+      scheduleCatchup(liveUpdatesReady ? 12000 : 1200);
     } catch (error) {
       await send("error", { message: "Live updates are temporarily unavailable." });
       await stopStream();

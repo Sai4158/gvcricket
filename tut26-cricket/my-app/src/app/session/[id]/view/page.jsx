@@ -3,9 +3,10 @@ import {
   absoluteUrl,
   getMatchupLabel,
   siteConfig,
+  versionedSocialImagePath,
 } from "../../../lib/site-metadata";
 import { loadSessionViewData } from "../../../lib/server-data";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 const SHARE_IMAGE_SIZE = { width: 1200, height: 630 };
@@ -20,8 +21,12 @@ export async function generateMetadata({ params }) {
     teamAName: match.teamAName || session.teamAName,
     teamBName: match.teamBName || session.teamBName,
   });
-  const shareImageUrl = absoluteUrl(`/session/${id}/view/opengraph-image`);
-  const twitterImageUrl = absoluteUrl(`/session/${id}/view/twitter-image`);
+  const shareImageUrl = absoluteUrl(
+    versionedSocialImagePath(`/session/${id}/view/opengraph-image`)
+  );
+  const twitterImageUrl = absoluteUrl(
+    versionedSocialImagePath(`/session/${id}/view/twitter-image`)
+  );
   const shareImageAlt = `${matchup} live score preview with GV Cricket branding`;
 
   return {
@@ -69,6 +74,10 @@ export async function generateMetadata({ params }) {
 export default async function ViewSessionPage({ params }) {
   const { id } = await params;
   const initialData = await loadSessionViewData(id);
+
+  if (!initialData?.found || !initialData?.session) {
+    notFound();
+  }
 
   if (initialData?.match?._id && !initialData.match.isOngoing) {
     redirect(`/result/${initialData.match._id}`);

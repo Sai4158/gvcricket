@@ -16,6 +16,7 @@ import {
   createScoreLiveEvent,
   createUndoLiveEvent,
 } from "../../lib/live-announcements";
+import { getWalkieRemoteSpeakerState } from "../../lib/walkie-ui";
 import { getTotalDismissalsAllowed } from "../../lib/team-utils";
 import {
   MatchHeader,
@@ -32,6 +33,7 @@ import useSpeechAnnouncer from "../live/useSpeechAnnouncer";
 import useMatch, { triggerMatchHapticFeedback } from "./useMatch";
 import useMatchAccess from "./useMatchAccess";
 import OptionalFeatureBoundary from "../shared/OptionalFeatureBoundary";
+import { buildShareUrl } from "../../lib/site-metadata";
 
 export default function MatchPageClient({
   matchId,
@@ -80,6 +82,11 @@ export default function MatchPageClient({
     autoConnectAudio: Boolean(authStatus === "granted" && isLiveMatch),
   });
   const hasPendingWalkieRequests = Boolean(isLiveMatch && walkie.pendingRequests?.length);
+  const umpireRemoteSpeakerState = getWalkieRemoteSpeakerState({
+    snapshot: walkie.snapshot,
+    participantId: walkie.participantId,
+    isSelfTalking: walkie.isSelfTalking,
+  });
 
   useEffect(() => {
     if (authStatus === "granted" && match && tossPending) {
@@ -239,7 +246,10 @@ export default function MatchPageClient({
     if (!match) return;
 
     triggerMatchHapticFeedback();
-    const link = `${window.location.origin}/session/${match.sessionId}/view`;
+    const link = buildShareUrl(
+      `/session/${match.sessionId}/view`,
+      window.location.origin
+    );
     const shareTitle = `${match.innings1.team} vs ${match.innings2.team}`;
     const shareText = `Follow the live score for ${shareTitle}. Current score: ${match.score}/${match.outs}.`;
 
@@ -281,7 +291,10 @@ export default function MatchPageClient({
     }
 
     if (walkie.canTalk || walkie.snapshot?.enabled) {
-      await walkie.prepareToTalk?.();
+      const prepared = await walkie.prepareToTalk?.();
+      if (prepared === false) {
+        return;
+      }
       await walkie.startTalking();
     }
   };
@@ -356,9 +369,13 @@ export default function MatchPageClient({
             {showCompactUmpireWalkie ? (
               <div className="mb-4">
                 <WalkieNotice
-                  notice={walkie.notice}
+                  notice={
+                    umpireRemoteSpeakerState.isRemoteTalking
+                      ? umpireRemoteSpeakerState.title
+                      : walkie.notice
+                  }
                   onDismiss={walkie.dismissNotice}
-                  quickTalkEnabled
+                  quickTalkEnabled={!umpireRemoteSpeakerState.isRemoteTalking}
                   quickTalkActive={walkie.isSelfTalking}
                   quickTalkFinishing={walkie.isFinishing}
                   quickTalkCountdown={walkie.countdown}
@@ -382,6 +399,8 @@ export default function MatchPageClient({
                           ? "You are live"
                           : walkie.isFinishing
                           ? "Finishing"
+                          : umpireRemoteSpeakerState.isRemoteTalking
+                          ? umpireRemoteSpeakerState.shortStatus
                           : walkie.snapshot?.enabled
                           ? "Channel is live"
                           : "Channel update"}
@@ -392,7 +411,11 @@ export default function MatchPageClient({
                 <div className="min-h-[84px]">
                   <WalkieNotice
                     embedded
-                    notice={walkie.notice}
+                    notice={
+                      umpireRemoteSpeakerState.isRemoteTalking
+                        ? umpireRemoteSpeakerState.title
+                        : walkie.notice
+                    }
                     onDismiss={walkie.dismissNotice}
                   />
                 </div>
@@ -427,8 +450,12 @@ export default function MatchPageClient({
             onWalkie={() => setModal({ type: "walkie" })}
             onMic={() => setModal({ type: "mic" })}
             onShare={handleCopyShareLink}
-            onWalkiePressStart={walkie.prepareToTalk}
-            onWalkieHoldStart={handleWalkieHoldStart}
+            onWalkiePressStart={
+              umpireRemoteSpeakerState.isRemoteTalking ? undefined : walkie.prepareToTalk
+            }
+            onWalkieHoldStart={
+              umpireRemoteSpeakerState.isRemoteTalking ? undefined : handleWalkieHoldStart
+            }
             onWalkieHoldEnd={() => walkie.stopTalking()}
             onMicHoldStart={
               isLiveMatch ? () => micMonitor.start({ pauseMedia: true }) : undefined
@@ -438,6 +465,15 @@ export default function MatchPageClient({
             isWalkieActive={Boolean(walkie.snapshot?.enabled)}
             isWalkieTalking={Boolean(walkie.isSelfTalking)}
             isWalkieFinishing={Boolean(walkie.isFinishing)}
+            isWalkieLoading={Boolean(
+              walkie.claiming ||
+                walkie.preparingToTalk ||
+                walkie.recoveringAudio ||
+                walkie.recoveringSignaling ||
+                walkie.updatingEnabled
+            )}
+            isWalkieBusyByOther={Boolean(umpireRemoteSpeakerState.isRemoteTalking)}
+            walkieBusyLabel={umpireRemoteSpeakerState.roleLabel}
             isCommentaryActive={micMonitor.isActive || micMonitor.isPaused}
             isCommentaryTalking={Boolean(micMonitor.isActive)}
             isAnnounceActive={Boolean(umpireSettings.enabled)}
@@ -471,7 +507,7 @@ export default function MatchPageClient({
 
                     if (nextEnabled) {
                       try {
-                        prime();
+                        prime({ userGesture: true });
                         speak("Umpire voice on.", {
                           key: "umpire-voice-enabled",
                           rate: 0.9,
@@ -511,6 +547,11 @@ export default function MatchPageClient({
                   canEnable: walkie.canEnable,
                   canRequestEnable: false,
                   canTalk: walkie.canTalk,
+                  claiming: walkie.claiming,
+                  preparingToTalk: walkie.preparingToTalk,
+                  updatingEnabled: walkie.updatingEnabled,
+                  recoveringAudio: walkie.recoveringAudio,
+                  recoveringSignaling: walkie.recoveringSignaling,
                   isSelfTalking: walkie.isSelfTalking,
                   isFinishing: walkie.isFinishing,
                   countdown: walkie.countdown,

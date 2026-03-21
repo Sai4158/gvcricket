@@ -4,6 +4,8 @@ let sharedUiAudioUnlocked = false;
 const unlockListeners = new Set();
 const cachedAudioUrlMap = new Map();
 const cachedAudioRequestMap = new Map();
+const cachedAudioBufferMap = new Map();
+const cachedAudioBufferRequestMap = new Map();
 const UI_AUDIO_CACHE_NAME = "gv-ui-audio-assets-v1";
 const SUPPORTED_AUDIO_SESSION_TYPES = new Set([
   "auto",
@@ -288,6 +290,158 @@ export async function getCachedAudioAssetUrl(src) {
 
   cachedAudioRequestMap.set(safeSrc, request);
   return request;
+}
+
+async function getCachedAudioArrayBuffer(src) {
+  const safeSrc = String(src || "");
+  if (!safeSrc) {
+    return null;
+  }
+
+  if (
+    typeof window !== "undefined" &&
+    "caches" in window &&
+    /^https?:/i.test(window.location?.protocol || "http:")
+  ) {
+    try {
+      const cache = await window.caches.open(UI_AUDIO_CACHE_NAME);
+      const cachedResponse = await cache.match(safeSrc);
+      if (cachedResponse?.ok) {
+        return await cachedResponse.arrayBuffer();
+      }
+    } catch {
+      // Fall back to direct fetch.
+    }
+  }
+
+  const response = await fetch(safeSrc, { cache: "force-cache" });
+  if (!response.ok) {
+    throw new Error("Audio file could not be fetched.");
+  }
+
+  try {
+    if (
+      typeof window !== "undefined" &&
+      "caches" in window &&
+      /^https?:/i.test(window.location?.protocol || "http:")
+    ) {
+      const cache = await window.caches.open(UI_AUDIO_CACHE_NAME);
+      await cache.put(safeSrc, response.clone());
+    }
+  } catch {
+    // Ignore Cache Storage failures and continue.
+  }
+
+  return await response.arrayBuffer();
+}
+
+async function getCachedAudioBuffer(src) {
+  const safeSrc = String(src || "");
+  if (!safeSrc) {
+    return null;
+  }
+
+  if (cachedAudioBufferMap.has(safeSrc)) {
+    return cachedAudioBufferMap.get(safeSrc);
+  }
+
+  if (cachedAudioBufferRequestMap.has(safeSrc)) {
+    return cachedAudioBufferRequestMap.get(safeSrc);
+  }
+
+  const request = (async () => {
+    const context = getUiAudioContext();
+    if (!context) {
+      throw new Error("Web Audio is unavailable.");
+    }
+
+    const arrayBuffer = await getCachedAudioArrayBuffer(safeSrc);
+    if (!arrayBuffer) {
+      throw new Error("Audio buffer could not be loaded.");
+    }
+
+    const decodedBuffer = await context.decodeAudioData(arrayBuffer.slice(0));
+    cachedAudioBufferMap.set(safeSrc, decodedBuffer);
+    return decodedBuffer;
+  })().finally(() => {
+    cachedAudioBufferRequestMap.delete(safeSrc);
+  });
+
+  cachedAudioBufferRequestMap.set(safeSrc, request);
+  return request;
+}
+
+export async function playBufferedUiAudio(
+  src,
+  { volume = 1, onEnded = null } = {}
+) {
+  const context = getUiAudioContext();
+  if (!context) {
+    return null;
+  }
+
+  const ready = await warmAudioContext(context);
+  if (!ready && context.state !== "running") {
+    return null;
+  }
+
+  const buffer = await getCachedAudioBuffer(src);
+  if (!buffer) {
+    return null;
+  }
+
+  const source = context.createBufferSource();
+  const gainNode = context.createGain();
+  gainNode.gain.value = Math.max(0, Math.min(1, volume));
+  source.buffer = buffer;
+  source.connect(gainNode);
+  gainNode.connect(context.destination);
+
+  const startTime = context.currentTime;
+  let stopped = false;
+
+  const cleanup = () => {
+    try {
+      source.disconnect();
+    } catch {}
+    try {
+      gainNode.disconnect();
+    } catch {}
+  };
+
+  source.onended = () => {
+    cleanup();
+    if (stopped) {
+      return;
+    }
+    if (typeof onEnded === "function") {
+      onEnded();
+    }
+  };
+
+  source.start(0);
+
+  return {
+    duration: buffer.duration,
+    startedAt: startTime,
+    stop() {
+      if (stopped) {
+        return;
+      }
+      stopped = true;
+      try {
+        source.stop(0);
+      } catch {
+        cleanup();
+      }
+    },
+    getCurrentTime() {
+      if (stopped) {
+        return 0;
+      }
+      return Math.max(0, context.currentTime - startTime);
+    },
+  };
 }
 
 export function getPreferredAudioSessionType() {

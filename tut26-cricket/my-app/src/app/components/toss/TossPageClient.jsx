@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FaArrowLeft, FaRedo } from "react-icons/fa";
 import { AccessGate, Splash } from "../match/MatchStatusShell";
 import useMatchAccess from "../match/useMatchAccess";
+import useSpeechAnnouncer from "../live/useSpeechAnnouncer";
 import LoadingButton from "../shared/LoadingButton";
 import TossStatePanels from "./TossStatePanels";
 import { getTeamBundle } from "../../lib/team-utils";
@@ -18,6 +19,12 @@ import StepFlow from "../shared/StepFlow";
 import LiquidSportText from "../home/LiquidSportText";
 
 const getDraftTokenKey = (sessionId) => `session_${sessionId}_draftToken`;
+const TOSS_ANNOUNCER_SETTINGS = {
+  enabled: true,
+  muted: false,
+  volume: 1,
+  mode: "full",
+};
 
 function createActionId(prefix) {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -48,6 +55,25 @@ async function uploadPendingSessionImage(matchId, pendingImage) {
   }
 }
 
+function buildTossResultAnnouncement(tossResult) {
+  const winnerName = String(tossResult?.winnerName || "").trim();
+
+  if (!winnerName) {
+    return "";
+  }
+
+  return `${winnerName} has won the toss. Do you want to bat or bowl?`;
+}
+
+function buildTossChoicePrompt(teamName) {
+  const safeTeamName = String(teamName || "").trim();
+  if (!safeTeamName) {
+    return "What do you want to choose, heads or tails?";
+  }
+
+  return `${safeTeamName}, what do you want to choose, heads or tails?`;
+}
+
 export default function TossPageClient({
   matchId,
   sessionId,
@@ -71,6 +97,10 @@ export default function TossPageClient({
   const [matchDetails, setMatchDetails] = useState(initialMatch);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const { speak, prime, stop } = useSpeechAnnouncer(TOSS_ANNOUNCER_SETTINGS);
+  const spokenCountdownRef = useRef(null);
+  const announcedResultRef = useRef("");
+  const choicePromptedRef = useRef(false);
 
   useEffect(() => {
     if (status !== "counting" || countdown <= 0) {
@@ -110,8 +140,59 @@ export default function TossPageClient({
     return () => window.clearTimeout(revealTimer);
   }, [status]);
 
+  useEffect(() => {
+    if (status !== "choosing" || choicePromptedRef.current || !matchDetails) {
+      return;
+    }
+
+    const teamName = getTeamBundle(matchDetails, "teamA").name;
+    const nextChoicePrompt = buildTossChoicePrompt(teamName);
+    prime();
+    choicePromptedRef.current = true;
+    speak(nextChoicePrompt, {
+      priority: 2,
+      interrupt: true,
+    });
+  }, [matchDetails, prime, speak, status]);
+
+  useEffect(() => {
+    if (status !== "counting" || countdown <= 0 || spokenCountdownRef.current === countdown) {
+      return;
+    }
+
+    spokenCountdownRef.current = countdown;
+    speak(String(countdown), { interrupt: true });
+  }, [countdown, speak, status]);
+
+  useEffect(() => {
+    if (status !== "finished") {
+      return;
+    }
+
+    const announcement = buildTossResultAnnouncement(tossResult);
+    if (!announcement || announcedResultRef.current === announcement) {
+      return;
+    }
+
+    announcedResultRef.current = announcement;
+    speak(announcement, {
+      interrupt: true,
+      priority: 3,
+    });
+  }, [speak, status, tossResult]);
+
+  useEffect(() => () => stop(), [stop]);
+
   const handleChoice = (choice) => {
+    stop();
     setError("");
+    spokenCountdownRef.current = null;
+    announcedResultRef.current = "";
+    choicePromptedRef.current = true;
+    prime({ userGesture: true });
+    if (speak("3", { userGesture: true, interrupt: true })) {
+      spokenCountdownRef.current = 3;
+    }
     setPlayerChoice(choice);
     setCountdown(3);
     setTossResult({ side: null, winnerName: null, call: null });
@@ -123,6 +204,7 @@ export default function TossPageClient({
       return;
     }
 
+    stop();
     setIsSubmitting(true);
     setError("");
 
@@ -198,6 +280,10 @@ export default function TossPageClient({
   };
 
   const redoToss = () => {
+    stop();
+    spokenCountdownRef.current = null;
+    announcedResultRef.current = "";
+    choicePromptedRef.current = false;
     setStatus("choosing");
     setPlayerChoice(null);
     setCountdown(3);
@@ -212,6 +298,7 @@ export default function TossPageClient({
       return;
     }
 
+    stop();
     router.back();
   };
 
@@ -241,6 +328,7 @@ export default function TossPageClient({
 
   const teamA = getTeamBundle(matchDetails, "teamA");
   const teamB = getTeamBundle(matchDetails, "teamB");
+  const tossChoicePrompt = buildTossChoicePrompt(teamA.name);
   const titleText = "Match Toss";
   const subtitleText = `${teamA.name} vs ${teamB.name}`;
   const currentStep = status === "finished" ? 4 : 3;
@@ -302,6 +390,7 @@ export default function TossPageClient({
               status={status}
               countdown={countdown}
               teamName={teamA.name}
+              tossChoicePrompt={tossChoicePrompt}
               tossResult={tossResult}
               isSubmitting={isSubmitting}
               onChoice={handleChoice}

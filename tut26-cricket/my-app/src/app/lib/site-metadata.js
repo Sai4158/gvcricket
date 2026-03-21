@@ -3,7 +3,8 @@ export const siteConfig = {
   shortName: "GV Cricket",
   url: "https://www.gvcricket.com",
   logoPath: "/gvLogo.png",
-  shareLogoPath: "/gv.png",
+  shareLogoPath: "/gvLogo.png",
+  socialImageVersion: "2026-03-21-gvLogo",
   description:
     "GV Cricket is a live cricket scoring app with umpire mode, spectator scoreboards, director controls, walkie-talkie, loudspeaker, match images, and instant results in one fast mobile flow.",
   defaultTitle:
@@ -25,36 +26,79 @@ export const siteConfig = {
     "cricket scoring app for umpires and spectators",
     "mobile cricket scoring app",
   ],
-  ogImagePath: "/opengraph-image",
-  twitterImagePath: "/twitter-image",
+  ogImagePath: "/opengraph-image?v=2026-03-21-gvLogo",
+  twitterImagePath: "/twitter-image?v=2026-03-21-gvLogo",
 };
 
-export function getSiteUrl() {
-  const vercelEnv = String(process.env.VERCEL_ENV || "").trim().toLowerCase();
-  const previewUrl = String(
-    process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL || ""
-  ).trim();
-  if (vercelEnv && vercelEnv !== "production" && previewUrl) {
-    return previewUrl.startsWith("http") ? previewUrl : `https://${previewUrl}`;
-  }
+function normalizeSiteUrl(value = "") {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  return trimmed.startsWith("http") ? trimmed : `https://${trimmed}`;
+}
 
-  const explicitUrl = String(process.env.NEXT_PUBLIC_SITE_URL || "").trim();
+function isLocalOrigin(value = "") {
+  try {
+    const { hostname } = new URL(normalizeSiteUrl(value));
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "[::1]" ||
+      hostname.endsWith(".local")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function getPublicSiteUrl() {
+  const explicitUrl = normalizeSiteUrl(process.env.NEXT_PUBLIC_SITE_URL || "");
   if (explicitUrl) {
-    return explicitUrl.startsWith("http") ? explicitUrl : `https://${explicitUrl}`;
+    return explicitUrl;
   }
 
-  const productionUrl = String(
+  return normalizeSiteUrl(siteConfig.url) || siteConfig.url;
+}
+
+export function getSiteUrl() {
+  const explicitUrl = normalizeSiteUrl(process.env.NEXT_PUBLIC_SITE_URL || "");
+  if (explicitUrl) {
+    return explicitUrl;
+  }
+
+  const productionUrl = normalizeSiteUrl(
     process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL || ""
-  ).trim();
+  );
   if (productionUrl) {
-    return productionUrl.startsWith("http") ? productionUrl : `https://${productionUrl}`;
+    return productionUrl;
   }
 
-  return siteConfig.url;
+  const vercelEnv = String(process.env.VERCEL_ENV || "").trim().toLowerCase();
+  const previewUrl = normalizeSiteUrl(
+    process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL || ""
+  );
+  if (vercelEnv && vercelEnv !== "production" && previewUrl) {
+    return previewUrl;
+  }
+
+  return getPublicSiteUrl();
 }
 
 export function absoluteUrl(path = "/") {
   return new URL(path, getSiteUrl()).toString();
+}
+
+export function buildShareUrl(path = "/", currentOrigin = "") {
+  const normalizedCurrentOrigin = normalizeSiteUrl(currentOrigin);
+  const baseUrl = isLocalOrigin(normalizedCurrentOrigin)
+    ? normalizedCurrentOrigin
+    : getPublicSiteUrl() || normalizedCurrentOrigin || getSiteUrl();
+  return new URL(path, baseUrl).toString();
+}
+
+export function versionedSocialImagePath(path = "/") {
+  const cleanPath = String(path || "/").trim() || "/";
+  const separator = cleanPath.includes("?") ? "&" : "?";
+  return `${cleanPath}${separator}v=${siteConfig.socialImageVersion}`;
 }
 
 export function cleanText(value = "") {

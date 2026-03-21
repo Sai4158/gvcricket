@@ -164,7 +164,7 @@ export default function PrimaryActionsSection() {
                   ? undefined
                   : { duration: 8.6, repeat: Infinity, ease: "easeInOut" }
               }
-              className="pointer-events-none absolute right-5 top-5 z-[1] text-white/44 drop-shadow-[0_4px_12px_rgba(255,255,255,0.08)] transition duration-300 group-hover:text-white/56"
+              className="pointer-events-none absolute right-5 top-5 z-1 text-white/44 drop-shadow-[0_4px_12px_rgba(255,255,255,0.08)] transition duration-300 group-hover:text-white/56"
             >
               <FaClipboardList className="text-[64px]" />
             </motion.div>
@@ -173,7 +173,7 @@ export default function PrimaryActionsSection() {
               whileInView="visible"
               viewport={{ once: true, amount: 0.4 }}
               variants={cardContentVariants}
-              className="relative z-10 flex h-full min-h-[152px] flex-col justify-between gap-6"
+              className="relative z-10 flex h-full min-h-38 flex-col justify-between gap-6"
             >
               <div className="space-y-4">
                 <motion.div
@@ -184,7 +184,7 @@ export default function PrimaryActionsSection() {
                 </motion.div>
                 <motion.h3
                   variants={cardItemVariants}
-                  className="max-w-[14rem] text-[24px] font-semibold leading-[1.04] tracking-tight text-white"
+                  className="max-w-56 text-[24px] font-semibold leading-[1.04] tracking-tight text-white"
                 >
                   Start a game
                 </motion.h3>
@@ -224,6 +224,7 @@ export default function PrimaryActionsSection() {
           href="/session"
           pendingLabel="Opening sessions..."
           pendingClassName="pending-shimmer"
+          primeAudioOnClick
           className="block"
         >
           <motion.div
@@ -257,7 +258,7 @@ export default function PrimaryActionsSection() {
                   ? undefined
                   : { duration: 8.6, repeat: Infinity, ease: "easeInOut" }
               }
-              className="pointer-events-none absolute right-5 top-5 z-[1] text-white/44 drop-shadow-[0_4px_12px_rgba(255,255,255,0.08)] transition duration-300 group-hover:text-white/56"
+              className="pointer-events-none absolute right-5 top-5 z-1 text-white/44 drop-shadow-[0_4px_12px_rgba(255,255,255,0.08)] transition duration-300 group-hover:text-white/56"
             >
               <FaChartLine className="text-[60px]" />
             </motion.div>
@@ -266,7 +267,7 @@ export default function PrimaryActionsSection() {
               whileInView="visible"
               viewport={{ once: true, amount: 0.4 }}
               variants={cardContentVariants}
-              className="relative z-10 flex h-full min-h-[152px] flex-col justify-between gap-6"
+              className="relative z-10 flex h-full min-h-38 flex-col justify-between gap-6"
             >
               <div className="space-y-4">
                 <motion.div
@@ -277,7 +278,7 @@ export default function PrimaryActionsSection() {
                 </motion.div>
                 <motion.h3
                   variants={cardItemVariants}
-                  className="max-w-[14rem] text-[24px] font-semibold leading-[1.04] tracking-tight text-white"
+                  className="max-w-56 text-[24px] font-semibold leading-[1.04] tracking-tight text-white"
                 >
                   View sessions
                 </motion.h3>
@@ -372,7 +373,7 @@ export default function PrimaryActionsSection() {
               </motion.span>
               <motion.span
                 variants={cardItemVariants}
-                className="mt-1 block max-w-[30rem] text-sm leading-6 text-white/76"
+                className="mt-1 block max-w-120 text-sm leading-6 text-white/76"
               >
                 Control mic, music, sound effects, and walkie from one simple phone console.
               </motion.span>

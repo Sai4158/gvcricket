@@ -3,20 +3,59 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isUiAudioUnlocked, subscribeUiAudioUnlock } from "../../lib/page-audio";
 
-const IOS_PREFERRED_VOICE_NAMES = ["samantha", "ava", "allison", "nicky"];
+const SAFARI_PREFERRED_VOICE_NAMES = [
+  "siri voice 4 enhanced",
+  "siri voice 4 premium",
+  "siri voice 4 natural",
+  "siri voice 4",
+  "siri female",
+  "siri",
+  "samantha enhanced",
+  "samantha premium",
+  "samantha natural",
+  "samantha",
+  "ava enhanced",
+  "ava premium",
+  "ava natural",
+  "ava",
+  "allison enhanced",
+  "allison premium",
+  "allison natural",
+  "allison",
+  "nicky enhanced",
+  "nicky premium",
+  "nicky natural",
+  "nicky",
+];
 const CHROME_PREFERRED_VOICE_NAMES = [
+  "google uk english female",
   "google us english",
   "google english",
-  "google uk english female",
 ];
 const DESKTOP_PREFERRED_VOICE_NAMES = [
+  "microsoft aria online",
+  "microsoft jenny online",
   "microsoft aria",
   "microsoft jenny",
-  "microsoft guy",
+  "google uk english female",
+  "google us english",
+  "google english",
   "samantha",
   "ava",
   "allison",
   "nicky",
+];
+const FEMALE_VOICE_KEYWORDS = [
+  "female",
+  "samantha",
+  "ava",
+  "allison",
+  "nicky",
+  "aria",
+  "jenny",
+  "zira",
+  "siri voice 4",
+  "siri",
 ];
 
 function getSpeechPlatform() {
@@ -59,9 +98,12 @@ function getVoiceScore(voice, platform) {
   if (name.includes("premium")) score += 40;
   if (name.includes("enhanced")) score += 35;
   if (name.includes("neural")) score += 35;
+  if (name.includes("female")) score += 24;
   if (name.includes("online")) score += 25;
   if (name.includes("compact")) score -= 20;
 
+  if (name.includes("siri voice 4")) score += 320;
+  if (name.includes("siri")) score += 180;
   if (name.includes("samantha")) score += 120;
   if (name.includes("samantha") && name.includes("enhanced")) score += 180;
   if (name.includes("ava")) score += 110;
@@ -70,19 +112,27 @@ function getVoiceScore(voice, platform) {
   if (name.includes("allison") && name.includes("enhanced")) score += 145;
   if (name.includes("nicky")) score += 100;
   if (name.includes("nicky") && name.includes("enhanced")) score += 140;
+  if (name.includes("google uk english female")) score += 110;
   if (name.includes("google us english")) score += 95;
   if (name.includes("google")) score += 55;
   if (name.includes("microsoft aria")) score += 100;
   if (name.includes("microsoft jenny")) score += 95;
-  if (name.includes("microsoft guy")) score += 90;
+  if (name.includes("microsoft guy")) score += 42;
   if (name.includes("aria")) score += 40;
   if (name.includes("jenny")) score += 35;
-  if (name.includes("guy")) score += 30;
-  if (name.includes("zira")) score -= 80;
-  if (name.includes("david")) score -= 30;
-  if (name.includes("mark")) score -= 15;
+  if (name.includes("guy")) score += 8;
+  if (name.includes("zira")) score -= 110;
+  if (name.includes("david")) score -= 50;
+  if (name.includes("mark")) score -= 24;
+  if (name.includes("fred")) score -= 160;
+  if (name.includes("zarvox")) score -= 180;
+  if (name.includes("bahh")) score -= 180;
+  if (name.includes("bells")) score -= 180;
+  if (name.includes("boing")) score -= 180;
 
-  if (isIOS && isSafari) {
+  if (isSafari) {
+    if (name.includes("siri voice 4")) score += 420;
+    if (name.includes("siri")) score += 260;
     if (name.includes("samantha")) score += 260;
     if (name.includes("ava")) score += 220;
     if (name.includes("allison")) score += 200;
@@ -94,7 +144,11 @@ function getVoiceScore(voice, platform) {
     if (name.includes("boing")) score -= 180;
   }
 
-  if (isChrome && name.includes("google us english")) score += 80;
+  if (isChrome) {
+    if (name.includes("google uk english female")) score += 180;
+    if (name.includes("google us english")) score += 140;
+    if (name.includes("google english")) score += 110;
+  }
 
   return score;
 }
@@ -112,19 +166,48 @@ function pickPreferredVoiceByName(voices, preferredNames) {
   return null;
 }
 
-function pickAmericanVoice(voices, platform) {
-  const englishVoices = voices.filter((voice) =>
-    voice?.lang?.toLowerCase().startsWith("en")
+function isLikelyFemaleVoice(voice) {
+  const name = voice?.name?.toLowerCase() || "";
+  return FEMALE_VOICE_KEYWORDS.some((keyword) => name.includes(keyword));
+}
+
+function pickLockedVoice(voices, lockedVoiceName) {
+  if (!lockedVoiceName) {
+    return null;
+  }
+
+  return (
+    voices.find(
+      (voice) => (voice?.name || "").toLowerCase() === lockedVoiceName.toLowerCase()
+    ) || null
+  );
+}
+
+function pickAmericanVoice(voices, platform, options = {}) {
+  const { excludeNames = [], lockedVoiceName = "" } = options;
+  const excluded = new Set(excludeNames.map((name) => String(name || "").toLowerCase()));
+  const englishVoices = voices.filter(
+    (voice) =>
+      voice?.lang?.toLowerCase().startsWith("en") &&
+      !excluded.has((voice?.name || "").toLowerCase())
   );
 
   if (!englishVoices.length) {
     return null;
   }
 
-  if (platform?.isIOS && platform?.isSafari) {
+  const lockedVoice = pickLockedVoice(englishVoices, lockedVoiceName);
+  if (lockedVoice) {
+    return lockedVoice;
+  }
+
+  const femaleEnglishVoices = englishVoices.filter(isLikelyFemaleVoice);
+  const candidateVoices = femaleEnglishVoices.length ? femaleEnglishVoices : englishVoices;
+
+  if (platform?.isSafari) {
     return (
-      pickPreferredVoiceByName(englishVoices, IOS_PREFERRED_VOICE_NAMES) ||
-      [...englishVoices].sort(
+      pickPreferredVoiceByName(candidateVoices, SAFARI_PREFERRED_VOICE_NAMES) ||
+      [...candidateVoices].sort(
         (a, b) => getVoiceScore(b, platform) - getVoiceScore(a, platform)
       )[0]
     );
@@ -132,16 +215,19 @@ function pickAmericanVoice(voices, platform) {
 
   if (platform?.isChrome) {
     return (
-      pickPreferredVoiceByName(englishVoices, CHROME_PREFERRED_VOICE_NAMES) ||
-      [...englishVoices].sort(
+      pickPreferredVoiceByName(candidateVoices, CHROME_PREFERRED_VOICE_NAMES) ||
+      [...candidateVoices].sort(
         (a, b) => getVoiceScore(b, platform) - getVoiceScore(a, platform)
       )[0]
     );
   }
 
-  return [...englishVoices].sort(
-    (a, b) => getVoiceScore(b, platform) - getVoiceScore(a, platform)
-  )[0];
+  return (
+    pickPreferredVoiceByName(candidateVoices, DESKTOP_PREFERRED_VOICE_NAMES) ||
+    [...candidateVoices].sort(
+      (a, b) => getVoiceScore(b, platform) - getVoiceScore(a, platform)
+    )[0]
+  );
 }
 
 function normalizeSpeechText(text) {
@@ -241,6 +327,7 @@ function getSpeechProfile(voice, options, platform) {
   const voiceName = voice?.name?.toLowerCase() || "";
   const { isIOS, isSafari, isChrome } = platform || {};
   const isAppleNatural =
+    voiceName.includes("siri") ||
     voiceName.includes("samantha") ||
     voiceName.includes("ava") ||
     voiceName.includes("allison") ||
@@ -261,16 +348,16 @@ function getSpeechProfile(voice, options, platform) {
           ? 0.82
           : 0.8
         : isAppleNatural
-        ? 0.88
+        ? 0.86
         : isGoogleNatural
         ? isChrome
-          ? 0.9
-          : 0.88
+          ? 0.87
+          : 0.86
         : isMicrosoftNatural
-        ? 0.89
+        ? 0.86
         : isLegacyVoice
         ? 0.83
-        : 0.9),
+        : 0.88),
     pitch:
       options.pitch ??
       (isIOSSafari
@@ -319,6 +406,8 @@ export default function useSpeechAnnouncer(settings) {
   const voicesReadyRef = useRef(false);
   const platformRef = useRef(getSpeechPlatform());
   const voicesPromiseRef = useRef(null);
+  const lockedVoiceNameRef = useRef("");
+  const lastGesturePrimeAtRef = useRef(0);
 
   useEffect(() => subscribeUiAudioUnlock(setAudioUnlocked), []);
 
@@ -343,6 +432,27 @@ export default function useSpeechAnnouncer(settings) {
     setStatus((current) => (current === "unsupported" ? current : "ready"));
   }, [clearStepTimer]);
 
+  const rememberPendingSequence = useCallback((sequence, options = {}) => {
+    if (!sequence?.items?.length) {
+      pendingSpeakRef.current = null;
+      return;
+    }
+
+    pendingSpeakRef.current = {
+      type: "sequence",
+      items: sequence.items.map((item) => ({ ...item })),
+      options: {
+        key: sequence.key,
+        pauseAfterMs: sequence.pauseAfterMs ?? 0,
+        priority: sequence.priority ?? 1,
+        fallbackTried: sequence.fallbackTried ?? false,
+        interrupt: true,
+        minGapMs: 0,
+        ...options,
+      },
+    };
+  }, []);
+
   const ensureVoicesReady = useCallback(() => {
     if (!canUseSpeechSynthesis()) {
       return Promise.resolve([]);
@@ -351,7 +461,12 @@ export default function useSpeechAnnouncer(settings) {
     const existingVoices = window.speechSynthesis.getVoices();
     if (existingVoices.length > 0) {
       voicesReadyRef.current = true;
-      const selectedVoice = pickAmericanVoice(existingVoices, platformRef.current);
+      const selectedVoice = pickAmericanVoice(existingVoices, platformRef.current, {
+        lockedVoiceName: lockedVoiceNameRef.current,
+      });
+      if (selectedVoice?.name) {
+        lockedVoiceNameRef.current = selectedVoice.name;
+      }
       setVoice(selectedVoice);
       setStatus((current) => (current === "unsupported" ? current : "ready"));
       return Promise.resolve(existingVoices);
@@ -383,7 +498,12 @@ export default function useSpeechAnnouncer(settings) {
         const voices = window.speechSynthesis.getVoices();
         if (voices.length > 0) {
           voicesReadyRef.current = true;
-          const selectedVoice = pickAmericanVoice(voices, platformRef.current);
+          const selectedVoice = pickAmericanVoice(voices, platformRef.current, {
+            lockedVoiceName: lockedVoiceNameRef.current,
+          });
+          if (selectedVoice?.name) {
+            lockedVoiceNameRef.current = selectedVoice.name;
+          }
           setVoice(selectedVoice);
           setStatus((current) => (current === "unsupported" ? current : "ready"));
           finish(voices);
@@ -504,23 +624,35 @@ export default function useSpeechAnnouncer(settings) {
           utteranceRef.current = null;
           currentSequenceRef.current = null;
           queuedSequencesRef.current = [];
+          isPrimedRef.current = false;
+          rememberPendingSequence(sequence);
           setStatus("waiting_for_gesture");
           return;
         }
 
-        if (voice && !sequence.useSystemVoice && !sequence.fallbackTried) {
-          utteranceRef.current = null;
-          currentSequenceRef.current = null;
-          clearStepTimer();
-          sequenceTokenRef.current += 1;
-          return void runSequence(
-            {
-              ...sequence,
-              useSystemVoice: true,
-              fallbackTried: true,
-            },
-            sequenceTokenRef.current
-          );
+        if (voice && !sequence.fallbackTried) {
+          const availableVoices = window.speechSynthesis.getVoices();
+          const alternateVoice = pickAmericanVoice(availableVoices, platformRef.current, {
+            excludeNames: [voice?.name],
+          });
+
+          if (alternateVoice) {
+            if (alternateVoice?.name) {
+              lockedVoiceNameRef.current = alternateVoice.name;
+            }
+            setVoice(alternateVoice);
+            utteranceRef.current = null;
+            currentSequenceRef.current = null;
+            clearStepTimer();
+            sequenceTokenRef.current += 1;
+            return void runSequence(
+              {
+                ...sequence,
+                fallbackTried: true,
+              },
+              sequenceTokenRef.current
+            );
+          }
         }
 
         utteranceRef.current = null;
@@ -547,7 +679,7 @@ export default function useSpeechAnnouncer(settings) {
 
       return true;
     },
-    [clearStepTimer, ensureVoicesReady, settings.volume, voice]
+    [clearStepTimer, ensureVoicesReady, rememberPendingSequence, settings.volume, voice]
   );
 
   const queueSequence = useCallback(
@@ -620,6 +752,11 @@ export default function useSpeechAnnouncer(settings) {
       };
 
       if (!isPrimedRef.current && !options.userGesture) {
+        pendingSpeakRef.current = {
+          type: "sequence",
+          items,
+          options,
+        };
         setStatus("waiting_for_gesture");
         return false;
       }
@@ -676,30 +813,41 @@ export default function useSpeechAnnouncer(settings) {
     ]
   );
 
-  const prime = useCallback(() => {
+  const prime = useCallback((options = {}) => {
     if (!canUseSpeechSynthesis()) {
       setStatus("unsupported");
       return false;
     }
 
+    const userGesture = Boolean(options.userGesture);
+
     try {
       void ensureVoicesReady();
       window.speechSynthesis.resume?.();
 
-      isPrimedRef.current = true;
-      setStatus("ready");
+      const unlocked = Boolean(userGesture || isUiAudioUnlocked());
+      isPrimedRef.current = unlocked;
+      setStatus(unlocked ? "ready" : "waiting_for_gesture");
 
-      if (pendingSpeakRef.current) {
+      if (unlocked && pendingSpeakRef.current) {
         const nextPending = pendingSpeakRef.current;
         pendingSpeakRef.current = null;
         if (nextPending.type === "sequence") {
-          queueSequence(nextPending.items, nextPending.options);
+          queueSequence(nextPending.items, {
+            ...nextPending.options,
+            userGesture,
+            minGapMs: 0,
+          });
         } else {
-          queueSequence([{ text: nextPending.text }], nextPending.options);
+          queueSequence([{ text: nextPending.text }], {
+            ...nextPending.options,
+            userGesture,
+            minGapMs: 0,
+          });
         }
       }
 
-      return true;
+      return unlocked;
     } catch {
       setStatus("blocked");
       return false;
@@ -707,24 +855,44 @@ export default function useSpeechAnnouncer(settings) {
   }, [ensureVoicesReady, queueSequence]);
 
   useEffect(() => {
+    if (!audioUnlocked || isPrimedRef.current || status === "unsupported") {
+      return;
+    }
+
+    prime();
+  }, [audioUnlocked, prime, status]);
+
+  useEffect(() => {
     if (!canUseSpeechSynthesis()) return undefined;
 
     const primeFromGesture = () => {
-      if (!isPrimedRef.current) {
-        prime();
+      const now = Date.now();
+      if (now - lastGesturePrimeAtRef.current < 320) {
+        return;
+      }
+
+      if (
+        !isPrimedRef.current ||
+        Boolean(pendingSpeakRef.current) ||
+        status === "waiting_for_gesture"
+      ) {
+        lastGesturePrimeAtRef.current = now;
+        prime({ userGesture: true });
       }
     };
 
-    window.addEventListener("pointerdown", primeFromGesture, { passive: true });
+    window.addEventListener("pointerup", primeFromGesture);
+    window.addEventListener("click", primeFromGesture);
     window.addEventListener("keydown", primeFromGesture);
-    window.addEventListener("touchstart", primeFromGesture, { passive: true });
+    window.addEventListener("touchend", primeFromGesture);
 
     return () => {
-      window.removeEventListener("pointerdown", primeFromGesture);
+      window.removeEventListener("pointerup", primeFromGesture);
+      window.removeEventListener("click", primeFromGesture);
       window.removeEventListener("keydown", primeFromGesture);
-      window.removeEventListener("touchstart", primeFromGesture);
+      window.removeEventListener("touchend", primeFromGesture);
     };
-  }, [prime]);
+  }, [prime, status]);
 
   useEffect(() => {
     if (typeof document === "undefined" || typeof window === "undefined") {
@@ -760,6 +928,11 @@ export default function useSpeechAnnouncer(settings) {
       }
 
       if (!isPrimedRef.current) {
+        pendingSpeakRef.current = {
+          type: "sequence",
+          items: [{ text }],
+          options,
+        };
         setStatus("waiting_for_gesture");
         return false;
       }
@@ -770,7 +943,17 @@ export default function useSpeechAnnouncer(settings) {
   );
 
   const speakSequence = useCallback(
-    (items, options = {}) => queueSequence(items, options),
+    (items, options = {}) => {
+      if (!options.userGesture && !isPrimedRef.current) {
+        pendingSpeakRef.current = {
+          type: "sequence",
+          items,
+          options,
+        };
+      }
+
+      return queueSequence(items, options);
+    },
     [queueSequence]
   );
 

@@ -15,6 +15,7 @@ import {
   FaTrophy,
 } from "react-icons/fa";
 import { buildResultInsights } from "../../lib/result-insights";
+import { buildShareUrl } from "../../lib/site-metadata";
 
 function SectionShell({ title, icon, children }) {
   return (
@@ -84,8 +85,13 @@ export default function ResultInsightsSections({ match }) {
   const statsFallback = "Detailed player stats were not recorded for this match.";
 
   const handleCopyLink = async () => {
+    const shareUrl = buildShareUrl(
+      `/result/${match?._id || ""}`,
+      window.location.origin
+    );
+
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(shareUrl);
       setShareStatus("Match link copied.");
     } catch {
       setShareStatus("Could not copy the link.");
@@ -98,7 +104,7 @@ export default function ResultInsightsSections({ match }) {
         await navigator.share({
           title: `${insights.teamA.name} vs ${insights.teamB.name}`,
           text: match?.result || "GV Cricket result",
-          url: window.location.href,
+          url: buildShareUrl(`/result/${match?._id || ""}`, window.location.origin),
         });
         setShareStatus("");
         return;

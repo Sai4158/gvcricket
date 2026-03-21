@@ -49,8 +49,10 @@ import {
   NON_UMPIRE_WALKIE_ACCEPTED_ANNOUNCEMENT,
   NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT,
 } from "../../lib/walkie-device-state";
+import { getWalkieRemoteSpeakerState } from "../../lib/walkie-ui";
 import { getTeamBundle } from "../../lib/team-utils";
 import { duckPageMedia, restorePageMedia } from "../../lib/page-audio";
+import { buildShareUrl } from "../../lib/site-metadata";
 import { ModalBase } from "../match/MatchBaseModals";
 import OptionalFeatureBoundary from "../shared/OptionalFeatureBoundary";
 
@@ -195,19 +197,22 @@ const HOLD_BUTTON_INTERACTION_PROPS = {
   },
 };
 
+const ANNOUNCER_AUTO_RESET_DELAY_MS = 1500;
+const ANNOUNCER_GESTURE_READ_DELAY_MS = 2000;
+
 export default function SessionViewClient({ sessionId, initialData }) {
   const [copied, setCopied] = useState(false);
   const [data, setData] = useState(initialData || null);
   const [activePanel, setActivePanel] = useState(null);
   const [localWalkieNotice, setLocalWalkieNotice] = useState("");
   const [streamError, setStreamError] = useState("");
-  const [sharedWalkieEnabled, setSharedWalkieEnabled] = useState(false);
   const [spectatorWalkieEnabled, setSpectatorWalkieEnabled] = useState(false);
   const [quickWalkieTalking, setQuickWalkieTalking] = useState(false);
   const [quickSpeakerTalking, setQuickSpeakerTalking] = useState(false);
   const lastAnnouncedEventRef = useRef("");
   const announcementDuckRef = useRef([]);
   const announcementRestoreTimerRef = useRef(null);
+  const announcerResetTimerRef = useRef(null);
   const walkieNoticeTimerRef = useRef(null);
   const walkieHoldTimerRef = useRef(null);
   const walkieHeldRef = useRef(false);
@@ -220,6 +225,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const lastStreamUpdateRef = useRef(initialData?.updatedAt || "");
   const announcerAutoEnabledMatchRef = useRef("");
   const announcerInitialSummaryRef = useRef("");
+  const announcerGestureReplayRef = useRef("");
+  const announcerAutoReadTimerRef = useRef(null);
   const router = useRouter();
   const sessionData = data?.session;
   const match = data?.match;
@@ -253,10 +260,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       startTransition(() => {
         setData(payload);
         setStreamError("");
-        if (liveEventType === "walkie_enabled") {
-          setSharedWalkieEnabled(true);
-        } else if (liveEventType === "walkie_disabled") {
-          setSharedWalkieEnabled(false);
+        if (liveEventType === "walkie_disabled") {
           setSpectatorWalkieEnabled(false);
         }
       });
@@ -276,7 +280,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     role: "spectator",
     displayName: sessionData?.name ? `${sessionData.name} Spectator` : "Spectator",
     autoConnectAudio: spectatorWalkieEnabled,
-    signalingActive: Boolean(match?._id && isLiveMatch && (sharedWalkieEnabled || spectatorWalkieEnabled)),
+    signalingActive: Boolean(match?._id && isLiveMatch),
   });
 
   const speakSequenceWithDuck = useCallback(
@@ -353,14 +357,22 @@ export default function SessionViewClient({ sessionId, initialData }) {
   }, []);
 
   useEffect(() => {
+    if (announcerAutoReadTimerRef.current) {
+      window.clearTimeout(announcerAutoReadTimerRef.current);
+      announcerAutoReadTimerRef.current = null;
+    }
+    if (announcerResetTimerRef.current) {
+      window.clearTimeout(announcerResetTimerRef.current);
+      announcerResetTimerRef.current = null;
+    }
     lastAnnouncedEventRef.current = "";
     previousEnabledRef.current = false;
     previousWalkieEnabledRef.current = false;
     previousWalkieRequestStateRef.current = "idle";
     announcerAutoEnabledMatchRef.current = "";
     announcerInitialSummaryRef.current = "";
+    announcerGestureReplayRef.current = "";
     queueMicrotask(() => {
-      setSharedWalkieEnabled(false);
       setSpectatorWalkieEnabled(false);
       setLocalWalkieNotice("");
       setQuickWalkieTalking(false);
@@ -374,7 +386,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
     async function loadSharedWalkieState() {
       if (!match?._id || !isLiveMatch) {
-        setSharedWalkieEnabled(false);
+        setSpectatorWalkieEnabled(false);
         return;
       }
 
@@ -392,10 +404,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         }
 
         const nextEnabled = Boolean(payload?.walkie?.enabled);
-        setSharedWalkieEnabled(nextEnabled);
-        if (!nextEnabled) {
-          setSpectatorWalkieEnabled(false);
-        }
+        setSpectatorWalkieEnabled(nextEnabled);
       } catch {
       }
     }
@@ -417,10 +426,35 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
 
     announcerAutoEnabledMatchRef.current = match._id;
+    lastAnnouncedEventRef.current = "";
+    announcerInitialSummaryRef.current = "";
+    previousEnabledRef.current = false;
+    clearAnnouncementTimers();
+    stop();
+    if (announcerResetTimerRef.current) {
+      window.clearTimeout(announcerResetTimerRef.current);
+      announcerResetTimerRef.current = null;
+    }
+    if (settings.enabled) {
+      updateSetting("enabled", false);
+      announcerResetTimerRef.current = window.setTimeout(() => {
+        announcerResetTimerRef.current = null;
+        updateSetting("enabled", true);
+      }, ANNOUNCER_AUTO_RESET_DELAY_MS);
+      return;
+    }
+
     if (!settings.enabled) {
       updateSetting("enabled", true);
     }
-  }, [isLiveMatch, match?._id, settings.enabled, updateSetting]);
+  }, [
+    clearAnnouncementTimers,
+    isLiveMatch,
+    match?._id,
+    settings.enabled,
+    stop,
+    updateSetting,
+  ]);
 
   useEffect(() => {
     const announcerEnabled = Boolean(match && isLiveMatch && settings.enabled && settings.mode !== "silent");
@@ -436,13 +470,15 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
 
     if (!previousEnabledRef.current) {
-      lastAnnouncedEventRef.current = currentLiveEventId;
+      lastAnnouncedEventRef.current = "";
+      announcerInitialSummaryRef.current = "";
       clearAnnouncementTimers();
       stop();
+      prime();
     }
 
     previousEnabledRef.current = true;
-  }, [clearAnnouncementTimers, currentLiveEventId, isLiveMatch, match, settings.enabled, settings.mode, stop]);
+  }, [clearAnnouncementTimers, isLiveMatch, match, prime, settings.enabled, settings.mode, stop]);
 
   useEffect(() => {
     const announcerEnabled = Boolean(match && isLiveMatch && settings.enabled && settings.mode !== "silent");
@@ -455,12 +491,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
       return;
     }
 
-    if (needsGesture) {
-      return;
-    }
-
+    const queuedWhileWaitingForGesture = announcerStatus === "waiting_for_gesture";
     const spoke = announceCurrentScore();
-    if (!spoke) {
+    if (!spoke && !queuedWhileWaitingForGesture) {
       return;
     }
 
@@ -470,7 +503,107 @@ export default function SessionViewClient({ sessionId, initialData }) {
     currentLiveEventId,
     isLiveMatch,
     match,
-    needsGesture,
+    announcerStatus,
+    audioUnlocked,
+    settings.enabled,
+    settings.mode,
+  ]);
+
+  useEffect(() => {
+    const announcerEnabled = Boolean(
+      match && isLiveMatch && settings.enabled && settings.mode !== "silent"
+    );
+    const initialSummaryKey = match?._id
+      ? `${match._id}:${currentLiveEventId || "snapshot"}`
+      : "";
+
+    if (
+      !announcerEnabled ||
+      !initialSummaryKey ||
+      announcerInitialSummaryRef.current === initialSummaryKey
+    ) {
+      return undefined;
+    }
+
+    if (announcerAutoReadTimerRef.current) {
+      window.clearTimeout(announcerAutoReadTimerRef.current);
+      announcerAutoReadTimerRef.current = null;
+    }
+
+    announcerAutoReadTimerRef.current = window.setTimeout(() => {
+      announcerAutoReadTimerRef.current = null;
+      if (announcerInitialSummaryRef.current === initialSummaryKey) {
+        return;
+      }
+      const spoke = announceCurrentScore({ interrupt: true });
+      if (spoke) {
+        announcerInitialSummaryRef.current = initialSummaryKey;
+      }
+    }, ANNOUNCER_GESTURE_READ_DELAY_MS);
+
+    return () => {
+      if (announcerAutoReadTimerRef.current) {
+        window.clearTimeout(announcerAutoReadTimerRef.current);
+        announcerAutoReadTimerRef.current = null;
+      }
+    };
+  }, [
+    announceCurrentScore,
+    currentLiveEventId,
+    isLiveMatch,
+    match,
+    settings.enabled,
+    settings.mode,
+  ]);
+
+  useEffect(() => {
+    const announcerEnabled = Boolean(
+      match && isLiveMatch && settings.enabled && settings.mode !== "silent"
+    );
+    const initialSummaryKey = match?._id
+      ? `${match._id}:${currentLiveEventId || "snapshot"}`
+      : "";
+
+    if (
+      !announcerEnabled ||
+      !initialSummaryKey ||
+      announcerInitialSummaryRef.current === initialSummaryKey ||
+      announcerGestureReplayRef.current === initialSummaryKey
+    ) {
+      return undefined;
+    }
+
+    const replayOnGesture = () => {
+      if (announcerGestureReplayRef.current === initialSummaryKey) {
+        return;
+      }
+      announcerGestureReplayRef.current = initialSummaryKey;
+      if (announcerAutoReadTimerRef.current) {
+        window.clearTimeout(announcerAutoReadTimerRef.current);
+        announcerAutoReadTimerRef.current = null;
+      }
+      prime({ userGesture: true });
+      const spoke = announceCurrentScore({ userGesture: true, interrupt: true });
+      if (spoke) {
+        announcerInitialSummaryRef.current = initialSummaryKey;
+      }
+    };
+
+    window.addEventListener("click", replayOnGesture, { once: true });
+    window.addEventListener("touchend", replayOnGesture, { once: true });
+    window.addEventListener("keydown", replayOnGesture, { once: true });
+
+    return () => {
+      window.removeEventListener("click", replayOnGesture);
+      window.removeEventListener("touchend", replayOnGesture);
+      window.removeEventListener("keydown", replayOnGesture);
+    };
+  }, [
+    announceCurrentScore,
+    currentLiveEventId,
+    isLiveMatch,
+    match,
+    prime,
     settings.enabled,
     settings.mode,
   ]);
@@ -490,7 +623,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
     if (lastAnnouncedEventRef.current === event.id) return;
 
-    lastAnnouncedEventRef.current = event.id;
     const line = buildSpectatorAnnouncement(event, match, settings.mode);
     if (!line) return;
     const scoreLine = buildSpectatorScoreAnnouncement(event, match);
@@ -519,7 +651,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
           }
         : null,
     ].filter(Boolean);
-    speakSequenceWithDuck(
+    const spoke = speakSequenceWithDuck(
       items,
       {
         key: event.id,
@@ -529,7 +661,17 @@ export default function SessionViewClient({ sessionId, initialData }) {
       },
       overSummary ? 3300 : scoreLine ? 2300 : 1500
     );
+    if (!spoke && announcerStatus === "waiting_for_gesture") {
+      lastAnnouncedEventRef.current = event.id;
+      return;
+    }
+    if (!spoke) {
+      return;
+    }
+    lastAnnouncedEventRef.current = event.id;
   }, [
+    announcerStatus,
+    audioUnlocked,
     isLiveMatch,
     match,
     settings.enabled,
@@ -549,6 +691,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
   useEffect(() => {
     return () => {
+      if (announcerAutoReadTimerRef.current) {
+        window.clearTimeout(announcerAutoReadTimerRef.current);
+        announcerAutoReadTimerRef.current = null;
+      }
+      if (announcerResetTimerRef.current) {
+        window.clearTimeout(announcerResetTimerRef.current);
+        announcerResetTimerRef.current = null;
+      }
       clearAnnouncementTimers();
       if (walkieNoticeTimerRef.current) {
         window.clearTimeout(walkieNoticeTimerRef.current);
@@ -567,13 +717,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
         sharedEnabled: walkieEnabled,
       })
     ) {
-      const sharedEnableMessage =
-        walkie.nonUmpireUi?.sharedEnableNotice ||
-        NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT;
       queueMicrotask(() => {
         setSpectatorWalkieEnabled(true);
-        setActivePanel("walkie");
-        showTemporaryWalkieNotice(sharedEnableMessage, 3600);
+        setLocalWalkieNotice("");
       });
       speakSequenceWithDuck(
         [
@@ -616,10 +762,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
     isLiveMatch,
     match?._id,
     sessionId,
-    showTemporaryWalkieNotice,
     speakSequenceWithDuck,
     walkie.nonUmpireUi?.sharedEnableAnnouncement,
-    walkie.nonUmpireUi?.sharedEnableNotice,
     walkie.snapshot?.enabled,
   ]);
 
@@ -635,8 +779,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     if (requestState === "accepted") {
       queueMicrotask(() => {
         setSpectatorWalkieEnabled(true);
-        setActivePanel("walkie");
-        showTemporaryWalkieNotice(NON_UMPIRE_WALKIE_ACCEPTED_ANNOUNCEMENT, 3200);
+        setLocalWalkieNotice("");
       });
       speakSequenceWithDuck(
         [
@@ -693,13 +836,18 @@ export default function SessionViewClient({ sessionId, initialData }) {
   }, [activePanel, micMonitor]);
 
   const handleShare = async () => {
+    const shareUrl = buildShareUrl(
+      `/session/${sessionId}/view`,
+      window.location.origin
+    );
+
     try {
       if (navigator.share) {
         try {
           await navigator.share({
             title: sessionData?.name || "GV Cricket live score",
             text: "View the live cricket score.",
-            url: window.location.href,
+            url: shareUrl,
           });
           return;
         } catch {
@@ -708,13 +856,13 @@ export default function SessionViewClient({ sessionId, initialData }) {
       }
 
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(window.location.href);
+        await navigator.clipboard.writeText(shareUrl);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
         return;
       }
 
-      window.prompt("Copy spectator link", window.location.href);
+      window.prompt("Copy spectator link", shareUrl);
     } catch (error) {
       console.error("Spectator share failed:", error);
     }
@@ -725,7 +873,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       return;
     }
 
-    prime();
+    prime({ userGesture: true });
     announceCurrentScore({ userGesture: true, interrupt: true });
   };
 
@@ -750,7 +898,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
     clearWalkieHoldTimer();
     walkieHeldRef.current = true;
-    setQuickWalkieTalking(true);
     void (async () => {
       const prepared = await walkie.prepareToTalk?.();
       if (!walkieHeldRef.current || prepared === false) {
@@ -760,10 +907,15 @@ export default function SessionViewClient({ sessionId, initialData }) {
       }
 
       const started = await walkie.startTalking();
+      if (!walkieHeldRef.current && started) {
+        await walkie.stopTalking();
+      }
       if (!walkieHeldRef.current || !started) {
         walkieHeldRef.current = false;
         setQuickWalkieTalking(false);
+        return;
       }
+      setQuickWalkieTalking(true);
     })();
   };
 
@@ -787,7 +939,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
     speakerHeldRef.current = true;
     setQuickSpeakerTalking(true);
     void (async () => {
-      const started = await micMonitor.start({ pauseMedia: true });
+      const started = micMonitor.isPaused
+        ? await micMonitor.resume({ pauseMedia: true })
+        : await micMonitor.start({ pauseMedia: true });
       if (!started) {
         speakerHeldRef.current = false;
         setQuickSpeakerTalking(false);
@@ -854,13 +1008,12 @@ export default function SessionViewClient({ sessionId, initialData }) {
         setLocalWalkieNotice("");
         setActivePanel((current) => (current === "walkie" ? null : current));
         walkie.dismissNotice();
-        await walkie.deactivateAudio();
+        await walkie.deactivateAudio({ restartSignaling: true });
         return;
       }
 
       setSpectatorWalkieEnabled(true);
       if (action === "enable") {
-        showTemporaryWalkieNotice("Walkie-talkie is on. Tap and hold to talk.");
         return;
       }
 
@@ -871,7 +1024,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
       if (action === "request") {
         setSpectatorWalkieEnabled(true);
-        prime();
+        prime({ userGesture: true });
         showTemporaryWalkieNotice("Requesting walkie-talkie...");
         speakSequenceWithDuck(
           [
@@ -910,7 +1063,17 @@ export default function SessionViewClient({ sessionId, initialData }) {
     async (nextChecked) => {
       if (nextChecked) {
         micPrepareRequestedRef.current = true;
-        void micMonitor.prepare({ requestPermission: true });
+        const prepared = await micMonitor.prepare({ requestPermission: true });
+        if (prepared && !micMonitor.isActive && !micMonitor.isPaused) {
+          const primed = await micMonitor.start({
+            pauseMedia: false,
+            startPaused: true,
+            playStartCue: false,
+          });
+          if (!primed) {
+            return;
+          }
+        }
         setActivePanel("mic");
         return;
       }
@@ -930,7 +1093,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
       if (nextChecked) {
         setActivePanel("announce");
-        prime();
+        prime({ userGesture: true });
         announcerInitialSummaryRef.current = "";
         announceCurrentScore({ userGesture: true, interrupt: true });
         return;
@@ -979,10 +1142,27 @@ export default function SessionViewClient({ sessionId, initialData }) {
     });
   const walkiePendingRequest = Boolean(walkieUi.pendingRequest);
   const walkieNeedsLocalEnableNotice = Boolean(walkieUi.needsLocalEnableNotice);
+  const walkieLoading = Boolean(
+    walkie.preparingToTalk ||
+      walkie.claiming ||
+      walkie.recoveringAudio ||
+      walkie.recoveringSignaling
+  );
+  const walkieRemoteSpeakerState = getWalkieRemoteSpeakerState({
+    snapshot: walkie.snapshot,
+    participantId: walkie.participantId,
+    isSelfTalking: walkieCardTalking,
+  });
   const speakerCardTalking = quickSpeakerTalking || micMonitor.isActive;
   const speakerSwitchOn = Boolean(speakerMicOn || activePanel === "mic");
   const announceSwitchOn = Boolean(settings.enabled);
-  const walkieCardDescription = walkieCardFinishing
+  const walkieCardDescription = walkieLoading
+    ? walkie.recoveringAudio || walkie.recoveringSignaling
+      ? "Reconnecting walkie..."
+      : "Connecting walkie..."
+    : walkieRemoteSpeakerState.isRemoteTalking
+    ? walkieRemoteSpeakerState.shortStatus
+    : walkieCardFinishing
     ? "Finishing..."
     : walkieCardTalking
     ? "You are live."
@@ -996,14 +1176,25 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const shouldSurfaceWalkieNotice = Boolean(
     walkie.snapshot?.enabled || walkieSwitchOn || walkieNeedsLocalEnableNotice
   );
+  const hideGenericSharedWalkieNotice = Boolean(
+    !localWalkieNotice &&
+      (walkie.notice === "Walkie-talkie is live." || walkie.notice === "Walkie-talkie is off.")
+  );
   const rawWalkieNotice = walkieUi.notice
     ? walkieUi.notice
-    : localWalkieNotice || (shouldSurfaceWalkieNotice ? walkie.notice || "" : "");
+    : localWalkieNotice ||
+      (shouldSurfaceWalkieNotice && !hideGenericSharedWalkieNotice ? walkie.notice || "" : "");
   const walkieStatusNotice =
-    walkie.snapshot?.enabled && !walkieCardTalking
+    walkieRemoteSpeakerState.isRemoteTalking
+      ? walkieRemoteSpeakerState.title
+      : walkie.snapshot?.enabled && !walkieCardTalking
       ? walkie.snapshot?.busy
         ? walkie.snapshot?.activeSpeakerRole === "umpire"
-          ? "Umpire is live."
+          ? "Umpire is talking."
+          : walkie.snapshot?.activeSpeakerRole === "director"
+          ? "Director is talking."
+          : walkie.snapshot?.activeSpeakerRole === "spectator"
+          ? "Spectator is talking."
           : "Live channel is busy."
         : "Channel is free."
       : "";
@@ -1045,7 +1236,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     trackerHistory = reconstructedMatch[inningsKey]?.history || activeInningsHistory;
   }
   const launcherCardClass =
-    "relative w-full overflow-hidden rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.05),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.06),transparent_28%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] text-left shadow-[0_18px_50px_rgba(0,0,0,0.32)] backdrop-blur-sm transition-transform hover:-translate-y-0.5";
+    "relative w-full overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.05),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.06),transparent_28%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] text-left shadow-[0_18px_50px_rgba(0,0,0,0.32)] backdrop-blur-sm transition-transform hover:-translate-y-0.5";
   const innings1Complete = match?.innings === "second" || Boolean(match?.result);
   const innings2Complete = match?.innings === "second" && !isLiveMatch;
   const targetRuns = Number(match?.innings1?.score || 0) + 1;
@@ -1157,7 +1348,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         <div className="w-full max-w-4xl mt-1">
           {showWalkieLauncher ? (
             <div className={`${launcherCardClass} mb-4 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.08),transparent_26%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-3`}>
-            <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/50 to-transparent" />
+            <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-linear-to-r from-transparent via-emerald-300/50 to-transparent" />
             <div
               className="flex w-full flex-col gap-4"
               style={{
@@ -1194,6 +1385,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                     checked={walkieSwitchOn}
                     onChange={handleWalkieSwitchChange}
                     label="Toggle walkie-talkie for this device"
+                    disabled={walkie.requestState === "pending" || walkie.updatingEnabled}
                   />
                 </div>
               </div>
@@ -1203,7 +1395,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                   localWalkieNotice ||
                   walkie.notice ||
                   walkieNeedsLocalEnableNotice
-                    ? "min-h-[72px]"
+                    ? "min-h-18"
                     : ""
                 }
               >
@@ -1219,56 +1411,74 @@ export default function SessionViewClient({ sessionId, initialData }) {
               </div>
               {walkieSwitchOn ? (
                 <div className="flex flex-col items-center justify-center pt-1 pb-1">
-                  <button
-                    type="button"
-                    aria-label="Tap and hold walkie-talkie mic"
-                    {...HOLD_BUTTON_INTERACTION_PROPS}
-                    onPointerDown={(event) => {
-                      event.preventDefault();
-                      handleWalkieLauncherPressStart();
-                    }}
-                    onPointerUp={(event) => {
-                      event.preventDefault();
-                      void handleWalkieLauncherPressEnd();
-                    }}
-                    onPointerCancel={(event) => {
-                      event.preventDefault();
-                      void handleWalkieLauncherPressEnd();
-                    }}
-                    onPointerLeave={(event) => {
-                      event.preventDefault();
-                      void handleWalkieLauncherPressEnd();
-                    }}
-                    className={`inline-flex h-20 w-20 items-center justify-center rounded-full border transition ${
-                      walkieCardTalking
-                        ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_28px_rgba(16,185,129,0.38)]"
-                        : walkieCardFinishing
-                        ? "border-amber-300/40 bg-amber-500/12 text-amber-100 shadow-[0_0_22px_rgba(245,158,11,0.18)]"
-                        : "border-white/12 bg-white/5 text-white"
-                    }`}
-                  >
-                    {walkieCardTalking ? (
-                      <FaMicrophone className="text-[1.75rem]" />
-                    ) : (
-                      <FaMicrophoneSlash className="text-[1.75rem]" />
-                    )}
-                  </button>
-                  <span
-                    className="mt-3 text-xs font-medium tracking-[0.18em] text-zinc-400 uppercase"
-                    style={{
-                      userSelect: "none",
-                      WebkitUserSelect: "none",
-                      WebkitTouchCallout: "none",
-                      WebkitTapHighlightColor: "transparent",
-                      touchAction: "none",
-                    }}
-                  >
-                    {walkieCardTalking
-                      ? "Release to stop"
-                      : walkieCardFinishing
-                        ? "Finishing..."
-                        : "Tap and hold to talk"}
-                  </span>
+                  {walkieRemoteSpeakerState.isRemoteTalking ? (
+                    <div className="w-full max-w-[320px] rounded-[28px] border border-cyan-300/18 bg-[linear-gradient(180deg,rgba(10,18,26,0.92),rgba(8,10,16,0.98))] px-5 py-4 text-center shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
+                      <div className="mb-2 inline-flex items-center rounded-full border border-cyan-300/18 bg-cyan-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100">
+                        {walkieRemoteSpeakerState.capsuleLabel}
+                      </div>
+                      <p className="text-sm font-medium text-white">{walkieRemoteSpeakerState.title}</p>
+                      <p className="mt-2 text-xs leading-5 text-zinc-400">{walkieRemoteSpeakerState.detail}</p>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        aria-label="Tap and hold walkie-talkie mic"
+                        {...HOLD_BUTTON_INTERACTION_PROPS}
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          handleWalkieLauncherPressStart();
+                        }}
+                        onPointerUp={(event) => {
+                          event.preventDefault();
+                          void handleWalkieLauncherPressEnd();
+                        }}
+                        onPointerCancel={(event) => {
+                          event.preventDefault();
+                          void handleWalkieLauncherPressEnd();
+                        }}
+                        onPointerLeave={(event) => {
+                          event.preventDefault();
+                          void handleWalkieLauncherPressEnd();
+                        }}
+                        className={`inline-flex h-24 w-24 items-center justify-center rounded-full border transition ${
+                          walkieCardTalking
+                            ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_28px_rgba(16,185,129,0.38)]"
+                            : walkieLoading
+                            ? "border-cyan-300/40 bg-cyan-500/12 text-cyan-100 shadow-[0_0_22px_rgba(34,211,238,0.16)]"
+                            : walkieCardFinishing
+                            ? "border-amber-300/40 bg-amber-500/12 text-amber-100 shadow-[0_0_22px_rgba(245,158,11,0.18)]"
+                            : "border-white/12 bg-white/5 text-white"
+                        }`}
+                      >
+                        {walkieCardTalking ? (
+                          <FaMicrophone className="text-[2rem]" />
+                        ) : walkieLoading ? (
+                          <FaMicrophone className="animate-pulse text-[2rem]" />
+                        ) : (
+                          <FaMicrophoneSlash className="text-[2rem]" />
+                        )}
+                      </button>
+                      <span
+                        className="mt-3 text-xs font-medium tracking-[0.18em] text-zinc-400 uppercase"
+                        style={{
+                          userSelect: "none",
+                          WebkitUserSelect: "none",
+                          WebkitTouchCallout: "none",
+                          WebkitTapHighlightColor: "transparent",
+                          touchAction: "none",
+                        }}
+                      >
+                        {walkieCardTalking
+                          ? "Release to stop"
+                          : walkieLoading
+                            ? "Connecting..."
+                          : walkieCardFinishing
+                            ? "Finishing..."
+                            : "Tap and hold to talk"}
+                      </span>
+                    </>
+                  )}
                 </div>
               ) : null}
             </div>
@@ -1289,7 +1499,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
             className={`${launcherCardClass} min-h-34.5 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.11),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-3.5`}
             aria-label="Open loudspeaker"
           >
-            <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/50 to-transparent" />
+            <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-linear-to-r from-transparent via-amber-300/50 to-transparent" />
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between gap-3">
                 <span
@@ -1369,7 +1579,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
             className={`${launcherCardClass} min-h-34.5 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.08),transparent_24%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-3.5`}
             aria-label="Open score announcer"
           >
-            <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/46 to-transparent" />
+            <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-linear-to-r from-transparent via-violet-300/46 to-transparent" />
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between gap-3">
                 <button
@@ -1474,7 +1684,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
               onClose={() => setActivePanel(null)}
               onToggleEnabled={(nextEnabled) => {
                 if (nextEnabled) {
-                  prime();
+                  prime({ userGesture: true });
                   speakSequenceWithDuck(
                   [
                     {
@@ -1538,11 +1748,16 @@ export default function SessionViewClient({ sessionId, initialData }) {
             <WalkiePanel
               role="spectator"
               snapshot={walkie.snapshot}
-              notice={walkieUi.notice || localWalkieNotice || walkie.notice}
+              notice={walkieNoticeText}
               error={walkie.error}
               canEnable={false}
               canRequestEnable={walkie.canRequestEnable}
               canTalk={walkie.canTalk}
+              claiming={walkie.claiming}
+              preparingToTalk={walkie.preparingToTalk}
+              updatingEnabled={walkie.updatingEnabled}
+              recoveringAudio={walkie.recoveringAudio}
+              recoveringSignaling={walkie.recoveringSignaling}
               isSelfTalking={walkie.isSelfTalking}
               isFinishing={walkie.isFinishing}
               countdown={walkie.countdown}

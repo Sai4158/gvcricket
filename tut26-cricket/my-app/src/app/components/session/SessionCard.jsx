@@ -168,6 +168,7 @@ function SessionCard({ session, onUmpireClick, onDirectorClick }) {
                 href={scoreHref}
                 pendingLabel="Opening live score..."
                 pendingClassName="pending-shimmer"
+                primeAudioOnClick
                 className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-amber-200/16 bg-[linear-gradient(135deg,rgba(245,158,11,0.96),rgba(217,119,6,0.94)_58%,rgba(120,53,15,0.98))] px-4 py-3.5 text-[15px] font-semibold text-black shadow-[0_18px_34px_rgba(180,83,9,0.24)] transition hover:-translate-y-0.5 hover:border-amber-100/28 hover:brightness-105"
               >
                 {({ pending, spinner }) => (

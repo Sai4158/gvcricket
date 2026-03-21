@@ -4,6 +4,7 @@ import {
   absoluteUrl,
   getMatchupLabel,
   siteConfig,
+  versionedSocialImagePath,
 } from "../../lib/site-metadata";
 import { loadPublicMatchData } from "../../lib/server-data";
 
@@ -41,12 +42,12 @@ export async function generateMetadata({ params }) {
       title: `${pageLabel} | GV Cricket`,
       description: `Final score, winner, over summary, and match stats for ${matchup}.`,
       url: absoluteUrl(`/result/${id}`),
-      images: [absoluteUrl(`/result/${id}/opengraph-image`)],
+      images: [absoluteUrl(versionedSocialImagePath(`/result/${id}/opengraph-image`))],
     },
     twitter: {
       title: `${pageLabel} | GV Cricket`,
       description: `Final score and match stats for ${matchup}.`,
-      images: [absoluteUrl(`/result/${id}/twitter-image`)],
+      images: [absoluteUrl(versionedSocialImagePath(`/result/${id}/twitter-image`))],
     },
   };
 }
