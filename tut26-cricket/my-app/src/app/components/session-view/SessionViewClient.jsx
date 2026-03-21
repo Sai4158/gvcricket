@@ -209,6 +209,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const lastAnnouncedEventRef = useRef("");
   const announcementDuckRef = useRef([]);
   const announcementRestoreTimerRef = useRef(null);
+  const announcerResetTimerRef = useRef(null);
   const walkieNoticeTimerRef = useRef(null);
   const walkieHoldTimerRef = useRef(null);
   const walkieHeldRef = useRef(false);
@@ -351,6 +352,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
   }, []);
 
   useEffect(() => {
+    if (announcerResetTimerRef.current) {
+      window.clearTimeout(announcerResetTimerRef.current);
+      announcerResetTimerRef.current = null;
+    }
     lastAnnouncedEventRef.current = "";
     previousEnabledRef.current = false;
     previousWalkieEnabledRef.current = false;
@@ -411,10 +416,35 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
 
     announcerAutoEnabledMatchRef.current = match._id;
+    lastAnnouncedEventRef.current = "";
+    announcerInitialSummaryRef.current = "";
+    previousEnabledRef.current = false;
+    clearAnnouncementTimers();
+    stop();
+    if (announcerResetTimerRef.current) {
+      window.clearTimeout(announcerResetTimerRef.current);
+      announcerResetTimerRef.current = null;
+    }
+    if (settings.enabled) {
+      updateSetting("enabled", false);
+      announcerResetTimerRef.current = window.setTimeout(() => {
+        announcerResetTimerRef.current = null;
+        updateSetting("enabled", true);
+      }, 120);
+      return;
+    }
+
     if (!settings.enabled) {
       updateSetting("enabled", true);
     }
-  }, [isLiveMatch, match?._id, settings.enabled, updateSetting]);
+  }, [
+    clearAnnouncementTimers,
+    isLiveMatch,
+    match?._id,
+    settings.enabled,
+    stop,
+    updateSetting,
+  ]);
 
   useEffect(() => {
     const announcerEnabled = Boolean(match && isLiveMatch && settings.enabled && settings.mode !== "silent");
@@ -552,6 +582,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
   useEffect(() => {
     return () => {
+      if (announcerResetTimerRef.current) {
+        window.clearTimeout(announcerResetTimerRef.current);
+        announcerResetTimerRef.current = null;
+      }
       clearAnnouncementTimers();
       if (walkieNoticeTimerRef.current) {
         window.clearTimeout(walkieNoticeTimerRef.current);
