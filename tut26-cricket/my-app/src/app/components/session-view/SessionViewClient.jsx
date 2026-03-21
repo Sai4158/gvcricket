@@ -451,8 +451,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
       return;
     }
 
+    const queuedWhileWaitingForGesture = announcerStatus === "waiting_for_gesture";
     const spoke = announceCurrentScore();
-    if (!spoke) {
+    if (!spoke && !queuedWhileWaitingForGesture) {
       return;
     }
 
@@ -511,7 +512,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
           }
         : null,
     ].filter(Boolean);
-    if (!speakSequenceWithDuck(
+    const spoke = speakSequenceWithDuck(
       items,
       {
         key: event.id,
@@ -520,7 +521,12 @@ export default function SessionViewClient({ sessionId, initialData }) {
         minGapMs: 0,
       },
       overSummary ? 3300 : scoreLine ? 2300 : 1500
-    )) {
+    );
+    if (!spoke && announcerStatus === "waiting_for_gesture") {
+      lastAnnouncedEventRef.current = event.id;
+      return;
+    }
+    if (!spoke) {
       return;
     }
     lastAnnouncedEventRef.current = event.id;
@@ -720,7 +726,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       return;
     }
 
-    prime();
+    prime({ userGesture: true });
     announceCurrentScore({ userGesture: true, interrupt: true });
   };
 
@@ -869,7 +875,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
       if (action === "request") {
         setSpectatorWalkieEnabled(true);
-        prime();
+        prime({ userGesture: true });
         showTemporaryWalkieNotice("Requesting walkie-talkie...");
         speakSequenceWithDuck(
           [
@@ -928,7 +934,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
       if (nextChecked) {
         setActivePanel("announce");
-        prime();
+        prime({ userGesture: true });
         announcerInitialSummaryRef.current = "";
         announceCurrentScore({ userGesture: true, interrupt: true });
         return;
@@ -1519,7 +1525,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
               onClose={() => setActivePanel(null)}
               onToggleEnabled={(nextEnabled) => {
                 if (nextEnabled) {
-                  prime();
+                  prime({ userGesture: true });
                   speakSequenceWithDuck(
                   [
                     {

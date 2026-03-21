@@ -507,7 +507,7 @@ export default function MatchPageClient({
 
                     if (nextEnabled) {
                       try {
-                        prime();
+                        prime({ userGesture: true });
                         speak("Umpire voice on.", {
                           key: "umpire-voice-enabled",
                           rate: 0.9,

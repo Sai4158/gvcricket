@@ -221,6 +221,24 @@ function formatAudioTime(seconds) {
   return `${minutes}:${String(remainder).padStart(2, "0")}`;
 }
 
+function findLibraryCardIdFromPoint(clientX, clientY) {
+  if (typeof document === "undefined") {
+    return "";
+  }
+
+  const hoveredElement = document.elementFromPoint(clientX, clientY);
+  if (!(hoveredElement instanceof HTMLElement)) {
+    return "";
+  }
+
+  const card = hoveredElement.closest("[data-library-effect-id]");
+  if (!(card instanceof HTMLElement)) {
+    return "";
+  }
+
+  return card.dataset.libraryEffectId || "";
+}
+
 function IosSwitch({ checked, onChange, label, disabled = false }) {
   return (
     <button
@@ -576,10 +594,25 @@ export default function DirectorConsoleClient({
   const musicEffectDuckFactorRef = useRef(1);
   const musicDuckAnimationFrameRef = useRef(0);
   const ambientAudioSessionTypeRef = useRef("");
+  const libraryPointerDragRef = useRef({
+    pointerId: null,
+    activeId: "",
+    targetId: "",
+  });
   const [speechSettings, setSpeechSettings] = useState(createSpeechSettings);
   const speech = useSpeechAnnouncer(speechSettings);
   const micMonitor = useLocalMicMonitor();
   const iOSSafari = useMemo(() => isIOSSafari(), []);
+  const usePointerLibraryReorder = useMemo(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return Boolean(
+      window.matchMedia?.("(pointer: coarse)")?.matches ||
+        window.navigator?.maxTouchPoints > 0,
+    );
+  }, []);
 
   const cancelMusicDuckAnimation = useCallback(() => {
     if (musicDuckAnimationFrameRef.current) {
@@ -1153,6 +1186,121 @@ export default function DirectorConsoleClient({
     [handleLibraryReorder, orderedLibraryFiles],
   );
 
+  const setLibrarySelectionLock = useCallback((locked) => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    [document.body, document.documentElement].forEach((node) => {
+      if (!node) {
+        return;
+      }
+
+      if (locked) {
+        node.style.setProperty("user-select", "none");
+        node.style.setProperty("-webkit-user-select", "none");
+        node.style.setProperty("-webkit-touch-callout", "none");
+      } else {
+        node.style.removeProperty("user-select");
+        node.style.removeProperty("-webkit-user-select");
+        node.style.removeProperty("-webkit-touch-callout");
+      }
+    });
+  }, []);
+
+  useEffect(
+    () => () => {
+      setLibrarySelectionLock(false);
+    },
+    [setLibrarySelectionLock],
+  );
+
+  const updatePointerLibraryDropTarget = useCallback((clientX, clientY) => {
+    const activeId = libraryPointerDragRef.current.activeId;
+    if (!activeId) {
+      return;
+    }
+
+    const hoveredId = findLibraryCardIdFromPoint(clientX, clientY);
+    const nextTargetId =
+      hoveredId && hoveredId !== activeId ? hoveredId : "";
+
+    if (libraryPointerDragRef.current.targetId === nextTargetId) {
+      return;
+    }
+
+    libraryPointerDragRef.current.targetId = nextTargetId;
+    setLibraryDropTargetId(nextTargetId);
+  }, []);
+
+  const clearLibraryDragState = useCallback(() => {
+    libraryPointerDragRef.current = {
+      pointerId: null,
+      activeId: "",
+      targetId: "",
+    };
+    setLibrarySelectionLock(false);
+    setDraggingLibraryId("");
+    setLibraryDropTargetId("");
+  }, [setLibrarySelectionLock]);
+
+  const finishPointerLibraryDrag = useCallback(
+    (pointerId = null, options = {}) => {
+      const { commit = true, clientX = null, clientY = null } = options;
+      const activeDrag = libraryPointerDragRef.current;
+
+      if (!activeDrag.activeId) {
+        return;
+      }
+
+      if (
+        pointerId !== null &&
+        activeDrag.pointerId !== null &&
+        pointerId !== activeDrag.pointerId
+      ) {
+        return;
+      }
+
+      if (Number.isFinite(clientX) && Number.isFinite(clientY)) {
+        updatePointerLibraryDropTarget(clientX, clientY);
+      }
+
+      const activeId = libraryPointerDragRef.current.activeId;
+      const targetId = libraryPointerDragRef.current.targetId;
+      clearLibraryDragState();
+
+      if (commit && activeId && targetId && activeId !== targetId) {
+        moveLibraryItem(activeId, targetId);
+      }
+    },
+    [clearLibraryDragState, moveLibraryItem, updatePointerLibraryDropTarget],
+  );
+
+  const handleLibraryGripPointerDown = useCallback(
+    (event, fileId) => {
+      if (!usePointerLibraryReorder) {
+        return;
+      }
+
+      if (event.pointerType === "mouse" && event.button !== 0) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      setLibrarySelectionLock(true);
+      libraryPointerDragRef.current = {
+        pointerId: event.pointerId ?? null,
+        activeId: fileId,
+        targetId: "",
+      };
+      setDraggingLibraryId(fileId);
+      setLibraryDropTargetId("");
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    },
+    [setLibrarySelectionLock, usePointerLibraryReorder],
+  );
+
   const handleLibraryDragStart = (event, fileId) => {
     if (event.target instanceof HTMLElement && event.target.closest("button")) {
       event.preventDefault();
@@ -1183,14 +1331,57 @@ export default function DirectorConsoleClient({
     const activeId =
       event.dataTransfer.getData("text/plain") || draggingLibraryId;
     moveLibraryItem(activeId, fileId);
-    setDraggingLibraryId("");
-    setLibraryDropTargetId("");
+    clearLibraryDragState();
   };
 
-  const clearLibraryDragState = () => {
-    setDraggingLibraryId("");
-    setLibraryDropTargetId("");
-  };
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const handlePointerMove = (event) => {
+      const activeDrag = libraryPointerDragRef.current;
+      if (!activeDrag.activeId) {
+        return;
+      }
+
+      if (
+        activeDrag.pointerId !== null &&
+        event.pointerId !== undefined &&
+        event.pointerId !== activeDrag.pointerId
+      ) {
+        return;
+      }
+
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+      updatePointerLibraryDropTarget(event.clientX, event.clientY);
+    };
+
+    const handlePointerRelease = (event) => {
+      finishPointerLibraryDrag(event.pointerId, {
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
+    };
+
+    const handlePointerCancel = (event) => {
+      finishPointerLibraryDrag(event.pointerId, { commit: false });
+    };
+
+    window.addEventListener("pointermove", handlePointerMove, {
+      passive: false,
+    });
+    window.addEventListener("pointerup", handlePointerRelease);
+    window.addEventListener("pointercancel", handlePointerCancel);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerRelease);
+      window.removeEventListener("pointercancel", handlePointerCancel);
+    };
+  }, [finishPointerLibraryDrag, updatePointerLibraryDropTarget]);
 
   useEventSource({
     url:
@@ -1369,7 +1560,7 @@ export default function DirectorConsoleClient({
 
     void primeUiAudio();
     speech.stop();
-    speech.prime();
+    speech.prime({ userGesture: true });
     speech.speak(announcement, {
       key: `director-score-${targetMatch._id}`,
       userGesture: true,
@@ -1904,8 +2095,7 @@ export default function DirectorConsoleClient({
     setLibraryCurrentTime(0);
     setLibraryLiveId("");
     setLibraryState("idle");
-    setDraggingLibraryId("");
-    setLibraryDropTargetId("");
+    clearLibraryDragState();
     previousDirectorWalkieEnabledRef.current = false;
     previousDirectorWalkieRequestStateRef.current = "idle";
     if (directorWalkieNoticeTimerRef.current) {
@@ -1935,7 +2125,7 @@ export default function DirectorConsoleClient({
     }
 
     setMusicState("idle");
-  }, [managedSessionId]);
+  }, [clearLibraryDragState, managedSessionId]);
 
   const handleMusicSelection = (event) => {
     const files = Array.from(event.target.files || []);
@@ -2781,7 +2971,8 @@ export default function DirectorConsoleClient({
                     {orderedLibraryFiles.map((file) => (
                       <div
                         key={file.id}
-                        draggable
+                        data-library-effect-id={file.id}
+                        draggable={!usePointerLibraryReorder}
                         onDragStart={(event) =>
                           handleLibraryDragStart(event, file.id)
                         }
@@ -2803,7 +2994,7 @@ export default function DirectorConsoleClient({
                             void playEffect(file);
                           }
                         }}
-                        className={`group relative min-h-47 overflow-hidden rounded-3xl border px-4 py-4 pb-5 text-left transition cursor-grab active:cursor-grabbing ${
+                        className={`group relative min-h-47 overflow-hidden rounded-3xl border px-4 py-4 pb-5 text-left transition select-none ${
                           libraryLiveId === file.id
                             ? "border-emerald-300/30 bg-[linear-gradient(180deg,rgba(18,40,34,0.9),rgba(10,16,18,0.94))] shadow-[0_18px_40px_rgba(16,185,129,0.16)]"
                             : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
@@ -2825,8 +3016,34 @@ export default function DirectorConsoleClient({
                                 <FaMusic className="text-sm" />
                               </div>
                               <span
+                                role="button"
+                                tabIndex={-1}
                                 className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-zinc-400"
-                                title="Drag to reorder"
+                                title={
+                                  usePointerLibraryReorder
+                                    ? "Drag this handle to reorder"
+                                    : "Drag to reorder"
+                                }
+                                onPointerDown={(event) =>
+                                  handleLibraryGripPointerDown(event, file.id)
+                                }
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                }}
+                                onDragStart={(event) => {
+                                  if (usePointerLibraryReorder) {
+                                    event.preventDefault();
+                                  }
+                                }}
+                                style={{
+                                  userSelect: "none",
+                                  WebkitUserSelect: "none",
+                                  WebkitTouchCallout: "none",
+                                  touchAction: usePointerLibraryReorder
+                                    ? "none"
+                                    : "auto",
+                                }}
                               >
                                 <FaGripVertical className="text-sm" />
                               </span>

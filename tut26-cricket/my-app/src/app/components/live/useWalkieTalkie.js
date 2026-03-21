@@ -39,6 +39,11 @@ const REQUEST_RESET_MS = 1800;
 const REMOTE_AUDIO_LINGER_MS = 12000;
 const RTC_TOKEN_REFRESH_BUFFER_MS = 90 * 1000;
 const SIGNAL_TOKEN_REFRESH_BUFFER_MS = 90 * 1000;
+const SIGNALING_RETRY_BASE_MS = 1500;
+const SIGNALING_RETRY_MAX_MS = 12000;
+const SIGNALING_RETRY_COOLDOWN_MS = 45000;
+const SIGNALING_MAX_RECOVERABLE_RETRIES = 4;
+const SIGNALING_SYNC_REQUEST_MIN_GAP_MS = 15000;
 const AGORA_CHANNEL_NAME_MAX = 64;
 const AGORA_USER_ID_MAX = 64;
 const TALK_RETRY_MESSAGES = [
@@ -486,6 +491,8 @@ export default function useWalkieTalkie({
   const shouldMaintainSignalingRef = useRef(false);
   const signalingPropActiveRef = useRef(Boolean(signalingActive));
   const manualSignalingActiveRef = useRef(false);
+  const signalingRecoverableFailuresRef = useRef(0);
+  const lastSyncRequestAtRef = useRef(0);
   const noticeRef = useRef("");
   const isSafari = useMemo(() => safariBrowser(), []);
   signalingPropActiveRef.current = Boolean(signalingActive);
@@ -1486,12 +1493,29 @@ export default function useWalkieTalkie({
       });
 
       await refreshRuntimeState(client);
-      await client.publish(
-        channelName,
-        JSON.stringify({
-          type: "walkie-sync-request",
-        })
-      );
+      const now = Date.now();
+      const shouldRequestSync =
+        now - lastSyncRequestAtRef.current >= SIGNALING_SYNC_REQUEST_MIN_GAP_MS;
+      if (shouldRequestSync) {
+        lastSyncRequestAtRef.current = now;
+        try {
+          await client.publish(
+            channelName,
+            JSON.stringify({
+              type: "walkie-sync-request",
+            })
+          );
+        } catch (syncRequestError) {
+          walkieConsole("warn", "Walkie sync request skipped", {
+            stage: "rtm-sync-request",
+            message: messageFor(
+              syncRequestError,
+              "Walkie sync request could not be sent."
+            ),
+          });
+        }
+      }
+      signalingRecoverableFailuresRef.current = 0;
       setRecoveringSignaling(false);
       setHasWalkieToken(true);
       walkieConsole("info", "Walkie signaling ready", {
@@ -2279,6 +2303,8 @@ export default function useWalkieTalkie({
     if (!shouldMaintainSignaling) {
       manualSignalingActiveRef.current = false;
       setManualSignalingActiveState(false);
+      signalingRecoverableFailuresRef.current = 0;
+      lastSyncRequestAtRef.current = 0;
       setHasWalkieToken(false);
       setManualAudioReady(false);
       metadataStateRef.current = { enabled: false, pendingRequests: [] };
@@ -2319,22 +2345,46 @@ export default function useWalkieTalkie({
 
       const message = messageFor(connectError, "Walkie live connection is unavailable.");
       if (classification === "recoverable") {
+        const failureCount = signalingRecoverableFailuresRef.current + 1;
+        signalingRecoverableFailuresRef.current = failureCount;
+        const retryDelay =
+          failureCount >= SIGNALING_MAX_RECOVERABLE_RETRIES
+            ? SIGNALING_RETRY_COOLDOWN_MS
+            : Math.min(
+                SIGNALING_RETRY_BASE_MS * 2 ** Math.max(0, failureCount - 1),
+                SIGNALING_RETRY_MAX_MS
+              );
         setRecoveringSignaling(true);
         walkieConsole("warn", "Walkie signaling setup delayed", {
           stage: "signaling-setup",
+          retryDelay,
+          failureCount,
           message,
         });
-        updateNotice("Retrying live walkie...");
+        if (failureCount >= SIGNALING_MAX_RECOVERABLE_RETRIES) {
+          void cleanupSignaling();
+          setError(
+            "Walkie live connection looks blocked on this network or browser. Retrying automatically."
+          );
+          updateNotice(
+            `Walkie live connection is blocked. Retrying in ${Math.ceil(
+              retryDelay / 1000
+            )}s.`
+          );
+        } else {
+          updateNotice("Retrying live walkie...");
+        }
         clearTimer(signalingRetryTimerRef);
         signalingRetryTimerRef.current = window.setTimeout(() => {
           signalingRetryTimerRef.current = null;
           if (mountedRef.current && shouldMaintainSignalingRef.current) {
             setSignalingReconnectTick((current) => current + 1);
           }
-        }, 1200);
+        }, retryDelay);
         return;
       }
 
+      signalingRecoverableFailuresRef.current = 0;
       setRecoveringSignaling(false);
       walkieConsole("error", "Walkie signaling setup failed", {
         stage: "signaling-setup",

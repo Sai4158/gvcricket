@@ -431,6 +431,27 @@ export default function useSpeechAnnouncer(settings) {
     setStatus((current) => (current === "unsupported" ? current : "ready"));
   }, [clearStepTimer]);
 
+  const rememberPendingSequence = useCallback((sequence, options = {}) => {
+    if (!sequence?.items?.length) {
+      pendingSpeakRef.current = null;
+      return;
+    }
+
+    pendingSpeakRef.current = {
+      type: "sequence",
+      items: sequence.items.map((item) => ({ ...item })),
+      options: {
+        key: sequence.key,
+        pauseAfterMs: sequence.pauseAfterMs ?? 0,
+        priority: sequence.priority ?? 1,
+        fallbackTried: sequence.fallbackTried ?? false,
+        interrupt: true,
+        minGapMs: 0,
+        ...options,
+      },
+    };
+  }, []);
+
   const ensureVoicesReady = useCallback(() => {
     if (!canUseSpeechSynthesis()) {
       return Promise.resolve([]);
@@ -602,6 +623,8 @@ export default function useSpeechAnnouncer(settings) {
           utteranceRef.current = null;
           currentSequenceRef.current = null;
           queuedSequencesRef.current = [];
+          isPrimedRef.current = false;
+          rememberPendingSequence(sequence);
           setStatus("waiting_for_gesture");
           return;
         }
@@ -655,7 +678,7 @@ export default function useSpeechAnnouncer(settings) {
 
       return true;
     },
-    [clearStepTimer, ensureVoicesReady, settings.volume, voice]
+    [clearStepTimer, ensureVoicesReady, rememberPendingSequence, settings.volume, voice]
   );
 
   const queueSequence = useCallback(
@@ -789,30 +812,41 @@ export default function useSpeechAnnouncer(settings) {
     ]
   );
 
-  const prime = useCallback(() => {
+  const prime = useCallback((options = {}) => {
     if (!canUseSpeechSynthesis()) {
       setStatus("unsupported");
       return false;
     }
 
+    const userGesture = Boolean(options.userGesture);
+
     try {
       void ensureVoicesReady();
       window.speechSynthesis.resume?.();
 
-      isPrimedRef.current = true;
-      setStatus("ready");
+      const unlocked = Boolean(userGesture || isUiAudioUnlocked());
+      isPrimedRef.current = unlocked;
+      setStatus(unlocked ? "ready" : "waiting_for_gesture");
 
-      if (pendingSpeakRef.current) {
+      if (unlocked && pendingSpeakRef.current) {
         const nextPending = pendingSpeakRef.current;
         pendingSpeakRef.current = null;
         if (nextPending.type === "sequence") {
-          queueSequence(nextPending.items, nextPending.options);
+          queueSequence(nextPending.items, {
+            ...nextPending.options,
+            userGesture,
+            minGapMs: 0,
+          });
         } else {
-          queueSequence([{ text: nextPending.text }], nextPending.options);
+          queueSequence([{ text: nextPending.text }], {
+            ...nextPending.options,
+            userGesture,
+            minGapMs: 0,
+          });
         }
       }
 
-      return true;
+      return unlocked;
     } catch {
       setStatus("blocked");
       return false;
@@ -823,8 +857,12 @@ export default function useSpeechAnnouncer(settings) {
     if (!canUseSpeechSynthesis()) return undefined;
 
     const primeFromGesture = () => {
-      if (!isPrimedRef.current) {
-        prime();
+      if (
+        !isPrimedRef.current ||
+        Boolean(pendingSpeakRef.current) ||
+        status === "waiting_for_gesture"
+      ) {
+        prime({ userGesture: true });
       }
     };
 
@@ -837,7 +875,7 @@ export default function useSpeechAnnouncer(settings) {
       window.removeEventListener("keydown", primeFromGesture);
       window.removeEventListener("touchstart", primeFromGesture);
     };
-  }, [prime]);
+  }, [prime, status]);
 
   useEffect(() => {
     if (typeof document === "undefined" || typeof window === "undefined") {
