@@ -46,6 +46,7 @@ import {
   getNonUmpireWalkieToggleAction,
   NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT,
 } from "../../lib/walkie-device-state";
+import { getWalkieRemoteSpeakerState } from "../../lib/walkie-ui";
 import {
   getCachedAudioAssetUrl,
   isIOSSafari,
@@ -86,7 +87,9 @@ function readCachedDirectorSessions() {
   }
 
   try {
-    const cachedValue = window.sessionStorage.getItem(DIRECTOR_SESSIONS_CACHE_KEY);
+    const cachedValue = window.sessionStorage.getItem(
+      DIRECTOR_SESSIONS_CACHE_KEY,
+    );
     if (!cachedValue) {
       return [];
     }
@@ -115,7 +118,7 @@ function writeCachedDirectorSessions(sessions) {
   try {
     window.sessionStorage.setItem(
       DIRECTOR_SESSIONS_CACHE_KEY,
-      JSON.stringify(sessions)
+      JSON.stringify(sessions),
     );
   } catch {
     // Ignore storage failures and keep the in-memory cache.
@@ -132,7 +135,9 @@ function readCachedDirectorAudioLibrary() {
   }
 
   try {
-    const cachedValue = window.localStorage.getItem(DIRECTOR_AUDIO_LIBRARY_CACHE_KEY);
+    const cachedValue = window.localStorage.getItem(
+      DIRECTOR_AUDIO_LIBRARY_CACHE_KEY,
+    );
     if (!cachedValue) {
       return [];
     }
@@ -172,7 +177,7 @@ function writeCachedDirectorAudioLibrary(files) {
       JSON.stringify({
         savedAt: Date.now(),
         files,
-      })
+      }),
     );
   } catch {
     // Ignore storage failures and keep the in-memory cache.
@@ -198,7 +203,7 @@ function getPreferredLiveSessionId(sessions, preferredSessionId = "") {
   const nextSessions = Array.isArray(sessions) ? sessions : [];
   const preferredLive = preferredSessionId
     ? nextSessions.find(
-        (item) => item.session?._id === preferredSessionId && item.isLive
+        (item) => item.session?._id === preferredSessionId && item.isLive,
       )
     : null;
   const firstLive = nextSessions.find((item) => item.isLive);
@@ -225,15 +230,15 @@ function IosSwitch({ checked, onChange, label, disabled = false }) {
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange?.(!checked)}
-      className={`relative inline-flex h-8 w-[54px] items-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
+      className={`relative inline-flex h-8 w-13.5 items-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
         checked
           ? "border-emerald-300/35 bg-emerald-500 shadow-[0_10px_24px_rgba(16,185,129,0.22)]"
-          : "border-white/10 bg-white/[0.08]"
+          : "border-white/10 bg-white/8"
       } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
     >
       <span
         className={`inline-flex h-6 w-6 rounded-full bg-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition-transform ${
-          checked ? "translate-x-[26px]" : "translate-x-[3px]"
+          checked ? "translate-x-6.5" : "translate-x-0.75"
         }`}
       />
     </button>
@@ -259,13 +264,10 @@ function HelpButton({ title, body }) {
       }
 
       const panelWidth = Math.min(288, Math.max(220, window.innerWidth - 24));
-      const top = Math.min(
-        buttonRect.bottom + 10,
-        window.innerHeight - 24
-      );
+      const top = Math.min(buttonRect.bottom + 10, window.innerHeight - 24);
       const left = Math.min(
         Math.max(12, buttonRect.right - panelWidth),
-        Math.max(12, window.innerWidth - panelWidth - 12)
+        Math.max(12, window.innerWidth - panelWidth - 12),
       );
 
       setPanelStyle({
@@ -302,7 +304,7 @@ function HelpButton({ title, body }) {
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-200 transition hover:bg-white/[0.1] focus:outline-none focus:ring-2 focus:ring-emerald-400/35"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-400/35"
         aria-label={`How ${title} works`}
       >
         <FaInfoCircle />
@@ -312,12 +314,12 @@ function HelpButton({ title, body }) {
             <div
               ref={panelRef}
               style={panelStyle}
-              className="fixed z-[140] rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(26,26,32,0.98),rgba(11,11,16,0.98))] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
+              className="fixed z-140 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(26,26,32,0.98),rgba(11,11,16,0.98))] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
             >
               <p className="text-sm font-semibold text-white">{title}</p>
               <p className="mt-2 text-sm leading-6 text-zinc-300">{body}</p>
             </div>,
-            document.body
+            document.body,
           )
         : null}
     </div>
@@ -330,40 +332,35 @@ const DIRECTOR_CARD_THEMES = {
       "before:bg-[radial-gradient(circle_at_12%_0%,rgba(148,163,184,0.16),transparent_42%)]",
     strip:
       "bg-[linear-gradient(90deg,rgba(244,244,245,0),rgba(226,232,240,0.72)_22%,rgba(125,211,252,0.72)_62%,rgba(244,244,245,0))]",
-    icon:
-      "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.11),rgba(255,255,255,0.04))] text-white shadow-[0_10px_26px_rgba(15,23,42,0.22)]",
+    icon: "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.11),rgba(255,255,255,0.04))] text-white shadow-[0_10px_26px_rgba(15,23,42,0.22)]",
   },
   emerald: {
     shellGlow:
       "before:bg-[radial-gradient(circle_at_12%_0%,rgba(16,185,129,0.2),transparent_42%)]",
     strip:
       "bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(52,211,153,0.86)_18%,rgba(34,211,238,0.82)_58%,rgba(0,0,0,0))]",
-    icon:
-      "border-emerald-300/14 bg-[linear-gradient(180deg,rgba(16,185,129,0.18),rgba(6,95,70,0.08))] text-emerald-100 shadow-[0_10px_26px_rgba(16,185,129,0.18)]",
+    icon: "border-emerald-300/14 bg-[linear-gradient(180deg,rgba(16,185,129,0.18),rgba(6,95,70,0.08))] text-emerald-100 shadow-[0_10px_26px_rgba(16,185,129,0.18)]",
   },
   amber: {
     shellGlow:
       "before:bg-[radial-gradient(circle_at_12%_0%,rgba(245,158,11,0.2),transparent_42%)]",
     strip:
       "bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(251,191,36,0.85)_18%,rgba(245,158,11,0.82)_54%,rgba(34,211,238,0.54)_82%,rgba(0,0,0,0))]",
-    icon:
-      "border-amber-300/14 bg-[linear-gradient(180deg,rgba(245,158,11,0.18),rgba(120,53,15,0.08))] text-amber-100 shadow-[0_10px_26px_rgba(245,158,11,0.18)]",
+    icon: "border-amber-300/14 bg-[linear-gradient(180deg,rgba(245,158,11,0.18),rgba(120,53,15,0.08))] text-amber-100 shadow-[0_10px_26px_rgba(245,158,11,0.18)]",
   },
   violet: {
     shellGlow:
       "before:bg-[radial-gradient(circle_at_12%_0%,rgba(168,85,247,0.2),transparent_42%),radial-gradient(circle_at_88%_100%,rgba(59,130,246,0.12),transparent_34%)]",
     strip:
       "bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(192,132,252,0.84)_18%,rgba(99,102,241,0.74)_54%,rgba(34,211,238,0.6)_82%,rgba(0,0,0,0))]",
-    icon:
-      "border-violet-300/14 bg-[linear-gradient(180deg,rgba(139,92,246,0.18),rgba(76,29,149,0.08))] text-violet-100 shadow-[0_10px_26px_rgba(139,92,246,0.18)]",
+    icon: "border-violet-300/14 bg-[linear-gradient(180deg,rgba(139,92,246,0.18),rgba(76,29,149,0.08))] text-violet-100 shadow-[0_10px_26px_rgba(139,92,246,0.18)]",
   },
   cyan: {
     shellGlow:
       "before:bg-[radial-gradient(circle_at_12%_0%,rgba(34,211,238,0.2),transparent_42%)]",
     strip:
       "bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(34,211,238,0.86)_18%,rgba(59,130,246,0.74)_54%,rgba(250,204,21,0.52)_82%,rgba(0,0,0,0))]",
-    icon:
-      "border-cyan-300/14 bg-[linear-gradient(180deg,rgba(34,211,238,0.18),rgba(8,47,73,0.08))] text-cyan-100 shadow-[0_10px_26px_rgba(34,211,238,0.18)]",
+    icon: "border-cyan-300/14 bg-[linear-gradient(180deg,rgba(34,211,238,0.18),rgba(8,47,73,0.08))] text-cyan-100 shadow-[0_10px_26px_rgba(34,211,238,0.18)]",
   },
 };
 
@@ -381,7 +378,9 @@ function Card({
     <section
       className={`relative overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.98),rgba(10,10,14,0.98))] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.35)] before:pointer-events-none before:absolute before:inset-0 before:opacity-100 after:pointer-events-none after:absolute after:inset-x-5 after:top-0 after:h-px after:rounded-full ${theme.shellGlow}`}
     >
-      <div className={`absolute inset-x-5 top-0 h-[2px] rounded-full ${theme.strip}`} />
+      <div
+        className={`absolute inset-x-5 top-0 h-0.5 rounded-full ${theme.strip}`}
+      />
       <div className="relative mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <span
@@ -391,7 +390,9 @@ function Card({
           </span>
           <div className="min-w-0">
             <h3 className="text-lg font-semibold text-white">{title}</h3>
-            {subtitle ? <p className="mt-1 text-sm text-zinc-400">{subtitle}</p> : null}
+            {subtitle ? (
+              <p className="mt-1 text-sm text-zinc-400">{subtitle}</p>
+            ) : null}
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
@@ -437,8 +438,8 @@ function SessionHeader({
     match?.teamAName && match?.teamBName
       ? `${match.teamAName} vs ${match.teamBName}`
       : session?.teamAName && session?.teamBName
-      ? `${session.teamAName} vs ${session.teamBName}`
-      : "Teams pending";
+        ? `${session.teamAName} vs ${session.teamBName}`
+        : "Teams pending";
 
   return (
     <SessionCoverHero
@@ -452,7 +453,7 @@ function SessionHeader({
           <div className="min-w-0 text-center sm:text-left">
             <div className="mb-2 flex items-center justify-center gap-2 sm:justify-start">
               {match?.isOngoing && !match?.result ? (
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.08] px-3 py-1 text-xs font-medium text-white">
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/8 px-3 py-1 text-xs font-medium text-white">
                   <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                   Live
                 </span>
@@ -472,7 +473,7 @@ function SessionHeader({
             <button
               type="button"
               onClick={readCurrentScore}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-zinc-100 transition hover:bg-white/[0.1]"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/6 text-zinc-100 transition hover:bg-white/10"
               aria-label="Read current score"
             >
               <FaVolumeUp />
@@ -480,15 +481,17 @@ function SessionHeader({
             <button
               type="button"
               onClick={onChangeSession}
-              className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/[0.1] max-sm:text-xs"
+              className="rounded-full border border-white/10 bg-white/6 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10 max-sm:text-xs"
             >
               Change
             </button>
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-white/10 bg-black/30 px-4 py-4">
-          <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">Score</p>
+        <div className="rounded-3xl border border-white/10 bg-black/30 px-4 py-4">
+          <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">
+            Score
+          </p>
           <p className="mt-2 text-xl font-semibold text-white sm:text-2xl">
             {buildDirectorScoreLine(match)}
           </p>
@@ -510,7 +513,7 @@ export default function DirectorConsoleClient({
   const router = useRouter();
   const initialTargetSessionId = getPreferredLiveSessionId(
     initialSessions,
-    initialPreferredSessionId
+    initialPreferredSessionId,
   );
   const [authorized, setAuthorized] = useState(Boolean(initialAuthorized));
   const [sessions, setSessions] = useState(initialSessions || []);
@@ -518,13 +521,15 @@ export default function DirectorConsoleClient({
   const [authError, setAuthError] = useState("");
   const [isSubmittingPin, setIsSubmittingPin] = useState(false);
   const [showDirectorPinStep, setShowDirectorPinStep] = useState(
-    Boolean(initialAutoManage && initialTargetSessionId && !initialAuthorized)
+    Boolean(initialAutoManage && initialTargetSessionId && !initialAuthorized),
   );
-  const [selectedSessionId, setSelectedSessionId] = useState(initialTargetSessionId);
+  const [selectedSessionId, setSelectedSessionId] = useState(
+    initialTargetSessionId,
+  );
   const [managedSessionId, setManagedSessionId] = useState(() =>
     initialAuthorized && initialAutoManage && initialTargetSessionId
       ? initialTargetSessionId
-      : ""
+      : "",
   );
   const [showPicker, setShowPicker] = useState(false);
   const [musicTracks, setMusicTracks] = useState([]);
@@ -591,7 +596,7 @@ export default function DirectorConsoleClient({
   const getMusicTargetVolume = useCallback(
     (duckFactor = musicEffectDuckFactorRef.current) =>
       Math.max(0, Math.min(1, getBaseMusicVolume() * duckFactor)),
-    [getBaseMusicVolume]
+    [getBaseMusicVolume],
   );
 
   const applyMusicDuck = useCallback(
@@ -605,7 +610,9 @@ export default function DirectorConsoleClient({
       cancelMusicDuckAnimation();
 
       const targetVolume = getMusicTargetVolume(duckFactor);
-      const startVolume = Number.isFinite(audio.volume) ? audio.volume : targetVolume;
+      const startVolume = Number.isFinite(audio.volume)
+        ? audio.volume
+        : targetVolume;
 
       if (durationMs <= 0 || Math.abs(startVolume - targetVolume) < 0.01) {
         audio.volume = targetVolume;
@@ -619,7 +626,8 @@ export default function DirectorConsoleClient({
         audio.volume = startVolume + (targetVolume - startVolume) * eased;
 
         if (progress < 1) {
-          musicDuckAnimationFrameRef.current = window.requestAnimationFrame(step);
+          musicDuckAnimationFrameRef.current =
+            window.requestAnimationFrame(step);
         } else {
           musicDuckAnimationFrameRef.current = 0;
         }
@@ -627,7 +635,7 @@ export default function DirectorConsoleClient({
 
       musicDuckAnimationFrameRef.current = window.requestAnimationFrame(step);
     },
-    [cancelMusicDuckAnimation, getMusicTargetVolume]
+    [cancelMusicDuckAnimation, getMusicTargetVolume],
   );
 
   const showTemporaryDirectorWalkieNotice = useCallback(
@@ -641,7 +649,7 @@ export default function DirectorConsoleClient({
         directorWalkieNoticeTimerRef.current = null;
       }, duration);
     },
-    []
+    [],
   );
 
   useEffect(() => subscribeUiAudioUnlock(setAudioUnlocked), []);
@@ -650,9 +658,10 @@ export default function DirectorConsoleClient({
     if (audioUnlocked) {
       setEffectsNeedsUnlock(false);
       setConsoleError((current) =>
-        current === "Safari blocked this audio. Tap Enable Audio once, then play the sound again."
+        current ===
+        "Safari blocked this audio. Tap Enable Audio once, then play the sound again."
           ? ""
-          : current
+          : current,
       );
     }
   }, [audioUnlocked]);
@@ -685,10 +694,15 @@ export default function DirectorConsoleClient({
     if (!managedSessionId) {
       return null;
     }
-    return sessions.find((item) => item.session?._id === managedSessionId) || null;
+    return (
+      sessions.find((item) => item.session?._id === managedSessionId) || null
+    );
   }, [managedSessionId, sessions]);
 
-  const audioOrderStorageKey = useMemo(() => getDirectorAudioOrderStorageKey(), []);
+  const audioOrderStorageKey = useMemo(
+    () => getDirectorAudioOrderStorageKey(),
+    [],
+  );
 
   const [liveMatch, setLiveMatch] = useState(managedSession?.match || null);
   useEffect(() => {
@@ -709,7 +723,7 @@ export default function DirectorConsoleClient({
     }
 
     const preferredLive = sessions.find(
-      (item) => item.session?._id === preferredSessionId && item.isLive
+      (item) => item.session?._id === preferredSessionId && item.isLive,
     );
     if (!preferredLive) {
       return;
@@ -762,7 +776,7 @@ export default function DirectorConsoleClient({
       setSessions((current) => (current.length ? current : cachedSessions));
       const cachedLiveSessionId = getPreferredLiveSessionId(
         cachedSessions,
-        preferredSessionIdRef.current
+        preferredSessionIdRef.current,
       );
       if (cachedLiveSessionId) {
         setSelectedSessionId((current) => current || cachedLiveSessionId);
@@ -772,19 +786,23 @@ export default function DirectorConsoleClient({
     let cancelled = false;
 
     void (async () => {
-      const response = await fetch("/api/director/sessions", { cache: "no-store" });
+      const response = await fetch("/api/director/sessions", {
+        cache: "no-store",
+      });
       const payload = await response.json().catch(() => ({ sessions: [] }));
       if (!response.ok || cancelled) {
         return;
       }
 
-      const nextSessions = Array.isArray(payload.sessions) ? payload.sessions : [];
+      const nextSessions = Array.isArray(payload.sessions)
+        ? payload.sessions
+        : [];
       writeCachedDirectorSessions(nextSessions);
       setSessions(nextSessions);
 
       const nextLiveSessionId = getPreferredLiveSessionId(
         nextSessions,
-        preferredSessionIdRef.current
+        preferredSessionIdRef.current,
       );
 
       if (nextLiveSessionId) {
@@ -792,7 +810,7 @@ export default function DirectorConsoleClient({
           if (
             current &&
             nextSessions.some(
-              (item) => item.session?._id === current && item.isLive
+              (item) => item.session?._id === current && item.isLive,
             )
           ) {
             return current;
@@ -815,8 +833,12 @@ export default function DirectorConsoleClient({
     }
 
     directorAudioLibraryPromise = (async () => {
-      const response = await fetch("/api/director/audio-library", { cache: "no-store" });
-      const payload = await response.json().catch(() => ({ files: [], order: [] }));
+      const response = await fetch("/api/director/audio-library", {
+        cache: "no-store",
+      });
+      const payload = await response
+        .json()
+        .catch(() => ({ files: [], order: [] }));
 
       if (!response.ok) {
         return [];
@@ -835,7 +857,10 @@ export default function DirectorConsoleClient({
       }
       if (typeof window !== "undefined") {
         try {
-          window.localStorage.setItem(audioOrderStorageKey, JSON.stringify(nextOrder));
+          window.localStorage.setItem(
+            audioOrderStorageKey,
+            JSON.stringify(nextOrder),
+          );
         } catch {
           // Ignore storage failures and keep the in-memory order.
         }
@@ -889,7 +914,7 @@ export default function DirectorConsoleClient({
 
     try {
       const cachedValue = window.sessionStorage.getItem(
-        DIRECTOR_AUDIO_METADATA_CACHE_KEY
+        DIRECTOR_AUDIO_METADATA_CACHE_KEY,
       );
       if (!cachedValue) {
         return;
@@ -934,8 +959,12 @@ export default function DirectorConsoleClient({
 
     const orderMap = new Map(libraryOrder.map((id, index) => [id, index]));
     return [...libraryFiles].sort((left, right) => {
-      const leftIndex = orderMap.has(left.id) ? orderMap.get(left.id) : Number.MAX_SAFE_INTEGER;
-      const rightIndex = orderMap.has(right.id) ? orderMap.get(right.id) : Number.MAX_SAFE_INTEGER;
+      const leftIndex = orderMap.has(left.id)
+        ? orderMap.get(left.id)
+        : Number.MAX_SAFE_INTEGER;
+      const rightIndex = orderMap.has(right.id)
+        ? orderMap.get(right.id)
+        : Number.MAX_SAFE_INTEGER;
       if (leftIndex !== rightIndex) {
         return leftIndex - rightIndex;
       }
@@ -955,19 +984,22 @@ export default function DirectorConsoleClient({
     }
   }, []);
 
-  const persistLibraryOrder = useCallback(async (nextOrder, { keepalive = false } = {}) => {
-    try {
-      const response = await fetch("/api/director/audio-library", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        keepalive,
-        body: JSON.stringify({ order: nextOrder }),
-      });
-      return response.ok;
-    } catch {
-      return false;
-    }
-  }, []);
+  const persistLibraryOrder = useCallback(
+    async (nextOrder, { keepalive = false } = {}) => {
+      try {
+        const response = await fetch("/api/director/audio-library", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          keepalive,
+          body: JSON.stringify({ order: nextOrder }),
+        });
+        return response.ok;
+      } catch {
+        return false;
+      }
+    },
+    [],
+  );
 
   const flushPendingLibraryOrder = useCallback(
     async ({ useBeacon = false } = {}) => {
@@ -991,7 +1023,10 @@ export default function DirectorConsoleClient({
           const payload = new Blob([JSON.stringify({ order: nextOrder })], {
             type: "application/json",
           });
-          const queued = navigator.sendBeacon("/api/director/audio-library", payload);
+          const queued = navigator.sendBeacon(
+            "/api/director/audio-library",
+            payload,
+          );
           if (queued) {
             lastPersistedLibraryOrderRef.current = serializedOrder;
             pendingLibraryOrderRef.current = null;
@@ -1011,7 +1046,7 @@ export default function DirectorConsoleClient({
       }
       return persisted;
     },
-    [persistLibraryOrder]
+    [persistLibraryOrder],
   );
 
   const scheduleLibraryOrderPersist = useCallback(
@@ -1031,23 +1066,29 @@ export default function DirectorConsoleClient({
         void flushPendingLibraryOrder();
       }, DIRECTOR_AUDIO_ORDER_SAVE_DELAY_MS);
     },
-    [clearLibraryOrderSaveTimer, flushPendingLibraryOrder]
+    [clearLibraryOrderSaveTimer, flushPendingLibraryOrder],
   );
 
-  const handleLibraryReorder = useCallback((nextFiles) => {
-    setLibraryFiles(nextFiles);
-    const nextOrder = nextFiles.map((file) => file.id);
-    setLibraryOrder(nextOrder);
+  const handleLibraryReorder = useCallback(
+    (nextFiles) => {
+      setLibraryFiles(nextFiles);
+      const nextOrder = nextFiles.map((file) => file.id);
+      setLibraryOrder(nextOrder);
 
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.setItem(audioOrderStorageKey, JSON.stringify(nextOrder));
-      } catch {
-        // Ignore storage failures and keep the in-memory order.
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(
+            audioOrderStorageKey,
+            JSON.stringify(nextOrder),
+          );
+        } catch {
+          // Ignore storage failures and keep the in-memory order.
+        }
       }
-    }
-    scheduleLibraryOrderPersist(nextOrder);
-  }, [audioOrderStorageKey, scheduleLibraryOrderPersist]);
+      scheduleLibraryOrderPersist(nextOrder);
+    },
+    [audioOrderStorageKey, scheduleLibraryOrderPersist],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1081,25 +1122,36 @@ export default function DirectorConsoleClient({
         effectsAudio.src = "";
       }
     };
-  }, [cancelMusicDuckAnimation, clearLibraryOrderSaveTimer, flushPendingLibraryOrder]);
+  }, [
+    cancelMusicDuckAnimation,
+    clearLibraryOrderSaveTimer,
+    flushPendingLibraryOrder,
+  ]);
 
-  const moveLibraryItem = useCallback((activeId, targetId) => {
-    if (!activeId || !targetId || activeId === targetId) {
-      return;
-    }
+  const moveLibraryItem = useCallback(
+    (activeId, targetId) => {
+      if (!activeId || !targetId || activeId === targetId) {
+        return;
+      }
 
-    const activeIndex = orderedLibraryFiles.findIndex((file) => file.id === activeId);
-    const targetIndex = orderedLibraryFiles.findIndex((file) => file.id === targetId);
+      const activeIndex = orderedLibraryFiles.findIndex(
+        (file) => file.id === activeId,
+      );
+      const targetIndex = orderedLibraryFiles.findIndex(
+        (file) => file.id === targetId,
+      );
 
-    if (activeIndex < 0 || targetIndex < 0) {
-      return;
-    }
+      if (activeIndex < 0 || targetIndex < 0) {
+        return;
+      }
 
-    const nextFiles = [...orderedLibraryFiles];
-    const [movedItem] = nextFiles.splice(activeIndex, 1);
-    nextFiles.splice(targetIndex, 0, movedItem);
-    handleLibraryReorder(nextFiles);
-  }, [handleLibraryReorder, orderedLibraryFiles]);
+      const nextFiles = [...orderedLibraryFiles];
+      const [movedItem] = nextFiles.splice(activeIndex, 1);
+      nextFiles.splice(targetIndex, 0, movedItem);
+      handleLibraryReorder(nextFiles);
+    },
+    [handleLibraryReorder, orderedLibraryFiles],
+  );
 
   const handleLibraryDragStart = (event, fileId) => {
     if (event.target instanceof HTMLElement && event.target.closest("button")) {
@@ -1128,7 +1180,8 @@ export default function DirectorConsoleClient({
 
   const handleLibraryDrop = (event, fileId) => {
     event.preventDefault();
-    const activeId = event.dataTransfer.getData("text/plain") || draggingLibraryId;
+    const activeId =
+      event.dataTransfer.getData("text/plain") || draggingLibraryId;
     moveLibraryItem(activeId, fileId);
     setDraggingLibraryId("");
     setLibraryDropTargetId("");
@@ -1162,18 +1215,17 @@ export default function DirectorConsoleClient({
   const directorWalkieMatch = liveMatch || managedSession?.match || null;
   const directorWalkieAvailable = Boolean(
     authorized &&
-      managedSession?.match?._id &&
-      (directorWalkieMatch?.isOngoing ?? managedSession?.isLive)
+    managedSession?.match?._id &&
+    (directorWalkieMatch?.isOngoing ?? managedSession?.isLive),
   );
 
   const walkie = useWalkieTalkie({
     matchId: managedSession?.match?._id || "",
     enabled: directorWalkieAvailable,
     role: "director",
-    displayName:
-      managedSession?.session?.name
-        ? `${managedSession.session.name} Director`
-        : "Director",
+    displayName: managedSession?.session?.name
+      ? `${managedSession.session.name} Director`
+      : "Director",
     autoConnectAudio: directorWalkieAvailable && directorWalkieOn,
     signalingActive: directorWalkieAvailable,
   });
@@ -1205,7 +1257,7 @@ export default function DirectorConsoleClient({
       if (action === "pending") {
         showTemporaryDirectorWalkieNotice(
           "Requested umpire access. Waiting for approval.",
-          3200
+          3200,
         );
         return;
       }
@@ -1225,7 +1277,7 @@ export default function DirectorConsoleClient({
 
       showTemporaryDirectorWalkieNotice(
         "Requested umpire access. Waiting for approval.",
-        3200
+        3200,
       );
     },
     [
@@ -1235,7 +1287,7 @@ export default function DirectorConsoleClient({
       managedSession?.match?._id,
       showTemporaryDirectorWalkieNotice,
       walkie,
-    ]
+    ],
   );
 
   useEffect(() => {
@@ -1254,13 +1306,15 @@ export default function DirectorConsoleClient({
         walkie.nonUmpireUi?.sharedEnableAnnouncement ||
           NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT,
         {
-        key: `director-walkie-live-${
-          managedSession?.match?._id || managedSession?.session?._id || "session"
-        }`,
-        priority: 4,
-        interrupt: true,
-        ignoreEnabled: true,
-        }
+          key: `director-walkie-live-${
+            managedSession?.match?._id ||
+            managedSession?.session?._id ||
+            "session"
+          }`,
+          priority: 4,
+          interrupt: true,
+          ignoreEnabled: true,
+        },
       );
     }
 
@@ -1287,7 +1341,10 @@ export default function DirectorConsoleClient({
   ]);
 
   useEffect(() => {
-    if (directorWalkieRequestState === previousDirectorWalkieRequestStateRef.current) {
+    if (
+      directorWalkieRequestState ===
+      previousDirectorWalkieRequestStateRef.current
+    ) {
       return;
     }
 
@@ -1333,7 +1390,9 @@ export default function DirectorConsoleClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pin }),
       });
-      const payload = await response.json().catch(() => ({ message: "Could not verify PIN." }));
+      const payload = await response
+        .json()
+        .catch(() => ({ message: "Could not verify PIN." }));
 
       if (!response.ok) {
         setAuthError(payload.message || "Could not verify PIN.");
@@ -1343,14 +1402,17 @@ export default function DirectorConsoleClient({
       setConsoleError("");
       setAuthorized(true);
       setPin("");
-      const nextSessions = sessions.length ? sessions : readCachedDirectorSessions();
+      const nextSessions = sessions.length
+        ? sessions
+        : readCachedDirectorSessions();
       if (nextSessions.length) {
         writeCachedDirectorSessions(nextSessions);
         setSessions(nextSessions);
         const preferredLive = preferredSessionIdRef.current
           ? nextSessions.find(
               (item) =>
-                item.session?._id === preferredSessionIdRef.current && item.isLive
+                item.session?._id === preferredSessionIdRef.current &&
+                item.isLive,
             )
           : null;
         const nextLive = nextSessions.find((item) => item.isLive);
@@ -1358,7 +1420,7 @@ export default function DirectorConsoleClient({
           preferredLive?.session?._id ||
             nextLive?.session?._id ||
             nextSessions?.[0]?.session?._id ||
-            ""
+            "",
         );
         if (pendingInitialManageRef.current && preferredLive?.session?._id) {
           setManagedSessionId(preferredLive.session._id);
@@ -1425,7 +1487,7 @@ export default function DirectorConsoleClient({
   useEffect(() => {
     const nextVolume = Math.max(
       0,
-      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume)
+      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume),
     );
     if (effectsAudioRef.current) {
       effectsAudioRef.current.volume = nextVolume;
@@ -1455,7 +1517,7 @@ export default function DirectorConsoleClient({
           try {
             window.sessionStorage.setItem(
               DIRECTOR_AUDIO_METADATA_CACHE_KEY,
-              JSON.stringify(next)
+              JSON.stringify(next),
             );
           } catch {
             // Ignore storage failures.
@@ -1472,7 +1534,9 @@ export default function DirectorConsoleClient({
       applyMusicDuck(1, { durationMs: 260 });
     };
     const handlePause = () => {
-      setLibraryState((current) => (current === "loading" ? current : "paused"));
+      setLibraryState((current) =>
+        current === "loading" ? current : "paused",
+      );
       if (!audio.ended) {
         setLibraryCurrentTime(audio.currentTime || 0);
       }
@@ -1486,7 +1550,9 @@ export default function DirectorConsoleClient({
     };
     const handleCanPlay = () => {
       setConsoleError("");
-      setLibraryState((current) => (current === "loading" ? "paused" : current));
+      setLibraryState((current) =>
+        current === "loading" ? "paused" : current,
+      );
       persistLibraryDuration();
     };
     const handleError = () => {
@@ -1537,14 +1603,16 @@ export default function DirectorConsoleClient({
       .enumerateDevices()
       .then((devices) => {
         if (cancelled) return;
-        const outputs = devices.filter((device) => device.kind === "audiooutput");
+        const outputs = devices.filter(
+          (device) => device.kind === "audiooutput",
+        );
         setSpeakerDevices(outputs);
         if (outputs.length) {
           setSpeakerMessage(
             typeof HTMLMediaElement !== "undefined" &&
               "setSinkId" in HTMLMediaElement.prototype
               ? "Speaker selection is supported in this browser."
-              : "Using your phone or Bluetooth output."
+              : "Using your phone or Bluetooth output.",
           );
         } else {
           setSpeakerMessage("Using your phone or Bluetooth output.");
@@ -1562,7 +1630,11 @@ export default function DirectorConsoleClient({
   }, []);
 
   const stopAllEffects = (options = {}) => {
-    const { clearSource = true, preserveRequest = false, restoreMusic = !preserveRequest } = options;
+    const {
+      clearSource = true,
+      preserveRequest = false,
+      restoreMusic = !preserveRequest,
+    } = options;
     const audio = effectsAudioRef.current;
     if (!audio && !bufferedEffectPlaybackRef.current) {
       return;
@@ -1681,7 +1753,7 @@ export default function DirectorConsoleClient({
         const playback = await playBufferedUiAudio(file.src, {
           volume: Math.max(
             0,
-            Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume)
+            Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume),
           ),
           onEnded: () => {
             bufferedEffectPlaybackRef.current = null;
@@ -1713,7 +1785,7 @@ export default function DirectorConsoleClient({
             try {
               window.sessionStorage.setItem(
                 DIRECTOR_AUDIO_METADATA_CACHE_KEY,
-                JSON.stringify(next)
+                JSON.stringify(next),
               );
             } catch {
               // Ignore storage failures.
@@ -1738,7 +1810,7 @@ export default function DirectorConsoleClient({
           return;
         }
         setConsoleError(
-          "This sound could not be played right now. Try Enable Audio and tap again."
+          "This sound could not be played right now. Try Enable Audio and tap again.",
         );
         setEffectsNeedsUnlock(true);
         setLibraryState("idle");
@@ -1762,7 +1834,7 @@ export default function DirectorConsoleClient({
     audio.dataset.effectId = file.id;
     audio.volume = Math.max(
       0,
-      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume)
+      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume),
     );
     if (sourceChanged) {
       audio.src = nextSrc;
@@ -1795,7 +1867,7 @@ export default function DirectorConsoleClient({
         (error.name === "AbortError" || error.name === "NotAllowedError")
       ) {
         setConsoleError(
-          "Safari blocked this audio. Tap Enable Audio once, then play the sound again."
+          "Safari blocked this audio. Tap Enable Audio once, then play the sound again.",
         );
         setEffectsNeedsUnlock(true);
         setLibraryState("idle");
@@ -1882,7 +1954,7 @@ export default function DirectorConsoleClient({
     setMusicTracks(nextTracks);
     setCurrentTrackIndex(0);
     setMusicMessage(
-      `${nextTracks.length} track${nextTracks.length === 1 ? "" : "s"} loaded.`
+      `${nextTracks.length} track${nextTracks.length === 1 ? "" : "s"} loaded.`,
     );
     window.setTimeout(() => setMusicMessage(""), 2200);
   };
@@ -1991,7 +2063,7 @@ export default function DirectorConsoleClient({
       setDirectorHoldLive(false);
       await micMonitor.stop({ resumeMedia: true });
     },
-    [micMonitor]
+    [micMonitor],
   );
 
   useEffect(() => {
@@ -2049,7 +2121,7 @@ export default function DirectorConsoleClient({
     setSpeakerMessage(
       applied
         ? "Music routed to selected output."
-        : "Using your phone or Bluetooth output."
+        : "Using your phone or Bluetooth output.",
     );
   };
 
@@ -2144,44 +2216,58 @@ export default function DirectorConsoleClient({
     });
   const directorWalkiePending = Boolean(directorWalkieUi.pendingRequest);
   const directorWalkieNeedsLocalEnableNotice = Boolean(
-    directorWalkieUi.needsLocalEnableNotice
+    directorWalkieUi.needsLocalEnableNotice,
   );
-  const walkieStatus = directorWalkiePending
-    ? "Requested"
-    : !directorWalkieChannelEnabled
-    ? "Off"
-    : !directorWalkieOn
-    ? "Off"
-    : walkie.isFinishing
-    ? "Finishing"
-    : walkie.isSelfTalking
-    ? "Director Live"
-    : walkie.snapshot?.activeSpeakerRole === "umpire"
-    ? "Umpire Live"
-    : walkie.snapshot?.activeSpeakerRole === "spectator"
-    ? "Spectator Live"
-    : "Ready";
+  const directorWalkieLoading = Boolean(
+    walkie.claiming ||
+    walkie.preparingToTalk ||
+    walkie.recoveringAudio ||
+    walkie.recoveringSignaling ||
+    walkie.updatingEnabled,
+  );
+  const directorRemoteSpeakerState = getWalkieRemoteSpeakerState({
+    snapshot: walkie.snapshot,
+    participantId: walkie.participantId,
+    isSelfTalking: walkie.isSelfTalking,
+  });
+  const walkieStatus = directorWalkieLoading
+    ? walkie.recoveringAudio || walkie.recoveringSignaling
+      ? "Reconnecting"
+      : "Connecting"
+    : directorRemoteSpeakerState.isRemoteTalking
+      ? directorRemoteSpeakerState.shortStatus
+      : directorWalkiePending
+        ? "Requested"
+        : !directorWalkieChannelEnabled
+          ? "Off"
+          : !directorWalkieOn
+            ? "Off"
+            : walkie.isFinishing
+              ? "Finishing"
+              : walkie.isSelfTalking
+                ? "Director Live"
+                : "Ready";
   const surfacedDirectorWalkieNotice = directorWalkieNeedsLocalEnableNotice
     ? directorWalkieUi.notice
     : directorWalkieChannelEnabled ||
-      directorWalkieOn ||
-      directorWalkieRequestState === "dismissed"
-    ? directorWalkieNotice || walkie.notice
-    : "";
+        directorWalkieOn ||
+        directorWalkieRequestState === "dismissed"
+      ? directorWalkieNotice || walkie.notice
+      : "";
   const showDirectorWalkieNotice = Boolean(
-    surfacedDirectorWalkieNotice || directorWalkieNeedsLocalEnableNotice
+    surfacedDirectorWalkieNotice || directorWalkieNeedsLocalEnableNotice,
   );
   const canManageSession = Boolean(authorized && managedSession?.match?._id);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 lg:max-w-[1500px] lg:px-6 2xl:max-w-[1760px]">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 lg:max-w-375 lg:px-6 2xl:max-w-440">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
           onClick={() => {
             void leaveDirectorMode();
           }}
-          className="press-feedback inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-white"
+          className="press-feedback inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white"
         >
           <FaArrowLeft />
           Home
@@ -2243,7 +2329,7 @@ export default function DirectorConsoleClient({
                   </div>
                 ) : null}
                 {!showDirectorPinStep ? (
-                  <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,8,11,0.68),rgba(8,8,11,0.4))] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                  <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(8,8,11,0.68),rgba(8,8,11,0.4))] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                     <LoadingButton
                       type="button"
                       onClick={() => {
@@ -2256,14 +2342,15 @@ export default function DirectorConsoleClient({
                     </LoadingButton>
                   </div>
                 ) : (
-                  <div className="rounded-[24px] border border-white/10 bg-black/30 px-4 py-4">
+                  <div className="rounded-3xl border border-white/10 bg-black/30 px-4 py-4">
                     <div className="mb-4 flex items-start justify-between gap-3">
                       <div>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500">
                           Step 1
                         </p>
                         <p className="mt-2 text-sm text-zinc-300">
-                          Enter the 4-digit director PIN to join the shared live director console.
+                          Enter the 4-digit director PIN to join the shared live
+                          director console.
                         </p>
                       </div>
                       <button
@@ -2273,7 +2360,7 @@ export default function DirectorConsoleClient({
                           setPin("");
                           setAuthError("");
                         }}
-                        className="press-feedback inline-flex rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-300"
+                        className="press-feedback inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-300"
                       >
                         Back
                       </button>
@@ -2292,7 +2379,9 @@ export default function DirectorConsoleClient({
                       maxLength={4}
                       value={pin}
                       onChange={(event) =>
-                        setPin(event.target.value.replace(/\D/g, "").slice(0, 4))
+                        setPin(
+                          event.target.value.replace(/\D/g, "").slice(0, 4),
+                        )
                       }
                       onKeyDown={(event) => {
                         if (event.key === "Enter") {
@@ -2301,7 +2390,7 @@ export default function DirectorConsoleClient({
                         }
                       }}
                       placeholder="0000"
-                      className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-emerald-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(16,185,129,0.08)]"
+                      className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-emerald-400/30 focus:bg-white/6 focus:shadow-[0_0_0_4px_rgba(16,185,129,0.08)]"
                     />
                     <LoadingButton
                       type="button"
@@ -2328,7 +2417,8 @@ export default function DirectorConsoleClient({
                     Choose a live session
                   </h1>
                   <p className="mt-1 text-sm text-zinc-300">
-                    Pick a live match to join. Multiple directors can open the same match at the same time.
+                    Pick a live match to join. Multiple directors can open the
+                    same match at the same time.
                   </p>
                 </div>
                 <DirectorSessionPicker
@@ -2361,391 +2451,452 @@ export default function DirectorConsoleClient({
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.78fr)] 2xl:grid-cols-[minmax(0,1.48fr)_minmax(380px,0.72fr)]">
         <div className="flex flex-col gap-5">
           <div className="order-3 xl:order-1">
-          <Card
-            title="Loudspeaker"
-            subtitle={
-              directorHoldLive || micMonitor.isActive
-                ? "Live on speaker"
-                : micMonitor.isStarting
-                ? "Starting loudspeaker"
-                : directorSpeakerOn
-                ? "Hold to talk over loudspeaker"
-                : "Turn on mic to use hold to talk"
-            }
-            icon={<FaMicrophone />}
-            accent="amber"
-            help={{
-              title: "Loudspeaker",
-              body: "Press and hold to speak over the phone speaker or connected Bluetooth speaker. Music and effects duck automatically while you talk.",
-            }}
-            action={
-              <IosSwitch
-                checked={directorSpeakerOn}
-                label="Loudspeaker mic"
-                onChange={(nextChecked) => {
-                  void handleDirectorSpeakerSwitchChange(nextChecked);
-                }}
-              />
-            }
-          >
-            <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(0,0,0,0.24),rgba(10,10,14,0.46))] px-4 py-5">
-              <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(251,191,36,0.84)_20%,rgba(34,211,238,0.42)_75%,rgba(0,0,0,0))]" />
-              <div
-                className="flex flex-col items-center gap-4 text-center"
-                style={{
-                  userSelect: "none",
-                  WebkitUserSelect: "none",
-                  WebkitTouchCallout: "none",
-                }}
-              >
-                {!directorSpeakerOn ? (
-                  <div className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-zinc-300">
-                    Turn on the loudspeaker mic to use hold to talk.
-                  </div>
-                ) : null}
-                <button
-                  type="button"
-                  disabled={!directorSpeakerOn}
-                  {...HOLD_BUTTON_INTERACTION_PROPS}
-                  onPointerDown={(event) => {
-                    if (!event.isPrimary) return;
-                    if (event.pointerType === "mouse" && event.button !== 0) return;
-                    event.preventDefault();
-                    directorMicPointerIdRef.current = event.pointerId;
-                    event.currentTarget.setPointerCapture?.(event.pointerId);
-                    void handleDirectorMicStart();
+            <Card
+              title="Loudspeaker"
+              subtitle={
+                directorHoldLive || micMonitor.isActive
+                  ? "Live on speaker"
+                  : micMonitor.isStarting
+                    ? "Starting loudspeaker"
+                    : directorSpeakerOn
+                      ? "Hold to talk over loudspeaker"
+                      : "Turn on mic to use hold to talk"
+              }
+              icon={<FaMicrophone />}
+              accent="amber"
+              help={{
+                title: "Loudspeaker",
+                body: "Press and hold to speak over the phone speaker or connected Bluetooth speaker. Music and effects duck automatically while you talk.",
+              }}
+              action={
+                <IosSwitch
+                  checked={directorSpeakerOn}
+                  label="Loudspeaker mic"
+                  onChange={(nextChecked) => {
+                    void handleDirectorSpeakerSwitchChange(nextChecked);
                   }}
-                  onPointerUp={(event) => {
-                    event.currentTarget.releasePointerCapture?.(event.pointerId);
-                  }}
-                  onPointerCancel={(event) => {
-                    event.preventDefault();
-                    event.currentTarget.releasePointerCapture?.(event.pointerId);
-                    directorMicPointerIdRef.current = null;
-                    void handleDirectorMicStop();
-                  }}
-                  className={`relative inline-flex h-28 w-28 items-center justify-center rounded-full border text-3xl transition focus:outline-none focus:ring-2 focus:ring-emerald-400/40 ${
-                    !directorSpeakerOn
-                      ? "cursor-not-allowed border-white/8 bg-white/[0.03] text-zinc-500"
-                      : directorHoldLive || micMonitor.isActive
-                      ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_40px_rgba(16,185,129,0.34)]"
-                      : "border-white/10 bg-white/[0.05] text-white"
-                  }`}
-                  aria-label="Hold to talk on loudspeaker"
-                >
-                  <span
-                    className={`absolute inset-[-8px] rounded-full border ${
-                      directorSpeakerOn && (directorHoldLive || micMonitor.isActive)
-                        ? "animate-pulse border-emerald-300/35"
-                        : "border-transparent"
-                    }`}
-                  />
-                  <FaMicrophone />
-                </button>
+                />
+              }
+            >
+              <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(0,0,0,0.24),rgba(10,10,14,0.46))] px-4 py-5">
+                <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(251,191,36,0.84)_20%,rgba(34,211,238,0.42)_75%,rgba(0,0,0,0))]" />
                 <div
+                  className="flex flex-col items-center gap-4 text-center"
                   style={{
                     userSelect: "none",
                     WebkitUserSelect: "none",
                     WebkitTouchCallout: "none",
                   }}
                 >
-                  <p className="text-lg font-semibold text-white">
-                    {!directorSpeakerOn
-                      ? "Turn on to talk"
-                      : micMonitor.isStarting
-                      ? "Starting..."
-                      : directorHoldLive || micMonitor.isActive
-                      ? "Release to stop"
-                      : "Hold to talk"}
-                  </p>
-                  <p className="mt-1 text-sm text-zinc-400">
-                    {directorSpeakerOn
-                      ? "Music and effects duck while you speak."
-                      : "Mic stays off until you enable it on this device."}
-                  </p>
+                  {!directorSpeakerOn ? (
+                    <div className="w-full rounded-2xl border border-white/10 bg-white/4 px-4 py-3 text-sm text-zinc-300">
+                      Turn on the loudspeaker mic to use hold to talk.
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={!directorSpeakerOn}
+                    {...HOLD_BUTTON_INTERACTION_PROPS}
+                    onPointerDown={(event) => {
+                      if (!event.isPrimary) return;
+                      if (event.pointerType === "mouse" && event.button !== 0)
+                        return;
+                      event.preventDefault();
+                      directorMicPointerIdRef.current = event.pointerId;
+                      event.currentTarget.setPointerCapture?.(event.pointerId);
+                      void handleDirectorMicStart();
+                    }}
+                    onPointerUp={(event) => {
+                      event.currentTarget.releasePointerCapture?.(
+                        event.pointerId,
+                      );
+                    }}
+                    onPointerCancel={(event) => {
+                      event.preventDefault();
+                      event.currentTarget.releasePointerCapture?.(
+                        event.pointerId,
+                      );
+                      directorMicPointerIdRef.current = null;
+                      void handleDirectorMicStop();
+                    }}
+                    className={`relative inline-flex h-28 w-28 items-center justify-center rounded-full border text-3xl transition focus:outline-none focus:ring-2 focus:ring-emerald-400/40 ${
+                      !directorSpeakerOn
+                        ? "cursor-not-allowed border-white/8 bg-white/3 text-zinc-500"
+                        : directorHoldLive || micMonitor.isActive
+                          ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_40px_rgba(16,185,129,0.34)]"
+                          : "border-white/10 bg-white/5 text-white"
+                    }`}
+                    aria-label="Hold to talk on loudspeaker"
+                  >
+                    <span
+                      className={`absolute -inset-2 rounded-full border ${
+                        directorSpeakerOn &&
+                        (directorHoldLive || micMonitor.isActive)
+                          ? "animate-pulse border-emerald-300/35"
+                          : "border-transparent"
+                      }`}
+                    />
+                    <FaMicrophone />
+                  </button>
+                  <div
+                    style={{
+                      userSelect: "none",
+                      WebkitUserSelect: "none",
+                      WebkitTouchCallout: "none",
+                    }}
+                  >
+                    <p className="text-lg font-semibold text-white">
+                      {!directorSpeakerOn
+                        ? "Turn on to talk"
+                        : micMonitor.isStarting
+                          ? "Starting..."
+                          : directorHoldLive || micMonitor.isActive
+                            ? "Release to stop"
+                            : "Hold to talk"}
+                    </p>
+                    <p className="mt-1 text-sm text-zinc-400">
+                      {directorSpeakerOn
+                        ? "Music and effects duck while you speak."
+                        : "Mic stays off until you enable it on this device."}
+                    </p>
+                  </div>
+                  {micMonitor.error ? (
+                    <p className="text-sm text-rose-300">{micMonitor.error}</p>
+                  ) : null}
                 </div>
-                {micMonitor.error ? (
-                  <p className="text-sm text-rose-300">{micMonitor.error}</p>
-                ) : null}
               </div>
-            </div>
-          </Card>
+            </Card>
           </div>
 
           <div className="order-1 xl:order-2">
-          <Card
-            title="Walkie with umpire"
-            subtitle="Shared live channel"
-            icon={<FaBroadcastTower />}
-            accent="emerald"
-            help={{
-              title: "Walkie with umpire",
-              body: "Request walkie when it is off. Once it is on, you can talk with the umpire or spectators. Only one person can hold the channel at a time.",
-            }}
-            action={
-              <div className="flex items-center gap-2">
-                {walkieStatus !== "Off" ? (
-                  <span
-                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                      walkieStatus.includes("Live")
-                        ? "bg-emerald-500/14 text-emerald-200"
-                        : "bg-white/[0.06] text-zinc-300"
-                    }`}
-                  >
-                    {walkieStatus}
-                  </span>
-                ) : null}
-                <IosSwitch
-                  checked={directorWalkieOn}
-                  label="Walkie state"
-                  onChange={(nextChecked) => {
-                    void handleDirectorWalkieSwitchChange(nextChecked);
-                  }}
-                  disabled={!canManageSession}
-                />
-              </div>
-            }
-          >
-            <div className="space-y-4">
-              {showDirectorWalkieNotice ? (
-              <div className="min-h-[72px]">
-                <WalkieNotice
-                  embedded
-                  notice={surfacedDirectorWalkieNotice}
-                  attention={directorWalkieUi.attentionMode}
-                  onDismiss={() => {
-                    setDirectorWalkieNotice("");
-                    walkie.dismissNotice();
-                  }}
-                />
-              </div>
-              ) : null}
-              <div
-                className={
-                  directorWalkieChannelEnabled && directorWalkieOn
-                    ? "grid gap-4 md:grid-cols-[1fr_auto] md:items-center"
-                    : "space-y-3"
-                }
-              >
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-500/8 px-3 py-1 text-sm text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-                    <FaBroadcastTower className="text-sky-300" />
-                    {walkie.snapshot?.umpireCount || 0} umpire
-                  </span>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-cyan-500/8 px-3 py-1 text-sm text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-                    <FaHeadphones className="text-emerald-300" />
-                    {walkie.snapshot?.directorCount || 0} director
-                  </span>
+            <Card
+              title="Walkie with umpire"
+              subtitle="Shared live channel"
+              icon={<FaBroadcastTower />}
+              accent="emerald"
+              help={{
+                title: "Walkie with umpire",
+                body: "Request walkie when it is off. Once it is on, you can talk with the umpire or spectators. Only one person can hold the channel at a time.",
+              }}
+              action={
+                <div className="flex items-center gap-2">
+                  {walkieStatus !== "Off" ? (
+                    <span
+                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                        walkieStatus.includes("Live")
+                          ? "bg-emerald-500/14 text-emerald-200"
+                          : "bg-white/6 text-zinc-300"
+                      }`}
+                    >
+                      {walkieStatus}
+                    </span>
+                  ) : null}
+                  <IosSwitch
+                    checked={directorWalkieOn}
+                    label="Walkie state"
+                    onChange={(nextChecked) => {
+                      void handleDirectorWalkieSwitchChange(nextChecked);
+                    }}
+                    disabled={
+                      !canManageSession ||
+                      walkie.requestState === "pending" ||
+                      walkie.updatingEnabled
+                    }
+                  />
                 </div>
-                <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(4,20,18,0.68),rgba(10,10,14,0.5))] px-4 py-3 text-center text-sm text-zinc-300">
-                  <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(52,211,153,0.8)_22%,rgba(34,211,238,0.46)_72%,rgba(0,0,0,0))]" />
-                  {!canManageSession
-                    ? "Enter director mode and choose a live session to use walkie."
-                    : walkie.snapshot?.enabled && !directorWalkieOn
-                    ? "Turn on walkie to listen and respond."
-                    : walkie.snapshot?.enabled
-                    ? "Hold to talk with the live channel."
-                    : directorWalkiePending
-                    ? "Requested umpire access. Waiting for approval."
-                    : directorWalkieOn
-                    ? "Walkie is on. Requesting umpire access."
-                    : walkie.requestState === "dismissed"
-                    ? "Umpire dismissed the request."
-                    : "Turn on this device to request access."}
+              }
+            >
+              <div className="space-y-4">
+                <div className="min-h-18">
+                  {showDirectorWalkieNotice ? (
+                    <WalkieNotice
+                      embedded
+                      notice={surfacedDirectorWalkieNotice}
+                      attention={directorWalkieUi.attentionMode}
+                      onDismiss={() => {
+                        setDirectorWalkieNotice("");
+                        walkie.dismissNotice();
+                      }}
+                    />
+                  ) : null}
                 </div>
-                {walkie.error ? (
-                  <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                    {walkie.error}
+                <div
+                  className={
+                    directorWalkieChannelEnabled && directorWalkieOn
+                      ? "grid gap-4 md:grid-cols-[1fr_auto] md:items-center"
+                      : "space-y-3"
+                  }
+                >
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-500/8 px-3 py-1 text-sm text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <FaBroadcastTower className="text-sky-300" />
+                        {walkie.snapshot?.umpireCount || 0} umpire
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-cyan-500/8 px-3 py-1 text-sm text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <FaHeadphones className="text-emerald-300" />
+                        {walkie.snapshot?.directorCount || 0} director
+                      </span>
+                    </div>
+                    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(4,20,18,0.68),rgba(10,10,14,0.5))] px-4 py-3 text-center text-sm text-zinc-300">
+                      <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(52,211,153,0.8)_22%,rgba(34,211,238,0.46)_72%,rgba(0,0,0,0))]" />
+                      {!canManageSession
+                        ? "Enter director mode and choose a live session to use walkie."
+                        : directorWalkieLoading
+                          ? walkie.recoveringAudio || walkie.recoveringSignaling
+                            ? "Reconnecting walkie..."
+                            : "Connecting walkie..."
+                          : directorRemoteSpeakerState.isRemoteTalking
+                            ? directorRemoteSpeakerState.detail
+                            : walkie.snapshot?.enabled && !directorWalkieOn
+                              ? "Turn on walkie to listen and respond."
+                              : walkie.snapshot?.enabled
+                                ? "Hold to talk with the live channel."
+                                : directorWalkiePending
+                                  ? "Requested umpire access. Waiting for approval."
+                                  : directorWalkieOn
+                                    ? "Walkie is on. Requesting umpire access."
+                                    : walkie.requestState === "dismissed"
+                                      ? "Umpire dismissed the request."
+                                      : "Turn on this device to request access."}
+                    </div>
+                    {walkie.error ? (
+                      <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                        {walkie.error}
+                      </div>
+                    ) : null}
+                    {walkie.needsAudioUnlock ? (
+                      <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                        <p>
+                          Safari needs one tap to enable walkie audio on this
+                          device.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => void walkie.unlockAudio()}
+                          className="mt-3 rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-amber-300"
+                        >
+                          Enable Audio
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
-                {walkie.needsAudioUnlock ? (
-                  <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                    <p>Safari needs one tap to enable walkie audio on this device.</p>
+                  {directorWalkieChannelEnabled && directorWalkieOn ? (
+                    <div className="flex flex-col items-center gap-4">
+                      {directorRemoteSpeakerState.isRemoteTalking ? (
+                        <div className="w-full max-w-[320px] rounded-[28px] border border-cyan-300/18 bg-[linear-gradient(180deg,rgba(10,18,26,0.92),rgba(8,10,16,0.98))] px-5 py-4 text-center shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
+                          <div className="mb-2 inline-flex items-center rounded-full border border-cyan-300/18 bg-cyan-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100">
+                            {directorRemoteSpeakerState.capsuleLabel}
+                          </div>
+                          <p className="text-sm font-medium text-white">
+                            {directorRemoteSpeakerState.title}
+                          </p>
+                          <p className="mt-2 text-xs leading-5 text-zinc-400">
+                            {directorRemoteSpeakerState.detail}
+                          </p>
+                        </div>
+                      ) : (
+                        <WalkieTalkButton
+                          active={walkie.isSelfTalking}
+                          finishing={walkie.isFinishing}
+                          pending={directorWalkieLoading}
+                          disabled={
+                            !walkie.canTalk ||
+                            walkie.recoveringAudio ||
+                            walkie.recoveringSignaling
+                          }
+                          countdown={walkie.countdown}
+                          finishDelayLeft={walkie.finishDelayLeft}
+                          onStart={walkie.startTalking}
+                          onStop={walkie.stopTalking}
+                          label="Hold to talk to umpire"
+                        />
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          <div className="order-2 xl:order-3">
+            <Card
+              title="Audio Library"
+              subtitle="Tap to play audio"
+              icon={<FaBullhorn />}
+              accent="violet"
+              help={{
+                title: "Audio Library",
+                body: "Drop audio files into public/audio/effects and they will show here automatically. Files only load when you tap them.",
+              }}
+              action={
+                <button
+                  type="button"
+                  onClick={stopAllEffects}
+                  className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-zinc-200"
+                >
+                  Stop audio
+                </button>
+              }
+            >
+              <audio
+                ref={effectsAudioRef}
+                hidden
+                preload="metadata"
+                playsInline
+              />
+              <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,16,30,0.36),rgba(10,10,14,0.32))] p-2">
+                <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(192,132,252,0.84)_18%,rgba(59,130,246,0.42)_76%,rgba(0,0,0,0))]" />
+                {effectsNeedsUnlock ? (
+                  <div className="mb-3 rounded-[22px] border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                    <p>
+                      Safari needs one quick tap to enable audio playback on
+                      this device.
+                    </p>
                     <button
                       type="button"
-                      onClick={() => void walkie.unlockAudio()}
+                      onClick={() => {
+                        void primeEffectsAudio().then(() => {
+                          setEffectsNeedsUnlock(false);
+                          setConsoleError("");
+                        });
+                      }}
                       className="mt-3 rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-amber-300"
                     >
                       Enable Audio
                     </button>
                   </div>
                 ) : null}
-              </div>
-              {directorWalkieChannelEnabled && directorWalkieOn ? (
-              <div className="flex flex-col items-center gap-4">
-                <WalkieTalkButton
-                  active={walkie.isSelfTalking}
-                  finishing={walkie.isFinishing}
-                  disabled={!walkie.canTalk}
-                  countdown={walkie.countdown}
-                  finishDelayLeft={walkie.finishDelayLeft}
-                  onStart={walkie.startTalking}
-                  onStop={walkie.stopTalking}
-                  label="Hold to talk to umpire"
-                />
-              </div>
-              ) : null}
-            </div>
-            </div>
-          </Card>
-          </div>
-
-          <div className="order-2 xl:order-3">
-          <Card
-            title="Audio Library"
-            subtitle="Tap to play audio. Music ducks under effects."
-            icon={<FaBullhorn />}
-            accent="violet"
-            help={{
-              title: "Audio Library",
-              body: "Drop audio files into public/audio/effects and they will show here automatically. Files only load when you tap them.",
-            }}
-            action={
-              <button
-                type="button"
-                onClick={stopAllEffects}
-                className="rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-zinc-200"
-              >
-                Stop audio
-              </button>
-            }
-          >
-            <audio ref={effectsAudioRef} hidden preload="metadata" playsInline />
-            <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,16,30,0.36),rgba(10,10,14,0.32))] p-2">
-              <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(192,132,252,0.84)_18%,rgba(59,130,246,0.42)_76%,rgba(0,0,0,0))]" />
-              {effectsNeedsUnlock ? (
-                <div className="mb-3 rounded-[22px] border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                  <p>Safari needs one quick tap to enable audio playback on this device.</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void primeEffectsAudio().then(() => {
-                        setEffectsNeedsUnlock(false);
-                        setConsoleError("");
-                      });
-                    }}
-                    className="mt-3 rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-amber-300"
-                  >
-                    Enable Audio
-                  </button>
+                {!effectsNeedsUnlock && iOSSafari && !audioUnlocked ? (
+                  <div className="mb-3 rounded-[22px] border border-white/10 bg-white/4 px-4 py-3 text-sm text-zinc-300">
+                    Tap any sound once to enable audio on this iPhone or iPad.
+                  </div>
+                ) : null}
+                <div className="mb-3 rounded-[22px] border border-white/10 bg-white/3 px-4 py-3 text-sm text-zinc-300">
+                  Turn off silent mode to hear sound effects
                 </div>
-              ) : null}
-              {!effectsNeedsUnlock && iOSSafari && !audioUnlocked ? (
-                <div className="mb-3 rounded-[22px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-zinc-300">
-                  Tap any sound once to enable audio on this iPhone or iPad.
-                </div>
-              ) : null}
-              {orderedLibraryFiles.length ? (
-                <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
-                  {orderedLibraryFiles.map((file) => (
-                    <div
-                      key={file.id}
-                      draggable
-                      onDragStart={(event) => handleLibraryDragStart(event, file.id)}
-                      onDragEnter={() => handleLibraryDragEnter(file.id)}
-                      onDragOver={(event) => handleLibraryDragOver(event, file.id)}
-                      onDrop={(event) => handleLibraryDrop(event, file.id)}
-                      onDragEnd={clearLibraryDragState}
-                      onPointerDown={() => {
-                        void primeEffectsAudio();
-                      }}
-                      onClick={() => void playEffect(file)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          void playEffect(file);
+                {orderedLibraryFiles.length ? (
+                  <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
+                    {orderedLibraryFiles.map((file) => (
+                      <div
+                        key={file.id}
+                        draggable
+                        onDragStart={(event) =>
+                          handleLibraryDragStart(event, file.id)
                         }
-                      }}
-                      className={`group relative min-h-[11.75rem] overflow-hidden rounded-[24px] border px-4 py-4 pb-5 text-left transition cursor-grab active:cursor-grabbing ${
-                        libraryLiveId === file.id
-                          ? "border-emerald-300/30 bg-[linear-gradient(180deg,rgba(18,40,34,0.9),rgba(10,16,18,0.94))] shadow-[0_18px_40px_rgba(16,185,129,0.16)]"
-                          : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
-                      } ${
-                        draggingLibraryId === file.id
-                          ? "scale-[0.985] opacity-72 shadow-[0_20px_50px_rgba(0,0,0,0.34)]"
-                          : ""
-                      } ${
-                        libraryDropTargetId === file.id
-                          ? "border-emerald-300/40 ring-2 ring-emerald-400/20"
-                          : ""
-                      }`}
-                    >
-                      <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
-                      <div className="flex h-full flex-col justify-between">
-                        <div className="space-y-2">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-white/90">
-                              <FaMusic className="text-sm" />
+                        onDragEnter={() => handleLibraryDragEnter(file.id)}
+                        onDragOver={(event) =>
+                          handleLibraryDragOver(event, file.id)
+                        }
+                        onDrop={(event) => handleLibraryDrop(event, file.id)}
+                        onDragEnd={clearLibraryDragState}
+                        onPointerDown={() => {
+                          void primeEffectsAudio();
+                        }}
+                        onClick={() => void playEffect(file)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            void playEffect(file);
+                          }
+                        }}
+                        className={`group relative min-h-47 overflow-hidden rounded-3xl border px-4 py-4 pb-5 text-left transition cursor-grab active:cursor-grabbing ${
+                          libraryLiveId === file.id
+                            ? "border-emerald-300/30 bg-[linear-gradient(180deg,rgba(18,40,34,0.9),rgba(10,16,18,0.94))] shadow-[0_18px_40px_rgba(16,185,129,0.16)]"
+                            : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                        } ${
+                          draggingLibraryId === file.id
+                            ? "scale-[0.985] opacity-72 shadow-[0_20px_50px_rgba(0,0,0,0.34)]"
+                            : ""
+                        } ${
+                          libraryDropTargetId === file.id
+                            ? "border-emerald-300/40 ring-2 ring-emerald-400/20"
+                            : ""
+                        }`}
+                      >
+                        <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-linear-to-r from-transparent via-white/18 to-transparent" />
+                        <div className="flex h-full flex-col justify-between">
+                          <div className="space-y-2">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/6 text-white/90">
+                                <FaMusic className="text-sm" />
+                              </div>
+                              <span
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-zinc-400"
+                                title="Drag to reorder"
+                              >
+                                <FaGripVertical className="text-sm" />
+                              </span>
                             </div>
-                            <span
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-400"
-                              title="Drag to reorder"
-                            >
-                              <FaGripVertical className="text-sm" />
-                            </span>
-                          </div>
-                          <div className="space-y-1">
-                            <div className="line-clamp-2 text-sm font-semibold leading-5 text-white">
-                              {file.label}
+                            <div className="space-y-1">
+                              <div className="line-clamp-2 text-sm font-semibold leading-5 text-white">
+                                {file.label}
+                              </div>
+                              <div className="truncate text-xs text-zinc-400">
+                                {file.fileName}
+                              </div>
                             </div>
-                            <div className="truncate text-xs text-zinc-400">{file.fileName}</div>
                           </div>
-                        </div>
-                        <div className="mt-3 flex items-end justify-between gap-2">
-                          <div className="space-y-1 pb-1 text-xs text-zinc-400">
-                            {libraryLiveId === file.id
-                              ? libraryState === "loading"
-                                ? "Loading..."
-                                : "Playing"
-                              : "Tap to play"}
-                            <div className="text-[11px] text-zinc-500">
+                          <div className="mt-3 flex items-end justify-between gap-2">
+                            <div className="space-y-1 pb-1 text-xs text-zinc-400">
                               {libraryLiveId === file.id
-                                ? `${formatAudioTime(libraryCurrentTime)} / ${formatAudioTime(
-                                    libraryDurations[file.id] || 0
-                                  )}`
-                                : formatAudioTime(libraryDurations[file.id] || 0)}
+                                ? libraryState === "loading"
+                                  ? "Loading..."
+                                  : "Playing"
+                                : "Tap to play"}
+                              <div className="text-[11px] text-zinc-500">
+                                {libraryLiveId === file.id
+                                  ? `${formatAudioTime(libraryCurrentTime)} / ${formatAudioTime(
+                                      libraryDurations[file.id] || 0,
+                                    )}`
+                                  : formatAudioTime(
+                                      libraryDurations[file.id] || 0,
+                                    )}
+                              </div>
                             </div>
+                            {libraryLiveId === file.id ? (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  stopAllEffects();
+                                }}
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/8 text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)]"
+                                aria-label={`Stop ${file.label}`}
+                              >
+                                {libraryState === "loading" ? (
+                                  <FaMusic className="text-xs" />
+                                ) : (
+                                  <FaPause className="text-xs" />
+                                )}
+                              </button>
+                            ) : null}
                           </div>
-                          {libraryLiveId === file.id ? (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                stopAllEffects();
-                              }}
-                              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.08] text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)]"
-                              aria-label={`Stop ${file.label}`}
-                            >
-                              {libraryState === "loading" ? (
-                                <FaMusic className="text-xs" />
-                              ) : (
-                                <FaPause className="text-xs" />
-                              )}
-                            </button>
-                          ) : null}
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  disabled
-                  className="w-full rounded-[22px] border border-white/10 bg-black/20 px-4 py-5 text-left text-sm text-zinc-400"
-                >
-                  Drop audio files into <span className="font-semibold text-zinc-200">public/audio/effects</span> and they will appear here.
-                </button>
-              )}
-            </div>
-          </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="w-full rounded-[22px] border border-white/10 bg-black/20 px-4 py-5 text-left text-sm text-zinc-400"
+                  >
+                    Drop audio files into{" "}
+                    <span className="font-semibold text-zinc-200">
+                      public/audio/effects
+                    </span>{" "}
+                    and they will appear here.
+                  </button>
+                )}
+              </div>
+            </Card>
           </div>
 
           <div className="order-4 xl:order-4 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1">
               <FaHeadphones className="text-zinc-200" />
               {speakerMessage || "Using phone speaker output."}
             </span>
@@ -2776,7 +2927,7 @@ export default function DirectorConsoleClient({
             }
           >
             <div className="space-y-4">
-              <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(28,16,46,0.38),rgba(10,10,14,0.52))] px-4 py-4">
+              <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(28,16,46,0.38),rgba(10,10,14,0.52))] px-4 py-4">
                 <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(192,132,252,0.82)_18%,rgba(34,211,238,0.42)_76%,rgba(0,0,0,0))]" />
                 <p className="text-sm text-zinc-300">
                   {speechSettings.enabled
@@ -2801,7 +2952,7 @@ export default function DirectorConsoleClient({
                 type="button"
                 onClick={readCurrentScore}
                 disabled={!canManageSession}
-                className="w-full rounded-[22px] border border-amber-400/20 bg-amber-500/10 px-4 py-4 text-left text-sm font-semibold text-amber-100 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-zinc-500 disabled:hover:translate-y-0"
+                className="w-full rounded-[22px] border border-amber-400/20 bg-amber-500/10 px-4 py-4 text-left text-sm font-semibold text-amber-100 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/4 disabled:text-zinc-500 disabled:hover:translate-y-0"
               >
                 {canManageSession
                   ? "Read current score"
@@ -2822,8 +2973,8 @@ export default function DirectorConsoleClient({
             action={
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black shadow-[0_10px_30px_rgba(16,185,129,0.2)]">
                 <FaCompactDisc />
-                  Add tracks
-                  <input
+                Add tracks
+                <input
                   type="file"
                   accept="audio/*"
                   multiple
@@ -2835,7 +2986,7 @@ export default function DirectorConsoleClient({
           >
             <audio ref={audioRef} onEnded={handleTrackEnd} hidden />
             <div className="space-y-4">
-              <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,25,34,0.38),rgba(10,10,14,0.52))] px-4 py-4">
+              <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(8,25,34,0.38),rgba(10,10,14,0.52))] px-4 py-4">
                 <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(34,211,238,0.82)_18%,rgba(59,130,246,0.76)_56%,rgba(250,204,21,0.34)_82%,rgba(0,0,0,0))]" />
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
                   Now playing
@@ -2848,8 +2999,8 @@ export default function DirectorConsoleClient({
                     (musicState === "playing"
                       ? "Playing"
                       : musicState === "paused"
-                      ? "Paused"
-                      : "Ready")}
+                        ? "Paused"
+                        : "Ready")}
                 </p>
               </div>
 
@@ -2869,7 +3020,7 @@ export default function DirectorConsoleClient({
                   type="button"
                   onClick={handlePauseMusic}
                   disabled={!currentTrack}
-                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.06] text-white disabled:cursor-not-allowed disabled:text-zinc-500"
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/6 text-white disabled:cursor-not-allowed disabled:text-zinc-500"
                   aria-label="Pause music"
                 >
                   <FaPause />
@@ -2878,7 +3029,7 @@ export default function DirectorConsoleClient({
                   type="button"
                   onClick={handleNextMusic}
                   disabled={!currentTrack || musicTracks.length < 2}
-                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.06] text-white disabled:cursor-not-allowed disabled:text-zinc-500"
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/6 text-white disabled:cursor-not-allowed disabled:text-zinc-500"
                   aria-label="Next track"
                 >
                   <FaForward />
@@ -2887,7 +3038,7 @@ export default function DirectorConsoleClient({
                   type="button"
                   onClick={handleStopMusic}
                   disabled={!currentTrack}
-                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.06] text-white disabled:cursor-not-allowed disabled:text-zinc-500"
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/6 text-white disabled:cursor-not-allowed disabled:text-zinc-500"
                   aria-label="Stop music"
                 >
                   <FaStop />
@@ -2909,14 +3060,16 @@ export default function DirectorConsoleClient({
                     max="1"
                     step="0.05"
                     value={musicVolume}
-                    onChange={(event) => setMusicVolume(Number(event.target.value))}
+                    onChange={(event) =>
+                      setMusicVolume(Number(event.target.value))
+                    }
                     className="director-gradient-slider__input"
                   />
                 </div>
               </label>
 
               {musicTracks.length ? (
-                <div className="space-y-2 rounded-[24px] border border-white/10 bg-black/20 p-3">
+                <div className="space-y-2 rounded-3xl border border-white/10 bg-black/20 p-3">
                   {musicTracks.map((track, index) => (
                     <button
                       key={track.id}
@@ -2925,7 +3078,7 @@ export default function DirectorConsoleClient({
                       className={`flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left text-sm ${
                         index === currentTrackIndex
                           ? "bg-emerald-500/12 text-emerald-100"
-                          : "text-zinc-300 hover:bg-white/[0.04]"
+                          : "text-zinc-300 hover:bg-white/4"
                       }`}
                     >
                       <span className="truncate">{track.name}</span>
@@ -2938,7 +3091,7 @@ export default function DirectorConsoleClient({
                   ))}
                 </div>
               ) : (
-                <div className="mt-2 rounded-[24px] border border-white/10 bg-black/20 px-4 py-4 text-center text-sm text-zinc-400">
+                <div className="mt-2 rounded-3xl border border-white/10 bg-black/20 px-4 py-4 text-center text-sm text-zinc-400">
                   Add audio files from Files, Downloads, or this phone.
                 </div>
               )}
@@ -2956,12 +3109,16 @@ export default function DirectorConsoleClient({
             }}
           >
             <div className="space-y-4">
-              <div className="rounded-[24px] border border-rose-300/16 bg-[radial-gradient(circle_at_top_left,rgba(251,113,133,0.18),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(239,68,68,0.16),transparent_36%),linear-gradient(180deg,rgba(52,18,24,0.34),rgba(18,6,10,0.22))] px-4 py-4">
-                <p className="text-sm font-semibold text-white">How to use it</p>
+              <div className="rounded-3xl border border-rose-300/16 bg-[radial-gradient(circle_at_top_left,rgba(251,113,133,0.18),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(239,68,68,0.16),transparent_36%),linear-gradient(180deg,rgba(52,18,24,0.34),rgba(18,6,10,0.22))] px-4 py-4">
+                <p className="text-sm font-semibold text-white">
+                  How to use it
+                </p>
                 <ul className="mt-3 space-y-2 text-sm leading-6 text-zinc-300">
                   <li>1. Connect your phone to a Bluetooth speaker.</li>
                   <li>2. Keep the speaker volume up.</li>
-                  <li>3. Use PA mic, music, or sound effects from this page.</li>
+                  <li>
+                    3. Use PA mic, music, or sound effects from this page.
+                  </li>
                 </ul>
               </div>
             </div>

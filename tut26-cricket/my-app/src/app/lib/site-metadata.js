@@ -4,6 +4,7 @@ export const siteConfig = {
   url: "https://www.gvcricket.com",
   logoPath: "/gvLogo.png",
   shareLogoPath: "/gvLogo.png",
+  socialImageVersion: "2026-03-20-logo",
   description:
     "GV Cricket is a live cricket scoring app with umpire mode, spectator scoreboards, director controls, walkie-talkie, loudspeaker, match images, and instant results in one fast mobile flow.",
   defaultTitle:
@@ -25,8 +26,8 @@ export const siteConfig = {
     "cricket scoring app for umpires and spectators",
     "mobile cricket scoring app",
   ],
-  ogImagePath: "/opengraph-image",
-  twitterImagePath: "/twitter-image",
+  ogImagePath: "/opengraph-image?v=2026-03-20-logo",
+  twitterImagePath: "/twitter-image?v=2026-03-20-logo",
 };
 
 export function getSiteUrl() {
@@ -55,6 +56,12 @@ export function getSiteUrl() {
 
 export function absoluteUrl(path = "/") {
   return new URL(path, getSiteUrl()).toString();
+}
+
+export function versionedSocialImagePath(path = "/") {
+  const cleanPath = String(path || "/").trim() || "/";
+  const separator = cleanPath.includes("?") ? "&" : "?";
+  return `${cleanPath}${separator}v=${siteConfig.socialImageVersion}`;
 }
 
 export function cleanText(value = "") {

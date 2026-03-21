@@ -15,7 +15,7 @@ function sseHeaders() {
   return {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache, no-transform",
-    Connection: "keep-alive",
+    Connection: "close",
     "X-Accel-Buffering": "no",
     "Content-Encoding": "none",
   };
@@ -38,6 +38,7 @@ export async function GET(request, { params }) {
       let didCleanup = false;
       let lastSerializedMatch = "";
       let bootstrapCatchupDone = false;
+      let liveUpdatesReady = false;
       let heartbeatLoop = async () => {};
       let bootstrapCatchupLoop = async () => {};
 
@@ -102,7 +103,7 @@ export async function GET(request, { params }) {
       };
 
       const scheduleBootstrapCatchup = (delay = 1200) => {
-        if (closed || bootstrapCatchupDone) {
+        if (closed) {
           return;
         }
         if (bootstrapCatchup) {
@@ -174,7 +175,7 @@ export async function GET(request, { params }) {
         };
 
       bootstrapCatchupLoop = async () => {
-        if (closed || bootstrapCatchupDone) {
+        if (closed) {
           return;
         }
 
@@ -183,7 +184,9 @@ export async function GET(request, { params }) {
         } catch (error) {
           console.error("Match SSE bootstrap catchup failed:", error);
         }
+
         bootstrapCatchupDone = true;
+        scheduleBootstrapCatchup(liveUpdatesReady ? 12000 : 1000);
       };
 
         await pushMatch();
@@ -197,6 +200,7 @@ export async function GET(request, { params }) {
         try {
           await ensureLiveUpdates();
           if (!closed) {
+            liveUpdatesReady = true;
             cleanup = subscribeToMatch(id, async () => {
               try {
                 await pushMatch();
@@ -210,7 +214,7 @@ export async function GET(request, { params }) {
         }
 
         scheduleHeartbeat();
-        scheduleBootstrapCatchup();
+        scheduleBootstrapCatchup(liveUpdatesReady ? 12000 : 1200);
 
         request.signal.addEventListener("abort", () => {
           stopStream();

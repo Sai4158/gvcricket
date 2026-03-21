@@ -283,6 +283,9 @@ export default function MatchActionGrid({
   isWalkieActive = false,
   isWalkieTalking = false,
   isWalkieFinishing = false,
+  isWalkieLoading = false,
+  isWalkieBusyByOther = false,
+  walkieBusyLabel = "",
   isCommentaryActive = false,
   isCommentaryTalking = false,
   isAnnounceActive = false,
@@ -308,6 +311,10 @@ export default function MatchActionGrid({
             badge={
               isWalkieTalking
                 ? "Live"
+                : isWalkieBusyByOther
+                ? walkieBusyLabel || "Busy"
+                : isWalkieLoading
+                ? "Connecting"
                 : isWalkieFinishing
                 ? "Finishing"
                 : isWalkieActive
@@ -317,6 +324,10 @@ export default function MatchActionGrid({
             badgeClass={
               isWalkieTalking
                 ? "border-cyan-400/30 bg-cyan-500/15 text-cyan-100"
+                : isWalkieBusyByOther
+                ? "border-amber-400/25 bg-amber-500/12 text-amber-100"
+                : isWalkieLoading
+                ? "border-sky-400/25 bg-sky-500/12 text-sky-100"
                 : isWalkieFinishing
                 ? "border-amber-400/25 bg-amber-500/12 text-amber-100"
                 : isWalkieActive

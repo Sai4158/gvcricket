@@ -3,16 +3,43 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isUiAudioUnlocked, subscribeUiAudioUnlock } from "../../lib/page-audio";
 
-const IOS_PREFERRED_VOICE_NAMES = ["samantha", "ava", "allison", "nicky"];
+const SAFARI_PREFERRED_VOICE_NAMES = [
+  "siri voice 4 enhanced",
+  "siri voice 4 premium",
+  "siri voice 4 natural",
+  "siri voice 4",
+  "siri female",
+  "siri",
+  "samantha enhanced",
+  "samantha premium",
+  "samantha natural",
+  "samantha",
+  "ava enhanced",
+  "ava premium",
+  "ava natural",
+  "ava",
+  "allison enhanced",
+  "allison premium",
+  "allison natural",
+  "allison",
+  "nicky enhanced",
+  "nicky premium",
+  "nicky natural",
+  "nicky",
+];
 const CHROME_PREFERRED_VOICE_NAMES = [
+  "google uk english female",
   "google us english",
   "google english",
-  "google uk english female",
 ];
 const DESKTOP_PREFERRED_VOICE_NAMES = [
+  "microsoft aria online",
+  "microsoft jenny online",
   "microsoft aria",
   "microsoft jenny",
-  "microsoft guy",
+  "google uk english female",
+  "google us english",
+  "google english",
   "samantha",
   "ava",
   "allison",
@@ -59,9 +86,12 @@ function getVoiceScore(voice, platform) {
   if (name.includes("premium")) score += 40;
   if (name.includes("enhanced")) score += 35;
   if (name.includes("neural")) score += 35;
+  if (name.includes("female")) score += 24;
   if (name.includes("online")) score += 25;
   if (name.includes("compact")) score -= 20;
 
+  if (name.includes("siri voice 4")) score += 320;
+  if (name.includes("siri")) score += 180;
   if (name.includes("samantha")) score += 120;
   if (name.includes("samantha") && name.includes("enhanced")) score += 180;
   if (name.includes("ava")) score += 110;
@@ -70,19 +100,27 @@ function getVoiceScore(voice, platform) {
   if (name.includes("allison") && name.includes("enhanced")) score += 145;
   if (name.includes("nicky")) score += 100;
   if (name.includes("nicky") && name.includes("enhanced")) score += 140;
+  if (name.includes("google uk english female")) score += 110;
   if (name.includes("google us english")) score += 95;
   if (name.includes("google")) score += 55;
   if (name.includes("microsoft aria")) score += 100;
   if (name.includes("microsoft jenny")) score += 95;
-  if (name.includes("microsoft guy")) score += 90;
+  if (name.includes("microsoft guy")) score += 42;
   if (name.includes("aria")) score += 40;
   if (name.includes("jenny")) score += 35;
-  if (name.includes("guy")) score += 30;
-  if (name.includes("zira")) score -= 80;
-  if (name.includes("david")) score -= 30;
-  if (name.includes("mark")) score -= 15;
+  if (name.includes("guy")) score += 8;
+  if (name.includes("zira")) score -= 110;
+  if (name.includes("david")) score -= 50;
+  if (name.includes("mark")) score -= 24;
+  if (name.includes("fred")) score -= 160;
+  if (name.includes("zarvox")) score -= 180;
+  if (name.includes("bahh")) score -= 180;
+  if (name.includes("bells")) score -= 180;
+  if (name.includes("boing")) score -= 180;
 
-  if (isIOS && isSafari) {
+  if (isSafari) {
+    if (name.includes("siri voice 4")) score += 420;
+    if (name.includes("siri")) score += 260;
     if (name.includes("samantha")) score += 260;
     if (name.includes("ava")) score += 220;
     if (name.includes("allison")) score += 200;
@@ -94,7 +132,11 @@ function getVoiceScore(voice, platform) {
     if (name.includes("boing")) score -= 180;
   }
 
-  if (isChrome && name.includes("google us english")) score += 80;
+  if (isChrome) {
+    if (name.includes("google uk english female")) score += 180;
+    if (name.includes("google us english")) score += 140;
+    if (name.includes("google english")) score += 110;
+  }
 
   return score;
 }
@@ -121,9 +163,9 @@ function pickAmericanVoice(voices, platform) {
     return null;
   }
 
-  if (platform?.isIOS && platform?.isSafari) {
+  if (platform?.isSafari) {
     return (
-      pickPreferredVoiceByName(englishVoices, IOS_PREFERRED_VOICE_NAMES) ||
+      pickPreferredVoiceByName(englishVoices, SAFARI_PREFERRED_VOICE_NAMES) ||
       [...englishVoices].sort(
         (a, b) => getVoiceScore(b, platform) - getVoiceScore(a, platform)
       )[0]
@@ -139,9 +181,12 @@ function pickAmericanVoice(voices, platform) {
     );
   }
 
-  return [...englishVoices].sort(
-    (a, b) => getVoiceScore(b, platform) - getVoiceScore(a, platform)
-  )[0];
+  return (
+    pickPreferredVoiceByName(englishVoices, DESKTOP_PREFERRED_VOICE_NAMES) ||
+    [...englishVoices].sort(
+      (a, b) => getVoiceScore(b, platform) - getVoiceScore(a, platform)
+    )[0]
+  );
 }
 
 function normalizeSpeechText(text) {
@@ -241,6 +286,7 @@ function getSpeechProfile(voice, options, platform) {
   const voiceName = voice?.name?.toLowerCase() || "";
   const { isIOS, isSafari, isChrome } = platform || {};
   const isAppleNatural =
+    voiceName.includes("siri") ||
     voiceName.includes("samantha") ||
     voiceName.includes("ava") ||
     voiceName.includes("allison") ||
@@ -261,16 +307,16 @@ function getSpeechProfile(voice, options, platform) {
           ? 0.82
           : 0.8
         : isAppleNatural
-        ? 0.88
+        ? 0.86
         : isGoogleNatural
         ? isChrome
-          ? 0.9
-          : 0.88
+          ? 0.87
+          : 0.86
         : isMicrosoftNatural
-        ? 0.89
+        ? 0.86
         : isLegacyVoice
         ? 0.83
-        : 0.9),
+        : 0.88),
     pitch:
       options.pitch ??
       (isIOSSafari
@@ -620,6 +666,11 @@ export default function useSpeechAnnouncer(settings) {
       };
 
       if (!isPrimedRef.current && !options.userGesture) {
+        pendingSpeakRef.current = {
+          type: "sequence",
+          items,
+          options,
+        };
         setStatus("waiting_for_gesture");
         return false;
       }
@@ -760,6 +811,11 @@ export default function useSpeechAnnouncer(settings) {
       }
 
       if (!isPrimedRef.current) {
+        pendingSpeakRef.current = {
+          type: "sequence",
+          items: [{ text }],
+          options,
+        };
         setStatus("waiting_for_gesture");
         return false;
       }
@@ -770,7 +826,17 @@ export default function useSpeechAnnouncer(settings) {
   );
 
   const speakSequence = useCallback(
-    (items, options = {}) => queueSequence(items, options),
+    (items, options = {}) => {
+      if (!options.userGesture && !isPrimedRef.current) {
+        pendingSpeakRef.current = {
+          type: "sequence",
+          items,
+          options,
+        };
+      }
+
+      return queueSequence(items, options);
+    },
     [queueSequence]
   );
 

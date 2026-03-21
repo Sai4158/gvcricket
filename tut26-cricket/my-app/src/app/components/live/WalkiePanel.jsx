@@ -8,6 +8,7 @@ import {
   FaPhoneVolume,
   FaUsers,
 } from "react-icons/fa";
+import { getWalkieRemoteSpeakerState, getWalkieRoleLabel } from "../../lib/walkie-ui";
 import LiquidLoader from "../shared/LiquidLoader";
 
 function WalkieInlineTalkButton({
@@ -214,12 +215,6 @@ export function WalkieNotice({
   );
 }
 
-function roleLabel(role) {
-  if (role === "director") return "Director";
-  if (role === "umpire") return "Umpire";
-  return "Spectator";
-}
-
 export function WalkieRequestQueue({
   requests = [],
   onAccept,
@@ -237,7 +232,7 @@ export function WalkieRequestQueue({
             <div>
               <div className="mb-2 flex items-center gap-2">
                 <span className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100">
-                  {roleLabel(request.role)}
+                  {getWalkieRoleLabel(request.role)}
                 </span>
               </div>
               <p className="text-sm font-medium text-white">
@@ -258,6 +253,10 @@ export function WalkieRequestQueue({
       ))}
     </div>
   );
+}
+
+function roleLabel(role) {
+  return getWalkieRoleLabel(role);
 }
 
 function IosSwitch({ checked, onChange, disabled = false, label }) {
@@ -287,6 +286,8 @@ function IosSwitch({ checked, onChange, disabled = false, label }) {
 export function WalkieTalkButton({
   active,
   finishing = false,
+  pending = false,
+  size = "md",
   disabled,
   countdown,
   finishDelayLeft = 0,
@@ -387,13 +388,15 @@ export function WalkieTalkButton({
         onDragStart={(event) => {
           event.preventDefault();
         }}
-        className={`relative inline-flex h-24 w-24 touch-none select-none items-center justify-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
+        className={`relative inline-flex touch-none select-none items-center justify-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
           disabled
             ? "cursor-not-allowed border-white/5 bg-zinc-900 text-zinc-600"
             : active || holding || finishing
             ? "border-emerald-300/40 bg-emerald-500 text-black shadow-[0_18px_44px_rgba(16,185,129,0.3)]"
+            : pending
+            ? "border-cyan-300/35 bg-cyan-500/10 text-cyan-100 shadow-[0_14px_34px_rgba(34,211,238,0.18)]"
             : "border-white/10 bg-white/[0.06] text-zinc-100 hover:-translate-y-0.5 hover:bg-white/[0.09]"
-        }`}
+        } ${size === "lg" ? "h-28 w-28" : "h-24 w-24"}`}
         aria-label={active || holding || finishing ? "Release walkie talk" : label}
         style={{
           userSelect: "none",
@@ -408,11 +411,19 @@ export function WalkieTalkButton({
           className={`absolute inset-[-8px] rounded-full border transition-opacity ${
             active || holding || finishing
               ? "animate-pulse border-emerald-300/35 opacity-100"
+              : pending
+              ? "animate-pulse border-cyan-300/25 opacity-100"
               : "border-transparent opacity-0"
           }`}
         />
-        <span className="text-[1.65rem]">
-          {active || holding || finishing ? <FaMicrophone /> : <FaMicrophoneSlash />}
+        <span className={size === "lg" ? "text-[2rem]" : "text-[1.65rem]"}>
+          {active || holding || finishing ? (
+            <FaMicrophone />
+          ) : pending ? (
+            <FaMicrophone className="animate-pulse" />
+          ) : (
+            <FaMicrophoneSlash />
+          )}
         </span>
       </button>
       <div
@@ -425,7 +436,13 @@ export function WalkieTalkButton({
         }}
       >
         <p className="text-xs font-medium text-zinc-400">
-          {finishing ? "Finishing" : active || holding ? "Live" : "Hold to talk"}
+          {finishing
+            ? "Finishing"
+            : active || holding
+            ? "Live"
+            : pending
+            ? "Connecting"
+            : "Hold to talk"}
         </p>
         {finishing ? (
           <p className="mt-1 text-[11px] text-zinc-500">{finishDelayLeft || 1}s</p>
@@ -447,6 +464,11 @@ export default function WalkiePanel({
   canTalk,
   isSelfTalking,
   isFinishing,
+  claiming = false,
+  preparingToTalk = false,
+  updatingEnabled = false,
+  recoveringAudio = false,
+  recoveringSignaling = false,
   countdown,
   finishDelayLeft,
   requestCooldownLeft,
@@ -464,19 +486,25 @@ export default function WalkiePanel({
   onDismissRequest,
 }) {
   const isUmpire = role === "umpire";
+  const walkieActionPending = Boolean(claiming || preparingToTalk || updatingEnabled);
+  const walkieRecovering = Boolean(recoveringAudio || recoveringSignaling);
+  const remoteSpeakerState = getWalkieRemoteSpeakerState({
+    snapshot,
+    isSelfTalking,
+  });
   const canShowRequestAction = !snapshot?.enabled && !isUmpire;
-  const statusText = !snapshot?.enabled
+  const statusText = walkieActionPending
+    ? "Connecting"
+    : walkieRecovering
+    ? "Reconnecting"
+    : remoteSpeakerState.isRemoteTalking
+    ? remoteSpeakerState.shortStatus
+    : !snapshot?.enabled
     ? "Walkie-talkie is off"
     : isFinishing
     ? "Finishing"
     : isSelfTalking
     ? "You are live"
-    : snapshot?.activeSpeakerRole === "umpire"
-    ? "Umpire is speaking"
-    : snapshot?.activeSpeakerRole === "director"
-    ? "Director is speaking"
-    : snapshot?.activeSpeakerRole === "spectator"
-    ? "Spectator is speaking"
     : "Ready";
   const activeSpeakerLabel = snapshot?.activeSpeakerName
     ? `${snapshot.activeSpeakerName}${
@@ -484,6 +512,15 @@ export default function WalkiePanel({
       }`
     : snapshot?.activeSpeakerRole
     ? roleLabel(snapshot.activeSpeakerRole)
+    : "";
+  const activeSpeakerLabelText = snapshot?.activeSpeakerName
+    ? `${snapshot.activeSpeakerName}${
+        snapshot?.activeSpeakerRole && !isSelfTalking
+          ? ` • ${getWalkieRoleLabel(snapshot.activeSpeakerRole)}`
+          : ""
+      }`
+    : snapshot?.activeSpeakerRole
+    ? getWalkieRoleLabel(snapshot.activeSpeakerRole)
     : "";
 
   const handleToggle = (checked) => {
@@ -532,9 +569,9 @@ export default function WalkiePanel({
                 {isUmpire ? "Walkie-Talkie" : "Push to Talk"}
               </h3>
               <p className="mt-1 text-sm text-zinc-400">{statusText}</p>
-              {snapshot?.enabled && activeSpeakerLabel && !isSelfTalking ? (
-                <p className="mt-1 text-xs font-medium text-emerald-200">
-                  Live now: {activeSpeakerLabel}
+              {snapshot?.enabled && activeSpeakerLabelText && !isSelfTalking ? (
+                <p className="mt-1 text-xs font-medium text-emerald-200" title={activeSpeakerLabel}>
+                  Live now: {activeSpeakerLabelText.replace("â€¢", "•")}
                 </p>
               ) : null}
               <p className="mt-1 text-xs text-zinc-500">
@@ -549,7 +586,7 @@ export default function WalkiePanel({
           {isUmpire ? (
             <IosSwitch
               checked={Boolean(snapshot?.enabled)}
-              disabled={false}
+              disabled={updatingEnabled}
               label={
                 snapshot?.enabled
                   ? "Walkie-talkie is on"
@@ -602,17 +639,29 @@ export default function WalkiePanel({
 
         <div className="mt-5 flex justify-center">
           {isUmpire || snapshot?.enabled ? (
-            <WalkieTalkButton
-              active={isSelfTalking}
-              finishing={isFinishing}
-              disabled={!canTalk}
-              countdown={countdown}
-              finishDelayLeft={finishDelayLeft}
-              onPrepare={onPrepareTalking}
-              onStart={onStartTalking}
-              onStop={onStopTalking}
-              label={isUmpire ? "Hold to reply" : "Hold to talk"}
-            />
+            remoteSpeakerState.isRemoteTalking ? (
+              <div className="w-full max-w-[320px] rounded-[28px] border border-cyan-300/18 bg-[linear-gradient(180deg,rgba(10,18,26,0.92),rgba(8,10,16,0.98))] px-5 py-4 text-center shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
+                <div className="mb-2 inline-flex items-center rounded-full border border-cyan-300/18 bg-cyan-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100">
+                  {remoteSpeakerState.capsuleLabel}
+                </div>
+                <p className="text-sm font-medium text-white">{remoteSpeakerState.title}</p>
+                <p className="mt-2 text-xs leading-5 text-zinc-400">{remoteSpeakerState.detail}</p>
+              </div>
+            ) : (
+              <WalkieTalkButton
+                active={isSelfTalking}
+                finishing={isFinishing}
+                pending={walkieActionPending || walkieRecovering}
+                size={role === "spectator" ? "lg" : "md"}
+                disabled={!canTalk || walkieRecovering}
+                countdown={countdown}
+                finishDelayLeft={finishDelayLeft}
+                onPrepare={onPrepareTalking}
+                onStart={onStartTalking}
+                onStop={onStopTalking}
+                label={isUmpire ? "Hold to reply" : "Hold to talk"}
+              />
+            )
           ) : canShowRequestAction ? (
             <div className="space-y-3">
               <button
@@ -620,7 +669,7 @@ export default function WalkiePanel({
                 onClick={() => {
                   onRequestEnable?.();
                 }}
-                disabled={!canRequestEnable || requestState === "pending"}
+                disabled={!canRequestEnable || requestState === "pending" || walkieRecovering}
                 className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black shadow-[0_12px_30px_rgba(16,185,129,0.22)] transition disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
               >
                 {requestState === "pending" ? (

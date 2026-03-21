@@ -90,9 +90,17 @@ function appendActionHistory(match, action, snapshot) {
   match.actionHistory = nextHistory.slice(-MAX_ACTION_HISTORY);
 }
 
+function getStoredLastEventType(liveEvent) {
+  if (!liveEvent?.type) {
+    return "";
+  }
+
+  return liveEvent.type === "score_update" ? "score" : liveEvent.type;
+}
+
 function markLiveEvent(match, liveEvent) {
   match.lastLiveEvent = liveEvent;
-  match.lastEventType = liveEvent?.type || "";
+  match.lastEventType = getStoredLastEventType(liveEvent);
   match.lastEventText = liveEvent?.summaryText || "";
 }
 
