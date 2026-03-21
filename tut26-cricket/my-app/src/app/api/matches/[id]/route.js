@@ -152,9 +152,18 @@ export async function PATCH(req, { params }) {
     match.teamAName = nextState.teamAName;
     match.teamBName = nextState.teamBName;
     match.overs = nextState.overs;
+    match.score = nextState.score;
+    match.outs = nextState.outs;
+    match.isOngoing = nextState.isOngoing;
+    match.innings = nextState.innings;
+    match.result = nextState.result;
     match.tossWinner = nextState.tossWinner;
     match.innings1 = nextState.innings1;
     match.innings2 = nextState.innings2;
+    match.balls = nextState.balls;
+    match.lastLiveEvent = nextState.lastLiveEvent;
+    match.lastEventType = nextState.lastEventType;
+    match.lastEventText = nextState.lastEventText;
     match.announcerEnabled = nextState.announcerEnabled;
     match.announcerMode = nextState.announcerMode;
     await match.save();

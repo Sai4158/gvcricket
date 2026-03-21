@@ -51,7 +51,7 @@ test("walkie audio transport stays off when match walkie is disabled", () => {
   assert.equal(result, false);
 });
 
-test("walkie audio transport stays on for opted-in passive listening and active talk", () => {
+test("walkie audio transport stays on only when audio is actually needed", () => {
   assert.equal(
     shouldMaintainWalkieAudioTransport({
       enabled: true,
@@ -84,7 +84,7 @@ test("walkie audio transport stays on for opted-in passive listening and active 
       isSelfTalking: false,
       isFinishing: false,
     }),
-    true
+    false
   );
 
   assert.equal(

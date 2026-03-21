@@ -469,6 +469,9 @@ export default function useWalkieTalkie({
   const toggleEnabledPromiseRef = useRef(null);
   const requestEnablePromiseRef = useRef(null);
   const respondPromiseRef = useRef(null);
+  const refreshSignalPromiseRef = useRef(null);
+  const refreshSignalHandlerRef = useRef(null);
+  const lastRefreshRequestIdRef = useRef("");
 
   const snapshotRef = useRef(EMPTY);
   const participantIdRef = useRef("");
@@ -1427,6 +1430,24 @@ export default function useWalkieTalkie({
             return;
           }
 
+          if (payload.type === "walkie-refresh-request") {
+            const requestId = String(payload.requestId || "");
+            const sourceParticipantId = String(payload.participantId || "");
+            if (
+              (requestId && requestId === lastRefreshRequestIdRef.current) ||
+              sourceParticipantId === participantIdRef.current
+            ) {
+              return;
+            }
+            lastRefreshRequestIdRef.current = requestId;
+            updateNotice(payload.message || `${payload.name || "Someone"} refreshed walkie signal.`);
+            void refreshSignalHandlerRef.current?.({
+              propagate: false,
+              source: "remote",
+            });
+            return;
+          }
+
           if (payload.type === "walkie-speaker-started") {
             activeSpeakerRef.current = {
               owner: String(payload.userId || payload.signalingUserId || ""),
@@ -2300,6 +2321,99 @@ export default function useWalkieTalkie({
     }
   }, [enableManualSignaling, ensureAudioUnlock, joinRtc, participantId]);
 
+  const refreshSignal = useCallback(
+    async ({ propagate = false, source = "local" } = {}) => {
+      if (refreshSignalPromiseRef.current) {
+        return refreshSignalPromiseRef.current;
+      }
+
+      refreshSignalPromiseRef.current = (async () => {
+        const participant = participantIdRef.current || ensureParticipantId();
+        const requestId = `walkie-refresh:${Date.now()}:${Math.random()
+          .toString(36)
+          .slice(2, 10)}`;
+        lastRefreshRequestIdRef.current = requestId;
+        setError("");
+        clearTimer(audioRetryTimerRef);
+        clearTimer(signalingRetryTimerRef);
+        clearTimer(remoteAudioLingerTimerRef);
+        if (source !== "remote") {
+          updateNotice("Refreshing walkie signal...");
+        }
+
+        if (
+          propagate &&
+          rtmClientRef.current &&
+          signalingChannelRef.current &&
+          participant
+        ) {
+          try {
+            await rtmClientRef.current.publish(
+              signalingChannelRef.current,
+              JSON.stringify({
+                type: "walkie-refresh-request",
+                requestId,
+                participantId: participant,
+                role,
+                name: defaultDisplayName(role, displayName),
+                requestedAt: nowIso(),
+                message: `${defaultDisplayName(role, displayName)} refreshed walkie signal.`,
+              })
+            );
+          } catch (refreshBroadcastError) {
+            walkieConsole("warn", "Walkie refresh broadcast skipped", {
+              stage: "refresh-broadcast",
+              message: messageFor(
+                refreshBroadcastError,
+                "Walkie refresh broadcast could not be sent."
+              ),
+            });
+          }
+        }
+
+        if (matchId && role && participant) {
+          clearStoredWalkieToken("signal", matchId, role, participant);
+        }
+
+        cancelPendingStartRef.current = true;
+        setRecoveringAudio(Boolean(autoConnectAudio));
+        setRecoveringSignaling(true);
+
+        await stopTalking(source === "remote" ? "remote-refresh" : "refreshing");
+        await cleanupTransport();
+        resetRtcSessionForReload();
+        await cleanupSignaling();
+
+        if (mountedRef.current && shouldMaintainSignalingRef.current) {
+          setSignalingReconnectTick((current) => current + 1);
+          return true;
+        }
+
+        setRecoveringAudio(false);
+        setRecoveringSignaling(false);
+        return false;
+      })().finally(() => {
+        refreshSignalPromiseRef.current = null;
+      });
+
+      return refreshSignalPromiseRef.current;
+    },
+    [
+      autoConnectAudio,
+      cleanupSignaling,
+      cleanupTransport,
+      displayName,
+      ensureParticipantId,
+      matchId,
+      resetRtcSessionForReload,
+      role,
+      stopTalking,
+      updateNotice,
+    ]
+  );
+
+  refreshSignalHandlerRef.current = refreshSignal;
+
   const deactivateAudio = useCallback(async ({ restartSignaling = false } = {}) => {
     clearTimer(audioRetryTimerRef);
     clearTimer(signalingRetryTimerRef);
@@ -2817,6 +2931,7 @@ export default function useWalkieTalkie({
     unlockAudio,
     prepareToTalk,
     deactivateAudio,
+    refreshSignal,
     acceptRequest,
     dismissRequest,
   };

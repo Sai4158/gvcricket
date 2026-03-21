@@ -15,11 +15,11 @@ export function addBallToHistory(match, ball) {
 
   const history = innings.history;
   const lastOver = history.at(-1);
-  const isLegalBall =
-    ball.extraType !== "wide" && ball.extraType !== "noball";
   const legalBallsInLastOver = countLegalBalls(lastOver ? [lastOver] : []);
 
-  if (!lastOver || (legalBallsInLastOver >= 6 && isLegalBall)) {
+  // Once an over already has 6 legal balls, any next scoring event belongs
+  // to the next over, including wides and no-balls.
+  if (!lastOver || legalBallsInLastOver >= 6) {
     history.push({
       overNumber: (lastOver?.overNumber ?? 0) + 1,
       balls: [ball],

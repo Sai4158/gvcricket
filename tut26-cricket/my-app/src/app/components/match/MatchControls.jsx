@@ -66,7 +66,7 @@ export function Controls({
       <ScoreButton
         onClick={() => onScore(0)}
         disabled={disabled}
-        className={`${baseBtn} bg-zinc-800 hover:bg-zinc-700`}
+        className={`${baseBtn} bg-sky-700 hover:bg-sky-600`}
       >
         Dot
       </ScoreButton>

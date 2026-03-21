@@ -1,18 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FaBroadcastTower } from "react-icons/fa";
 import useLocalMicMonitor from "../live/useLocalMicMonitor";
 import useAnnouncementSettings from "../live/useAnnouncementSettings";
+import useLiveSoundEffectsPlayer from "../live/useLiveSoundEffectsPlayer";
 import { WalkieNotice, WalkieRequestQueue } from "../live/WalkiePanel";
 import useWalkieTalkie from "../live/useWalkieTalkie";
 import MatchHeroBackdrop from "./MatchHeroBackdrop";
 import { countLegalBalls } from "../../lib/match-scoring";
 import {
   buildCurrentScoreAnnouncement,
-  buildUmpireAnnouncement,
-  buildUmpireTapAnnouncement,
+  buildLiveScoreAnnouncementSequence,
   createScoreLiveEvent,
   createUndoLiveEvent,
 } from "../../lib/live-announcements";
@@ -28,12 +28,31 @@ import { Controls } from "./MatchControls";
 import { BallTracker } from "./MatchBallHistory";
 import MatchActionGrid from "./MatchActionGrid";
 import MatchModalLayer from "./MatchModalLayer";
+import MatchSoundEffectsPanel from "./MatchSoundEffectsPanel";
 import useLiveRelativeTime from "../live/useLiveRelativeTime";
 import useSpeechAnnouncer from "../live/useSpeechAnnouncer";
 import useMatch, { triggerMatchHapticFeedback } from "./useMatch";
 import useMatchAccess from "./useMatchAccess";
 import OptionalFeatureBoundary from "../shared/OptionalFeatureBoundary";
 import { buildShareUrl } from "../../lib/site-metadata";
+import {
+  fetchCachedSoundEffectsLibrary,
+  persistSoundEffectsOrder,
+  readCachedSoundEffectsLibrary,
+  readCachedSoundEffectsOrder,
+  sortSoundEffectsByOrder,
+  writeCachedSoundEffectsLibrary,
+  writeCachedSoundEffectsOrder,
+} from "../../lib/sound-effects-client";
+import { applyMatchAction } from "../../lib/match-engine";
+
+function createSoundEffectRequestId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return `sound-effect:${crypto.randomUUID()}`;
+  }
+
+  return `sound-effect:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
+}
 
 export default function MatchPageClient({
   matchId,
@@ -43,10 +62,27 @@ export default function MatchPageClient({
   const router = useRouter();
   const [modal, setModal] = useState({ type: null });
   const [infoText, setInfoText] = useState(null);
+  const [soundEffectsOpen, setSoundEffectsOpen] = useState(false);
+  const [soundEffectFiles, setSoundEffectFiles] = useState(() => {
+    const cachedFiles = readCachedSoundEffectsLibrary();
+    return sortSoundEffectsByOrder(cachedFiles, readCachedSoundEffectsOrder());
+  });
+  const [soundEffectLibraryStatus, setSoundEffectLibraryStatus] = useState(() =>
+    readCachedSoundEffectsLibrary().length ? "ready" : "idle",
+  );
+  const [soundEffectError, setSoundEffectError] = useState("");
   const localAnnouncementIdRef = useRef(0);
   const lastWalkieRequestSignatureRef = useRef("");
   const umpireAnnouncementTimerRef = useRef(null);
   const pendingUmpireAnnouncementRef = useRef(null);
+  const previousSoundEffectMatchIdRef = useRef(initialMatch?._id || "");
+  const lastSoundEffectTriggerRef = useRef({ effectId: "", at: 0 });
+  const lastHandledSoundEffectEventRef = useRef(
+    initialMatch?.lastLiveEvent?.type === "sound_effect"
+      ? initialMatch.lastLiveEvent.id || ""
+      : "",
+  );
+  const localSoundEffectRequestIdRef = useRef("");
   const { authStatus, authError, authSubmitting, submitPin } = useMatchAccess(
     matchId,
     initialAuthStatus
@@ -54,8 +90,19 @@ export default function MatchPageClient({
   const { settings: umpireSettings, updateSetting: updateUmpireSetting } =
     useAnnouncementSettings("umpire", matchId);
   const micMonitor = useLocalMicMonitor();
-  const { speak, prime, stop, status, voiceName } =
+  const { speak, speakSequence, prime, stop, status, voiceName } =
     useSpeechAnnouncer(umpireSettings);
+  const {
+    audioRef: soundEffectsAudioRef,
+    activeEffectId: activeSoundEffectId,
+    needsUnlock: soundEffectsNeedsUnlock,
+    playEffect: playLocalSoundEffect,
+  } = useLiveSoundEffectsPlayer({
+    volume: 1,
+    onBeforePlay: () => {
+      stop();
+    },
+  });
   const {
     match,
     error,
@@ -99,6 +146,20 @@ export default function MatchPageClient({
       stop();
     }
   }, [isLiveMatch, stop]);
+
+  useEffect(() => {
+    const nextMatchId = match?._id || "";
+    if (previousSoundEffectMatchIdRef.current === nextMatchId) {
+      return;
+    }
+
+    previousSoundEffectMatchIdRef.current = nextMatchId;
+    localSoundEffectRequestIdRef.current = "";
+    lastHandledSoundEffectEventRef.current =
+      match?.lastLiveEvent?.type === "sound_effect"
+        ? match.lastLiveEvent.id || ""
+        : "";
+  }, [match?._id, match?.lastLiveEvent?.id, match?.lastLiveEvent?.type]);
 
   useEffect(() => {
     return () => {
@@ -149,9 +210,24 @@ export default function MatchPageClient({
       return;
     }
     localAnnouncementIdRef.current += 1;
-    speak(next.text, {
+    speakSequence(next.items, {
       key: `umpire-${localAnnouncementIdRef.current}`,
-      rate: 0.92,
+      priority: next.priority || 2,
+      minGapMs: 0,
+      userGesture: true,
+      interrupt: true,
+    });
+  };
+
+  const speakImmediateUmpireSequence = (sequence, keyPrefix) => {
+    if (!sequence?.items?.length || !umpireSettings.enabled || umpireSettings.mode === "silent") {
+      return;
+    }
+
+    localAnnouncementIdRef.current += 1;
+    speakSequence(sequence.items, {
+      key: `${keyPrefix}-${localAnnouncementIdRef.current}`,
+      priority: sequence.priority || 2,
       minGapMs: 0,
       userGesture: true,
       interrupt: true,
@@ -163,23 +239,34 @@ export default function MatchPageClient({
       return;
     }
 
-    const nextMatch = match
-      ? {
-          ...match,
-          score: match.score + runs,
-          outs: isOut ? match.outs + 1 : match.outs,
-        }
-      : null;
+    let nextMatch = match;
+    if (match) {
+      try {
+        nextMatch = applyMatchAction(match, {
+          actionId: `umpire-preview:${Date.now()}`,
+          type: "score_ball",
+          runs,
+          isOut,
+          extraType,
+        });
+      } catch {
+        nextMatch = match;
+      }
+    }
     const event = createScoreLiveEvent(match, nextMatch || match, {
       runs,
       isOut,
       extraType,
     });
-    const text = buildUmpireTapAnnouncement(event, umpireSettings.mode);
+    const sequence = buildLiveScoreAnnouncementSequence(
+      event,
+      nextMatch || match,
+      umpireSettings.mode
+    );
 
-    if (!text) return;
+    if (!sequence.items.length) return;
 
-    pendingUmpireAnnouncementRef.current = { text };
+    pendingUmpireAnnouncementRef.current = sequence;
     if (umpireAnnouncementTimerRef.current) {
       window.clearTimeout(umpireAnnouncementTimerRef.current);
     }
@@ -210,27 +297,215 @@ export default function MatchPageClient({
     });
   };
 
+  const ensureUmpireScoreFeedbackEnabled = () => {
+    if (!umpireSettings.enabled) {
+      updateUmpireSetting("enabled", true);
+    }
+
+    if (umpireSettings.mode === "silent") {
+      updateUmpireSetting("mode", "simple");
+    }
+  };
+
+  const handleScoreFeedbackHoldStart = () => {
+    if (!match) {
+      return;
+    }
+
+    ensureUmpireScoreFeedbackEnabled();
+    prime({ userGesture: true });
+    handleManualScoreAnnouncement();
+  };
+
+  const loadSoundEffectsLibrary = useCallback(async () => {
+    if (soundEffectLibraryStatus === "loading") {
+      return;
+    }
+
+    if (soundEffectFiles.length) {
+      setSoundEffectLibraryStatus("ready");
+      return;
+    }
+
+    setSoundEffectLibraryStatus("loading");
+    setSoundEffectError("");
+
+    try {
+      const nextFiles = await fetchCachedSoundEffectsLibrary();
+      setSoundEffectFiles(nextFiles);
+      setSoundEffectLibraryStatus("ready");
+    } catch (caughtError) {
+      setSoundEffectLibraryStatus("idle");
+      setSoundEffectError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Could not load sound effects.",
+      );
+    }
+  }, [soundEffectFiles.length, soundEffectLibraryStatus]);
+
+  const toggleSoundEffectsPanel = useCallback(() => {
+    setSoundEffectsOpen((current) => {
+      const nextOpen = !current;
+      if (nextOpen) {
+        void loadSoundEffectsLibrary();
+      }
+      return nextOpen;
+    });
+  }, [loadSoundEffectsLibrary]);
+
+  const handlePlaySoundEffect = useCallback(
+    async (file) => {
+      if (!match?._id || !isLiveMatch || !file?.src) {
+        return;
+      }
+
+      const now = Date.now();
+      if (
+        lastSoundEffectTriggerRef.current.effectId === file.id &&
+        now - lastSoundEffectTriggerRef.current.at < 220
+      ) {
+        return;
+      }
+      lastSoundEffectTriggerRef.current = {
+        effectId: file.id,
+        at: now,
+      };
+
+      triggerMatchHapticFeedback();
+      setSoundEffectError("");
+
+      const clientRequestId = createSoundEffectRequestId();
+      const playedLocally = await playLocalSoundEffect(file, {
+        userGesture: true,
+      });
+      if (!playedLocally) {
+        return;
+      }
+      localSoundEffectRequestIdRef.current = clientRequestId;
+
+      try {
+        const response = await fetch(`/api/matches/${matchId}/sound-effects`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          keepalive: true,
+          body: JSON.stringify({
+            effectId: file.id,
+            clientRequestId,
+          }),
+        });
+        if (!response.ok) {
+          const payload = await response
+            .json()
+            .catch(() => ({ message: "Could not play the sound effect." }));
+          throw new Error(payload?.message || "Could not play the sound effect.");
+        }
+      } catch (caughtError) {
+        console.error("Sound effect trigger failed:", caughtError);
+        setSoundEffectError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Could not play the sound effect.",
+        );
+      }
+    },
+    [isLiveMatch, match?._id, matchId, playLocalSoundEffect],
+  );
+
+  const handleReorderSoundEffects = useCallback((activeId, targetId) => {
+    if (!activeId || !targetId || activeId === targetId) {
+      return;
+    }
+
+    setSoundEffectFiles((currentFiles) => {
+      const activeIndex = currentFiles.findIndex((file) => file.id === activeId);
+      const targetIndex = currentFiles.findIndex((file) => file.id === targetId);
+
+      if (activeIndex < 0 || targetIndex < 0) {
+        return currentFiles;
+      }
+
+      const nextFiles = [...currentFiles];
+      const [movedItem] = nextFiles.splice(activeIndex, 1);
+      nextFiles.splice(targetIndex, 0, movedItem);
+
+      writeCachedSoundEffectsLibrary(nextFiles);
+      const nextOrder = nextFiles.map((file) => file.id);
+      writeCachedSoundEffectsOrder(nextOrder);
+      void persistSoundEffectsOrder(nextOrder);
+
+      return nextFiles;
+    });
+  }, []);
+
+  useEffect(() => {
+    const liveEvent = match?.lastLiveEvent;
+    if (!liveEvent?.id || liveEvent.type !== "sound_effect") {
+      return;
+    }
+
+    if (lastHandledSoundEffectEventRef.current === liveEvent.id) {
+      return;
+    }
+
+    lastHandledSoundEffectEventRef.current = liveEvent.id;
+    if (
+      liveEvent.clientRequestId &&
+      liveEvent.clientRequestId === localSoundEffectRequestIdRef.current
+    ) {
+      localSoundEffectRequestIdRef.current = "";
+      return;
+    }
+
+    stop();
+    void playLocalSoundEffect(
+      {
+        id: liveEvent.effectId || liveEvent.effectFileName || liveEvent.id,
+        fileName: liveEvent.effectFileName || liveEvent.effectId || "",
+        label: liveEvent.effectLabel || "Sound effect",
+        src: liveEvent.effectSrc || "",
+      },
+      { userGesture: false },
+    );
+  }, [match?.lastLiveEvent, playLocalSoundEffect, stop]);
+
   const handleAnnouncedUndo = async () => {
     if (umpireAnnouncementTimerRef.current) {
       window.clearTimeout(umpireAnnouncementTimerRef.current);
       umpireAnnouncementTimerRef.current = null;
     }
     pendingUmpireAnnouncementRef.current = null;
-    localAnnouncementIdRef.current += 1;
     const undoEvent = createUndoLiveEvent(match);
-    const undoText = buildUmpireTapAnnouncement(undoEvent, umpireSettings.mode) || "Undo.";
-
-    if (umpireSettings.enabled && umpireSettings.mode !== "silent") {
-      speak(undoText, {
-        key: `umpire-undo-${localAnnouncementIdRef.current}`,
-        rate: 0.92,
-        minGapMs: 0,
-        userGesture: true,
-        interrupt: true,
-      });
-    }
+    const undoSequence = buildLiveScoreAnnouncementSequence(
+      undoEvent,
+      match,
+      umpireSettings.mode
+    );
+    speakImmediateUmpireSequence(undoSequence, "umpire-undo");
 
     await handleUndo();
+  };
+
+  const handleAnnouncedPatchUpdate = async (payload) => {
+    const nextMatch = await patchAndUpdate(payload);
+    if (!nextMatch) {
+      return null;
+    }
+
+    if (
+      payload?.innings1Score === undefined &&
+      payload?.overs === undefined
+    ) {
+      return nextMatch;
+    }
+
+    const correctionSequence = buildLiveScoreAnnouncementSequence(
+      nextMatch.lastLiveEvent,
+      nextMatch,
+      umpireSettings.mode
+    );
+    speakImmediateUmpireSequence(correctionSequence, "umpire-correction");
+    return nextMatch;
   };
 
   const handleUmpirePressFeedback = () => {
@@ -438,15 +713,42 @@ export default function MatchPageClient({
             setInfoText={setInfoText}
             disabled={controlsDisabled}
           />
+          {isLiveMatch ? (
+            <MatchSoundEffectsPanel
+              files={soundEffectFiles}
+              isDisabled={controlsDisabled}
+              isLoading={soundEffectLibraryStatus === "loading"}
+              isOpen={soundEffectsOpen}
+              error={soundEffectError}
+              activeEffectId={activeSoundEffectId}
+              needsUnlock={soundEffectsNeedsUnlock}
+              onToggle={toggleSoundEffectsPanel}
+              onMinimize={() => setSoundEffectsOpen(false)}
+              onPlayEffect={handlePlaySoundEffect}
+              onReorder={handleReorderSoundEffects}
+            />
+          ) : null}
           <MatchActionGrid
             isUpdating={isUpdating}
             historyStackLength={currentInningsHasHistory ? historyStack.length : 0}
             onEditTeams={() => setModal({ type: "editTeams" })}
             onEditOvers={() => setModal({ type: "editOvers" })}
+            editOversLabel={
+              match?.innings === "second" ? (
+                <>
+                  Edit overs
+                  <br />
+                  / innings
+                </>
+              ) : (
+                "Edit overs"
+              )
+            }
             onUndo={handleAnnouncedUndo}
             onHistory={() => setModal({ type: "history" })}
             onImage={() => setModal({ type: "image" })}
             onCommentary={() => setModal({ type: "commentary" })}
+            onCommentaryHoldStart={handleScoreFeedbackHoldStart}
             onWalkie={() => setModal({ type: "walkie" })}
             onMic={() => setModal({ type: "mic" })}
             onShare={handleCopyShareLink}
@@ -478,6 +780,7 @@ export default function MatchPageClient({
             isCommentaryTalking={Boolean(micMonitor.isActive)}
             isAnnounceActive={Boolean(umpireSettings.enabled)}
           />
+          <audio ref={soundEffectsAudioRef} hidden />
         </div>
       </main>
       <OptionalFeatureBoundary label="Optional match tools unavailable right now.">
@@ -506,6 +809,9 @@ export default function MatchPageClient({
                     }
 
                     if (nextEnabled) {
+                      if (umpireSettings.mode === "silent") {
+                        updateUmpireSetting("mode", "simple");
+                      }
                       try {
                         prime({ userGesture: true });
                         speak("Umpire voice on.", {
@@ -576,7 +882,7 @@ export default function MatchPageClient({
           firstInningsOversPlayed={firstInningsOversPlayed}
           infoText={infoText}
           onNext={handleNextInningsOrEnd}
-          onUpdate={patchAndUpdate}
+          onUpdate={handleAnnouncedPatchUpdate}
           onImageUploaded={replaceMatch}
           onScoreEvent={handleAnnouncedScoreEvent}
           onClose={() => setModal({ type: null })}

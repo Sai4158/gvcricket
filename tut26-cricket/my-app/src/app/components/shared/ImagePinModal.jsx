@@ -8,9 +8,13 @@ import LoadingButton from "./LoadingButton";
 export default function ImagePinModal({
   isOpen,
   title = "Enter PIN",
-  subtitle = "Enter the 4-digit PIN to continue with this image.",
+  subtitle = "Enter the 6-digit PIN to continue with this image.",
   confirmLabel = "Continue",
   showContinueWithout = false,
+  digitCount = 6,
+  pinLabel = "6-digit PIN",
+  placeholder = "- - - - - -",
+  hideHeaderCopy = false,
   onConfirm,
   onContinueWithout,
   onClose,
@@ -80,33 +84,45 @@ export default function ImagePinModal({
             </button>
 
             <div className="relative">
-              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-400/12 text-xl text-amber-300 shadow-[0_12px_24px_rgba(245,158,11,0.12)]">
-                <FaImage />
-              </div>
-              <h3 className="text-2xl font-black tracking-tight text-white">
-                {title}
-              </h3>
-              <p className="mt-2 max-w-xs text-sm leading-6 text-zinc-400">
-                {subtitle}
-              </p>
+              {!hideHeaderCopy ? (
+                <>
+                  <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-400/12 text-xl text-amber-300 shadow-[0_12px_24px_rgba(245,158,11,0.12)]">
+                    <FaImage />
+                  </div>
+                  {title ? (
+                    <h3 className="text-2xl font-black tracking-tight text-white">
+                      {title}
+                    </h3>
+                  ) : null}
+                  {subtitle ? (
+                    <p className="mt-2 max-w-xs text-sm leading-6 text-zinc-400">
+                      {subtitle}
+                    </p>
+                  ) : null}
+                </>
+              ) : null}
 
-              <div className="mt-6">
-                <label
-                  htmlFor="image-pin-input"
-                  className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500"
-                >
-                  4-digit PIN
-                </label>
+              <div className={hideHeaderCopy ? "mt-2" : "mt-6"}>
+                {!hideHeaderCopy ? (
+                  <label
+                    htmlFor="image-pin-input"
+                    className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500"
+                  >
+                    {pinLabel}
+                  </label>
+                ) : null}
                 <input
                   ref={inputRef}
                   id="image-pin-input"
                   type="text"
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  maxLength={4}
+                  maxLength={digitCount}
                   value={pin}
                   onChange={(event) =>
-                    setPin(event.target.value.replace(/\D/g, "").slice(0, 4))
+                    setPin(
+                      event.target.value.replace(/\D/g, "").slice(0, digitCount)
+                    )
                   }
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
@@ -114,7 +130,8 @@ export default function ImagePinModal({
                       handleSubmit();
                     }
                   }}
-                  placeholder="0000"
+                  placeholder={placeholder}
+                  aria-label={pinLabel}
                   className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-amber-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(251,191,36,0.08)]"
                 />
               </div>
@@ -129,7 +146,7 @@ export default function ImagePinModal({
                 <LoadingButton
                   type="button"
                   onClick={handleSubmit}
-                  disabled={pin.length !== 4}
+                  disabled={pin.length !== digitCount}
                   loading={isSubmitting}
                   pendingLabel="Checking..."
                   trailingIcon={<FaArrowRight />}

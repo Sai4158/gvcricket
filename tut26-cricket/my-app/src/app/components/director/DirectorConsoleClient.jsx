@@ -715,20 +715,25 @@ export default function DirectorConsoleClient({
   const previousManagedMatchIdRef = useRef("");
   const directorWalkieNoticeTimerRef = useRef(null);
   const effectPlayRequestRef = useRef(0);
+  const effectPrimeRequestRef = useRef(null);
+  const playEffectRef = useRef(null);
   const musicUrlsRef = useRef([]);
   const cachedEffectUrlRef = useRef(new Map());
   const musicEffectDuckFactorRef = useRef(1);
   const musicDuckAnimationFrameRef = useRef(0);
   const ambientAudioSessionTypeRef = useRef("");
   const lastDirectorAnnouncedLiveEventRef = useRef("");
+  const lastHandledSharedSoundEffectEventRef = useRef("");
   const pendingDirectorAnnouncementRef = useRef(null);
   const libraryPointerDragRef = useRef({
     pointerId: null,
     activeId: "",
     targetId: "",
   });
+  const libraryLoadTimeoutRef = useRef(null);
   const [speechSettings, setSpeechSettings] = useState(createSpeechSettings);
   const speech = useSpeechAnnouncer(speechSettings);
+  const stopDirectorSpeech = speech.stop;
   const micMonitor = useLocalMicMonitor();
   const iOSSafari = useMemo(() => isIOSSafari(), []);
   const usePointerLibraryReorder = useMemo(() => {
@@ -929,6 +934,10 @@ export default function DirectorConsoleClient({
     pendingDirectorAnnouncementRef.current = null;
     lastDirectorAnnouncedLiveEventRef.current =
       nextManagedMatch?.lastLiveEvent?.id || "";
+    lastHandledSharedSoundEffectEventRef.current =
+      nextManagedMatch?.lastLiveEvent?.type === "sound_effect"
+        ? nextManagedMatch.lastLiveEvent.id || ""
+        : "";
 
     if (!nextManagedMatch?._id) {
       setLiveMatch(null);
@@ -1725,6 +1734,8 @@ export default function DirectorConsoleClient({
       setDirectorWalkieOn(true);
 
       if (action === "enable") {
+        showTemporaryDirectorWalkieNotice("Refreshing walkie signal...", 3200);
+        await walkie.refreshSignal?.({ propagate: false });
         return;
       }
 
@@ -1898,6 +1909,33 @@ export default function DirectorConsoleClient({
     speechSettings.mode,
     speechSettings.muted,
   ]);
+
+  useEffect(() => {
+    const targetMatch = getDirectorPreferredMatch(
+      liveMatch,
+      managedSession?.match,
+    );
+    const liveEvent = targetMatch?.lastLiveEvent || null;
+
+    if (!authorized || !liveEvent?.id || liveEvent.type !== "sound_effect") {
+      return;
+    }
+
+    if (lastHandledSharedSoundEffectEventRef.current === liveEvent.id) {
+      return;
+    }
+
+    lastHandledSharedSoundEffectEventRef.current = liveEvent.id;
+    void playEffectRef.current?.(
+      {
+        id: liveEvent.effectId || liveEvent.effectFileName || liveEvent.id,
+        fileName: liveEvent.effectFileName || liveEvent.effectId || "",
+        label: liveEvent.effectLabel || "Sound effect",
+        src: liveEvent.effectSrc || "",
+      },
+      { toggleIfActive: false },
+    );
+  }, [authorized, liveMatch, managedSession?.match]);
 
   const readCurrentScore = () => {
     const targetMatch = getDirectorPreferredMatch(
@@ -2173,7 +2211,7 @@ export default function DirectorConsoleClient({
     };
   }, []);
 
-  const stopAllEffects = (options = {}) => {
+  const stopAllEffects = useCallback((options = {}) => {
     const {
       clearSource = true,
       preserveRequest = false,
@@ -2190,6 +2228,10 @@ export default function DirectorConsoleClient({
 
     setConsoleError("");
     setEffectsNeedsUnlock(false);
+    if (libraryLoadTimeoutRef.current) {
+      window.clearTimeout(libraryLoadTimeoutRef.current);
+      libraryLoadTimeoutRef.current = null;
+    }
     if (bufferedEffectTimerRef.current) {
       window.clearInterval(bufferedEffectTimerRef.current);
       bufferedEffectTimerRef.current = null;
@@ -2220,36 +2262,83 @@ export default function DirectorConsoleClient({
       applyMusicDuck(1, { durationMs: 240 });
       window.setTimeout(flushPendingDirectorAnnouncement, 40);
     }
-  };
+  }, [applyMusicDuck, flushPendingDirectorAnnouncement]);
 
-  const primeEffectsAudio = useCallback(async () => {
-    const audio = effectsAudioRef.current;
-    const unlocked = isUiAudioUnlocked()
-      ? true
-      : await primeUiAudio({
-          mediaElements: audio ? [audio] : [],
-        });
-
-    if (!audio) {
-      return unlocked;
+  useEffect(() => {
+    if (libraryLoadTimeoutRef.current) {
+      window.clearTimeout(libraryLoadTimeoutRef.current);
+      libraryLoadTimeoutRef.current = null;
     }
 
-    audio.muted = false;
-    audio.playsInline = true;
-    audio.setAttribute("playsinline", "");
-    audio.setAttribute("webkit-playsinline", "");
-    audio.volume = Math.max(0, Math.min(1, masterVolume));
-    setEffectsNeedsUnlock(!unlocked && iOSSafari);
-    return unlocked;
+    if (libraryState !== "loading" || !libraryLiveId) {
+      return undefined;
+    }
+
+    libraryLoadTimeoutRef.current = window.setTimeout(() => {
+      const audio = effectsAudioRef.current;
+      if (
+        !audio ||
+        libraryState !== "loading" ||
+        !libraryLiveId ||
+        !audio.src
+      ) {
+        return;
+      }
+
+      setConsoleError("This sound got stuck loading. Tap it again.");
+      setLibraryState("idle");
+      setLibraryLiveId("");
+      setLibraryCurrentTime(0);
+      applyMusicDuck(1, { durationMs: 180 });
+    }, 4500);
+
+    return () => {
+      if (libraryLoadTimeoutRef.current) {
+        window.clearTimeout(libraryLoadTimeoutRef.current);
+        libraryLoadTimeoutRef.current = null;
+      }
+    };
+  }, [applyMusicDuck, libraryLiveId, libraryState]);
+
+  const primeEffectsAudio = useCallback(async () => {
+    if (effectPrimeRequestRef.current) {
+      return effectPrimeRequestRef.current;
+    }
+
+    const audio = effectsAudioRef.current;
+    const request = (async () => {
+      const unlocked = isUiAudioUnlocked()
+        ? true
+        : await primeUiAudio({
+            mediaElements: audio ? [audio] : [],
+          });
+
+      if (!audio) {
+        return unlocked;
+      }
+
+      audio.muted = false;
+      audio.playsInline = true;
+      audio.setAttribute("playsinline", "");
+      audio.setAttribute("webkit-playsinline", "");
+      audio.volume = Math.max(0, Math.min(1, masterVolume));
+      setEffectsNeedsUnlock(!unlocked && iOSSafari);
+      return unlocked;
+    })().finally(() => {
+      effectPrimeRequestRef.current = null;
+    });
+
+    effectPrimeRequestRef.current = request;
+    return request;
   }, [iOSSafari, masterVolume]);
 
-  const playEffect = async (file) => {
+  const playEffect = useCallback(async (file, options = {}) => {
     const audio = effectsAudioRef.current;
     if (!file?.src) {
       return;
     }
 
-    if (libraryLiveId === file.id) {
+    if (options.toggleIfActive !== false && libraryLiveId === file.id) {
       stopAllEffects();
       return;
     }
@@ -2257,7 +2346,7 @@ export default function DirectorConsoleClient({
     const requestId = effectPlayRequestRef.current + 1;
     effectPlayRequestRef.current = requestId;
 
-    speech.stop();
+    stopDirectorSpeech();
     stopAllEffects({ clearSource: false, preserveRequest: true });
     setConsoleError("");
     setEffectsNeedsUnlock(false);
@@ -2265,6 +2354,9 @@ export default function DirectorConsoleClient({
     setLibraryState("loading");
     setLibraryCurrentTime(0);
     const unlocked = await primeEffectsAudio();
+    if (requestId !== effectPlayRequestRef.current) {
+      return;
+    }
     if (iOSSafari && !unlocked) {
       setConsoleError("Tap Enable Audio once, then play the sound again.");
       setLibraryState("idle");
@@ -2426,7 +2518,20 @@ export default function DirectorConsoleClient({
       setLibraryLiveId("");
       applyMusicDuck(1, { durationMs: 180 });
     }
-  };
+  }, [
+    applyMusicDuck,
+    iOSSafari,
+    libraryLiveId,
+    masterVolume,
+    micMonitor.isActive,
+    primeEffectsAudio,
+    stopDirectorSpeech,
+    stopAllEffects,
+  ]);
+
+  useEffect(() => {
+    playEffectRef.current = playEffect;
+  }, [playEffect]);
 
   const stopAllAudio = async () => {
     audioRef.current?.pause();
@@ -2464,6 +2569,7 @@ export default function DirectorConsoleClient({
       effectsAudioRef.current.src = "";
       delete effectsAudioRef.current.dataset.effectSrc;
       delete effectsAudioRef.current.dataset.effectId;
+      effectsAudioRef.current.load();
     }
     if (bufferedEffectTimerRef.current) {
       window.clearInterval(bufferedEffectTimerRef.current);
@@ -3334,9 +3440,6 @@ export default function DirectorConsoleClient({
                         }
                         onDrop={(event) => handleLibraryDrop(event, file.id)}
                         onDragEnd={clearLibraryDragState}
-                        onPointerDown={() => {
-                          void primeEffectsAudio();
-                        }}
                         onClick={() => void playEffect(file)}
                         role="button"
                         tabIndex={0}

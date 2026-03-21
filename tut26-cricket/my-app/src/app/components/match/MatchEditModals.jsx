@@ -256,12 +256,33 @@ export function EditOversModal({
   currentOverNumber,
   innings,
   firstInningsOversPlayed,
+  currentFirstInningsScore = 0,
+  firstInningsTeamName = "",
+  currentSecondInningsScore = 0,
   onUpdate,
   onClose,
   isUpdating = false,
 }) {
   const [overs, setOvers] = useState(currentOvers);
+  const [firstInningsScore, setFirstInningsScore] = useState(currentFirstInningsScore);
+  const isSecondInningsEditor = innings === "second";
+  const firstInningsMinScore = Math.max(
+    0,
+    Number(currentFirstInningsScore || 0) - 7
+  );
+  const firstInningsMaxScore = Math.max(
+    firstInningsMinScore,
+    Number(currentFirstInningsScore || 0) + 7
+  );
+  const clampFirstInningsScore = (value) =>
+    Math.min(
+      firstInningsMaxScore,
+      Math.max(firstInningsMinScore, Number(value) || 0)
+    );
   const nextOvers = Number(overs) || 0;
+  const nextFirstInningsScore = isSecondInningsEditor
+    ? clampFirstInningsScore(firstInningsScore)
+    : Math.max(0, Number(firstInningsScore) || 0);
   const minAllowedOvers =
     innings === "first"
       ? Math.max(1, currentOverNumber)
@@ -289,10 +310,30 @@ export function EditOversModal({
       ? "Save And End Match"
       : "Save And End Innings"
     : "Save Changes";
+  const nextTarget = nextFirstInningsScore + 1;
+  const nextRunsNeeded = Math.max(0, nextTarget - Number(currentSecondInningsScore || 0));
+  const firstInningsChanged =
+    nextFirstInningsScore !== Number(currentFirstInningsScore || 0);
+  const oversChanged = nextOvers !== Number(currentOvers || 0);
+  const shouldShowTargetReachedWarning =
+    isSecondInningsEditor &&
+    Number(currentSecondInningsScore || 0) > nextFirstInningsScore &&
+    firstInningsChanged;
+  const modalTitle = isSecondInningsEditor
+    ? "Edit Overs / Innings"
+    : "Edit Match Overs";
 
   return (
-    <ModalBase title="Edit Match Overs" onExit={onClose}>
-      <div className="flex items-center justify-between p-2 my-6 bg-zinc-800 rounded-2xl">
+    <ModalBase title={modalTitle} onExit={onClose}>
+      <div className="mb-3 rounded-[22px] border border-white/8 bg-white/[0.03] px-4 py-3 text-left">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500">
+          Match overs
+        </p>
+        <p className="mt-1 text-sm text-zinc-300">
+          Adjust the total overs limit for this {innings === "second" ? "chase" : "innings"}.
+        </p>
+      </div>
+      <div className="my-6 flex items-center justify-between rounded-2xl bg-zinc-800 p-2">
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => setOvers((value) => Math.max(minAllowedOvers, value - 1))}
@@ -317,11 +358,89 @@ export function EditOversModal({
           +
         </motion.button>
       </div>
+      {isSecondInningsEditor ? (
+        <div className="mb-6 rounded-[24px] border border-amber-300/16 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.16),transparent_38%),linear-gradient(180deg,rgba(33,24,12,0.98),rgba(15,12,10,0.99))] p-4 shadow-[0_18px_36px_rgba(120,53,15,0.18)]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-200/70">
+                1st innings
+              </p>
+              <p className="mt-1 text-base font-semibold uppercase tracking-[0.08em] text-white">
+                {firstInningsTeamName || "First innings"}
+              </p>
+              <p className="mt-2 text-xs font-medium uppercase tracking-[0.16em] text-amber-100/70">
+                Limit {firstInningsMinScore} to {firstInningsMaxScore}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-amber-300/16 bg-amber-500/10 px-3 py-2 text-right">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-amber-100/70">
+                Target
+              </p>
+              <p className="mt-1 text-xl font-bold text-amber-200">{nextTarget}</p>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center justify-between rounded-2xl bg-black/20 p-2">
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() =>
+                setFirstInningsScore((value) =>
+                  clampFirstInningsScore((Number(value) || 0) - 1)
+                )
+              }
+              disabled={nextFirstInningsScore <= firstInningsMinScore}
+              className="flex h-14 w-14 items-center justify-center rounded-lg bg-zinc-700 text-3xl transition-colors hover:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              -
+            </motion.button>
+            <input
+              type="number"
+              value={firstInningsScore}
+              onChange={(event) =>
+                setFirstInningsScore(
+                  event.target.value === ""
+                    ? ""
+                    : clampFirstInningsScore(Number(event.target.value))
+                )
+              }
+              min={firstInningsMinScore}
+              max={firstInningsMaxScore}
+              className="h-20 w-32 bg-transparent text-center text-5xl font-bold text-white outline-none"
+            />
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() =>
+                setFirstInningsScore((value) =>
+                  clampFirstInningsScore((Number(value) || 0) + 1)
+                )
+              }
+              disabled={nextFirstInningsScore >= firstInningsMaxScore}
+              className="flex h-14 w-14 items-center justify-center rounded-lg bg-zinc-700 text-3xl transition-colors hover:bg-zinc-600"
+            >
+              +
+            </motion.button>
+          </div>
+          <p className="mt-3 text-sm text-zinc-300">
+            {nextRunsNeeded > 0
+              ? `${nextRunsNeeded} to win`
+              : "Target reached"}
+          </p>
+          <p className="mt-1 text-xs text-zinc-400">
+            Max change: +/-7
+          </p>
+        </div>
+      ) : null}
       {isInvalid && (
         <p className="text-center text-amber-400 text-sm mb-4 font-semibold">
           Cannot set total overs below {minAllowedOvers}.
         </p>
       )}
+      {shouldShowTargetReachedWarning ? (
+        <div className="mb-4 rounded-[22px] border border-emerald-400/22 bg-[linear-gradient(180deg,rgba(4,120,87,0.24),rgba(6,78,59,0.16))] px-4 py-3 text-left">
+          <p className="text-sm font-semibold text-emerald-100">
+            Saving this will complete the chase immediately with the corrected target.
+          </p>
+        </div>
+      ) : null}
       {shouldShowShortenWarning ? (
         <div
           className={`mb-4 rounded-[22px] border px-4 py-3 text-left ${
@@ -346,7 +465,18 @@ export function EditOversModal({
       <LoadingButton
         onClick={async () => {
           if (isInvalid) return;
-          await onUpdate({ overs: nextOvers });
+          const patch = {};
+          if (oversChanged) {
+            patch.overs = nextOvers;
+          }
+          if (isSecondInningsEditor && firstInningsChanged) {
+            patch.innings1Score = nextFirstInningsScore;
+          }
+          if (!Object.keys(patch).length) {
+            onClose();
+            return;
+          }
+          await onUpdate(patch);
           onClose();
         }}
         disabled={isInvalid}

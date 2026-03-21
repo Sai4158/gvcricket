@@ -6,6 +6,7 @@ import {
 } from "./match-scoring";
 import { normalizeLegacyTossState } from "./match-toss";
 import {
+  createMatchCorrectionLiveEvent,
   createMatchEndLiveEvent,
   createScoreLiveEvent,
   createUndoLiveEvent,
@@ -448,6 +449,13 @@ export function applyMatchAction(matchDocument, action) {
 export function applySafeMatchPatch(matchDocument, patch) {
   const currentMatch = toPlainMatch(matchDocument);
   const nextMatch = toPlainMatch(matchDocument);
+  const oversChanged =
+    typeof patch.overs === "number" &&
+    patch.overs !== Number(currentMatch?.overs || 0);
+  const innings1ScoreChanged =
+    typeof patch.innings1Score === "number" &&
+    patch.innings1Score !== Number(currentMatch?.innings1?.score || 0);
+  let correctionEndedMatch = false;
   const rosterPermissions = getRosterEditPermissions(currentMatch);
   const previousNames = {
     teamAName: currentMatch.teamAName || "Team A",
@@ -478,6 +486,29 @@ export function applySafeMatchPatch(matchDocument, patch) {
     }
 
     nextMatch.overs = patch.overs;
+  }
+
+  if (typeof patch.innings1Score === "number") {
+    nextMatch.innings1 = nextMatch.innings1 || {
+      team: "",
+      score: 0,
+      history: [],
+    };
+    nextMatch.innings1.score = patch.innings1Score;
+
+    if (nextMatch.innings === "first") {
+      nextMatch.score = patch.innings1Score;
+    } else if (
+      nextMatch.innings === "second" &&
+      nextMatch.isOngoing &&
+      !nextMatch.result &&
+      isTargetChased(nextMatch)
+    ) {
+      nextMatch.isOngoing = false;
+      nextMatch.result = buildWinByWicketsText(nextMatch, Number(nextMatch.outs || 0));
+      markLiveEvent(nextMatch, createMatchEndLiveEvent(nextMatch, nextMatch.result));
+      correctionEndedMatch = true;
+    }
   }
 
   if (patch.teamAName !== undefined) nextMatch.teamAName = nextNames.teamAName;
@@ -527,6 +558,13 @@ export function applySafeMatchPatch(matchDocument, patch) {
     nextMatch.tossWinner = syncedMatch.tossWinner;
     nextMatch.innings1 = syncedMatch.innings1;
     nextMatch.innings2 = syncedMatch.innings2;
+  }
+
+  if ((oversChanged || innings1ScoreChanged) && !correctionEndedMatch) {
+    markLiveEvent(
+      nextMatch,
+      createMatchCorrectionLiveEvent(currentMatch, nextMatch, patch)
+    );
   }
 
   validateRosterDismissalState(nextMatch);

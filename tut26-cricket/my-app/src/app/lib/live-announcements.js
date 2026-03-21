@@ -45,6 +45,11 @@ function getBallsRemaining(match) {
   return Math.max(0, safeNumber(match?.overs) * 6 - countLegalBalls(getActiveHistory(match)));
 }
 
+function formatRemainingBalls(match) {
+  const ballsRemaining = getBallsRemaining(match);
+  return `${ballsRemaining} ball${ballsRemaining === 1 ? "" : "s"}`;
+}
+
 function formatRemainingOvers(match) {
   const ballsRemaining = getBallsRemaining(match);
   const overs = Math.floor(ballsRemaining / 6);
@@ -84,6 +89,7 @@ export function getSpectatorAnnouncementPriority(event) {
   if (!event) return 0;
   if (
     event.type === "undo" ||
+    event.type === "score_correction" ||
     event.type === "match_end" ||
     event.type === "target_chased"
   ) {
@@ -143,6 +149,10 @@ function buildBallEventLine(ball) {
   return buildRunsCall(safeNumber(ball.runs));
 }
 
+function buildUndoAnnouncementLine() {
+  return "Umpire has undone the last ball. The score for that ball has been removed. Umpire will redo this ball.";
+}
+
 function buildProgressReminder(event, match) {
   if (!event?.ball || event.overCompleted || !isLegalBall(event.ball)) {
     return "";
@@ -153,6 +163,57 @@ function buildProgressReminder(event, match) {
   if (ballNumber === 4) return "This is ball 4.";
   if (ballNumber === 5) return "This is the last ball of the over.";
   return "";
+}
+
+function buildChaseEquationLine(match) {
+  if (match?.innings !== "second") {
+    return "";
+  }
+
+  const target = safeNumber(match?.innings1?.score) + 1;
+  const runsNeeded = Math.max(0, target - safeNumber(match?.score));
+  const ballsRemaining = getBallsRemaining(match);
+
+  if (runsNeeded <= 0 || ballsRemaining <= 0) {
+    return "";
+  }
+
+  return `${runsNeeded} needed from ${formatRemainingBalls(match)}.`;
+}
+
+function shouldCallChaseEquation(event, match) {
+  if (!event || !buildChaseEquationLine(match)) {
+    return false;
+  }
+
+  if (
+    event.type === "undo" ||
+    event.type === "innings_change" ||
+    event.type === "match_end" ||
+    event.type === "target_chased"
+  ) {
+    return false;
+  }
+
+  if (event.overCompleted) {
+    return true;
+  }
+
+  if (!event.ball || !isLegalBall(event.ball)) {
+    return false;
+  }
+
+  const ballNumber = getBallNumberInOver(match);
+  return ballNumber === 3 || ballNumber === 5;
+}
+
+function buildSmartScoreReminder(event, match) {
+  const chaseEquation = buildChaseEquationLine(match);
+  if (shouldCallChaseEquation(event, match) && chaseEquation) {
+    return chaseEquation;
+  }
+
+  return buildProgressReminder(event, match);
 }
 
 function buildScoreSentence(score, outs) {
@@ -184,7 +245,7 @@ export function buildSpectatorBallAnnouncement(event) {
   if (!event) return "";
 
   if (event.type === "undo") {
-    return "Umpire has undone the last ball.";
+    return buildUndoAnnouncementLine();
   }
 
   if (event.type === "match_end") {
@@ -198,7 +259,24 @@ export function buildSpectatorScoreAnnouncement(event, match) {
   if (!event) return "";
 
   if (event.type === "undo") {
-    return "";
+    return [
+      buildScoreSentence(event.score, event.outs),
+      buildChaseEquationLine(match),
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  if (event.type === "score_correction") {
+    return [
+      buildScoreSentence(event.score, event.outs),
+      typeof event.nextInnings1Score === "number" && match?.innings === "second"
+        ? `Target is now ${safeNumber(match?.innings1?.score) + 1}.`
+        : "",
+      buildChaseEquationLine(match),
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
 
   if (event.type === "match_end") {
@@ -246,7 +324,7 @@ export function buildSpectatorScoreAnnouncement(event, match) {
   const parts = [];
   parts.push(buildScoreSentence(event.score, event.outs));
 
-  const reminder = buildProgressReminder(event, match);
+  const reminder = buildSmartScoreReminder(event, match);
   if (reminder) {
     parts.push(reminder);
   }
@@ -268,6 +346,11 @@ export function buildSpectatorOverCompleteAnnouncement(match) {
 
   if (oversLeft > 0) {
     parts.push(oversLeft === 1 ? "1 over is left." : `${oversLeft} overs are left.`);
+  }
+
+  const chaseLine = buildChaseEquationLine(match);
+  if (chaseLine) {
+    parts.push(chaseLine);
   }
 
   if (wicketsInOver > 0) {
@@ -319,6 +402,39 @@ export function createUndoLiveEvent(match) {
   };
 }
 
+export function createMatchCorrectionLiveEvent(matchBefore, matchAfter, patch) {
+  const activeInningsKey =
+    matchAfter?.innings === "first" ? "innings1" : "innings2";
+  const history = matchAfter?.[activeInningsKey]?.history ?? [];
+  const correctionSummary = [
+    typeof patch?.innings1Score === "number"
+      ? matchAfter?.innings === "second"
+        ? "Umpire corrected the first innings score."
+        : "Umpire corrected the score."
+      : "",
+    typeof patch?.overs === "number" ? `Match is now ${safeNumber(matchAfter?.overs)} overs.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    type: "score_correction",
+    summaryText: correctionSummary || "Umpire corrected the score.",
+    score: matchAfter?.score ?? 0,
+    outs: matchAfter?.outs ?? 0,
+    battingTeam: getBattingTeamBundle(matchAfter).name,
+    overs: `${Math.floor(countLegalBalls(history) / 6)}.${countLegalBalls(history) % 6}`,
+    result: matchAfter?.result || "",
+    previousInnings1Score: safeNumber(matchBefore?.innings1?.score),
+    nextInnings1Score:
+      typeof patch?.innings1Score === "number" ? safeNumber(matchAfter?.innings1?.score) : null,
+    previousOvers: safeNumber(matchBefore?.overs),
+    nextOvers: typeof patch?.overs === "number" ? safeNumber(matchAfter?.overs) : null,
+    createdAt: new Date().toISOString(),
+  };
+}
+
 export function createMatchEndLiveEvent(match, resultText) {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -328,6 +444,22 @@ export function createMatchEndLiveEvent(match, resultText) {
     outs: match?.outs ?? 0,
     battingTeam: getBattingTeamBundle(match).name,
     result: resultText,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+export function createSoundEffectLiveEvent(match, effect, options = {}) {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    type: "sound_effect",
+    summaryText: effect?.label ? `${effect.label} sound effect.` : "Sound effect.",
+    score: match?.score ?? 0,
+    outs: match?.outs ?? 0,
+    effectId: effect?.id || "",
+    effectFileName: effect?.fileName || effect?.id || "",
+    effectLabel: effect?.label || "",
+    effectSrc: effect?.src || "",
+    clientRequestId: options.clientRequestId || "",
     createdAt: new Date().toISOString(),
   };
 }
@@ -371,7 +503,65 @@ export function buildSpectatorAnnouncement(event, match, mode = "full") {
     return "Umpire turned off walkie-talkie.";
   }
 
+  if (event.type === "score_correction") {
+    return event.summaryText || "Umpire corrected the score.";
+  }
+
+  if (event.type === "sound_effect") {
+    return "";
+  }
+
   return buildSpectatorBallAnnouncement(event);
+}
+
+export function buildLiveScoreAnnouncementSequence(event, match, mode = "full") {
+  if (!event || mode === "silent") {
+    return {
+      items: [],
+      priority: 0,
+      restoreAfterMs: 0,
+    };
+  }
+
+  const line = buildSpectatorAnnouncement(event, match, mode);
+  if (!line) {
+    return {
+      items: [],
+      priority: 0,
+      restoreAfterMs: 0,
+    };
+  }
+
+  const scoreLine = buildSpectatorScoreAnnouncement(event, match);
+  const overSummary = event.overCompleted
+    ? buildSpectatorOverCompleteAnnouncement(match)
+    : "";
+
+  return {
+    items: [
+      {
+        text: line,
+        pauseAfterMs: scoreLine || overSummary ? 180 : 0,
+        rate: 0.78,
+      },
+      scoreLine
+        ? {
+            text: scoreLine,
+            pauseAfterMs: overSummary ? 220 : 0,
+            rate: 0.8,
+          }
+        : null,
+      overSummary
+        ? {
+            text: overSummary,
+            pauseAfterMs: 0,
+            rate: 0.8,
+          }
+        : null,
+    ].filter(Boolean),
+    priority: getSpectatorAnnouncementPriority(event),
+    restoreAfterMs: overSummary ? 3300 : scoreLine ? 2300 : 1500,
+  };
 }
 
 export function buildCurrentScoreAnnouncement(match) {
@@ -389,10 +579,9 @@ export function buildCurrentScoreAnnouncement(match) {
   }
 
   if (match?.innings === "second") {
-    const target = safeNumber(match?.innings1?.score) + 1;
-    const runsNeeded = Math.max(0, target - safeNumber(match?.score));
-    if (runsNeeded > 0) {
-      parts.push(`${runsNeeded} needed from ${formatRemainingOvers(match)}.`);
+    const chaseLine = buildChaseEquationLine(match);
+    if (chaseLine) {
+      parts.push(chaseLine);
     }
   }
 
@@ -405,7 +594,7 @@ export function buildUmpireAnnouncement(event, mode = "simple") {
   }
 
   if (event.type === "undo") {
-    return "Umpire has undone the last ball. The score for that ball has been removed. Umpire will redo this ball.";
+    return buildUndoAnnouncementLine();
   }
 
   if (event.type === "match_end") {

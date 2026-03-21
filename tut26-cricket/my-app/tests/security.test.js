@@ -39,6 +39,7 @@ import {
   buildSpectatorAnnouncement,
   buildSpectatorOverCompleteAnnouncement,
   buildSpectatorScoreAnnouncement,
+  createMatchCorrectionLiveEvent,
   createScoreLiveEvent,
   createUndoLiveEvent,
 } from "../src/app/lib/live-announcements.js";
@@ -670,6 +671,11 @@ test("umpire match patching blocks impossible over changes and unsafe roster edi
 
   const oversRaised = applySafeMatchPatch(match, { overs: 3 });
   assert.equal(oversRaised.overs, 3);
+  const correctedFirstInnings = applySafeMatchPatch(match, { innings1Score: 9 });
+  assert.equal(correctedFirstInnings.innings1.score, 9);
+  assert.equal(correctedFirstInnings.score, 0);
+  assert.equal(correctedFirstInnings.isOngoing, true);
+  assert.equal(correctedFirstInnings.result, "");
 
   const renamedLockedTeam = applySafeMatchPatch(match, {
     teamAName: "Falcons Prime",
@@ -705,6 +711,22 @@ test("umpire match patching blocks impossible over changes and unsafe roster edi
     isOut: true,
     extraType: null,
   });
+  const afterSecondInningsBoundary = applyMatchAction(match, {
+    actionId: "score:patch-second-boundary",
+    type: "score_ball",
+    runs: 6,
+    isOut: false,
+    extraType: null,
+  });
+  const correctedWinningTarget = applySafeMatchPatch(afterSecondInningsBoundary, {
+    innings1Score: 5,
+  });
+
+  assert.equal(correctedWinningTarget.innings1.score, 5);
+  assert.equal(correctedWinningTarget.score, 6);
+  assert.equal(correctedWinningTarget.isOngoing, false);
+  assert.equal(correctedWinningTarget.result, "Titans won by 3 wickets.");
+  assert.equal(correctedWinningTarget.lastLiveEvent?.type, "match_end");
 
   assert.throws(
     () =>
@@ -931,7 +953,7 @@ test("spectator commentary uses simple ball-first wording and separate score lin
   assert.match(currentScoreLine, /Score is 8 for 1\./);
   assert.match(currentScoreLine, /0 overs are done\./);
   assert.match(currentScoreLine, /2 overs are left\./);
-  assert.match(currentScoreLine, /3 needed from 1 over and 5 balls\./);
+  assert.match(currentScoreLine, /3 needed from 11 balls\./);
 });
 
 test("walkie requests support spectator and director, prevent duplicates, and require umpire response", () => {
@@ -1213,7 +1235,56 @@ test("spectator commentary gives progress reminders and clean undo lines", () =>
     buildSpectatorScoreAnnouncement(ballFourEvent, match),
     "Score is 4 for 0. This is ball 4."
   );
-  assert.equal(buildSpectatorAnnouncement(undoEvent, match, "full"), "Umpire has undone the last ball.");
+  assert.equal(
+    buildSpectatorAnnouncement(undoEvent, match, "full"),
+    "Umpire has undone the last ball. The score for that ball has been removed. Umpire will redo this ball."
+  );
+  assert.equal(buildSpectatorScoreAnnouncement(undoEvent, match), "Score is 4 for 0.");
+});
+
+test("score correction announcements stay smart for umpire and spectator", () => {
+  const firstInnings = applyMatchAction(buildBaseMatch(), {
+    actionId: "toss:correction-flow",
+    type: "set_toss",
+    tossWinner: "Falcons",
+    tossDecision: "bat",
+  });
+  const singleOverMatch = applySafeMatchPatch(firstInnings, { overs: 1 });
+  const firstInningsComplete = [
+    { actionId: "score:first-1", type: "score_ball", runs: 1, isOut: false, extraType: null },
+    { actionId: "score:first-2", type: "score_ball", runs: 1, isOut: false, extraType: null },
+    { actionId: "score:first-3", type: "score_ball", runs: 1, isOut: false, extraType: null },
+    { actionId: "score:first-4", type: "score_ball", runs: 1, isOut: false, extraType: null },
+    { actionId: "score:first-5", type: "score_ball", runs: 1, isOut: false, extraType: null },
+    { actionId: "score:first-6", type: "score_ball", runs: 0, isOut: false, extraType: null },
+  ].reduce((nextMatch, action) => applyMatchAction(nextMatch, action), singleOverMatch);
+  const secondInnings = applyMatchAction(firstInningsComplete, {
+    actionId: "advance:to-second",
+    type: "complete_innings",
+  });
+  const chaseMatch = applyMatchAction(secondInnings, {
+    actionId: "score:second-1",
+    type: "score_ball",
+    runs: 2,
+    isOut: false,
+    extraType: null,
+  });
+
+  const correctedMatch = applySafeMatchPatch(chaseMatch, {
+    innings1Score: 6,
+  });
+  const correctionEvent = createMatchCorrectionLiveEvent(chaseMatch, correctedMatch, {
+    innings1Score: 6,
+  });
+
+  assert.equal(
+    buildSpectatorAnnouncement(correctionEvent, correctedMatch, "full"),
+    "Umpire corrected the first innings score."
+  );
+  assert.equal(
+    buildSpectatorScoreAnnouncement(correctionEvent, correctedMatch),
+    "Score is 2 for 0. Target is now 7. 5 needed from 5 balls."
+  );
 });
 
 test("umpire commentary speaks score buttons and undo with clean wording", () => {

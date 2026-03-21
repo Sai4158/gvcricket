@@ -8,7 +8,7 @@ import { publishMatchUpdate, publishSessionUpdate } from "../../../../lib/live-u
 import {
   getMatchAccessCookieName,
   hasValidMatchAccess,
-  isValidUmpirePin,
+  isValidManagePin,
 } from "../../../../lib/match-access";
 import {
   buildPublicMatchImageUrl,
@@ -28,7 +28,7 @@ import {
   parseJsonRequest,
   parseMultipartRequest,
 } from "../../../../lib/request-security";
-import { pinPayloadSchema } from "../../../../lib/validators";
+import { secretPinPayloadSchema } from "../../../../lib/validators";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 
@@ -99,7 +99,7 @@ export async function POST(req, { params }) {
       Number(match.adminAccessVersion || 1)
     );
     const pinValue = String(parsedRequest.value.get("pin") || "").trim();
-    const hasPinAccess = Boolean(pinValue) && isValidUmpirePin(pinValue);
+    const hasPinAccess = Boolean(pinValue) && isValidManagePin(pinValue);
 
     if (!hasCookieAccess && !hasPinAccess) {
       await writeAuditLog({
@@ -111,7 +111,7 @@ export async function POST(req, { params }) {
         userAgent: meta.userAgent,
       });
 
-      return jsonError("Umpire access required for image upload.", 401);
+      return jsonError("Manage PIN required for image upload.", 401);
     }
 
     const file = parsedRequest.value.get("image");
@@ -296,14 +296,14 @@ export async function DELETE(req, { params }) {
   }
 
   try {
-    const parsedRequest = await parseJsonRequest(req, pinPayloadSchema, {
+    const parsedRequest = await parseJsonRequest(req, secretPinPayloadSchema, {
       maxBytes: 2048,
     });
     if (!parsedRequest.ok) {
       return jsonError(parsedRequest.message, parsedRequest.status);
     }
 
-    if (!isValidUmpirePin(parsedRequest.value.pin)) {
+    if (!isValidManagePin(parsedRequest.value.pin)) {
       await writeAuditLog({
         action: "match_media_delete_denied",
         targetType: "match",

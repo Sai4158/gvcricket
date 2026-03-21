@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
@@ -18,6 +25,8 @@ import LoadingButton from "../shared/LoadingButton";
 import PendingLink from "../shared/PendingLink";
 import SessionCard from "./SessionCard";
 import LiquidSportText from "../home/LiquidSportText";
+import ImagePinModal from "../shared/ImagePinModal";
+import { ModalBase } from "../match/MatchBaseModals";
 
 const SORT_OPTIONS = [
   { value: "live-newest", label: "Live first" },
@@ -104,10 +113,20 @@ function EmptyState({ title, text, href, label }) {
 }
 
 export default function SessionsPageClient({ initialSessions }) {
+  const [sessions, setSessions] = useState(initialSessions ?? []);
   const [pinPrompt, setPinPrompt] = useState(null);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [pinError, setPinError] = useState("");
   const [pinSubmitting, setPinSubmitting] = useState(false);
+  const [managePinPrompt, setManagePinPrompt] = useState(null);
+  const [manageSessionContext, setManageSessionContext] = useState(null);
+  const [manageForm, setManageForm] = useState({
+    name: "",
+    teamAName: "",
+    teamBName: "",
+  });
+  const [manageSubmitting, setManageSubmitting] = useState(false);
+  const [manageError, setManageError] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("live-newest");
@@ -116,13 +135,27 @@ export default function SessionsPageClient({ initialSessions }) {
   const [page, setPage] = useState(1);
   const [isGoingHome, setIsGoingHome] = useState(false);
   const router = useRouter();
-  const sessions = useMemo(() => initialSessions ?? [], [initialSessions]);
   const deferredSearchQuery = useDeferredValue(searchInput.trim().toLowerCase());
+  const secretHoldTimerRef = useRef(null);
+  const suppressCardOpenUntilRef = useRef(0);
+
+  useEffect(() => {
+    setSessions(initialSessions ?? []);
+  }, [initialSessions]);
 
   useEffect(() => {
     setSearchQuery(deferredSearchQuery);
     setPage(1);
   }, [deferredSearchQuery]);
+
+  useEffect(() => {
+    return () => {
+      if (secretHoldTimerRef.current) {
+        window.clearTimeout(secretHoldTimerRef.current);
+        secretHoldTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const indexedSessions = useMemo(
     () =>
@@ -176,10 +209,179 @@ export default function SessionsPageClient({ initialSessions }) {
     setPinPrompt({ mode: "director", session: nextSession });
   }, []);
 
+  const clearSecretHoldTimer = useCallback(() => {
+    if (secretHoldTimerRef.current) {
+      window.clearTimeout(secretHoldTimerRef.current);
+      secretHoldTimerRef.current = null;
+    }
+  }, []);
+
+  const handleSecretManageHoldStart = useCallback(
+    (session, event) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest("button,a,input,textarea,select,label")
+      ) {
+        return;
+      }
+
+      clearSecretHoldTimer();
+      secretHoldTimerRef.current = window.setTimeout(() => {
+        suppressCardOpenUntilRef.current = Date.now() + 1200;
+        setManagePinPrompt(session);
+      }, 4000);
+    },
+    [clearSecretHoldTimer]
+  );
+
+  const handleSecretManageHoldEnd = useCallback(() => {
+    clearSecretHoldTimer();
+  }, [clearSecretHoldTimer]);
+
+  const shouldBlockCardOpen = useCallback(
+    () => Date.now() < suppressCardOpenUntilRef.current,
+    []
+  );
+
   const handleGoHome = useCallback(() => {
     setIsGoingHome(true);
     router.replace("/");
   }, [router]);
+
+  const openSessionManager = useCallback((session, pin) => {
+    setManageSessionContext({ sessionId: session._id, pin });
+    setManageForm({
+      name: session.name || "",
+      teamAName: session.teamAName || "",
+      teamBName: session.teamBName || "",
+    });
+    setManageError("");
+  }, []);
+
+  const handleManagePinSubmit = useCallback(
+    async (pin) => {
+      if (!managePinPrompt?._id) {
+        return;
+      }
+
+      const response = await fetch("/api/media/pin-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+      const payload = await response
+        .json()
+        .catch(() => ({ message: "Incorrect PIN." }));
+
+      if (!response.ok) {
+        throw new Error(payload.message || "Incorrect PIN.");
+      }
+
+      const session = managePinPrompt;
+      setManagePinPrompt(null);
+      openSessionManager(session, pin);
+    },
+    [managePinPrompt, openSessionManager]
+  );
+
+  const closeSessionManager = useCallback(() => {
+    setManageSessionContext(null);
+    setManageError("");
+    setManageSubmitting(false);
+  }, []);
+
+  const handleManageFieldChange = useCallback((field, value) => {
+    setManageForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }, []);
+
+  const handleManageSessionSave = useCallback(async () => {
+    if (!manageSessionContext?.sessionId || manageSubmitting) {
+      return;
+    }
+
+    setManageSubmitting(true);
+    setManageError("");
+
+    try {
+      const response = await fetch(
+        `/api/sessions/${manageSessionContext.sessionId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pin: manageSessionContext.pin,
+            name: manageForm.name.trim(),
+            teamAName: manageForm.teamAName.trim(),
+            teamBName: manageForm.teamBName.trim(),
+          }),
+        }
+      );
+      const payload = await response
+        .json()
+        .catch(() => ({ message: "Could not update session." }));
+
+      if (!response.ok) {
+        throw new Error(payload.message || "Could not update session.");
+      }
+
+      setSessions((current) =>
+        current.map((session) =>
+          session._id === payload._id ? { ...session, ...payload } : session
+        )
+      );
+      closeSessionManager();
+    } catch (error) {
+      setManageError(error.message || "Could not update session.");
+    } finally {
+      setManageSubmitting(false);
+    }
+  }, [closeSessionManager, manageForm.name, manageForm.teamAName, manageForm.teamBName, manageSessionContext, manageSubmitting]);
+
+  const handleManageSessionDelete = useCallback(async () => {
+    if (!manageSessionContext?.sessionId || manageSubmitting) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Delete this session and its match permanently?"
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setManageSubmitting(true);
+    setManageError("");
+
+    try {
+      const response = await fetch(
+        `/api/sessions/${manageSessionContext.sessionId}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pin: manageSessionContext.pin }),
+        }
+      );
+      const payload = await response
+        .json()
+        .catch(() => ({ message: "Could not delete session." }));
+
+      if (!response.ok) {
+        throw new Error(payload.message || "Could not delete session.");
+      }
+
+      setSessions((current) =>
+        current.filter((session) => session._id !== manageSessionContext.sessionId)
+      );
+      closeSessionManager();
+    } catch (error) {
+      setManageError(error.message || "Could not delete session.");
+    } finally {
+      setManageSubmitting(false);
+    }
+  }, [closeSessionManager, manageSessionContext, manageSubmitting]);
 
   const handlePinSubmit = async (pin) => {
     if (!pinPrompt?.session?.match || !pinPrompt.session.isLive) return;
@@ -378,12 +580,24 @@ export default function SessionsPageClient({ initialSessions }) {
             <>
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-4">
                 {paginatedSessions.map((session) => (
-                  <SessionCard
+                  <div
                     key={session._id}
-                    session={session}
-                    onUmpireClick={handleOpenUmpirePin}
-                    onDirectorClick={handleOpenDirectorPin}
-                  />
+                    className="h-full"
+                    onPointerDown={(event) =>
+                      handleSecretManageHoldStart(session, event)
+                    }
+                    onPointerUp={handleSecretManageHoldEnd}
+                    onPointerLeave={handleSecretManageHoldEnd}
+                    onPointerCancel={handleSecretManageHoldEnd}
+                    onContextMenu={(event) => event.preventDefault()}
+                  >
+                    <SessionCard
+                      session={session}
+                      onUmpireClick={handleOpenUmpirePin}
+                      onDirectorClick={handleOpenDirectorPin}
+                      shouldBlockCardOpen={shouldBlockCardOpen}
+                    />
+                  </div>
                 ))}
               </div>
 
@@ -460,6 +674,100 @@ export default function SessionsPageClient({ initialSessions }) {
               pinPrompt.mode === "director" ? "Join Director Mode" : "Enter Umpire Mode"
             }
           />
+        ) : null}
+        {managePinPrompt ? (
+          <ImagePinModal
+            isOpen={Boolean(managePinPrompt)}
+            title=""
+            subtitle=""
+            confirmLabel="Continue"
+            digitCount={6}
+            pinLabel="Secret manage PIN"
+            placeholder="- - - - - -"
+            hideHeaderCopy
+            onConfirm={handleManagePinSubmit}
+            onClose={() => {
+              setManagePinPrompt(null);
+            }}
+          />
+        ) : null}
+        {manageSessionContext ? (
+          <ModalBase
+            title="Session Manager"
+            onExit={closeSessionManager}
+            panelClassName="max-w-md"
+          >
+            <div className="space-y-4">
+              <label className="block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                  Game Name
+                </span>
+                <input
+                  type="text"
+                  value={manageForm.name}
+                  onChange={(event) =>
+                    handleManageFieldChange("name", event.target.value)
+                  }
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-white outline-none transition focus:border-emerald-300/28 focus:bg-white/[0.06]"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                  Team A
+                </span>
+                <input
+                  type="text"
+                  value={manageForm.teamAName}
+                  onChange={(event) =>
+                    handleManageFieldChange("teamAName", event.target.value)
+                  }
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-white outline-none transition focus:border-emerald-300/28 focus:bg-white/[0.06]"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                  Team B
+                </span>
+                <input
+                  type="text"
+                  value={manageForm.teamBName}
+                  onChange={(event) =>
+                    handleManageFieldChange("teamBName", event.target.value)
+                  }
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-white outline-none transition focus:border-emerald-300/28 focus:bg-white/[0.06]"
+                />
+              </label>
+              {manageError ? (
+                <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                  {manageError}
+                </div>
+              ) : null}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <LoadingButton
+                  type="button"
+                  onClick={handleManageSessionSave}
+                  disabled={
+                    !manageForm.name.trim() ||
+                    !manageForm.teamAName.trim() ||
+                    !manageForm.teamBName.trim()
+                  }
+                  loading={manageSubmitting}
+                  pendingLabel="Saving..."
+                  className="rounded-2xl bg-[linear-gradient(90deg,#10b981_0%,#059669_100%)] px-5 py-3 font-semibold text-black transition disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Save Changes
+                </LoadingButton>
+                <button
+                  type="button"
+                  onClick={() => void handleManageSessionDelete()}
+                  disabled={manageSubmitting}
+                  className="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-5 py-3 font-semibold text-rose-200 transition hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Delete Session
+                </button>
+              </div>
+            </div>
+          </ModalBase>
         ) : null}
         {isInfoModalOpen ? (
           <InfoModal onExit={() => setIsInfoModalOpen(false)} />

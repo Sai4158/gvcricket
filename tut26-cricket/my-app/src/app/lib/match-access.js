@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 const COOKIE_PREFIX = "gv_match_access_";
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
 const ADMIN_ROLE = "admin";
+const DEFAULT_MANAGE_PIN = "636363";
 
 function getConfiguredPinValue() {
   return (
@@ -11,6 +12,10 @@ function getConfiguredPinValue() {
     process.env.UMPIRE_PIN ||
     ""
   );
+}
+
+function getConfiguredManagePinValue() {
+  return process.env.SESSION_MANAGE_PIN || DEFAULT_MANAGE_PIN;
 }
 
 function getConfiguredPinHashValue() {
@@ -33,12 +38,29 @@ function getAccessSecret() {
   );
 }
 
+function getManageSecret() {
+  return (
+    process.env.SESSION_MANAGE_ACCESS_SECRET ||
+    process.env.SESSION_MANAGE_PIN ||
+    process.env.MATCH_ACCESS_SECRET ||
+    "gv-cricket-manage-secret"
+  );
+}
+
 function hashPin(pin) {
   return crypto.scryptSync(String(pin || ""), getAccessSecret(), 64);
 }
 
+function hashManagePin(pin) {
+  return crypto.scryptSync(String(pin || "").trim(), getManageSecret(), 64);
+}
+
 export function getConfiguredUmpirePin() {
   return getConfiguredPinValue();
+}
+
+export function getConfiguredManagePin() {
+  return getConfiguredManagePinValue();
 }
 
 export function isValidUmpirePin(pin) {
@@ -56,6 +78,15 @@ export function isValidUmpirePin(pin) {
 
   const incomingHash = hashPin(pin);
   const expectedHash = hashPin(configuredPin);
+  return crypto.timingSafeEqual(incomingHash, expectedHash);
+}
+
+export function isValidManagePin(pin) {
+  const configuredPin = getConfiguredManagePin();
+  if (!configuredPin) return false;
+
+  const incomingHash = hashManagePin(pin);
+  const expectedHash = hashManagePin(configuredPin);
   return crypto.timingSafeEqual(incomingHash, expectedHash);
 }
 

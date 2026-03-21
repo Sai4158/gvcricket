@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import {
@@ -43,24 +43,28 @@ export default function TeamSelectionPageClient() {
   const [error, setError] = useState("");
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [imageUploadState, setImageUploadState] = useState("idle");
+  const imageUploadPromiseRef = useRef(null);
 
-  useEffect(() => {
+  const uploadDraftImageIfNeeded = useCallback(async () => {
     if (typeof window === "undefined") {
-      return undefined;
+      return true;
+    }
+
+    if (imageUploadPromiseRef.current) {
+      return imageUploadPromiseRef.current;
     }
 
     const draftToken = window.sessionStorage.getItem(draftTokenKey) || "";
     const pendingImage = getPendingSessionImage();
 
     if (!draftToken || !pendingImage?.dataUrl) {
-      return undefined;
+      setImageUploadState("done");
+      return true;
     }
-
-    let isMounted = true;
 
     setImageUploadState("uploading");
 
-    void uploadPendingSessionImageToDraftSession({
+    const uploadPromise = uploadPendingSessionImageToDraftSession({
       sessionId,
       draftToken,
       pendingImage,
@@ -68,23 +72,47 @@ export default function TeamSelectionPageClient() {
       .then((didUpload) => {
         if (didUpload) {
           clearPendingSessionImage();
-          if (!isMounted) return;
           setImageUploadState("done");
-          return;
+          return true;
         }
 
-        if (!isMounted) return;
         setImageUploadState("failed");
+        return false;
       })
       .catch(() => {
-        if (!isMounted) return;
         setImageUploadState("failed");
+        return false;
+      })
+      .finally(() => {
+        imageUploadPromiseRef.current = null;
       });
+
+    imageUploadPromiseRef.current = uploadPromise;
+    return uploadPromise;
+  }, [draftTokenKey, sessionId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    if (!window.sessionStorage.getItem(draftTokenKey) || !getPendingSessionImage()?.dataUrl) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    void uploadDraftImageIfNeeded().then((didUpload) => {
+      if (!isMounted || didUpload) {
+        return;
+      }
+      setImageUploadState("failed");
+    });
 
     return () => {
       isMounted = false;
     };
-  }, [draftTokenKey, sessionId]);
+  }, [draftTokenKey, sessionId, uploadDraftImageIfNeeded]);
 
   const deleteDraftSession = async () => {
     if (typeof window === "undefined") return;
@@ -134,6 +162,11 @@ export default function TeamSelectionPageClient() {
     await primeUiAudio().catch(() => false);
 
     try {
+      const imageReady = await uploadDraftImageIfNeeded();
+      if (!imageReady) {
+        throw new Error("Cover image is still uploading. Please try again in a moment.");
+      }
+
       const response = await fetch(`/api/sessions/${sessionId}/setup-match`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

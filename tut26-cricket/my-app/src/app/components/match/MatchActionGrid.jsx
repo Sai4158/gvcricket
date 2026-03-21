@@ -267,10 +267,12 @@ export default function MatchActionGrid({
   historyStackLength,
   onEditTeams,
   onEditOvers,
+  editOversLabel = "Edit overs",
   onUndo,
   onHistory,
   onImage,
   onCommentary,
+  onCommentaryHoldStart,
   onWalkie,
   onMic,
   onShare,
@@ -294,7 +296,7 @@ export default function MatchActionGrid({
     <div className="mt-8 flex justify-center border-t border-zinc-700 pt-6">
       <div className="space-y-5">
         <p className="text-center text-[12px] text-white">
-          Hold to talk. Tap to open.
+          Hold to talk or read. Tap to open.
         </p>
         <div className="grid grid-cols-3 gap-x-4 gap-y-6">
           <ActionIconButton
@@ -336,6 +338,30 @@ export default function MatchActionGrid({
             }
           />
           <ActionIconButton
+            onClick={onCommentary}
+            onHoldStart={onCommentaryHoldStart}
+            onPressFeedback={onPressFeedback}
+            icon={<AnnounceIcon />}
+            label="Score feedback"
+            colorClass="text-cyan-300"
+            active={isAnnounceActive}
+            badge={isAnnounceActive ? "On" : "Off"}
+            badgeClass={
+              isAnnounceActive
+                ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
+                : "border-rose-400/20 bg-rose-500/10 text-rose-200"
+            }
+          />
+          <ActionIconButton
+            onClick={onUndo}
+            onPressFeedback={onPressFeedback}
+            icon={<LuUndo2 />}
+            label="Undo"
+            colorClass="text-zinc-400"
+            disabled={isUpdating || historyStackLength === 0}
+            compact
+          />
+          <ActionIconButton
             onClick={onMic}
             onHoldStart={onMicHoldStart}
             onHoldEnd={onMicHoldEnd}
@@ -355,29 +381,6 @@ export default function MatchActionGrid({
             }
           />
           <ActionIconButton
-            onClick={onUndo}
-            onPressFeedback={onPressFeedback}
-            icon={<LuUndo2 />}
-            label="Undo"
-            colorClass="text-zinc-400"
-            disabled={isUpdating || historyStackLength === 0}
-            compact
-          />
-          <ActionIconButton
-            onClick={onCommentary}
-            onPressFeedback={onPressFeedback}
-            icon={<AnnounceIcon />}
-            label="Score feedback"
-            colorClass="text-cyan-300"
-            active={isAnnounceActive}
-            badge={isAnnounceActive ? "On" : "Off"}
-            badgeClass={
-              isAnnounceActive
-                ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
-                : "border-rose-400/20 bg-rose-500/10 text-rose-200"
-            }
-          />
-          <ActionIconButton
             onClick={onEditTeams}
             onPressFeedback={onPressFeedback}
             icon={<FaUserEdit />}
@@ -390,7 +393,7 @@ export default function MatchActionGrid({
             onClick={onEditOvers}
             onPressFeedback={onPressFeedback}
             icon={<FaRegClock />}
-            label="Edit overs"
+            label={editOversLabel}
             colorClass="text-amber-400"
             disabled={isUpdating}
             compact

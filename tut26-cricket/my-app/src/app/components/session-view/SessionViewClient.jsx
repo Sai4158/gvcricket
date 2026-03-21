@@ -29,16 +29,14 @@ import MatchHeroBackdrop from "../match/MatchHeroBackdrop";
 import { BallTracker } from "../match/MatchBallHistory";
 import useEventSource from "../live/useEventSource";
 import useSpeechAnnouncer from "../live/useSpeechAnnouncer";
+import useLiveSoundEffectsPlayer from "../live/useLiveSoundEffectsPlayer";
 import LiveScoreCard from "./LiveScoreCard";
 import SplashMsg from "./SplashMsg";
 import TeamInningsDetail from "./TeamInningsDetail";
 import LiquidSportText from "../home/LiquidSportText";
 import {
   buildCurrentScoreAnnouncement,
-  buildSpectatorAnnouncement,
-  getSpectatorAnnouncementPriority,
-  buildSpectatorOverCompleteAnnouncement,
-  buildSpectatorScoreAnnouncement,
+  buildLiveScoreAnnouncementSequence,
 } from "../../lib/live-announcements";
 import { addBallToHistory } from "../../lib/match-scoring";
 import {
@@ -216,6 +214,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const walkieNoticeTimerRef = useRef(null);
   const walkieHoldTimerRef = useRef(null);
   const walkieHeldRef = useRef(false);
+  const announcerHoldTimerRef = useRef(null);
+  const announcerHoldStartedRef = useRef(false);
+  const suppressAnnouncerCardClickRef = useRef(false);
   const speakerHoldTimerRef = useRef(null);
   const speakerHeldRef = useRef(false);
   const previousEnabledRef = useRef(false);
@@ -227,6 +228,15 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const announcerInitialSummaryRef = useRef("");
   const announcerGestureReplayRef = useRef("");
   const announcerAutoReadTimerRef = useRef(null);
+  const interruptedAnnouncementQueueRef = useRef([]);
+  const deferredAnnouncementRef = useRef(null);
+  const soundEffectPlayingRef = useRef(false);
+  const previousSoundEffectMatchIdRef = useRef(initialData?.match?._id || "");
+  const lastHandledSoundEffectEventRef = useRef(
+    initialData?.match?.lastLiveEvent?.type === "sound_effect"
+      ? initialData.match.lastLiveEvent.id || ""
+      : "",
+  );
   const router = useRouter();
   const sessionData = data?.session;
   const match = data?.match;
@@ -239,6 +249,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     speakSequence,
     prime,
     stop,
+    interruptAndCapture,
     isSupported,
     needsGesture,
     audioUnlocked,
@@ -345,6 +356,61 @@ export default function SessionViewClient({ sessionId, initialData }) {
     restorePageMedia(announcementDuckRef);
   }, []);
 
+  const {
+    audioRef: soundEffectsAudioRef,
+    playEffect: playLiveSoundEffect,
+  } = useLiveSoundEffectsPlayer({
+    volume: 0.95,
+    onBeforePlay: () => {
+      soundEffectPlayingRef.current = true;
+      clearAnnouncementTimers();
+      const interruptedQueue = interruptAndCapture();
+      if (interruptedQueue?.length) {
+        interruptedAnnouncementQueueRef.current = interruptedQueue;
+      }
+    },
+    onAfterEnd: () => {
+      soundEffectPlayingRef.current = false;
+
+      if (!settings.enabled || settings.mode === "silent") {
+        interruptedAnnouncementQueueRef.current = [];
+        deferredAnnouncementRef.current = null;
+        return;
+      }
+
+      const resumeQueue = [
+        ...interruptedAnnouncementQueueRef.current,
+        ...(deferredAnnouncementRef.current ? [deferredAnnouncementRef.current] : []),
+      ];
+      interruptedAnnouncementQueueRef.current = [];
+      deferredAnnouncementRef.current = null;
+
+      if (!resumeQueue.length) {
+        return;
+      }
+
+      const resumeItems = resumeQueue.flatMap((entry) => entry.items || []);
+      const resumePriority = Math.max(
+        ...resumeQueue.map((entry) => Number(entry.options?.priority || 1)),
+      );
+      const resumeRestoreAfterMs = Math.max(
+        2400,
+        ...resumeQueue.map((entry) => Number(entry.restoreAfterMs || 0)),
+      );
+
+      speakSequenceWithDuck(
+        resumeItems,
+        {
+          key: `spectator-resume-${Date.now()}`,
+          priority: resumePriority,
+          interrupt: true,
+          minGapMs: 0,
+        },
+        resumeRestoreAfterMs
+      );
+    },
+  });
+
   const showTemporaryWalkieNotice = useCallback((message, duration = 2600) => {
     setLocalWalkieNotice(message);
     if (walkieNoticeTimerRef.current) {
@@ -380,6 +446,19 @@ export default function SessionViewClient({ sessionId, initialData }) {
     clearAnnouncementTimers();
     stop();
   }, [clearAnnouncementTimers, match?._id, stop]);
+
+  useEffect(() => {
+    const nextMatchId = match?._id || "";
+    if (previousSoundEffectMatchIdRef.current === nextMatchId) {
+      return;
+    }
+
+    previousSoundEffectMatchIdRef.current = nextMatchId;
+    lastHandledSoundEffectEventRef.current =
+      match?.lastLiveEvent?.type === "sound_effect"
+        ? match.lastLiveEvent.id || ""
+        : "";
+  }, [match?._id, match?.lastLiveEvent?.id, match?.lastLiveEvent?.type]);
 
   useEffect(() => {
     let cancelled = false;
@@ -623,34 +702,26 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
     if (lastAnnouncedEventRef.current === event.id) return;
 
-    const line = buildSpectatorAnnouncement(event, match, settings.mode);
-    if (!line) return;
-    const scoreLine = buildSpectatorScoreAnnouncement(event, match);
-    const overSummary = event.overCompleted
-      ? buildSpectatorOverCompleteAnnouncement(match)
-      : "";
-    const priority = getSpectatorAnnouncementPriority(event);
-    const items = [
-      {
-        text: line,
-        pauseAfterMs: scoreLine || overSummary ? 180 : 0,
-        rate: 0.78,
-      },
-      scoreLine
-        ? {
-            text: scoreLine,
-            pauseAfterMs: overSummary ? 220 : 0,
-            rate: 0.8,
-          }
-        : null,
-      overSummary
-        ? {
-            text: overSummary,
-            pauseAfterMs: 0,
-            rate: 0.8,
-          }
-        : null,
-    ].filter(Boolean);
+    const { items, priority, restoreAfterMs } = buildLiveScoreAnnouncementSequence(
+      event,
+      match,
+      settings.mode
+    );
+    if (!items.length) return;
+    if (soundEffectPlayingRef.current) {
+      deferredAnnouncementRef.current = {
+        items,
+        options: {
+          key: event.id,
+          priority,
+          interrupt: false,
+          minGapMs: 0,
+        },
+        restoreAfterMs,
+      };
+      lastAnnouncedEventRef.current = event.id;
+      return;
+    }
     const spoke = speakSequenceWithDuck(
       items,
       {
@@ -659,7 +730,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         interrupt: true,
         minGapMs: 0,
       },
-      overSummary ? 3300 : scoreLine ? 2300 : 1500
+      restoreAfterMs
     );
     if (!spoke && announcerStatus === "waiting_for_gesture") {
       lastAnnouncedEventRef.current = event.id;
@@ -688,6 +759,28 @@ export default function SessionViewClient({ sessionId, initialData }) {
       stop();
     }
   }, [isLiveMatch, match?.lastLiveEvent?.type, stop]);
+
+  useEffect(() => {
+    const liveEvent = match?.lastLiveEvent;
+    if (!liveEvent?.id || liveEvent.type !== "sound_effect") {
+      return;
+    }
+
+    if (lastHandledSoundEffectEventRef.current === liveEvent.id) {
+      return;
+    }
+
+    lastHandledSoundEffectEventRef.current = liveEvent.id;
+    void playLiveSoundEffect(
+      {
+        id: liveEvent.effectId || liveEvent.effectFileName || liveEvent.id,
+        fileName: liveEvent.effectFileName || liveEvent.effectId || "",
+        label: liveEvent.effectLabel || "Sound effect",
+        src: liveEvent.effectSrc || "",
+      },
+      { userGesture: false },
+    );
+  }, [match?.lastLiveEvent, playLiveSoundEffect]);
 
   useEffect(() => {
     return () => {
@@ -868,14 +961,28 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
   };
 
-  const handleQuickAnnounce = () => {
-    if (!match) {
-      return;
-    }
+  const ensureSpectatorAnnouncerReady = useCallback(
+    ({ userGesture = false, openPanel = false } = {}) => {
+      if (!settings.enabled) {
+        updateSetting("enabled", true);
+      }
 
-    prime({ userGesture: true });
-    announceCurrentScore({ userGesture: true, interrupt: true });
-  };
+      if (settings.mode === "silent") {
+        updateSetting("mode", "full");
+      }
+
+      if (openPanel) {
+        setActivePanel("announce");
+      }
+
+      prime({ userGesture });
+    },
+    [prime, settings.enabled, settings.mode, updateSetting]
+  );
+
+  const handleOpenAnnouncePanel = useCallback(() => {
+    ensureSpectatorAnnouncerReady({ userGesture: true, openPanel: true });
+  }, [ensureSpectatorAnnouncerReady]);
 
   const clearWalkieHoldTimer = () => {
     if (walkieHoldTimerRef.current) {
@@ -883,6 +990,50 @@ export default function SessionViewClient({ sessionId, initialData }) {
       walkieHoldTimerRef.current = null;
     }
   };
+
+  const clearAnnouncerHoldTimer = () => {
+    if (announcerHoldTimerRef.current) {
+      window.clearTimeout(announcerHoldTimerRef.current);
+      announcerHoldTimerRef.current = null;
+    }
+  };
+
+  const handleQuickAnnounce = useCallback(() => {
+    if (!match) {
+      return;
+    }
+
+    ensureSpectatorAnnouncerReady({ userGesture: true });
+    announceCurrentScore({ userGesture: true, interrupt: true });
+  }, [announceCurrentScore, ensureSpectatorAnnouncerReady, match]);
+
+  const handleAnnouncerCardPressStart = useCallback(
+    (event) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest("button, input, select, textarea, a, [role='switch']")
+      ) {
+        return;
+      }
+
+      clearAnnouncerHoldTimer();
+      announcerHoldStartedRef.current = false;
+      announcerHoldTimerRef.current = window.setTimeout(() => {
+        announcerHoldTimerRef.current = null;
+        announcerHoldStartedRef.current = true;
+        suppressAnnouncerCardClickRef.current = true;
+        handleQuickAnnounce();
+        window.setTimeout(() => {
+          suppressAnnouncerCardClickRef.current = false;
+        }, 220);
+      }, 180);
+    },
+    [handleQuickAnnounce]
+  );
+
+  const handleAnnouncerCardPressEnd = useCallback(() => {
+    clearAnnouncerHoldTimer();
+  }, []);
 
   const clearSpeakerHoldTimer = () => {
     if (speakerHoldTimerRef.current) {
@@ -967,8 +1118,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
     const resetHeldAudio = () => {
       clearWalkieHoldTimer();
+      clearAnnouncerHoldTimer();
       clearSpeakerHoldTimer();
       walkieHeldRef.current = false;
+      announcerHoldStartedRef.current = false;
+      suppressAnnouncerCardClickRef.current = false;
       speakerHeldRef.current = false;
       setQuickWalkieTalking(false);
       setQuickSpeakerTalking(false);
@@ -1014,6 +1168,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
       setSpectatorWalkieEnabled(true);
       if (action === "enable") {
+        showTemporaryWalkieNotice("Refreshing walkie signal...", 3400);
+        await walkie.refreshSignal?.({ propagate: false });
         return;
       }
 
@@ -1059,6 +1215,22 @@ export default function SessionViewClient({ sessionId, initialData }) {
     ]
   );
 
+  const handleWalkieSignalRefresh = useCallback(async () => {
+    clearWalkieHoldTimer();
+    walkieHeldRef.current = false;
+    setQuickWalkieTalking(false);
+    setSpectatorWalkieEnabled(true);
+    setLocalWalkieNotice("");
+    walkie.dismissNotice();
+    showTemporaryWalkieNotice("Refreshing walkie signal...", 3600);
+    const refreshed = await walkie.refreshSignal?.({ propagate: true });
+    if (refreshed !== false) {
+      showTemporaryWalkieNotice("Signal refreshed. Walkie stays on.", 3400);
+      return;
+    }
+    showTemporaryWalkieNotice("Walkie refresh is waiting for the live channel.", 3400);
+  }, [showTemporaryWalkieNotice, walkie]);
+
   const handleSpeakerSwitchChange = useCallback(
     async (nextChecked) => {
       if (nextChecked) {
@@ -1092,6 +1264,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
       updateSetting("enabled", nextChecked);
 
       if (nextChecked) {
+        if (settings.mode === "silent") {
+          updateSetting("mode", "full");
+        }
         setActivePanel("announce");
         prime({ userGesture: true });
         announcerInitialSummaryRef.current = "";
@@ -1102,7 +1277,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       stop();
       setActivePanel((current) => (current === "announce" ? null : current));
     },
-    [announceCurrentScore, prime, stop, updateSetting]
+    [announceCurrentScore, prime, settings.mode, stop, updateSetting]
   );
 
   if (!sessionId) return <SplashMsg>No Session ID provided.</SplashMsg>;
@@ -1477,6 +1652,16 @@ export default function SessionViewClient({ sessionId, initialData }) {
                             ? "Finishing..."
                             : "Tap and hold to talk"}
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleWalkieSignalRefresh();
+                        }}
+                        disabled={walkieLoading}
+                        className="mt-4 inline-flex min-h-11 items-center justify-center rounded-full border border-cyan-300/18 bg-[linear-gradient(180deg,rgba(34,211,238,0.14),rgba(8,18,24,0.82))] px-5 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-100 shadow-[0_16px_32px_rgba(8,145,178,0.18)] transition hover:border-cyan-200/30 hover:bg-[linear-gradient(180deg,rgba(56,189,248,0.18),rgba(10,18,24,0.86))] disabled:cursor-not-allowed disabled:opacity-55"
+                      >
+                        {walkieLoading ? "Refreshing..." : "Refresh signal"}
+                      </button>
                     </>
                   )}
                 </div>
@@ -1569,13 +1754,23 @@ export default function SessionViewClient({ sessionId, initialData }) {
             <div
             role="button"
             tabIndex={0}
-            onClick={() => setActivePanel("announce")}
+            onClick={() => {
+              if (suppressAnnouncerCardClickRef.current || announcerHoldStartedRef.current) {
+                announcerHoldStartedRef.current = false;
+                return;
+              }
+              handleOpenAnnouncePanel();
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
-                setActivePanel("announce");
+                handleOpenAnnouncePanel();
               }
             }}
+            onPointerDown={handleAnnouncerCardPressStart}
+            onPointerUp={handleAnnouncerCardPressEnd}
+            onPointerCancel={handleAnnouncerCardPressEnd}
+            onPointerLeave={handleAnnouncerCardPressEnd}
             className={`${launcherCardClass} min-h-34.5 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.08),transparent_24%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-3.5`}
             aria-label="Open score announcer"
           >
@@ -1779,6 +1974,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
           </ModalBase>
         </OptionalFeatureBoundary>
       ) : null}
+      <audio ref={soundEffectsAudioRef} hidden />
     </main>
   );
 }

@@ -220,6 +220,27 @@ export async function primeUiAudio(options = {}) {
   return unlocked;
 }
 
+function normalizeCachedAudioSource(src) {
+  const safeSrc = String(src || "");
+  if (!safeSrc) {
+    return "";
+  }
+
+  if (safeSrc.startsWith("blob:") || safeSrc.startsWith("data:")) {
+    return safeSrc;
+  }
+
+  if (typeof window === "undefined") {
+    return safeSrc;
+  }
+
+  try {
+    return new URL(safeSrc, window.location.href).toString();
+  } catch {
+    return safeSrc;
+  }
+}
+
 export async function getCachedAudioAssetUrl(src) {
   const safeSrc = String(src || "");
   if (!safeSrc) {
@@ -233,12 +254,14 @@ export async function getCachedAudioAssetUrl(src) {
     return safeSrc;
   }
 
-  if (cachedAudioUrlMap.has(safeSrc)) {
-    return cachedAudioUrlMap.get(safeSrc);
+  const cacheKey = normalizeCachedAudioSource(safeSrc);
+
+  if (cachedAudioUrlMap.has(cacheKey)) {
+    return cachedAudioUrlMap.get(cacheKey);
   }
 
-  if (cachedAudioRequestMap.has(safeSrc)) {
-    return cachedAudioRequestMap.get(safeSrc);
+  if (cachedAudioRequestMap.has(cacheKey)) {
+    return cachedAudioRequestMap.get(cacheKey);
   }
 
   const request = (async () => {
@@ -249,11 +272,11 @@ export async function getCachedAudioAssetUrl(src) {
     ) {
       try {
         const cache = await window.caches.open(UI_AUDIO_CACHE_NAME);
-        const cachedResponse = await cache.match(safeSrc);
+        const cachedResponse = await cache.match(cacheKey);
         if (cachedResponse?.ok) {
           const cachedBlob = await cachedResponse.blob();
           const cachedObjectUrl = URL.createObjectURL(cachedBlob);
-          cachedAudioUrlMap.set(safeSrc, cachedObjectUrl);
+          cachedAudioUrlMap.set(cacheKey, cachedObjectUrl);
           return cachedObjectUrl;
         }
       } catch {
@@ -261,7 +284,7 @@ export async function getCachedAudioAssetUrl(src) {
       }
     }
 
-    const response = await fetch(safeSrc, { cache: "force-cache" });
+    const response = await fetch(cacheKey, { cache: "force-cache" });
     if (!response.ok) {
       throw new Error("Audio file could not be fetched.");
     }
@@ -273,7 +296,7 @@ export async function getCachedAudioAssetUrl(src) {
         /^https?:/i.test(window.location?.protocol || "http:")
       ) {
         const cache = await window.caches.open(UI_AUDIO_CACHE_NAME);
-        await cache.put(safeSrc, response.clone());
+        await cache.put(cacheKey, response.clone());
       }
     } catch {
       // Ignore Cache Storage failures and continue with in-memory caching.
@@ -281,14 +304,14 @@ export async function getCachedAudioAssetUrl(src) {
 
     const blob = await response.blob();
     const objectUrl = URL.createObjectURL(blob);
-    cachedAudioUrlMap.set(safeSrc, objectUrl);
+    cachedAudioUrlMap.set(cacheKey, objectUrl);
     return objectUrl;
   })()
     .finally(() => {
-      cachedAudioRequestMap.delete(safeSrc);
+      cachedAudioRequestMap.delete(cacheKey);
     });
 
-  cachedAudioRequestMap.set(safeSrc, request);
+  cachedAudioRequestMap.set(cacheKey, request);
   return request;
 }
 
@@ -298,6 +321,8 @@ async function getCachedAudioArrayBuffer(src) {
     return null;
   }
 
+  const cacheKey = normalizeCachedAudioSource(safeSrc);
+
   if (
     typeof window !== "undefined" &&
     "caches" in window &&
@@ -305,7 +330,7 @@ async function getCachedAudioArrayBuffer(src) {
   ) {
     try {
       const cache = await window.caches.open(UI_AUDIO_CACHE_NAME);
-      const cachedResponse = await cache.match(safeSrc);
+      const cachedResponse = await cache.match(cacheKey);
       if (cachedResponse?.ok) {
         return await cachedResponse.arrayBuffer();
       }
@@ -314,7 +339,7 @@ async function getCachedAudioArrayBuffer(src) {
     }
   }
 
-  const response = await fetch(safeSrc, { cache: "force-cache" });
+  const response = await fetch(cacheKey, { cache: "force-cache" });
   if (!response.ok) {
     throw new Error("Audio file could not be fetched.");
   }
@@ -326,7 +351,7 @@ async function getCachedAudioArrayBuffer(src) {
       /^https?:/i.test(window.location?.protocol || "http:")
     ) {
       const cache = await window.caches.open(UI_AUDIO_CACHE_NAME);
-      await cache.put(safeSrc, response.clone());
+      await cache.put(cacheKey, response.clone());
     }
   } catch {
     // Ignore Cache Storage failures and continue.
@@ -341,12 +366,14 @@ async function getCachedAudioBuffer(src) {
     return null;
   }
 
-  if (cachedAudioBufferMap.has(safeSrc)) {
-    return cachedAudioBufferMap.get(safeSrc);
+  const cacheKey = normalizeCachedAudioSource(safeSrc);
+
+  if (cachedAudioBufferMap.has(cacheKey)) {
+    return cachedAudioBufferMap.get(cacheKey);
   }
 
-  if (cachedAudioBufferRequestMap.has(safeSrc)) {
-    return cachedAudioBufferRequestMap.get(safeSrc);
+  if (cachedAudioBufferRequestMap.has(cacheKey)) {
+    return cachedAudioBufferRequestMap.get(cacheKey);
   }
 
   const request = (async () => {
@@ -355,19 +382,19 @@ async function getCachedAudioBuffer(src) {
       throw new Error("Web Audio is unavailable.");
     }
 
-    const arrayBuffer = await getCachedAudioArrayBuffer(safeSrc);
+    const arrayBuffer = await getCachedAudioArrayBuffer(cacheKey);
     if (!arrayBuffer) {
       throw new Error("Audio buffer could not be loaded.");
     }
 
     const decodedBuffer = await context.decodeAudioData(arrayBuffer.slice(0));
-    cachedAudioBufferMap.set(safeSrc, decodedBuffer);
+    cachedAudioBufferMap.set(cacheKey, decodedBuffer);
     return decodedBuffer;
   })().finally(() => {
-    cachedAudioBufferRequestMap.delete(safeSrc);
+    cachedAudioBufferRequestMap.delete(cacheKey);
   });
 
-  cachedAudioBufferRequestMap.set(safeSrc, request);
+  cachedAudioBufferRequestMap.set(cacheKey, request);
   return request;
 }
 

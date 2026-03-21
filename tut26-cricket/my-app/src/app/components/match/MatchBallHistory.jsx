@@ -23,6 +23,8 @@ export function Ball({ ball, ballNumber }) {
     const noBallRuns = Math.max(Number(ball.runs || 0), 0);
     label = noBallRuns > 0 ? `NB+${noBallRuns}` : "NB";
   } else if (ball.runs === 0) {
+    style =
+      "border border-sky-300/20 bg-[linear-gradient(180deg,rgba(56,189,248,0.95),rgba(37,99,235,0.98))] shadow-[0_12px_28px_rgba(37,99,235,0.28)]";
     label = ".";
   }
 
@@ -46,7 +48,7 @@ export function BallTracker({ history }) {
     if (trackerRef.current) {
       trackerRef.current.scrollLeft = trackerRef.current.scrollWidth;
     }
-  }, [currentOver.balls.length]);
+  }, [currentOver.balls.length, currentOver.overNumber]);
 
   return (
     <div className="bg-zinc-900/50 p-4 rounded-2xl ring-1 ring-white/10 mb-6">

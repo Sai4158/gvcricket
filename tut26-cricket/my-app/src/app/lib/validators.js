@@ -43,6 +43,10 @@ const pinSchema = z
   .string()
   .trim()
   .regex(/^\d{4}$/, "PIN must be 4 digits.");
+const secretPinSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, "PIN must be 6 digits.");
 const ballSchema = z
   .object({
     runs: z.number().int().min(0).max(7),
@@ -96,6 +100,12 @@ export const pinPayloadSchema = z
   })
   .strict();
 
+export const secretPinPayloadSchema = z
+  .object({
+    pin: secretPinSchema,
+  })
+  .strict();
+
 export const sessionPatchObjectSchema = z
   .object({
     name: requiredNameSchema.optional(),
@@ -136,6 +146,7 @@ export const matchPatchObjectSchema = z
     teamA: playerArraySchema.optional(),
     teamB: playerArraySchema.optional(),
     overs: oversSchema.optional(),
+    innings1Score: z.number().int().min(0).max(999).optional(),
     announcerEnabled: z.boolean().optional(),
     announcerMode: z.enum(["simple", "full", ""]).optional(),
   })
@@ -328,4 +339,4 @@ export function validateWalkieSignalPayload(body) {
   return validateWithSchema(walkieSignalSchema, body);
 }
 
-export { draftTokenSchema, inningsSchema, oversSchema, pinSchema };
+export { draftTokenSchema, inningsSchema, oversSchema, pinSchema, secretPinSchema };

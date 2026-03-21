@@ -1,11 +1,18 @@
 "use client";
 
+import { countLegalBalls } from "../../lib/match-scoring";
 import { getBattingTeamBundle } from "../../lib/team-utils";
 
 export default function LiveScoreCard({ match }) {
   if (!match) return null;
 
   const battingTeam = getBattingTeamBundle(match);
+  const activeHistory =
+    match?.innings === "second"
+      ? match?.innings2?.history || []
+      : match?.innings1?.history || [];
+  const legalBalls = countLegalBalls(activeHistory);
+  const oversDisplay = `${Math.floor(legalBalls / 6)}.${legalBalls % 6}`;
   const targetRuns =
     match?.innings === "second" ? Number(match?.innings1?.score || 0) + 1 : 0;
 
@@ -30,6 +37,17 @@ export default function LiveScoreCard({ match }) {
             </p>
             <p className="mt-1 text-[1.1rem] font-bold tracking-tight text-white">
               {battingTeam.players.length}
+            </p>
+          </div>
+        </div>
+        <div className="relative min-w-[92px] overflow-hidden rounded-[18px] border border-sky-300/16 bg-[linear-gradient(180deg,rgba(56,189,248,0.1),rgba(29,78,216,0.08))] px-3.5 py-2.5 text-center shadow-[0_10px_24px_rgba(29,78,216,0.16)]">
+          <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-sky-200/44 to-transparent" />
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-sky-100/72">
+              Overs
+            </p>
+            <p className="mt-1 text-[1.1rem] font-bold tracking-tight text-sky-100">
+              {oversDisplay}
             </p>
           </div>
         </div>

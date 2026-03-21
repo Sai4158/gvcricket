@@ -215,7 +215,7 @@ export default function MatchImageUploader({
       <ImagePinModal
         isOpen={isPinModalOpen}
         title={existingImageUrl ? "Replace Image" : "Add Image"}
-        subtitle="Enter the 4-digit PIN before using this match image."
+        subtitle="Enter the 6-digit PIN before using this match image."
         confirmLabel="Use this image"
         showContinueWithout={true}
         onConfirm={handleConfirmPin}

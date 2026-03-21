@@ -12,6 +12,7 @@ const REQUEST_MAX_AGE_MS = 120_000;
 const MESSAGE_TTL_MS = 20_000;
 const STATE_IDLE_TTL_MS = 5 * 60_000;
 const MAX_QUEUED_MESSAGES_PER_PARTICIPANT = 24;
+const WALKIE_STATE_RETRY_LIMIT = 4;
 
 function nowDate() {
   return new Date();
@@ -25,6 +26,10 @@ function newNotification(type, message, request = null) {
     request,
     createdAt: nowDate(),
   };
+}
+
+function isRetryableWalkieStateError(error) {
+  return error?.name === "VersionError";
 }
 
 function touchIdleExpiry(doc) {
@@ -83,7 +88,7 @@ function buildSnapshot(doc) {
   };
 }
 
-async function touchAndCleanState(matchId) {
+async function touchAndCleanState(matchId, attempt = 0) {
   const now = nowDate();
   const staleBefore = new Date(now.getTime() - PARTICIPANT_STALE_MS);
   const doc = await WalkieState.findOneAndUpdate(
@@ -118,8 +123,19 @@ async function touchAndCleanState(matchId) {
         expired ? "Walkie-talkie transmission ended." : "Transmission ended."
       );
       touchIdleExpiry(doc);
-      await doc.save();
+      try {
+        await doc.save();
+      } catch (error) {
+        if (
+          isRetryableWalkieStateError(error) &&
+          attempt < WALKIE_STATE_RETRY_LIMIT - 1
+        ) {
+          return touchAndCleanState(matchId, attempt + 1);
+        }
+        throw error;
+      }
       publishWalkieStateUpdate(matchId);
+      return touchAndCleanState(matchId, attempt + 1);
     }
   }
 
@@ -132,8 +148,19 @@ async function touchAndCleanState(matchId) {
       doc.version += 1;
       doc.lastNotification = newNotification("walkie_disabled", "Walkie-talkie is off.");
       touchIdleExpiry(doc);
-      await doc.save();
+      try {
+        await doc.save();
+      } catch (error) {
+        if (
+          isRetryableWalkieStateError(error) &&
+          attempt < WALKIE_STATE_RETRY_LIMIT - 1
+        ) {
+          return touchAndCleanState(matchId, attempt + 1);
+        }
+        throw error;
+      }
       publishWalkieStateUpdate(matchId);
+      return touchAndCleanState(matchId, attempt + 1);
     }
   }
 
@@ -175,8 +202,12 @@ export async function getPersistentWalkieSnapshot(matchId) {
   };
 }
 
-export async function registerPersistentWalkieParticipant(matchId, participant) {
-  const doc = await touchAndCleanState(matchId);
+export async function registerPersistentWalkieParticipant(
+  matchId,
+  participant,
+  attempt = 0
+) {
+  const doc = await touchAndCleanState(matchId, attempt);
   const participantId = String(participant.id);
   const existing = doc.participants.find((item) => item.id === participantId);
   const nextNow = nowDate();
@@ -197,7 +228,17 @@ export async function registerPersistentWalkieParticipant(matchId, participant) 
 
   doc.version += 1;
   touchIdleExpiry(doc);
-  await doc.save();
+  try {
+    await doc.save();
+  } catch (error) {
+    if (
+      isRetryableWalkieStateError(error) &&
+      attempt < WALKIE_STATE_RETRY_LIMIT - 1
+    ) {
+      return registerPersistentWalkieParticipant(matchId, participant, attempt + 1);
+    }
+    throw error;
+  }
   publishWalkieStateUpdate(matchId);
   return {
     snapshot: buildSnapshot(doc),
@@ -209,28 +250,46 @@ export async function heartbeatPersistentWalkieParticipant(
   matchId,
   participantId,
   role,
-  name = ""
+  name = "",
+  attempt = 0
 ) {
-  const doc = await touchAndCleanState(matchId);
+  const doc = await touchAndCleanState(matchId, attempt);
   const participant = doc.participants.find((item) => item.id === String(participantId));
   if (!participant) {
     return registerPersistentWalkieParticipant(matchId, {
       id: participantId,
       role,
       name,
-    });
+    }, attempt);
   }
   participant.lastSeenAt = nowDate();
   touchIdleExpiry(doc);
-  await doc.save();
+  try {
+    await doc.save();
+  } catch (error) {
+    if (
+      isRetryableWalkieStateError(error) &&
+      attempt < WALKIE_STATE_RETRY_LIMIT - 1
+    ) {
+      return heartbeatPersistentWalkieParticipant(
+        matchId,
+        participantId,
+        role,
+        name,
+        attempt + 1
+      );
+    }
+    throw error;
+  }
   return {
     snapshot: buildSnapshot(doc),
     notification: doc.lastNotification?.id ? doc.lastNotification : null,
   };
 }
 
-export async function setPersistentWalkieEnabled(matchId, enabled) {
-  const doc = await touchAndCleanState(matchId);
+export async function setPersistentWalkieEnabled(matchId, enabled, attempt = 0) {
+  const doc = await touchAndCleanState(matchId, attempt);
+  const participantMessages = [];
   doc.enabled = Boolean(enabled);
   if (!enabled) {
     const previousSpeakerId = doc.activeSpeakerId || "";
@@ -241,16 +300,24 @@ export async function setPersistentWalkieEnabled(matchId, enabled) {
     doc.expiresAt = null;
     doc.transmissionId = "";
     if (previousSpeakerId) {
-      await queueParticipantMessage(matchId, previousSpeakerId, "participant", {
+      participantMessages.push({
+        toParticipantId: previousSpeakerId,
+        eventType: "participant",
+        payload: {
         type: "transmission-ended",
         reason: "disabled",
+        },
       });
     }
   } else {
     for (const request of doc.pendingRequests) {
-      await queueParticipantMessage(matchId, request.participantId, "participant", {
-        type: "request-accepted",
-        requestId: request.requestId,
+      participantMessages.push({
+        toParticipantId: request.participantId,
+        eventType: "participant",
+        payload: {
+          type: "request-accepted",
+          requestId: request.requestId,
+        },
       });
     }
     doc.pendingRequests = [];
@@ -262,13 +329,35 @@ export async function setPersistentWalkieEnabled(matchId, enabled) {
     enabled ? "Walkie-talkie is live." : "Walkie-talkie is off."
   );
   touchIdleExpiry(doc);
-  await doc.save();
+  try {
+    await doc.save();
+  } catch (error) {
+    if (
+      isRetryableWalkieStateError(error) &&
+      attempt < WALKIE_STATE_RETRY_LIMIT - 1
+    ) {
+      return setPersistentWalkieEnabled(matchId, enabled, attempt + 1);
+    }
+    throw error;
+  }
   publishWalkieStateUpdate(matchId);
+  for (const message of participantMessages) {
+    await queueParticipantMessage(
+      matchId,
+      message.toParticipantId,
+      message.eventType,
+      message.payload
+    );
+  }
   return buildSnapshot(doc);
 }
 
-export async function requestPersistentWalkieEnable(matchId, { participantId, role }) {
-  const doc = await touchAndCleanState(matchId);
+export async function requestPersistentWalkieEnable(
+  matchId,
+  { participantId, role },
+  attempt = 0
+) {
+  const doc = await touchAndCleanState(matchId, attempt);
   const participant = doc.participants.find((item) => item.id === String(participantId));
 
   if (!participant || participant.role !== role || !["spectator", "director"].includes(role)) {
@@ -317,7 +406,21 @@ export async function requestPersistentWalkieEnable(matchId, { participantId, ro
     name: participant.name,
   });
   touchIdleExpiry(doc);
-  await doc.save();
+  try {
+    await doc.save();
+  } catch (error) {
+    if (
+      isRetryableWalkieStateError(error) &&
+      attempt < WALKIE_STATE_RETRY_LIMIT - 1
+    ) {
+      return requestPersistentWalkieEnable(
+        matchId,
+        { participantId, role },
+        attempt + 1
+      );
+    }
+    throw error;
+  }
   publishWalkieStateUpdate(matchId);
 
   await queueParticipantMessage(matchId, participant.id, "participant", {
@@ -328,8 +431,12 @@ export async function requestPersistentWalkieEnable(matchId, { participantId, ro
   return { ok: true, snapshot: buildSnapshot(doc) };
 }
 
-export async function respondToPersistentWalkieRequest(matchId, { requestId, action }) {
-  const doc = await touchAndCleanState(matchId);
+export async function respondToPersistentWalkieRequest(
+  matchId,
+  { requestId, action },
+  attempt = 0
+) {
+  const doc = await touchAndCleanState(matchId, attempt);
   const request = doc.pendingRequests.find((item) => item.requestId === requestId);
 
   if (!request) {
@@ -350,7 +457,21 @@ export async function respondToPersistentWalkieRequest(matchId, { requestId, act
       }
     );
     touchIdleExpiry(doc);
-    await doc.save();
+    try {
+      await doc.save();
+    } catch (error) {
+      if (
+        isRetryableWalkieStateError(error) &&
+        attempt < WALKIE_STATE_RETRY_LIMIT - 1
+      ) {
+        return respondToPersistentWalkieRequest(
+          matchId,
+          { requestId, action },
+          attempt + 1
+        );
+      }
+      throw error;
+    }
     publishWalkieStateUpdate(matchId);
     await queueParticipantMessage(matchId, request.participantId, "participant", {
       type: "request-dismissed",
@@ -373,7 +494,21 @@ export async function respondToPersistentWalkieRequest(matchId, { requestId, act
     }
   );
   touchIdleExpiry(doc);
-  await doc.save();
+  try {
+    await doc.save();
+  } catch (error) {
+    if (
+      isRetryableWalkieStateError(error) &&
+      attempt < WALKIE_STATE_RETRY_LIMIT - 1
+    ) {
+      return respondToPersistentWalkieRequest(
+        matchId,
+        { requestId, action },
+        attempt + 1
+      );
+    }
+    throw error;
+  }
   publishWalkieStateUpdate(matchId);
 
   await queueParticipantMessage(matchId, request.participantId, "participant", {
@@ -384,8 +519,12 @@ export async function respondToPersistentWalkieRequest(matchId, { requestId, act
   return { ok: true, snapshot: buildSnapshot(doc) };
 }
 
-export async function claimPersistentWalkieSpeaker(matchId, { role, participantId }) {
-  const doc = await touchAndCleanState(matchId);
+export async function claimPersistentWalkieSpeaker(
+  matchId,
+  { role, participantId },
+  attempt = 0
+) {
+  const doc = await touchAndCleanState(matchId, attempt);
   const participant = doc.participants.find((item) => item.id === String(participantId));
 
   if (!participant || participant.role !== role) {
@@ -440,14 +579,32 @@ export async function claimPersistentWalkieSpeaker(matchId, { role, participantI
       : "Umpire is replying."
   );
   touchIdleExpiry(doc);
-  await doc.save();
+  try {
+    await doc.save();
+  } catch (error) {
+    if (
+      isRetryableWalkieStateError(error) &&
+      attempt < WALKIE_STATE_RETRY_LIMIT - 1
+    ) {
+      return claimPersistentWalkieSpeaker(
+        matchId,
+        { role, participantId },
+        attempt + 1
+      );
+    }
+    throw error;
+  }
   publishWalkieStateUpdate(matchId);
 
   return { ok: true, snapshot: buildSnapshot(doc) };
 }
 
-export async function releasePersistentWalkieSpeaker(matchId, { participantId }) {
-  const doc = await touchAndCleanState(matchId);
+export async function releasePersistentWalkieSpeaker(
+  matchId,
+  { participantId },
+  attempt = 0
+) {
+  const doc = await touchAndCleanState(matchId, attempt);
   if (doc.activeSpeakerId !== String(participantId)) {
     return { ok: false, status: 409, message: "This participant is not speaking." };
   }
@@ -462,7 +619,21 @@ export async function releasePersistentWalkieSpeaker(matchId, { participantId })
   doc.version += 1;
   doc.lastNotification = newNotification("transmission_ended", "Channel is free.");
   touchIdleExpiry(doc);
-  await doc.save();
+  try {
+    await doc.save();
+  } catch (error) {
+    if (
+      isRetryableWalkieStateError(error) &&
+      attempt < WALKIE_STATE_RETRY_LIMIT - 1
+    ) {
+      return releasePersistentWalkieSpeaker(
+        matchId,
+        { participantId },
+        attempt + 1
+      );
+    }
+    throw error;
+  }
   publishWalkieStateUpdate(matchId);
 
   await queueParticipantMessage(matchId, previousSpeakerId, "participant", {

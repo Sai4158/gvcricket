@@ -966,6 +966,73 @@ export default function useSpeechAnnouncer(settings) {
     hardStop();
   }, [hardStop]);
 
+  const interruptAndCapture = useCallback(() => {
+    const captured = [];
+
+    if (currentSequenceRef.current?.items?.length) {
+      const currentSequence = currentSequenceRef.current;
+      const remainingItems = currentSequence.items
+        .slice(Math.max(0, currentSequence.index || 0))
+        .map((item) => ({ ...item }));
+
+      if (remainingItems.length) {
+        captured.push({
+          items: remainingItems,
+          options: {
+            key: currentSequence.key
+              ? `${currentSequence.key}:resume`
+              : `resume-${Date.now()}`,
+            priority: currentSequence.priority ?? 1,
+            pauseAfterMs: currentSequence.pauseAfterMs ?? 0,
+            interrupt: true,
+            minGapMs: 0,
+          },
+        });
+      }
+    }
+
+    for (const queued of queuedSequencesRef.current) {
+      if (!queued?.items?.length) {
+        continue;
+      }
+
+      captured.push({
+        items: queued.items.map((item) => ({ ...item })),
+        options: {
+          key: queued.key ? `${queued.key}:resume` : `queued-resume-${Date.now()}`,
+          priority: queued.priority ?? 1,
+          pauseAfterMs: queued.pauseAfterMs ?? 0,
+          interrupt: false,
+          minGapMs: 0,
+        },
+      });
+    }
+
+    if (pendingSpeakRef.current?.type === "sequence" && pendingSpeakRef.current.items?.length) {
+      captured.push({
+        items: pendingSpeakRef.current.items.map((item) =>
+          typeof item === "string" ? { text: item } : { ...item }
+        ),
+        options: {
+          ...(pendingSpeakRef.current.options || {}),
+          key: pendingSpeakRef.current.options?.key
+            ? `${pendingSpeakRef.current.options.key}:resume`
+            : `pending-resume-${Date.now()}`,
+          interrupt: false,
+          minGapMs: 0,
+        },
+      });
+    }
+
+    if (!captured.length) {
+      return [];
+    }
+
+    pendingSpeakRef.current = null;
+    hardStop();
+    return captured;
+  }, [hardStop]);
+
   useEffect(() => () => hardStop(), [hardStop]);
 
   return {
@@ -975,6 +1042,7 @@ export default function useSpeechAnnouncer(settings) {
     stop,
     isSupported: status !== "unsupported",
     isSpeaking: status === "speaking",
+    interruptAndCapture,
     needsGesture: status === "waiting_for_gesture",
     status,
     voiceName: voice?.name || "",

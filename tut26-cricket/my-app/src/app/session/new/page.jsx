@@ -276,7 +276,7 @@ export default function NewSessionPage() {
       <ImagePinModal
         isOpen={isPinModalOpen}
         title="Add team picture"
-        subtitle="Enter the 4-digit PIN before adding a session cover image."
+        subtitle="Enter the 6-digit PIN before adding a session cover image."
         confirmLabel="Use this image"
         showContinueWithout={true}
         onConfirm={handleConfirmImagePin}

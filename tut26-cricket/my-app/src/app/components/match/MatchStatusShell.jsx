@@ -85,6 +85,7 @@ export function Scoreboard({ match, history }) {
   const legalBalls = countLegalBalls(history);
   const oversDisplay = `${Math.floor(legalBalls / 6)}.${legalBalls % 6}`;
   const battingTeam = getBattingTeamBundle(match);
+  const ballsLeft = Math.max(Number(match?.overs || 0) * 6 - legalBalls, 0);
 
   return (
     <div className="grid grid-cols-2 gap-4 text-center mb-6 bg-zinc-900/50 p-4 rounded-2xl ring-1 ring-white/10">
@@ -101,6 +102,7 @@ export function Scoreboard({ match, history }) {
         <div className="text-6xl font-bold text-white">{oversDisplay}</div>
         <div className="text-zinc-100 text-sm uppercase tracking-wider">
           Overs <strong>({match.overs})</strong>
+          <strong className="block">({ballsLeft} left)</strong>
         </div>
       </div>
     </div>

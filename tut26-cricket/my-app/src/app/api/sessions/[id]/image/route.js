@@ -1,9 +1,10 @@
 import crypto from "node:crypto";
+import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 import { jsonError, jsonRateLimit } from "../../../../lib/api-response";
 import { writeAuditLog } from "../../../../lib/audit-log";
 import { connectDB } from "../../../../lib/db";
-import { publishSessionUpdate } from "../../../../lib/live-updates";
+import { publishMatchUpdate, publishSessionUpdate } from "../../../../lib/live-updates";
 import {
   buildPublicMatchImageUrl,
   isSafeRemoteMatchImageUrl,
@@ -198,6 +199,32 @@ export async function POST(req, { params }) {
     session.matchImageUploadedBy = "draft";
     session.mediaUpdatedAt = new Date();
     await session.save();
+
+    if (session.match) {
+      await Match.findByIdAndUpdate(session.match, {
+        $set: {
+          matchImageUrl: buildPublicMatchImageUrl(
+            session.match,
+            imageMetadata.matchImagePublicId || imageMetadata.matchImageUploadedAt?.getTime()
+          ),
+          matchImagePublicId: imageMetadata.matchImagePublicId,
+          matchImageStorageUrlEnc: session.matchImageStorageUrlEnc,
+          matchImageStorageUrlHash: session.matchImageStorageUrlHash,
+          matchImageUploadedAt: session.matchImageUploadedAt,
+          matchImageUploadedBy: session.matchImageUploadedBy,
+          mediaUpdatedAt: session.mediaUpdatedAt,
+          lastEventType: "image_update",
+          lastEventText: "Match image updated.",
+          lastLiveEvent: {
+            id: `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`,
+            type: "image_update",
+            summaryText: "Match image updated.",
+            createdAt: new Date().toISOString(),
+          },
+        },
+      });
+      publishMatchUpdate(session.match);
+    }
 
     publishSessionUpdate(session._id);
 
