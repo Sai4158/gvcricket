@@ -206,7 +206,11 @@ export default function useLocalMicMonitor() {
     return preparePromiseRef.current;
   }, []);
 
-  const start = async ({ pauseMedia = false } = {}) => {
+  const start = async ({
+    pauseMedia = false,
+    startPaused = false,
+    playStartCue = true,
+  } = {}) => {
     if (startPromiseRef.current) {
       return startPromiseRef.current;
     }
@@ -286,13 +290,23 @@ export default function useLocalMicMonitor() {
         source.connect(gainNode);
         gainNode.connect(audioContext.destination);
 
+        if (startPaused) {
+          try {
+            await audioContext.suspend();
+          } catch {
+            // Keep the stream active if Safari refuses an immediate suspend.
+          }
+        }
+
         streamRef.current = stream;
         sourceRef.current = source;
         gainNodeRef.current = gainNode;
         permissionPrimedRef.current = true;
         setIsActive(true);
-        setIsPaused(false);
-        playUiTone({ frequency: 880, durationMs: 140, type: "sine", volume: 0.04 });
+        setIsPaused(audioContext.state !== "running");
+        if (playStartCue && audioContext.state === "running") {
+          playUiTone({ frequency: 880, durationMs: 140, type: "sine", volume: 0.04 });
+        }
         return true;
       } catch (nextError) {
         await stop({ resumeMedia: pauseMedia });
@@ -332,12 +346,15 @@ export default function useLocalMicMonitor() {
     }
   };
 
-  const resume = async () => {
+  const resume = async ({ pauseMedia = false } = {}) => {
     if (!audioContextRef.current || !isActive || !isPaused) {
       return false;
     }
 
     try {
+      if (pauseMedia) {
+        duckPageMedia(pausedMediaRef, 0.18);
+      }
       await audioContextRef.current.resume();
       setIsPaused(false);
       return true;

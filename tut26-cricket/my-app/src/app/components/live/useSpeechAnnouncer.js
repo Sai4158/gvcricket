@@ -407,6 +407,7 @@ export default function useSpeechAnnouncer(settings) {
   const platformRef = useRef(getSpeechPlatform());
   const voicesPromiseRef = useRef(null);
   const lockedVoiceNameRef = useRef("");
+  const lastGesturePrimeAtRef = useRef(0);
 
   useEffect(() => subscribeUiAudioUnlock(setAudioUnlocked), []);
 
@@ -857,23 +858,31 @@ export default function useSpeechAnnouncer(settings) {
     if (!canUseSpeechSynthesis()) return undefined;
 
     const primeFromGesture = () => {
+      const now = Date.now();
+      if (now - lastGesturePrimeAtRef.current < 320) {
+        return;
+      }
+
       if (
         !isPrimedRef.current ||
         Boolean(pendingSpeakRef.current) ||
         status === "waiting_for_gesture"
       ) {
+        lastGesturePrimeAtRef.current = now;
         prime({ userGesture: true });
       }
     };
 
-    window.addEventListener("pointerdown", primeFromGesture, { passive: true });
+    window.addEventListener("pointerup", primeFromGesture);
+    window.addEventListener("click", primeFromGesture);
     window.addEventListener("keydown", primeFromGesture);
-    window.addEventListener("touchstart", primeFromGesture, { passive: true });
+    window.addEventListener("touchend", primeFromGesture);
 
     return () => {
-      window.removeEventListener("pointerdown", primeFromGesture);
+      window.removeEventListener("pointerup", primeFromGesture);
+      window.removeEventListener("click", primeFromGesture);
       window.removeEventListener("keydown", primeFromGesture);
-      window.removeEventListener("touchstart", primeFromGesture);
+      window.removeEventListener("touchend", primeFromGesture);
     };
   }, [prime, status]);
 

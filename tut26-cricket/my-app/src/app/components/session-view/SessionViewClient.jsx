@@ -197,6 +197,8 @@ const HOLD_BUTTON_INTERACTION_PROPS = {
   },
 };
 
+const ANNOUNCER_AUTO_RESET_DELAY_MS = 1500;
+
 export default function SessionViewClient({ sessionId, initialData }) {
   const [copied, setCopied] = useState(false);
   const [data, setData] = useState(initialData || null);
@@ -222,6 +224,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const lastStreamUpdateRef = useRef(initialData?.updatedAt || "");
   const announcerAutoEnabledMatchRef = useRef("");
   const announcerInitialSummaryRef = useRef("");
+  const announcerGestureReplayRef = useRef("");
   const router = useRouter();
   const sessionData = data?.session;
   const match = data?.match;
@@ -362,6 +365,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     previousWalkieRequestStateRef.current = "idle";
     announcerAutoEnabledMatchRef.current = "";
     announcerInitialSummaryRef.current = "";
+    announcerGestureReplayRef.current = "";
     queueMicrotask(() => {
       setSpectatorWalkieEnabled(false);
       setLocalWalkieNotice("");
@@ -430,7 +434,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       announcerResetTimerRef.current = window.setTimeout(() => {
         announcerResetTimerRef.current = null;
         updateSetting("enabled", true);
-      }, 120);
+      }, ANNOUNCER_AUTO_RESET_DELAY_MS);
       return;
     }
 
@@ -495,6 +499,55 @@ export default function SessionViewClient({ sessionId, initialData }) {
     match,
     announcerStatus,
     audioUnlocked,
+    settings.enabled,
+    settings.mode,
+  ]);
+
+  useEffect(() => {
+    const announcerEnabled = Boolean(
+      match && isLiveMatch && settings.enabled && settings.mode !== "silent"
+    );
+    const initialSummaryKey = match?._id
+      ? `${match._id}:${currentLiveEventId || "snapshot"}`
+      : "";
+
+    if (
+      !announcerEnabled ||
+      !initialSummaryKey ||
+      announcerStatus !== "waiting_for_gesture" ||
+      announcerGestureReplayRef.current === initialSummaryKey
+    ) {
+      return undefined;
+    }
+
+    const replayOnGesture = () => {
+      if (announcerGestureReplayRef.current === initialSummaryKey) {
+        return;
+      }
+      announcerGestureReplayRef.current = initialSummaryKey;
+      prime({ userGesture: true });
+      const spoke = announceCurrentScore({ userGesture: true, interrupt: true });
+      if (spoke) {
+        announcerInitialSummaryRef.current = initialSummaryKey;
+      }
+    };
+
+    window.addEventListener("click", replayOnGesture, { once: true });
+    window.addEventListener("touchend", replayOnGesture, { once: true });
+    window.addEventListener("keydown", replayOnGesture, { once: true });
+
+    return () => {
+      window.removeEventListener("click", replayOnGesture);
+      window.removeEventListener("touchend", replayOnGesture);
+      window.removeEventListener("keydown", replayOnGesture);
+    };
+  }, [
+    announceCurrentScore,
+    announcerStatus,
+    currentLiveEventId,
+    isLiveMatch,
+    match,
+    prime,
     settings.enabled,
     settings.mode,
   ]);
@@ -826,7 +879,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
     speakerHeldRef.current = true;
     setQuickSpeakerTalking(true);
     void (async () => {
-      const started = await micMonitor.start({ pauseMedia: true });
+      const started = micMonitor.isPaused
+        ? await micMonitor.resume({ pauseMedia: true })
+        : await micMonitor.start({ pauseMedia: true });
       if (!started) {
         speakerHeldRef.current = false;
         setQuickSpeakerTalking(false);
@@ -948,7 +1003,17 @@ export default function SessionViewClient({ sessionId, initialData }) {
     async (nextChecked) => {
       if (nextChecked) {
         micPrepareRequestedRef.current = true;
-        void micMonitor.prepare({ requestPermission: true });
+        const prepared = await micMonitor.prepare({ requestPermission: true });
+        if (prepared && !micMonitor.isActive && !micMonitor.isPaused) {
+          const primed = await micMonitor.start({
+            pauseMedia: false,
+            startPaused: true,
+            playStartCue: false,
+          });
+          if (!primed) {
+            return;
+          }
+        }
         setActivePanel("mic");
         return;
       }
