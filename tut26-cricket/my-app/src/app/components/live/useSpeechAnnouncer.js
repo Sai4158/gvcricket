@@ -45,6 +45,18 @@ const DESKTOP_PREFERRED_VOICE_NAMES = [
   "allison",
   "nicky",
 ];
+const FEMALE_VOICE_KEYWORDS = [
+  "female",
+  "samantha",
+  "ava",
+  "allison",
+  "nicky",
+  "aria",
+  "jenny",
+  "zira",
+  "siri voice 4",
+  "siri",
+];
 
 function getSpeechPlatform() {
   if (typeof window === "undefined") {
@@ -154,19 +166,48 @@ function pickPreferredVoiceByName(voices, preferredNames) {
   return null;
 }
 
-function pickAmericanVoice(voices, platform) {
-  const englishVoices = voices.filter((voice) =>
-    voice?.lang?.toLowerCase().startsWith("en")
+function isLikelyFemaleVoice(voice) {
+  const name = voice?.name?.toLowerCase() || "";
+  return FEMALE_VOICE_KEYWORDS.some((keyword) => name.includes(keyword));
+}
+
+function pickLockedVoice(voices, lockedVoiceName) {
+  if (!lockedVoiceName) {
+    return null;
+  }
+
+  return (
+    voices.find(
+      (voice) => (voice?.name || "").toLowerCase() === lockedVoiceName.toLowerCase()
+    ) || null
+  );
+}
+
+function pickAmericanVoice(voices, platform, options = {}) {
+  const { excludeNames = [], lockedVoiceName = "" } = options;
+  const excluded = new Set(excludeNames.map((name) => String(name || "").toLowerCase()));
+  const englishVoices = voices.filter(
+    (voice) =>
+      voice?.lang?.toLowerCase().startsWith("en") &&
+      !excluded.has((voice?.name || "").toLowerCase())
   );
 
   if (!englishVoices.length) {
     return null;
   }
 
+  const lockedVoice = pickLockedVoice(englishVoices, lockedVoiceName);
+  if (lockedVoice) {
+    return lockedVoice;
+  }
+
+  const femaleEnglishVoices = englishVoices.filter(isLikelyFemaleVoice);
+  const candidateVoices = femaleEnglishVoices.length ? femaleEnglishVoices : englishVoices;
+
   if (platform?.isSafari) {
     return (
-      pickPreferredVoiceByName(englishVoices, SAFARI_PREFERRED_VOICE_NAMES) ||
-      [...englishVoices].sort(
+      pickPreferredVoiceByName(candidateVoices, SAFARI_PREFERRED_VOICE_NAMES) ||
+      [...candidateVoices].sort(
         (a, b) => getVoiceScore(b, platform) - getVoiceScore(a, platform)
       )[0]
     );
@@ -174,16 +215,16 @@ function pickAmericanVoice(voices, platform) {
 
   if (platform?.isChrome) {
     return (
-      pickPreferredVoiceByName(englishVoices, CHROME_PREFERRED_VOICE_NAMES) ||
-      [...englishVoices].sort(
+      pickPreferredVoiceByName(candidateVoices, CHROME_PREFERRED_VOICE_NAMES) ||
+      [...candidateVoices].sort(
         (a, b) => getVoiceScore(b, platform) - getVoiceScore(a, platform)
       )[0]
     );
   }
 
   return (
-    pickPreferredVoiceByName(englishVoices, DESKTOP_PREFERRED_VOICE_NAMES) ||
-    [...englishVoices].sort(
+    pickPreferredVoiceByName(candidateVoices, DESKTOP_PREFERRED_VOICE_NAMES) ||
+    [...candidateVoices].sort(
       (a, b) => getVoiceScore(b, platform) - getVoiceScore(a, platform)
     )[0]
   );
@@ -365,6 +406,7 @@ export default function useSpeechAnnouncer(settings) {
   const voicesReadyRef = useRef(false);
   const platformRef = useRef(getSpeechPlatform());
   const voicesPromiseRef = useRef(null);
+  const lockedVoiceNameRef = useRef("");
 
   useEffect(() => subscribeUiAudioUnlock(setAudioUnlocked), []);
 
@@ -397,7 +439,12 @@ export default function useSpeechAnnouncer(settings) {
     const existingVoices = window.speechSynthesis.getVoices();
     if (existingVoices.length > 0) {
       voicesReadyRef.current = true;
-      const selectedVoice = pickAmericanVoice(existingVoices, platformRef.current);
+      const selectedVoice = pickAmericanVoice(existingVoices, platformRef.current, {
+        lockedVoiceName: lockedVoiceNameRef.current,
+      });
+      if (selectedVoice?.name) {
+        lockedVoiceNameRef.current = selectedVoice.name;
+      }
       setVoice(selectedVoice);
       setStatus((current) => (current === "unsupported" ? current : "ready"));
       return Promise.resolve(existingVoices);
@@ -429,7 +476,12 @@ export default function useSpeechAnnouncer(settings) {
         const voices = window.speechSynthesis.getVoices();
         if (voices.length > 0) {
           voicesReadyRef.current = true;
-          const selectedVoice = pickAmericanVoice(voices, platformRef.current);
+          const selectedVoice = pickAmericanVoice(voices, platformRef.current, {
+            lockedVoiceName: lockedVoiceNameRef.current,
+          });
+          if (selectedVoice?.name) {
+            lockedVoiceNameRef.current = selectedVoice.name;
+          }
           setVoice(selectedVoice);
           setStatus((current) => (current === "unsupported" ? current : "ready"));
           finish(voices);
@@ -554,19 +606,29 @@ export default function useSpeechAnnouncer(settings) {
           return;
         }
 
-        if (voice && !sequence.useSystemVoice && !sequence.fallbackTried) {
-          utteranceRef.current = null;
-          currentSequenceRef.current = null;
-          clearStepTimer();
-          sequenceTokenRef.current += 1;
-          return void runSequence(
-            {
-              ...sequence,
-              useSystemVoice: true,
-              fallbackTried: true,
-            },
-            sequenceTokenRef.current
-          );
+        if (voice && !sequence.fallbackTried) {
+          const availableVoices = window.speechSynthesis.getVoices();
+          const alternateVoice = pickAmericanVoice(availableVoices, platformRef.current, {
+            excludeNames: [voice?.name],
+          });
+
+          if (alternateVoice) {
+            if (alternateVoice?.name) {
+              lockedVoiceNameRef.current = alternateVoice.name;
+            }
+            setVoice(alternateVoice);
+            utteranceRef.current = null;
+            currentSequenceRef.current = null;
+            clearStepTimer();
+            sequenceTokenRef.current += 1;
+            return void runSequence(
+              {
+                ...sequence,
+                fallbackTried: true,
+              },
+              sequenceTokenRef.current
+            );
+          }
         }
 
         utteranceRef.current = null;

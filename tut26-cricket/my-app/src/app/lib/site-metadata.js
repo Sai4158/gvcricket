@@ -30,32 +30,69 @@ export const siteConfig = {
   twitterImagePath: "/twitter-image?v=2026-03-20-logo",
 };
 
-export function getSiteUrl() {
-  const vercelEnv = String(process.env.VERCEL_ENV || "").trim().toLowerCase();
-  const previewUrl = String(
-    process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL || ""
-  ).trim();
-  if (vercelEnv && vercelEnv !== "production" && previewUrl) {
-    return previewUrl.startsWith("http") ? previewUrl : `https://${previewUrl}`;
-  }
+function normalizeSiteUrl(value = "") {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  return trimmed.startsWith("http") ? trimmed : `https://${trimmed}`;
+}
 
-  const explicitUrl = String(process.env.NEXT_PUBLIC_SITE_URL || "").trim();
+function isLocalOrigin(value = "") {
+  try {
+    const { hostname } = new URL(normalizeSiteUrl(value));
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "[::1]" ||
+      hostname.endsWith(".local")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function getPublicSiteUrl() {
+  const explicitUrl = normalizeSiteUrl(process.env.NEXT_PUBLIC_SITE_URL || "");
   if (explicitUrl) {
-    return explicitUrl.startsWith("http") ? explicitUrl : `https://${explicitUrl}`;
+    return explicitUrl;
   }
 
-  const productionUrl = String(
+  return normalizeSiteUrl(siteConfig.url) || siteConfig.url;
+}
+
+export function getSiteUrl() {
+  const explicitUrl = normalizeSiteUrl(process.env.NEXT_PUBLIC_SITE_URL || "");
+  if (explicitUrl) {
+    return explicitUrl;
+  }
+
+  const productionUrl = normalizeSiteUrl(
     process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL || ""
-  ).trim();
+  );
   if (productionUrl) {
-    return productionUrl.startsWith("http") ? productionUrl : `https://${productionUrl}`;
+    return productionUrl;
   }
 
-  return siteConfig.url;
+  const vercelEnv = String(process.env.VERCEL_ENV || "").trim().toLowerCase();
+  const previewUrl = normalizeSiteUrl(
+    process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL || ""
+  );
+  if (vercelEnv && vercelEnv !== "production" && previewUrl) {
+    return previewUrl;
+  }
+
+  return getPublicSiteUrl();
 }
 
 export function absoluteUrl(path = "/") {
   return new URL(path, getSiteUrl()).toString();
+}
+
+export function buildShareUrl(path = "/", currentOrigin = "") {
+  const normalizedCurrentOrigin = normalizeSiteUrl(currentOrigin);
+  const baseUrl = isLocalOrigin(normalizedCurrentOrigin)
+    ? normalizedCurrentOrigin
+    : getPublicSiteUrl() || normalizedCurrentOrigin || getSiteUrl();
+  return new URL(path, baseUrl).toString();
 }
 
 export function versionedSocialImagePath(path = "/") {

@@ -447,6 +447,7 @@ export default function useWalkieTalkie({
   const publishPromiseRef = useRef(null);
   const preparePromiseRef = useRef(null);
   const startTalkingPromiseRef = useRef(null);
+  const cancelPendingStartRef = useRef(false);
 
   const rtmClientRef = useRef(null);
   const rtmReadyPromiseRef = useRef(null);
@@ -1681,6 +1682,12 @@ export default function useWalkieTalkie({
           snapshotRef.current.activeSpeakerId === selfId
       );
       if (!ownsSpeakerLock) {
+        if (startTalkingPromiseRef.current) {
+          cancelPendingStartRef.current = true;
+          setClaiming(false);
+          setManualAudioReady(false);
+          return true;
+        }
         setIsSelfTalking(false);
         setIsFinishing(false);
         setFinishDelayLeft(0);
@@ -1764,13 +1771,19 @@ export default function useWalkieTalkie({
 
       startTalkingPromiseRef.current = (async () => {
       enableManualSignaling();
-      if (!enabled) return false;
+      cancelPendingStartRef.current = false;
+      if (!enabled) {
+        cancelPendingStartRef.current = false;
+        return false;
+      }
       const selfId = ensureParticipantId();
       if (!selfId) {
+        cancelPendingStartRef.current = false;
         setError("Walkie is still connecting.");
         return false;
       }
       if (!metadataStateRef.current.enabled) {
+        cancelPendingStartRef.current = false;
         setError("Walkie-talkie is off.");
         return false;
       }
@@ -1779,6 +1792,7 @@ export default function useWalkieTalkie({
         activeSpeakerRef.current.owner !== signalingUserIdRef.current &&
         new Date(activeSpeakerRef.current.expiresAt || 0).getTime() > Date.now()
       ) {
+        cancelPendingStartRef.current = false;
         setError("Channel is busy.");
         updateNotice(`${activeSpeakerRef.current.name || "Someone"} is talking.`);
         return false;
@@ -1793,13 +1807,21 @@ export default function useWalkieTalkie({
       setFinishDelayLeft(0);
       setClaiming(true);
 
-      if (preparePromiseRef.current) {
-        await preparePromiseRef.current;
+      const prepared = preparePromiseRef.current
+        ? await preparePromiseRef.current
+        : await prepareToTalk();
+      if (prepared === false) {
+        cancelPendingStartRef.current = false;
+        setClaiming(false);
+        setManualAudioReady(false);
+        return false;
       }
 
       const unlocked = await ensureAudioUnlock();
       if (!unlocked && isSafari) {
+        cancelPendingStartRef.current = false;
         setClaiming(false);
+        setManualAudioReady(false);
         updateNotice("Enable Audio once on this device for Safari walkie.");
         return false;
       }
@@ -1820,7 +1842,7 @@ export default function useWalkieTalkie({
             name: defaultDisplayName(role, displayName),
           };
           const transmissionId = `agora:${signalingUserIdRef.current}:${Date.now()}`;
-          activeSpeakerRef.current = {
+          const nextSpeaker = {
             owner: signalingUserIdRef.current,
             participantId: participant.participantId,
             role: participant.role,
@@ -1829,7 +1851,6 @@ export default function useWalkieTalkie({
             expiresAt: new Date(Date.now() + WALKIE_SPEAKER_TTL_SECONDS * 1000).toISOString(),
             transmissionId,
           };
-          syncSnapshot();
 
           await client.publish(
             channelName,
@@ -1839,14 +1860,22 @@ export default function useWalkieTalkie({
               participantId: participant.participantId,
               role: participant.role,
               name: participant.name,
-              lockStartedAt: activeSpeakerRef.current.lockStartedAt,
-              expiresAt: activeSpeakerRef.current.expiresAt,
+              lockStartedAt: nextSpeaker.lockStartedAt,
+              expiresAt: nextSpeaker.expiresAt,
               transmissionId,
               message: `${participant.name} is talking.`,
             })
           );
 
-          startCountdown(activeSpeakerRef.current.expiresAt);
+          activeSpeakerRef.current = nextSpeaker;
+          syncSnapshot();
+          if (cancelPendingStartRef.current) {
+            cancelPendingStartRef.current = false;
+            setClaiming(false);
+            await stopTalking();
+            return false;
+          }
+          startCountdown(nextSpeaker.expiresAt);
           setIsSelfTalking(true);
           playWalkieCue("start");
           updateNotice("");
@@ -1869,7 +1898,14 @@ export default function useWalkieTalkie({
 
       setClaiming(false);
       setIsSelfTalking(false);
+      setIsFinishing(false);
       setManualAudioReady(false);
+      cancelPendingStartRef.current = false;
+      activeSpeakerRef.current = null;
+      syncSnapshot();
+      clearTimer(countdownTimerRef, window.clearInterval);
+      setCountdown(0);
+      setFinishDelayLeft(0);
       const message = messageFor(lastError, "Could not start walkie audio.");
       setError(message);
       if (isExpectedWalkieTransportError(lastError)) {
@@ -1895,9 +1931,11 @@ export default function useWalkieTalkie({
       ensureRtmSession,
       enableManualSignaling,
       isSafari,
+      prepareToTalk,
       role,
       startCountdown,
       startTalkingPromiseRef,
+      stopTalking,
       syncSnapshot,
       cleanupTransport,
       updateNotice,

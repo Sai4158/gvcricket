@@ -33,6 +33,7 @@ import useSpeechAnnouncer from "../live/useSpeechAnnouncer";
 import useMatch, { triggerMatchHapticFeedback } from "./useMatch";
 import useMatchAccess from "./useMatchAccess";
 import OptionalFeatureBoundary from "../shared/OptionalFeatureBoundary";
+import { buildShareUrl } from "../../lib/site-metadata";
 
 export default function MatchPageClient({
   matchId,
@@ -245,7 +246,10 @@ export default function MatchPageClient({
     if (!match) return;
 
     triggerMatchHapticFeedback();
-    const link = `${window.location.origin}/session/${match.sessionId}/view`;
+    const link = buildShareUrl(
+      `/session/${match.sessionId}/view`,
+      window.location.origin
+    );
     const shareTitle = `${match.innings1.team} vs ${match.innings2.team}`;
     const shareText = `Follow the live score for ${shareTitle}. Current score: ${match.score}/${match.outs}.`;
 
@@ -287,7 +291,10 @@ export default function MatchPageClient({
     }
 
     if (walkie.canTalk || walkie.snapshot?.enabled) {
-      await walkie.prepareToTalk?.();
+      const prepared = await walkie.prepareToTalk?.();
+      if (prepared === false) {
+        return;
+      }
       await walkie.startTalking();
     }
   };

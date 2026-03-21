@@ -20,7 +20,7 @@ function WalkieInlineTalkButton({
   onStart,
   onStop,
 }) {
-  const [holding, setHolding] = useState(false);
+  const [starting, setStarting] = useState(false);
   const holdingRef = useRef(false);
   const pointerIdRef = useRef(null);
   const startAttemptRef = useRef(0);
@@ -28,30 +28,36 @@ function WalkieInlineTalkButton({
   const startHold = useCallback(async () => {
     if (holdingRef.current) return;
     holdingRef.current = true;
-    setHolding(true);
+    setStarting(true);
     const attemptId = startAttemptRef.current + 1;
     startAttemptRef.current = attemptId;
     try {
       const prepared = await onPrepare?.();
       if (!holdingRef.current || startAttemptRef.current !== attemptId || prepared === false) {
         holdingRef.current = false;
-        setHolding(false);
+        setStarting(false);
         return;
       }
-      await onStart?.();
-      if (!holdingRef.current || startAttemptRef.current !== attemptId) {
-        setHolding(false);
+      const started = (await onStart?.()) !== false;
+      if (!holdingRef.current || startAttemptRef.current !== attemptId || !started) {
+        if (!holdingRef.current && started) {
+          await onStop?.();
+        }
+        holdingRef.current = false;
+        setStarting(false);
+        return;
       }
     } catch {
       holdingRef.current = false;
-      setHolding(false);
+    } finally {
+      setStarting(false);
     }
-  }, [onPrepare, onStart]);
+  }, [onPrepare, onStart, onStop]);
 
   const endHold = useCallback(async () => {
     if (!holdingRef.current) return;
     holdingRef.current = false;
-    setHolding(false);
+    setStarting(false);
     await onStop?.();
   }, [onStop]);
 
@@ -79,11 +85,14 @@ function WalkieInlineTalkButton({
   }, [endHold]);
 
   useEffect(() => {
-    if (!active && !holding) {
+    if (!active && !starting) {
       holdingRef.current = false;
       pointerIdRef.current = null;
     }
-  }, [active, holding]);
+  }, [active, starting]);
+
+  const live = active || finishing;
+  const pending = starting && !live;
 
   return (
     <button
@@ -107,8 +116,10 @@ function WalkieInlineTalkButton({
       onMouseDown={(event) => event.preventDefault()}
       onDragStart={(event) => event.preventDefault()}
       className={`inline-flex min-w-[154px] touch-none select-none items-center justify-center gap-2 rounded-full px-2 py-2 text-xs font-semibold transition ${
-        active || holding || finishing
+        live
           ? "bg-[linear-gradient(135deg,#d1fae5_0%,#34d399_35%,#10b981_100%)] text-black shadow-[0_14px_34px_rgba(16,185,129,0.28)]"
+          : pending
+          ? "border border-cyan-300/30 bg-cyan-500/12 text-cyan-50 shadow-[0_14px_34px_rgba(34,211,238,0.18)]"
           : "border border-white/14 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:border-emerald-200/28 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))]"
       }`}
       style={{
@@ -119,11 +130,15 @@ function WalkieInlineTalkButton({
         touchAction: "none",
       }}
       draggable={false}
-      aria-label={active || holding || finishing ? "Release walkie talk" : "Hold to talk"}
+      aria-label={live ? "Release walkie talk" : "Hold to talk"}
     >
       <span
         className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-          active || holding || finishing ? "bg-black/12" : "bg-emerald-400/12 text-emerald-200"
+          live
+            ? "bg-black/12"
+            : pending
+            ? "bg-cyan-400/12 text-cyan-100"
+            : "bg-emerald-400/12 text-emerald-200"
         }`}
       >
         <FaMicrophone className="text-[0.82rem]" />
@@ -131,8 +146,10 @@ function WalkieInlineTalkButton({
       <span className="whitespace-nowrap">
         {finishing
           ? `Finishing ${finishDelayLeft || 1}s`
-          : active || holding
+          : active
           ? `Live ${countdown}s`
+          : pending
+          ? "Connecting"
           : "Press & hold"}
       </span>
     </button>
@@ -296,7 +313,7 @@ export function WalkieTalkButton({
   onStop,
   label = "Hold to talk",
 }) {
-  const [holding, setHolding] = useState(false);
+  const [starting, setStarting] = useState(false);
   const buttonRef = useRef(null);
   const holdingRef = useRef(false);
   const pointerIdRef = useRef(null);
@@ -304,19 +321,31 @@ export function WalkieTalkButton({
   const startHold = useCallback(async () => {
     if (disabled || holdingRef.current) return;
     holdingRef.current = true;
-    setHolding(true);
+    setStarting(true);
     try {
-      await onStart?.();
+      const prepared = await onPrepare?.();
+      if (!holdingRef.current || prepared === false) {
+        holdingRef.current = false;
+        return;
+      }
+      const started = (await onStart?.()) !== false;
+      if (!holdingRef.current || !started) {
+        if (!holdingRef.current && started) {
+          await onStop?.();
+        }
+        holdingRef.current = false;
+      }
     } catch {
       holdingRef.current = false;
-      setHolding(false);
+    } finally {
+      setStarting(false);
     }
-  }, [disabled, onStart]);
+  }, [disabled, onPrepare, onStart, onStop]);
 
   const endHold = useCallback(async () => {
     if (!holdingRef.current) return;
     holdingRef.current = false;
-    setHolding(false);
+    setStarting(false);
     await onStop?.();
   }, [onStop]);
 
@@ -344,11 +373,14 @@ export function WalkieTalkButton({
   }, [endHold]);
 
   useEffect(() => {
-    if (!active && !holding) {
+    if (!active && !starting) {
       holdingRef.current = false;
       pointerIdRef.current = null;
     }
-  }, [active, holding]);
+  }, [active, starting]);
+
+  const live = active || finishing;
+  const pendingState = pending || starting;
 
   return (
     <div
@@ -368,7 +400,6 @@ export function WalkieTalkButton({
           if (event.pointerType === "mouse" && event.button !== 0) return;
           pointerIdRef.current = event.pointerId;
           event.currentTarget.setPointerCapture?.(event.pointerId);
-          void onPrepare?.();
           void startHold();
         }}
         onPointerUp={(event) => {
@@ -391,13 +422,13 @@ export function WalkieTalkButton({
         className={`relative inline-flex touch-none select-none items-center justify-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
           disabled
             ? "cursor-not-allowed border-white/5 bg-zinc-900 text-zinc-600"
-            : active || holding || finishing
+            : live
             ? "border-emerald-300/40 bg-emerald-500 text-black shadow-[0_18px_44px_rgba(16,185,129,0.3)]"
-            : pending
+            : pendingState
             ? "border-cyan-300/35 bg-cyan-500/10 text-cyan-100 shadow-[0_14px_34px_rgba(34,211,238,0.18)]"
             : "border-white/10 bg-white/[0.06] text-zinc-100 hover:-translate-y-0.5 hover:bg-white/[0.09]"
         } ${size === "lg" ? "h-28 w-28" : "h-24 w-24"}`}
-        aria-label={active || holding || finishing ? "Release walkie talk" : label}
+        aria-label={live ? "Release walkie talk" : label}
         style={{
           userSelect: "none",
           WebkitUserSelect: "none",
@@ -409,17 +440,17 @@ export function WalkieTalkButton({
       >
         <span
           className={`absolute inset-[-8px] rounded-full border transition-opacity ${
-            active || holding || finishing
+            live
               ? "animate-pulse border-emerald-300/35 opacity-100"
-              : pending
+              : pendingState
               ? "animate-pulse border-cyan-300/25 opacity-100"
               : "border-transparent opacity-0"
           }`}
         />
         <span className={size === "lg" ? "text-[2rem]" : "text-[1.65rem]"}>
-          {active || holding || finishing ? (
+          {live ? (
             <FaMicrophone />
-          ) : pending ? (
+          ) : pendingState ? (
             <FaMicrophone className="animate-pulse" />
           ) : (
             <FaMicrophoneSlash />
@@ -438,15 +469,15 @@ export function WalkieTalkButton({
         <p className="text-xs font-medium text-zinc-400">
           {finishing
             ? "Finishing"
-            : active || holding
+            : active
             ? "Live"
-            : pending
+            : pendingState
             ? "Connecting"
             : "Hold to talk"}
         </p>
         {finishing ? (
           <p className="mt-1 text-[11px] text-zinc-500">{finishDelayLeft || 1}s</p>
-        ) : active || holding ? (
+        ) : active ? (
           <p className="mt-1 text-[11px] text-zinc-500">{countdown}s</p>
         ) : null}
       </div>

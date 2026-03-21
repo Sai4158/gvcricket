@@ -52,6 +52,7 @@ import {
 import { getWalkieRemoteSpeakerState } from "../../lib/walkie-ui";
 import { getTeamBundle } from "../../lib/team-utils";
 import { duckPageMedia, restorePageMedia } from "../../lib/page-audio";
+import { buildShareUrl } from "../../lib/site-metadata";
 import { ModalBase } from "../match/MatchBaseModals";
 import OptionalFeatureBoundary from "../shared/OptionalFeatureBoundary";
 
@@ -202,7 +203,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const [activePanel, setActivePanel] = useState(null);
   const [localWalkieNotice, setLocalWalkieNotice] = useState("");
   const [streamError, setStreamError] = useState("");
-  const [sharedWalkieEnabled, setSharedWalkieEnabled] = useState(false);
   const [spectatorWalkieEnabled, setSpectatorWalkieEnabled] = useState(false);
   const [quickWalkieTalking, setQuickWalkieTalking] = useState(false);
   const [quickSpeakerTalking, setQuickSpeakerTalking] = useState(false);
@@ -254,10 +254,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       startTransition(() => {
         setData(payload);
         setStreamError("");
-        if (liveEventType === "walkie_enabled") {
-          setSharedWalkieEnabled(true);
-        } else if (liveEventType === "walkie_disabled") {
-          setSharedWalkieEnabled(false);
+        if (liveEventType === "walkie_disabled") {
           setSpectatorWalkieEnabled(false);
         }
       });
@@ -277,7 +274,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     role: "spectator",
     displayName: sessionData?.name ? `${sessionData.name} Spectator` : "Spectator",
     autoConnectAudio: spectatorWalkieEnabled,
-    signalingActive: Boolean(match?._id && isLiveMatch && (sharedWalkieEnabled || spectatorWalkieEnabled)),
+    signalingActive: Boolean(match?._id && isLiveMatch),
   });
 
   const speakSequenceWithDuck = useCallback(
@@ -361,7 +358,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
     announcerAutoEnabledMatchRef.current = "";
     announcerInitialSummaryRef.current = "";
     queueMicrotask(() => {
-      setSharedWalkieEnabled(false);
       setSpectatorWalkieEnabled(false);
       setLocalWalkieNotice("");
       setQuickWalkieTalking(false);
@@ -375,7 +371,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
     async function loadSharedWalkieState() {
       if (!match?._id || !isLiveMatch) {
-        setSharedWalkieEnabled(false);
+        setSpectatorWalkieEnabled(false);
         return;
       }
 
@@ -393,10 +389,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         }
 
         const nextEnabled = Boolean(payload?.walkie?.enabled);
-        setSharedWalkieEnabled(nextEnabled);
-        if (!nextEnabled) {
-          setSpectatorWalkieEnabled(false);
-        }
+        setSpectatorWalkieEnabled(nextEnabled);
       } catch {
       }
     }
@@ -690,13 +683,18 @@ export default function SessionViewClient({ sessionId, initialData }) {
   }, [activePanel, micMonitor]);
 
   const handleShare = async () => {
+    const shareUrl = buildShareUrl(
+      `/session/${sessionId}/view`,
+      window.location.origin
+    );
+
     try {
       if (navigator.share) {
         try {
           await navigator.share({
             title: sessionData?.name || "GV Cricket live score",
             text: "View the live cricket score.",
-            url: window.location.href,
+            url: shareUrl,
           });
           return;
         } catch {
@@ -705,13 +703,13 @@ export default function SessionViewClient({ sessionId, initialData }) {
       }
 
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(window.location.href);
+        await navigator.clipboard.writeText(shareUrl);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
         return;
       }
 
-      window.prompt("Copy spectator link", window.location.href);
+      window.prompt("Copy spectator link", shareUrl);
     } catch (error) {
       console.error("Spectator share failed:", error);
     }
@@ -747,7 +745,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
     clearWalkieHoldTimer();
     walkieHeldRef.current = true;
-    setQuickWalkieTalking(true);
     void (async () => {
       const prepared = await walkie.prepareToTalk?.();
       if (!walkieHeldRef.current || prepared === false) {
@@ -757,10 +754,15 @@ export default function SessionViewClient({ sessionId, initialData }) {
       }
 
       const started = await walkie.startTalking();
+      if (!walkieHeldRef.current && started) {
+        await walkie.stopTalking();
+      }
       if (!walkieHeldRef.current || !started) {
         walkieHeldRef.current = false;
         setQuickWalkieTalking(false);
+        return;
       }
+      setQuickWalkieTalking(true);
     })();
   };
 

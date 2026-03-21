@@ -2707,6 +2707,7 @@ export default function DirectorConsoleClient({
                           }
                           countdown={walkie.countdown}
                           finishDelayLeft={walkie.finishDelayLeft}
+                          onPrepare={walkie.prepareToTalk}
                           onStart={walkie.startTalking}
                           onStop={walkie.stopTalking}
                           label="Hold to talk to umpire"
