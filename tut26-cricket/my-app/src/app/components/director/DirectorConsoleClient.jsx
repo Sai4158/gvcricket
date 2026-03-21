@@ -58,6 +58,7 @@ import {
   setPreferredAudioSessionType,
   subscribeUiAudioUnlock,
 } from "../../lib/page-audio";
+import { countLegalBalls } from "../../lib/match-scoring";
 
 const DIRECTOR_AUDIO_LIBRARY_CACHE_KEY = "gv-director-audio-library-v1";
 const DIRECTOR_AUDIO_METADATA_CACHE_KEY = "gv-director-audio-metadata-v1";
@@ -193,10 +194,105 @@ function createSpeechSettings() {
   };
 }
 
+const DIRECTOR_AUTO_ANNOUNCE_EVENT_TYPES = new Set([
+  "score_update",
+  "undo",
+  "innings_change",
+  "target_chased",
+  "match_end",
+]);
+
 function buildDirectorScoreLine(match) {
   if (!match) return "";
   const battingTeam = getBattingTeamBundle(match);
   return `${battingTeam.name} ${match.score || 0}/${match.outs || 0}`;
+}
+
+function mergeDirectorMatchIntoSessions(currentSessions, nextMatch) {
+  if (!Array.isArray(currentSessions) || !nextMatch?._id) {
+    return currentSessions;
+  }
+
+  let didChange = false;
+
+  const nextSessions = currentSessions.map((item) => {
+    const itemMatchId = item?.match?._id || "";
+    const itemSessionId = item?.session?._id || "";
+    const nextMatchId = String(nextMatch._id || "");
+    const nextSessionId = String(nextMatch.sessionId || "");
+
+    if (
+      itemMatchId !== nextMatchId &&
+      itemSessionId !== nextSessionId
+    ) {
+      return item;
+    }
+
+    didChange = true;
+    const nextIsLive = Boolean(nextMatch.isOngoing && !nextMatch.result);
+
+    return {
+      ...item,
+      session: {
+        ...item.session,
+        match: nextMatchId,
+        matchImageUrl:
+          nextMatch.matchImageUrl || item.session?.matchImageUrl || "",
+        teamAName: nextMatch.teamAName || item.session?.teamAName || "",
+        teamBName: nextMatch.teamBName || item.session?.teamBName || "",
+        isLive: nextIsLive,
+      },
+      match: {
+        ...item.match,
+        ...nextMatch,
+      },
+      updatedAt: new Date(
+        nextMatch.updatedAt || item.updatedAt || Date.now(),
+      ).toISOString(),
+      isLive: nextIsLive,
+    };
+  });
+
+  return didChange ? nextSessions : currentSessions;
+}
+
+function getDirectorActiveHistory(match) {
+  if (!match) {
+    return [];
+  }
+
+  return match[match.innings === "second" ? "innings2" : "innings1"]?.history || [];
+}
+
+function getDirectorOversDisplay(match) {
+  const legalBalls = countLegalBalls(getDirectorActiveHistory(match));
+  return `${Math.floor(legalBalls / 6)}.${legalBalls % 6}`;
+}
+
+function getDirectorChaseSummary(match) {
+  if (!match || match.innings !== "second") {
+    return "";
+  }
+
+  const target = Number(match?.innings1?.score || 0) + 1;
+  const runsNeeded = Math.max(0, target - Number(match?.score || 0));
+  if (runsNeeded <= 0) {
+    return `Target ${target} reached`;
+  }
+
+  const totalBalls = Math.max(Number(match?.overs || 0), 0) * 6;
+  const legalBalls = countLegalBalls(getDirectorActiveHistory(match));
+  const ballsLeft = Math.max(totalBalls - legalBalls, 0);
+  const oversLeft = `${Math.floor(ballsLeft / 6)}.${ballsLeft % 6}`;
+  return `Need ${runsNeeded} from ${oversLeft}`;
+}
+
+function getDirectorPreferredMatch(liveMatch, sessionMatch = null) {
+  if (liveMatch?._id) {
+    return liveMatch;
+  }
+
+  return sessionMatch || null;
 }
 
 function getPreferredLiveSessionId(sessions, preferredSessionId = "") {
@@ -450,7 +546,8 @@ function SessionHeader({
   readCurrentScore,
 }) {
   const session = selectedSession?.session;
-  const match = liveMatch || selectedSession?.match;
+  const match = getDirectorPreferredMatch(liveMatch, selectedSession?.match);
+  const isLive = Boolean(match?.isOngoing && !match?.result) || Boolean(selectedSession?.isLive);
   const imageUrl = match?.matchImageUrl || session?.matchImageUrl || "";
   const teams =
     match?.teamAName && match?.teamBName
@@ -458,6 +555,10 @@ function SessionHeader({
       : session?.teamAName && session?.teamBName
         ? `${session.teamAName} vs ${session.teamBName}`
         : "Teams pending";
+  const score = Number(match?.score || 0);
+  const outs = Number(match?.outs || 0);
+  const oversDisplay = getDirectorOversDisplay(match);
+  const chaseSummary = getDirectorChaseSummary(match);
 
   return (
     <SessionCoverHero
@@ -470,7 +571,7 @@ function SessionHeader({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 text-center sm:text-left">
             <div className="mb-2 flex items-center justify-center gap-2 sm:justify-start">
-              {match?.isOngoing && !match?.result ? (
+              {isLive ? (
                 <span className="inline-flex items-center gap-2 rounded-full bg-white/8 px-3 py-1 text-xs font-medium text-white">
                   <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                   Live
@@ -507,15 +608,39 @@ function SessionHeader({
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-black/30 px-4 py-4">
-          <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">
-            Score
-          </p>
-          <p className="mt-2 text-xl font-semibold text-white sm:text-2xl">
-            {buildDirectorScoreLine(match)}
-          </p>
-          <p className="mt-1 text-sm text-emerald-200">
-            {match?.result ? "Match finished" : "Managing live"}
-          </p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">
+                Live score
+              </p>
+              <p className="mt-2 text-xl font-semibold text-white sm:text-2xl">
+                {buildDirectorScoreLine(match)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-right shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500">
+                Overs
+              </p>
+              <p className="mt-1 text-lg font-semibold text-white">{oversDisplay}</p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+            <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-zinc-200">
+              Wickets {outs}
+            </span>
+            {chaseSummary ? (
+              <span className="inline-flex items-center rounded-full border border-amber-300/16 bg-amber-500/10 px-3 py-1.5 text-amber-100">
+                {chaseSummary}
+              </span>
+            ) : null}
+            <span className="inline-flex items-center rounded-full border border-emerald-300/16 bg-emerald-500/10 px-3 py-1.5 text-emerald-100">
+              {match?.result
+                ? "Match finished"
+                : isLive
+                  ? "Managing live"
+                  : "Waiting for live updates"}
+            </span>
+          </div>
         </div>
       </div>
     </SessionCoverHero>
@@ -587,6 +712,7 @@ export default function DirectorConsoleClient({
   const directorMicHoldingRef = useRef(false);
   const previousDirectorWalkieEnabledRef = useRef(false);
   const previousDirectorWalkieRequestStateRef = useRef("idle");
+  const previousManagedMatchIdRef = useRef("");
   const directorWalkieNoticeTimerRef = useRef(null);
   const effectPlayRequestRef = useRef(0);
   const musicUrlsRef = useRef([]);
@@ -594,6 +720,8 @@ export default function DirectorConsoleClient({
   const musicEffectDuckFactorRef = useRef(1);
   const musicDuckAnimationFrameRef = useRef(0);
   const ambientAudioSessionTypeRef = useRef("");
+  const lastDirectorAnnouncedLiveEventRef = useRef("");
+  const pendingDirectorAnnouncementRef = useRef(null);
   const libraryPointerDragRef = useRef({
     pointerId: null,
     activeId: "",
@@ -671,6 +799,56 @@ export default function DirectorConsoleClient({
     [cancelMusicDuckAnimation, getMusicTargetVolume],
   );
 
+  const speakDirectorScoreAnnouncement = useCallback(
+    (targetMatch, eventId, options = {}) => {
+      const announcement = buildCurrentScoreAnnouncement(targetMatch);
+      if (!targetMatch?._id || !announcement) {
+        return false;
+      }
+
+      return speech.speak(announcement, {
+        key: `director-auto-score-${eventId || targetMatch._id}`,
+        ignoreEnabled: false,
+        interrupt: options.interrupt ?? true,
+        priority: options.priority ?? 4,
+        rate: 0.9,
+        userGesture: Boolean(options.userGesture),
+      });
+    },
+    [speech],
+  );
+
+  const flushPendingDirectorAnnouncement = useCallback(() => {
+    const pendingAnnouncement = pendingDirectorAnnouncementRef.current;
+    if (
+      !pendingAnnouncement ||
+      !speechSettings.enabled ||
+      speechSettings.muted ||
+      speechSettings.mode === "silent"
+    ) {
+      return;
+    }
+
+    const spoke = speakDirectorScoreAnnouncement(
+      pendingAnnouncement.match,
+      pendingAnnouncement.eventId,
+      {
+        interrupt: true,
+      },
+    );
+    if (spoke || speech.needsGesture || speech.status === "waiting_for_gesture") {
+      lastDirectorAnnouncedLiveEventRef.current = pendingAnnouncement.eventId;
+      pendingDirectorAnnouncementRef.current = null;
+    }
+  }, [
+    speakDirectorScoreAnnouncement,
+    speech.needsGesture,
+    speech.status,
+    speechSettings.enabled,
+    speechSettings.mode,
+    speechSettings.muted,
+  ]);
+
   const showTemporaryDirectorWalkieNotice = useCallback(
     (message, duration = 2600) => {
       setDirectorWalkieNotice(message);
@@ -739,8 +917,28 @@ export default function DirectorConsoleClient({
 
   const [liveMatch, setLiveMatch] = useState(managedSession?.match || null);
   useEffect(() => {
-    setLiveMatch(managedSession?.match || null);
-  }, [managedSession]);
+    const nextManagedMatch = managedSession?.match || null;
+    const nextManagedMatchId = nextManagedMatch?._id || "";
+
+    if (previousManagedMatchIdRef.current === nextManagedMatchId) {
+      return;
+    }
+
+    previousManagedMatchIdRef.current = nextManagedMatchId;
+
+    pendingDirectorAnnouncementRef.current = null;
+    lastDirectorAnnouncedLiveEventRef.current =
+      nextManagedMatch?.lastLiveEvent?.id || "";
+
+    if (!nextManagedMatch?._id) {
+      setLiveMatch(null);
+      return;
+    }
+
+    setLiveMatch((current) =>
+      current?._id === nextManagedMatch._id && current ? current : nextManagedMatch,
+    );
+  }, [managedSession?.match]);
 
   useEffect(() => {
     const firstLive = sessions.find((item) => item.isLive);
@@ -799,37 +997,28 @@ export default function DirectorConsoleClient({
     }
   }, [managedSessionId, sessions]);
 
-  useEffect(() => {
+  const refreshDirectorSessions = useCallback(async () => {
     if (!authorized) {
-      return;
+      return [];
     }
-
-    const cachedSessions = readCachedDirectorSessions();
-    if (cachedSessions.length) {
-      setSessions((current) => (current.length ? current : cachedSessions));
-      const cachedLiveSessionId = getPreferredLiveSessionId(
-        cachedSessions,
-        preferredSessionIdRef.current,
-      );
-      if (cachedLiveSessionId) {
-        setSelectedSessionId((current) => current || cachedLiveSessionId);
-      }
-    }
-
-    let cancelled = false;
-
-    void (async () => {
+    try {
       const response = await fetch("/api/director/sessions", {
         cache: "no-store",
       });
       const payload = await response.json().catch(() => ({ sessions: [] }));
-      if (!response.ok || cancelled) {
-        return;
+      if (!response.ok) {
+        return [];
       }
-
       const nextSessions = Array.isArray(payload.sessions)
         ? payload.sessions
         : [];
+      const hasLiveSessions = nextSessions.some((item) => item.isLive);
+      const currentManagedStillLive = Boolean(
+        managedSessionId &&
+          nextSessions.some(
+            (item) => item.session?._id === managedSessionId && item.isLive,
+          ),
+      );
       writeCachedDirectorSessions(nextSessions);
       setSessions(nextSessions);
 
@@ -850,13 +1039,89 @@ export default function DirectorConsoleClient({
           }
           return nextLiveSessionId;
         });
+      } else {
+        setSelectedSessionId("");
       }
-    })();
+
+      setManagedSessionId((current) => {
+        if (
+          current &&
+          nextSessions.some(
+            (item) => item.session?._id === current && item.isLive,
+          )
+        ) {
+          return current;
+        }
+        return "";
+      });
+
+      if (!hasLiveSessions || (managedSessionId && !currentManagedStillLive)) {
+        setShowPicker(true);
+      }
+
+      return nextSessions;
+    } catch {
+      return [];
+    }
+  }, [authorized, managedSessionId]);
+
+  useEffect(() => {
+    if (!authorized) {
+      return;
+    }
+
+    const cachedSessions = readCachedDirectorSessions();
+    if (cachedSessions.length) {
+      setSessions((current) => (current.length ? current : cachedSessions));
+      const cachedLiveSessionId = getPreferredLiveSessionId(
+        cachedSessions,
+        preferredSessionIdRef.current,
+      );
+      if (cachedLiveSessionId) {
+        setSelectedSessionId((current) => current || cachedLiveSessionId);
+      }
+    }
+
+    let cancelled = false;
+    const refreshIfActive = async () => {
+      if (cancelled) {
+        return;
+      }
+      await refreshDirectorSessions();
+    };
+
+    void refreshIfActive();
+
+    const intervalId = window.setInterval(() => {
+      void refreshIfActive();
+    }, showPicker || !managedSessionId ? 5000 : 15000);
+
+    const handleFocus = () => {
+      void refreshIfActive();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void refreshIfActive();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [authorized]);
+  }, [authorized, managedSessionId, refreshDirectorSessions, showPicker]);
+
+  const handleChangeSession = useCallback(() => {
+    setManagedSessionId("");
+    setShowPicker(true);
+    void refreshDirectorSessions();
+  }, [refreshDirectorSessions]);
 
   const fetchAudioLibrary = useCallback(async () => {
     if (directorAudioLibraryPromise) {
@@ -1391,8 +1656,23 @@ export default function DirectorConsoleClient({
     event: "match",
     enabled: Boolean(authorized && managedSession?.match?._id),
     onMessage: (payload) => {
+      const nextLiveMatch = payload?.match || payload;
+      if (!nextLiveMatch?._id) {
+        return;
+      }
+
       startTransition(() => {
-        setLiveMatch(payload);
+        setLiveMatch(nextLiveMatch);
+        setSessions((current) => {
+          const nextSessions = mergeDirectorMatchIntoSessions(
+            current,
+            nextLiveMatch,
+          );
+          if (nextSessions !== current) {
+            writeCachedDirectorSessions(nextSessions);
+          }
+          return nextSessions;
+        });
         setConsoleError("");
       });
     },
@@ -1403,7 +1683,10 @@ export default function DirectorConsoleClient({
     },
   });
 
-  const directorWalkieMatch = liveMatch || managedSession?.match || null;
+  const directorWalkieMatch = getDirectorPreferredMatch(
+    liveMatch,
+    managedSession?.match,
+  );
   const directorWalkieAvailable = Boolean(
     authorized &&
     managedSession?.match?._id &&
@@ -1551,8 +1834,76 @@ export default function DirectorConsoleClient({
     }
   }, [directorWalkieRequestState]);
 
+  useEffect(() => {
+    if (!speechSettings.enabled || speechSettings.muted || speechSettings.mode === "silent") {
+      pendingDirectorAnnouncementRef.current = null;
+      return;
+    }
+
+    const targetMatch = getDirectorPreferredMatch(
+      liveMatch,
+      managedSession?.match,
+    );
+    const liveEvent = targetMatch?.lastLiveEvent || null;
+
+    if (
+      !authorized ||
+      !targetMatch?._id ||
+      !liveEvent?.id ||
+      lastDirectorAnnouncedLiveEventRef.current === liveEvent.id
+    ) {
+      return;
+    }
+
+    if (!DIRECTOR_AUTO_ANNOUNCE_EVENT_TYPES.has(liveEvent.type)) {
+      lastDirectorAnnouncedLiveEventRef.current = liveEvent.id;
+      pendingDirectorAnnouncementRef.current = null;
+      return;
+    }
+
+    const effectIsActive =
+      Boolean(libraryLiveId) ||
+      libraryState === "loading" ||
+      libraryState === "playing" ||
+      Boolean(bufferedEffectPlaybackRef.current);
+
+    if (effectIsActive) {
+      pendingDirectorAnnouncementRef.current = {
+        match: targetMatch,
+        eventId: liveEvent.id,
+      };
+      lastDirectorAnnouncedLiveEventRef.current = liveEvent.id;
+      return;
+    }
+
+    const spoke = speakDirectorScoreAnnouncement(targetMatch, liveEvent.id, {
+      interrupt: true,
+    });
+
+    if (spoke || speech.needsGesture || speech.status === "waiting_for_gesture") {
+      lastDirectorAnnouncedLiveEventRef.current = liveEvent.id;
+      pendingDirectorAnnouncementRef.current = null;
+    }
+  }, [
+    authorized,
+    bufferedEffectPlaybackRef,
+    libraryLiveId,
+    libraryState,
+    liveMatch,
+    managedSession?.match,
+    speakDirectorScoreAnnouncement,
+    speech.needsGesture,
+    speech.status,
+    speechSettings.enabled,
+    speechSettings.mode,
+    speechSettings.muted,
+  ]);
+
   const readCurrentScore = () => {
-    const targetMatch = liveMatch || managedSession?.match;
+    const targetMatch = getDirectorPreferredMatch(
+      liveMatch,
+      managedSession?.match,
+    );
     const announcement = buildCurrentScoreAnnouncement(targetMatch);
     if (!targetMatch || !announcement) {
       return;
@@ -1723,6 +2074,7 @@ export default function DirectorConsoleClient({
       setLibraryState("idle");
       setLibraryCurrentTime(0);
       applyMusicDuck(1, { durationMs: 260 });
+      window.setTimeout(flushPendingDirectorAnnouncement, 40);
     };
     const handlePause = () => {
       setLibraryState((current) =>
@@ -1755,6 +2107,7 @@ export default function DirectorConsoleClient({
       setLibraryState("idle");
       setLibraryCurrentTime(0);
       applyMusicDuck(1, { durationMs: 200 });
+      window.setTimeout(flushPendingDirectorAnnouncement, 40);
     };
     const handleTimeUpdate = () => {
       setLibraryCurrentTime(audio.currentTime || 0);
@@ -1781,7 +2134,7 @@ export default function DirectorConsoleClient({
       audio.removeEventListener("error", handleError);
       audio.removeEventListener("timeupdate", handleTimeUpdate);
     };
-  }, [applyMusicDuck]);
+  }, [applyMusicDuck, flushPendingDirectorAnnouncement]);
 
   useEffect(() => {
     if (!navigator?.mediaDevices?.enumerateDevices) {
@@ -1865,6 +2218,7 @@ export default function DirectorConsoleClient({
     setLibraryCurrentTime(0);
     if (restoreMusic) {
       applyMusicDuck(1, { durationMs: 240 });
+      window.setTimeout(flushPendingDirectorAnnouncement, 40);
     }
   };
 
@@ -1903,6 +2257,7 @@ export default function DirectorConsoleClient({
     const requestId = effectPlayRequestRef.current + 1;
     effectPlayRequestRef.current = requestId;
 
+    speech.stop();
     stopAllEffects({ clearSource: false, preserveRequest: true });
     setConsoleError("");
     setEffectsNeedsUnlock(false);
@@ -2480,10 +2835,7 @@ export default function DirectorConsoleClient({
         <SessionHeader
           selectedSession={managedSession}
           liveMatch={liveMatch}
-          onChangeSession={() => {
-            setManagedSessionId("");
-            setShowPicker(true);
-          }}
+          onChangeSession={handleChangeSession}
           readCurrentScore={authorized ? readCurrentScore : () => {}}
         />
       ) : (
