@@ -460,6 +460,8 @@ export function createSoundEffectLiveEvent(match, effect, options = {}) {
     effectLabel: effect?.label || "",
     effectSrc: effect?.src || "",
     clientRequestId: options.clientRequestId || "",
+    resumeAnnouncements: Boolean(options.resumeAnnouncements),
+    trigger: options.trigger === "score_boundary" ? "score_boundary" : "manual",
     createdAt: new Date().toISOString(),
   };
 }

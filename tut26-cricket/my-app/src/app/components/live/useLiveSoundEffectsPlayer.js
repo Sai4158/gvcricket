@@ -14,11 +14,13 @@ export default function useLiveSoundEffectsPlayer({
   volume = 1,
   onBeforePlay,
   onAfterEnd,
+  onDuration,
 } = {}) {
   const audioRef = useRef(null);
   const bufferedPlaybackRef = useRef(null);
   const playRequestRef = useRef(0);
   const resolvedSrcByEffectRef = useRef(new Map());
+  const activeEffectRef = useRef(null);
   const isIosSafari = useMemo(() => isIOSSafari(), []);
   const [activeEffectId, setActiveEffectId] = useState("");
   const [status, setStatus] = useState("idle");
@@ -60,16 +62,29 @@ export default function useLiveSoundEffectsPlayer({
       resetPlaybackState();
     };
 
+    const handleLoadedMetadata = () => {
+      const activeEffect = activeEffectRef.current;
+      const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+      if (!activeEffect?.id || duration <= 0) {
+        return;
+      }
+      onDuration?.(activeEffect, duration);
+    };
+
     audio.addEventListener("ended", handleEnded);
     audio.addEventListener("playing", handlePlaying);
     audio.addEventListener("error", handleError);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("canplay", handleLoadedMetadata);
 
     return () => {
       audio.removeEventListener("ended", handleEnded);
       audio.removeEventListener("playing", handlePlaying);
       audio.removeEventListener("error", handleError);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("canplay", handleLoadedMetadata);
     };
-  }, [onAfterEnd, resetPlaybackState]);
+  }, [onAfterEnd, onDuration, resetPlaybackState]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -137,6 +152,7 @@ export default function useLiveSoundEffectsPlayer({
         return false;
       }
 
+      activeEffectRef.current = effect;
       const requestId = playRequestRef.current + 1;
       playRequestRef.current = requestId;
       stop({ clearSource: false, preserveRequest: true });
@@ -171,6 +187,9 @@ export default function useLiveSoundEffectsPlayer({
           }
 
           bufferedPlaybackRef.current = bufferedPlayback;
+          if (bufferedPlayback.duration > 0) {
+            onDuration?.(effect, bufferedPlayback.duration);
+          }
           setStatus("playing");
           return true;
         }
@@ -231,6 +250,7 @@ export default function useLiveSoundEffectsPlayer({
       isIosSafari,
       onAfterEnd,
       onBeforePlay,
+      onDuration,
       prime,
       resetPlaybackState,
       stop,

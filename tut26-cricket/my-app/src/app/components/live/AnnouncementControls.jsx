@@ -63,6 +63,7 @@ export default function AnnouncementControls({
   onTalkEnd,
   talkError = "",
   simpleMode = false,
+  showScoreSoundEffectsToggle = false,
 }) {
   const [isHolding, setIsHolding] = useState(false);
   const holdActiveRef = useRef(false);
@@ -261,6 +262,24 @@ export default function AnnouncementControls({
           ) : null}
           {statusText ? (
             <p className="text-xs text-zinc-500">{statusText}</p>
+          ) : null}
+          {showScoreSoundEffectsToggle ? (
+            <div className="flex items-center gap-3">
+              <IosSwitch
+                checked={settings.playScoreSoundEffects !== false}
+                label={
+                  settings.playScoreSoundEffects !== false
+                    ? "Turn score sound effects off"
+                    : "Turn score sound effects on"
+                }
+                onChange={(checked) =>
+                  updateSetting("playScoreSoundEffects", checked)
+                }
+              />
+              <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500">
+                4/6 sound FX
+              </span>
+            </div>
           ) : null}
           {talkError ? (
             <p className="text-xs text-rose-300">{talkError}</p>

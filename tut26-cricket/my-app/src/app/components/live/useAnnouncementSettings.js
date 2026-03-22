@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 
-const SETTINGS_VERSION = 4;
+const SETTINGS_VERSION = 5;
 
 const DEFAULTS = {
   spectator: {
@@ -12,6 +12,7 @@ const DEFAULTS = {
     volume: 0.85,
     mode: "full",
     accessibilityMode: false,
+    playScoreSoundEffects: true,
   },
   umpire: {
     version: SETTINGS_VERSION,
@@ -20,6 +21,7 @@ const DEFAULTS = {
     volume: 0.75,
     mode: "simple",
     accessibilityMode: false,
+    playScoreSoundEffects: true,
   },
 };
 

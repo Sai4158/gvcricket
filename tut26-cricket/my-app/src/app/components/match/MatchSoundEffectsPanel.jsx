@@ -5,8 +5,17 @@ import {
   FaChevronDown,
   FaGripVertical,
   FaMusic,
+  FaPause,
   FaVolumeUp,
 } from "react-icons/fa";
+
+function formatAudioTime(seconds) {
+  const safeSeconds = Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+  const wholeSeconds = Math.max(0, Math.round(safeSeconds));
+  const minutes = Math.floor(wholeSeconds / 60);
+  const remainder = wholeSeconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, "0")}`;
+}
 
 export default function MatchSoundEffectsPanel({
   files,
@@ -15,9 +24,12 @@ export default function MatchSoundEffectsPanel({
   isOpen = false,
   error = "",
   activeEffectId = "",
+  activeEffectStatus = "idle",
+  effectDurations = {},
   onToggle,
   onMinimize,
   onPlayEffect,
+  onStopEffect,
   onReorder,
   needsUnlock = false,
 }) {
@@ -387,8 +399,33 @@ export default function MatchSoundEffectsPanel({
                       <div className="line-clamp-2 text-sm font-semibold leading-5 text-white">
                         {file.label}
                       </div>
-                      <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-zinc-500">
-                        Tap to play
+                      <div className="mt-3 flex items-end justify-between gap-2">
+                        <div className="space-y-1 text-xs text-zinc-400">
+                          <div className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+                            {isActive
+                              ? activeEffectStatus === "loading"
+                                ? "Loading..."
+                                : "Playing"
+                              : "Tap to play"}
+                          </div>
+                          <div className="text-[11px] text-zinc-500">
+                            {formatAudioTime(effectDurations[file.id] || 0)}
+                          </div>
+                        </div>
+                        {isActive ? (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              onStopEffect?.();
+                            }}
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/8 text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)]"
+                            aria-label={`Stop ${file.label}`}
+                          >
+                            <FaPause className="text-xs" />
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                   </div>

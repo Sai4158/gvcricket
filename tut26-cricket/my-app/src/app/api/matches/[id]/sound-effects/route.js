@@ -10,7 +10,11 @@ import {
   getMatchAccessCookieName,
   hasValidMatchAccess,
 } from "../../../../lib/match-access";
-import { publishMatchUpdate } from "../../../../lib/live-updates";
+import {
+  getMatchSubscriberCount,
+  getSessionSubscriberCount,
+  publishMatchUpdate,
+} from "../../../../lib/live-updates";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { parseJsonRequest } from "../../../../lib/request-security";
 import Match from "../../../../../models/Match";
@@ -42,6 +46,8 @@ const soundEffectRequestSchema = z
       .max(120)
       .regex(/^[a-zA-Z0-9._:-]+$/, "clientRequestId is invalid.")
       .optional(),
+    resumeAnnouncements: z.boolean().optional(),
+    trigger: z.enum(["manual", "score_boundary"]).optional(),
   })
   .strict();
 
@@ -130,15 +136,57 @@ export async function POST(req, { params }) {
       return jsonError("Sound effect not found.", 404);
     }
 
+    const matchSubscriberCount = getMatchSubscriberCount(match._id);
+    const sessionSubscriberCount = match.sessionId
+      ? getSessionSubscriberCount(match.sessionId)
+      : 0;
+    const remoteLiveListenerCount = Math.max(
+      0,
+      matchSubscriberCount + sessionSubscriberCount - 1,
+    );
+
+    if (remoteLiveListenerCount === 0) {
+      return Response.json(
+        {
+          ok: true,
+          skippedRelay: true,
+          remoteLiveListenerCount,
+        },
+        {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        },
+      );
+    }
+
     const liveEvent = createSoundEffectLiveEvent(match, effect, {
       clientRequestId: parsedRequest.value.clientRequestId || "",
+      resumeAnnouncements: Boolean(parsedRequest.value.resumeAnnouncements),
+      trigger:
+        parsedRequest.value.trigger === "score_boundary"
+          ? "score_boundary"
+          : "manual",
     });
-    match.lastLiveEvent = liveEvent;
-    match.lastEventType = liveEvent.type;
-    match.lastEventText = liveEvent.summaryText;
-    await match.save();
+    const updatedMatch = await Match.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          lastLiveEvent: liveEvent,
+          lastEventType: liveEvent.type,
+          lastEventText: liveEvent.summaryText,
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      },
+    );
+    if (!updatedMatch) {
+      return jsonError("Match not found.", 404);
+    }
 
-    publishMatchUpdate(match._id);
+    publishMatchUpdate(updatedMatch._id);
 
     await writeAuditLog({
       action: "match_sound_effect",
@@ -161,7 +209,8 @@ export async function POST(req, { params }) {
         },
       },
     );
-  } catch {
+  } catch (error) {
+    console.error("Sound effect relay failed:", error);
     return jsonError("Could not play that sound effect.", 500);
   }
 }

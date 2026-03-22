@@ -231,6 +231,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const interruptedAnnouncementQueueRef = useRef([]);
   const deferredAnnouncementRef = useRef(null);
   const soundEffectPlayingRef = useRef(false);
+  const shouldResumeAfterSoundEffectRef = useRef(false);
   const previousSoundEffectMatchIdRef = useRef(initialData?.match?._id || "");
   const lastHandledSoundEffectEventRef = useRef(
     initialData?.match?.lastLiveEvent?.type === "sound_effect"
@@ -356,6 +357,54 @@ export default function SessionViewClient({ sessionId, initialData }) {
     restorePageMedia(announcementDuckRef);
   }, []);
 
+  const resumeSpectatorAnnouncementsAfterSoundEffect = useCallback(() => {
+    soundEffectPlayingRef.current = false;
+    if (!shouldResumeAfterSoundEffectRef.current) {
+      shouldResumeAfterSoundEffectRef.current = false;
+      interruptedAnnouncementQueueRef.current = [];
+      deferredAnnouncementRef.current = null;
+      return;
+    }
+    shouldResumeAfterSoundEffectRef.current = false;
+
+    if (!settings.enabled || settings.mode === "silent") {
+      interruptedAnnouncementQueueRef.current = [];
+      deferredAnnouncementRef.current = null;
+      return;
+    }
+
+    const resumeQueue = [
+      ...interruptedAnnouncementQueueRef.current,
+      ...(deferredAnnouncementRef.current ? [deferredAnnouncementRef.current] : []),
+    ];
+    interruptedAnnouncementQueueRef.current = [];
+    deferredAnnouncementRef.current = null;
+
+    if (!resumeQueue.length) {
+      return;
+    }
+
+    const resumeItems = resumeQueue.flatMap((entry) => entry.items || []);
+    const resumePriority = Math.max(
+      ...resumeQueue.map((entry) => Number(entry.options?.priority || 1)),
+    );
+    const resumeRestoreAfterMs = Math.max(
+      2400,
+      ...resumeQueue.map((entry) => Number(entry.restoreAfterMs || 0)),
+    );
+
+    speakSequenceWithDuck(
+      resumeItems,
+      {
+        key: `spectator-resume-${Date.now()}`,
+        priority: resumePriority,
+        interrupt: true,
+        minGapMs: 0,
+      },
+      resumeRestoreAfterMs
+    );
+  }, [settings.enabled, settings.mode, speakSequenceWithDuck]);
+
   const {
     audioRef: soundEffectsAudioRef,
     playEffect: playLiveSoundEffect,
@@ -369,46 +418,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         interruptedAnnouncementQueueRef.current = interruptedQueue;
       }
     },
-    onAfterEnd: () => {
-      soundEffectPlayingRef.current = false;
-
-      if (!settings.enabled || settings.mode === "silent") {
-        interruptedAnnouncementQueueRef.current = [];
-        deferredAnnouncementRef.current = null;
-        return;
-      }
-
-      const resumeQueue = [
-        ...interruptedAnnouncementQueueRef.current,
-        ...(deferredAnnouncementRef.current ? [deferredAnnouncementRef.current] : []),
-      ];
-      interruptedAnnouncementQueueRef.current = [];
-      deferredAnnouncementRef.current = null;
-
-      if (!resumeQueue.length) {
-        return;
-      }
-
-      const resumeItems = resumeQueue.flatMap((entry) => entry.items || []);
-      const resumePriority = Math.max(
-        ...resumeQueue.map((entry) => Number(entry.options?.priority || 1)),
-      );
-      const resumeRestoreAfterMs = Math.max(
-        2400,
-        ...resumeQueue.map((entry) => Number(entry.restoreAfterMs || 0)),
-      );
-
-      speakSequenceWithDuck(
-        resumeItems,
-        {
-          key: `spectator-resume-${Date.now()}`,
-          priority: resumePriority,
-          interrupt: true,
-          minGapMs: 0,
-        },
-        resumeRestoreAfterMs
-      );
-    },
+    onAfterEnd: resumeSpectatorAnnouncementsAfterSoundEffect,
   });
 
   const showTemporaryWalkieNotice = useCallback((message, duration = 2600) => {
@@ -771,6 +781,15 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
 
     lastHandledSoundEffectEventRef.current = liveEvent.id;
+    if (
+      liveEvent.trigger === "score_boundary" &&
+      settings.playScoreSoundEffects === false
+    ) {
+      return;
+    }
+    shouldResumeAfterSoundEffectRef.current = Boolean(
+      liveEvent.resumeAnnouncements
+    );
     void playLiveSoundEffect(
       {
         id: liveEvent.effectId || liveEvent.effectFileName || liveEvent.id,
@@ -779,8 +798,17 @@ export default function SessionViewClient({ sessionId, initialData }) {
         src: liveEvent.effectSrc || "",
       },
       { userGesture: false },
-    );
-  }, [match?.lastLiveEvent, playLiveSoundEffect]);
+    ).then((played) => {
+      if (!played) {
+        resumeSpectatorAnnouncementsAfterSoundEffect();
+      }
+    });
+  }, [
+    match?.lastLiveEvent,
+    playLiveSoundEffect,
+    resumeSpectatorAnnouncementsAfterSoundEffect,
+    settings.playScoreSoundEffects,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -1875,6 +1903,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
               settings={settings}
               updateSetting={updateSetting}
               simpleMode
+              showScoreSoundEffectsToggle
               variant="modal"
               onClose={() => setActivePanel(null)}
               onToggleEnabled={(nextEnabled) => {

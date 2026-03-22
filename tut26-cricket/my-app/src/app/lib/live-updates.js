@@ -13,6 +13,8 @@ const state = globalThis.__gvLiveState || {
   initializing: null,
   matchWatcher: null,
   sessionWatcher: null,
+  matchSubscribers: new Map(),
+  sessionSubscribers: new Map(),
 };
 globalThis.__gvLiveState = state;
 
@@ -99,12 +101,42 @@ export async function ensureLiveUpdates() {
 
 export function subscribeToMatch(matchId, callback) {
   const eventName = `match:${matchId}`;
+  const nextCount =
+    Number(state.matchSubscribers.get(String(matchId)) || 0) + 1;
+  state.matchSubscribers.set(String(matchId), nextCount);
   emitter.on(eventName, callback);
-  return () => emitter.off(eventName, callback);
+  return () => {
+    emitter.off(eventName, callback);
+    const currentCount = Number(state.matchSubscribers.get(String(matchId)) || 0);
+    if (currentCount <= 1) {
+      state.matchSubscribers.delete(String(matchId));
+      return;
+    }
+    state.matchSubscribers.set(String(matchId), currentCount - 1);
+  };
 }
 
 export function subscribeToSession(sessionId, callback) {
   const eventName = `session:${sessionId}`;
+  const nextCount =
+    Number(state.sessionSubscribers.get(String(sessionId)) || 0) + 1;
+  state.sessionSubscribers.set(String(sessionId), nextCount);
   emitter.on(eventName, callback);
-  return () => emitter.off(eventName, callback);
+  return () => {
+    emitter.off(eventName, callback);
+    const currentCount = Number(state.sessionSubscribers.get(String(sessionId)) || 0);
+    if (currentCount <= 1) {
+      state.sessionSubscribers.delete(String(sessionId));
+      return;
+    }
+    state.sessionSubscribers.set(String(sessionId), currentCount - 1);
+  };
+}
+
+export function getMatchSubscriberCount(matchId) {
+  return Number(state.matchSubscribers.get(String(matchId)) || 0);
+}
+
+export function getSessionSubscriberCount(sessionId) {
+  return Number(state.sessionSubscribers.get(String(sessionId)) || 0);
 }
