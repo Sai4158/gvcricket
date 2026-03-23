@@ -2,7 +2,7 @@ import SessionsPageClient from "../components/session/SessionsPageClient";
 import { absoluteUrl, siteConfig } from "../lib/site-metadata";
 import { loadSessionsIndexData } from "../lib/server-data";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 15;
 
 export const metadata = {
   title: "All Cricket Sessions - Live and Completed Matches",

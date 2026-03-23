@@ -83,7 +83,7 @@ export async function GET() {
 
     return Response.json(transformedSessions, {
       headers: {
-        "Cache-Control": "no-store",
+        "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=45",
       },
     });
   } catch {

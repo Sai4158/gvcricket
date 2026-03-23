@@ -55,6 +55,14 @@ const TALK_RETRY_MESSAGES = [
 const participantIdCache = new Map();
 const walkieSessionCache = new Map();
 
+function readPageVisibility() {
+  if (typeof document === "undefined") {
+    return true;
+  }
+
+  return document.visibilityState !== "hidden";
+}
+
 function safariBrowser() {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
@@ -385,13 +393,20 @@ export function shouldMaintainWalkieAudioTransport({
   snapshot = EMPTY,
   participantId = "",
   hasWalkieToken = false,
+  pageVisible = true,
   autoConnectAudio = false,
   listeningGraceActive = false,
   manualAudioReady = false,
   isSelfTalking = false,
   isFinishing = false,
 } = {}) {
-  if (!enabled || !snapshot?.enabled || !participantId || !hasWalkieToken) {
+  if (
+    !enabled ||
+    !snapshot?.enabled ||
+    !participantId ||
+    !hasWalkieToken ||
+    !pageVisible
+  ) {
     return false;
   }
   const remoteSpeakerActive = shouldReceiveWalkieAudio({ participantId, snapshot });
@@ -437,6 +452,7 @@ export default function useWalkieTalkie({
   const [recoveringSignaling, setRecoveringSignaling] = useState(false);
   const [audioReconnectTick, setAudioReconnectTick] = useState(0);
   const [signalingReconnectTick, setSignalingReconnectTick] = useState(0);
+  const [isPageVisible, setIsPageVisible] = useState(readPageVisibility);
 
   const rtcClientRef = useRef(null);
   const rtcTrackRef = useRef(null);
@@ -532,6 +548,7 @@ export default function useWalkieTalkie({
     snapshot,
     participantId,
     hasWalkieToken,
+    pageVisible: isPageVisible,
     autoConnectAudio,
     listeningGraceActive,
     manualAudioReady,
@@ -539,7 +556,7 @@ export default function useWalkieTalkie({
     isFinishing,
   });
   const shouldMaintainSignaling = Boolean(
-    enabled && matchId && (signalingActive || manualSignalingActive)
+    enabled && matchId && isPageVisible && (signalingActive || manualSignalingActive)
   );
   const nonUmpireUi = getNonUmpireWalkieUiState({
     sharedEnabled: snapshot.enabled,
@@ -1115,6 +1132,36 @@ export default function useWalkieTalkie({
     syncSnapshot();
   }, [syncSnapshot]);
 
+  const reconcileActiveSpeaker = useCallback(
+    (participants = participantsRef.current) => {
+      const current = activeSpeakerRef.current;
+      if (!current?.owner) {
+        syncSnapshot();
+        return;
+      }
+
+      const expiresAtMs = Date.parse(current.expiresAt || "");
+      if (
+        !participants.has(current.owner) ||
+        (Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now())
+      ) {
+        activeSpeakerRef.current = null;
+        syncSnapshot();
+        return;
+      }
+
+      const participant = participants.get(current.owner);
+      activeSpeakerRef.current = {
+        ...current,
+        participantId: participant?.participantId || current.participantId || "",
+        role: participant?.role || current.role || "",
+        name: participant?.name || current.name || "",
+      };
+      syncSnapshot();
+    },
+    [syncSnapshot]
+  );
+
   const applyPresenceSnapshot = useCallback(
     (occupants) => {
       const next = new Map();
@@ -1136,13 +1183,9 @@ export default function useWalkieTalkie({
         });
       }
       participantsRef.current = next;
-      if (activeSpeakerRef.current?.owner) {
-        resolveActiveSpeaker(activeSpeakerRef.current.owner, WALKIE_SPEAKER_TTL_SECONDS);
-      } else {
-        syncSnapshot();
-      }
+      reconcileActiveSpeaker(next);
     },
-    [resolveActiveSpeaker, role, syncSnapshot]
+    [reconcileActiveSpeaker, role]
   );
 
   const applyMetadataState = useCallback(
@@ -1783,6 +1826,11 @@ export default function useWalkieTalkie({
           setManualAudioReady(false);
           return true;
         }
+        if (manualAudioReady || rtcJoinedRef.current || rtcTrackRef.current) {
+          setManualAudioReady(false);
+          await cleanupTransport();
+          return true;
+        }
         setIsSelfTalking(false);
         setIsFinishing(false);
         setFinishDelayLeft(0);
@@ -1850,9 +1898,11 @@ export default function useWalkieTalkie({
       return true;
     },
     [
+      cleanupTransport,
       cleanupLocalTrack,
       ensureParticipantId,
       ensureRtmSession,
+      manualAudioReady,
       syncSnapshot,
       updateNotice,
     ]
@@ -2458,6 +2508,23 @@ export default function useWalkieTalkie({
   }, []);
 
   useEffect(() => {
+    if (typeof document === "undefined") {
+      return undefined;
+    }
+
+    const handleVisibilityChange = () => {
+      setIsPageVisible(readPageVisibility());
+    };
+
+    handleVisibilityChange();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
+  useEffect(() => {
     if (matchId && enabled) setParticipantId(storageParticipantId(matchId, role));
   }, [enabled, matchId, role]);
 
@@ -2786,6 +2853,45 @@ export default function useWalkieTalkie({
     clearTimer(countdownTimerRef, window.clearInterval);
     setCountdown(0);
   }, [isSelfTalking, participantId, snapshot.activeSpeakerId, snapshot.expiresAt, startCountdown, unpublishRtc]);
+
+  useEffect(() => {
+    const activeSpeakerId = String(snapshot.activeSpeakerId || "");
+    const transmissionId = String(snapshot.transmissionId || "");
+    const expiresAtMs = Date.parse(snapshot.expiresAt || "");
+
+    if (!activeSpeakerId || !Number.isFinite(expiresAtMs)) {
+      return undefined;
+    }
+
+    const timeoutMs = Math.max(0, expiresAtMs - Date.now()) + 250;
+    const timerId = window.setTimeout(() => {
+      if (
+        activeSpeakerRef.current &&
+        String(activeSpeakerRef.current.transmissionId || "") === transmissionId
+      ) {
+        const activeExpiresAtMs = Date.parse(activeSpeakerRef.current.expiresAt || "");
+        if (!Number.isFinite(activeExpiresAtMs) || activeExpiresAtMs <= Date.now()) {
+          activeSpeakerRef.current = null;
+          syncSnapshot();
+          if (!isSelfTalking && !isFinishing) {
+            updateNotice("Channel is free.");
+          }
+        }
+      }
+    }, timeoutMs);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [
+    isFinishing,
+    isSelfTalking,
+    snapshot.activeSpeakerId,
+    snapshot.expiresAt,
+    snapshot.transmissionId,
+    syncSnapshot,
+    updateNotice,
+  ]);
 
   useEffect(() => {
     if (!enabled) {

@@ -1,6 +1,4 @@
-import { NextResponse } from "next/server";
-
-function buildContentSecurityPolicy() {
+export function buildContentSecurityPolicy() {
   const scriptSrc = [
     "'self'",
     "'unsafe-inline'",
@@ -62,36 +60,61 @@ function buildContentSecurityPolicy() {
   ].join("; ");
 }
 
-export function middleware() {
-  const response = NextResponse.next();
+const CONTENT_SECURITY_POLICY = buildContentSecurityPolicy();
 
-  response.headers.set("Content-Security-Policy", buildContentSecurityPolicy());
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  response.headers.set("X-Frame-Options", "DENY");
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set(
-    "Permissions-Policy",
-    [
-      "camera=()",
-      "microphone=(self)",
-      "geolocation=()",
-      "payment=()",
-      "usb=()",
-    ].join(", ")
-  );
-  response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
-  response.headers.set("Cross-Origin-Resource-Policy", "same-site");
+export function buildSecurityHeaders({
+  isProduction = process.env.NODE_ENV === "production",
+} = {}) {
+  const headers = [
+    {
+      key: "Content-Security-Policy",
+      value: CONTENT_SECURITY_POLICY,
+    },
+    {
+      key: "Referrer-Policy",
+      value: "strict-origin-when-cross-origin",
+    },
+    {
+      key: "X-Frame-Options",
+      value: "DENY",
+    },
+    {
+      key: "X-Content-Type-Options",
+      value: "nosniff",
+    },
+    {
+      key: "Permissions-Policy",
+      value: [
+        "camera=()",
+        "microphone=(self)",
+        "geolocation=()",
+        "payment=()",
+        "usb=()",
+      ].join(", "),
+    },
+    {
+      key: "Cross-Origin-Opener-Policy",
+      value: "same-origin",
+    },
+    {
+      key: "Cross-Origin-Resource-Policy",
+      value: "same-site",
+    },
+  ];
 
-  if (process.env.NODE_ENV === "production") {
-    response.headers.set(
-      "Strict-Transport-Security",
-      "max-age=31536000; includeSubDomains; preload"
-    );
+  if (isProduction) {
+    headers.push({
+      key: "Strict-Transport-Security",
+      value: "max-age=31536000; includeSubDomains; preload",
+    });
   }
 
-  return response;
+  return headers;
 }
 
-export const config = {
-  matcher: "/:path*",
-};
+export function applySecurityHeaders(headers, options) {
+  for (const { key, value } of buildSecurityHeaders(options)) {
+    headers.set(key, value);
+  }
+  return headers;
+}

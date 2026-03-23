@@ -20,7 +20,7 @@ export default function TeamsInfoModal({ onExit }) {
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-white">How to Set Up Teams</h2>
+          <h2 className="text-2xl font-bold text-white">Team Setup</h2>
           <button
             onClick={onExit}
             className="text-zinc-500 hover:text-white transition-colors"
@@ -31,31 +31,21 @@ export default function TeamsInfoModal({ onExit }) {
         <div className="space-y-5 text-left">
           <div>
             <h3 className="font-bold text-lg text-amber-300 mb-1">
-              1. Set Player Count
+              1. Player Count
             </h3>
-            <p className="text-zinc-300">
-              Use the <strong className="text-white">+/-</strong> buttons to
-              change the number of players. Team names are kept separate from the
-              player count.
-            </p>
+            <p className="text-zinc-300">Use <strong className="text-white">+/-</strong> to change players.</p>
           </div>
           <div>
             <h3 className="font-bold text-lg text-amber-300 mb-1">
               2. Edit Names
             </h3>
-            <p className="text-zinc-300">
-              Click the edit icon to update the team name and the player list.
-              Click done to save the local draft.
-            </p>
+            <p className="text-zinc-300">Tap edit to change team or player names.</p>
           </div>
           <div>
             <h3 className="font-bold text-lg text-amber-300 mb-1">
-              3. Delete a Player
+              3. Remove Player
             </h3>
-            <p className="text-zinc-300">
-              While editing, use the trash icon next to a player to remove that
-              player from the roster.
-            </p>
+            <p className="text-zinc-300">While editing, tap the trash icon to remove a player.</p>
           </div>
         </div>
       </motion.div>

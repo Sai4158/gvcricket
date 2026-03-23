@@ -28,6 +28,11 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 export const preferredRegion = ["iad1"];
 
+const WALKIE_HEARTBEAT_INTERVAL_MS = 8000;
+const WALKIE_HEARTBEAT_START_DELAY_MS = 4000;
+const WALKIE_BOOT_PAD = "0".repeat(256);
+const WALKIE_PING_PAD = "0".repeat(64);
+
 function sseHeaders() {
   return {
     "Content-Type": "text/event-stream",
@@ -103,7 +108,6 @@ export async function GET(request, { params }) {
   let didCleanup = false;
   let pendingStateReplays = 0;
   let startupReplayTimers = [];
-  const bootPad = "0".repeat(8192);
   const bootstrapSnapshot = {
     enabled: false,
     spectatorCount: 0,
@@ -270,7 +274,7 @@ export async function GET(request, { params }) {
         current.notification,
         {
           token: participantToken,
-          ...(pendingStateReplays > 0 ? { bootPad } : {}),
+          ...(pendingStateReplays > 0 ? { bootPad: WALKIE_BOOT_PAD } : {}),
         }
       );
       if (!(await send("state", heartbeatStatePayload))) {
@@ -296,7 +300,7 @@ export async function GET(request, { params }) {
 
     heartbeat = setTimeout(() => {
       void heartbeatLoop();
-    }, 5000);
+    }, WALKIE_HEARTBEAT_INTERVAL_MS);
   };
 
   const pollLoop = async () => {
@@ -327,7 +331,7 @@ export async function GET(request, { params }) {
           ok: true,
           ts: Date.now(),
           replay: true,
-          pad: "0".repeat(8192),
+          pad: WALKIE_PING_PAD,
         });
       })();
     }, delay);
@@ -338,7 +342,7 @@ export async function GET(request, { params }) {
     try {
       const bootstrapStatePayload = buildStatePayload(bootstrapSnapshot, null, {
         token: participantToken,
-        bootPad,
+        bootPad: WALKIE_BOOT_PAD,
         bootstrap: true,
       });
       if (!(await send("state", bootstrapStatePayload))) {
@@ -348,7 +352,7 @@ export async function GET(request, { params }) {
         ok: true,
         ts: Date.now(),
         bootstrap: true,
-        pad: "0".repeat(4096),
+        pad: WALKIE_PING_PAD,
       });
 
       const registration = await registerPersistentWalkieParticipant(id, {
@@ -361,7 +365,7 @@ export async function GET(request, { params }) {
         registration.notification,
         {
           token: participantToken,
-          bootPad,
+          bootPad: WALKIE_BOOT_PAD,
         }
       );
       if (!(await send("state", initialStatePayload))) {
@@ -371,7 +375,7 @@ export async function GET(request, { params }) {
         ok: true,
         ts: Date.now(),
         init: true,
-        pad: "0".repeat(16384),
+        pad: WALKIE_PING_PAD,
       });
       lastVersion = Number(registration.snapshot?.version || 0);
       lastNotificationId = registration.notification?.id || "";
@@ -408,7 +412,7 @@ export async function GET(request, { params }) {
           if (closed) {
             return;
           }
-          scheduleHeartbeat(3000);
+          scheduleHeartbeat(WALKIE_HEARTBEAT_START_DELAY_MS);
         } catch (error) {
           console.error("Walkie change streams unavailable.", error);
           hasChangeStreamUpdates = false;
@@ -416,7 +420,7 @@ export async function GET(request, { params }) {
         }
       })();
 
-      scheduleHeartbeat(3000);
+      scheduleHeartbeat(WALKIE_HEARTBEAT_START_DELAY_MS);
     } catch (error) {
       console.error("Walkie SSE setup failed:", error);
       await stopStream();

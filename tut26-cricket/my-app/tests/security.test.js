@@ -30,7 +30,7 @@ import {
   serializePublicSession,
 } from "../src/app/lib/public-data.js";
 import { getTeamBundle } from "../src/app/lib/team-utils.js";
-import { middleware } from "../middleware.js";
+import { applySecurityHeaders } from "../security-headers.mjs";
 import { countLegalBalls, buildWinByWicketsText } from "../src/app/lib/match-scoring.js";
 import {
   buildCurrentScoreAnnouncement,
@@ -903,15 +903,15 @@ test("sensitive image moderation flags explicit predictions and allows neutral o
   assert.deepEqual(safe.blockedLabels, []);
 });
 
-test("middleware adds core security headers", () => {
-  const response = middleware();
-  const contentSecurityPolicy = response.headers.get("content-security-policy") || "";
-  assert.equal(response.headers.get("x-frame-options"), "DENY");
-  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+test("security headers include the required protection policy", () => {
+  const headers = applySecurityHeaders(new Headers(), { isProduction: false });
+  const contentSecurityPolicy = headers.get("content-security-policy") || "";
+  assert.equal(headers.get("x-frame-options"), "DENY");
+  assert.equal(headers.get("x-content-type-options"), "nosniff");
   assert.match(contentSecurityPolicy, /frame-ancestors 'none'/);
   assert.match(contentSecurityPolicy, /wss:\/\/\*\.edge\.agora\.io:\*/);
   assert.match(contentSecurityPolicy, /wss:\/\/\*\.edge\.sd-rtn\.com:\*/);
-  assert.match(response.headers.get("permissions-policy"), /camera=\(\)/);
+  assert.match(headers.get("permissions-policy"), /camera=\(\)/);
 });
 
 test("spectator commentary uses simple ball-first wording and separate score line", () => {

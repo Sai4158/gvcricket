@@ -408,6 +408,9 @@ export default function useSpeechAnnouncer(settings) {
   const voicesPromiseRef = useRef(null);
   const lockedVoiceNameRef = useRef("");
   const lastGesturePrimeAtRef = useRef(0);
+  const announcerEnabled = Boolean(
+    settings?.enabled && !settings?.muted && settings?.mode !== "silent"
+  );
 
   useEffect(() => subscribeUiAudioUnlock(setAudioUnlocked), []);
 
@@ -528,11 +531,25 @@ export default function useSpeechAnnouncer(settings) {
   }, []);
 
   useEffect(() => {
-    if (!canUseSpeechSynthesis()) return undefined;
+    if (!canUseSpeechSynthesis()) {
+      return undefined;
+    }
+
     platformRef.current = getSpeechPlatform();
+    return undefined;
+  }, []);
+
+  const shouldPrepareVoices =
+    announcerEnabled || status === "waiting_for_gesture";
+
+  useEffect(() => {
+    if (!shouldPrepareVoices) {
+      return undefined;
+    }
+
     void ensureVoicesReady();
     return undefined;
-  }, [ensureVoicesReady]);
+  }, [ensureVoicesReady, shouldPrepareVoices]);
 
   const runSequence = useCallback(
     async (sequence, token = sequenceTokenRef.current) => {
@@ -855,15 +872,22 @@ export default function useSpeechAnnouncer(settings) {
   }, [ensureVoicesReady, queueSequence]);
 
   useEffect(() => {
-    if (!audioUnlocked || isPrimedRef.current || status === "unsupported") {
+    if (
+      !audioUnlocked ||
+      isPrimedRef.current ||
+      status === "unsupported" ||
+      (!announcerEnabled && status !== "waiting_for_gesture")
+    ) {
       return;
     }
 
     prime();
-  }, [audioUnlocked, prime, status]);
+  }, [announcerEnabled, audioUnlocked, prime, status]);
 
   useEffect(() => {
-    if (!canUseSpeechSynthesis()) return undefined;
+    if (!canUseSpeechSynthesis() || status !== "waiting_for_gesture") {
+      return undefined;
+    }
 
     const primeFromGesture = () => {
       const now = Date.now();
@@ -899,6 +923,10 @@ export default function useSpeechAnnouncer(settings) {
       return undefined;
     }
 
+    if (status !== "speaking" && status !== "waiting_for_gesture") {
+      return undefined;
+    }
+
     const handleVisibility = () => {
       if (!document.hidden) {
         try {
@@ -911,7 +939,7 @@ export default function useSpeechAnnouncer(settings) {
 
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, []);
+  }, [status]);
 
   const speak = useCallback(
     (text, options = {}) => {

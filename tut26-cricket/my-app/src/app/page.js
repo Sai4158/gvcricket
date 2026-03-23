@@ -5,14 +5,12 @@ import HeroSection from "./components/home/HeroSection";
 import HomeHeader from "./components/home/HomeHeader";
 import PrimaryActionsSection from "./components/home/PrimaryActionsSection";
 import { absoluteUrl, siteConfig } from "./lib/site-metadata";
-import { loadHomeLiveBannerData } from "./lib/server-data";
 
 const HowItWorksSection = nextDynamic(() => import("./components/home/HowItWorksSection"), { ssr: true });
 const CommunityHighlightsSection = nextDynamic(() => import("./components/home/CommunityHighlightsSection"), { ssr: true });
 const LearnCricketCard = nextDynamic(() => import("./components/home/LearnCricketCard"), { ssr: true });
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 86400;
 
 export const metadata = {
   title: "GV Cricket | Live Cricket Scoring, Umpire Mode, Match Control",
@@ -44,19 +42,11 @@ export const metadata = {
 };
 
 export default async function HomePage() {
-  let liveMatch = null;
-
-  try {
-    liveMatch = await loadHomeLiveBannerData();
-  } catch (error) {
-    console.error("Home live banner load failed:", error);
-  }
-
   return (
     <>
       <HomeHeader />
       <main id="top" className="home-liquid-surface overflow-x-hidden bg-black text-zinc-200 font-sans">
-        <HeroSection liveMatch={liveMatch} />
+        <HeroSection />
         <div className="relative z-10 space-y-14 bg-[linear-gradient(155deg,theme(colors.red.900)_0%,theme(colors.black)_40%)] px-5 py-20 md:space-y-24 md:py-28 xl:px-8 xl:py-24 xl:space-y-20 2xl:px-10 2xl:py-28">
           <PrimaryActionsSection />
           <HowItWorksSection />

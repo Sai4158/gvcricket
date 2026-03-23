@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { isValidObjectId } from "mongoose";
+import { Types, isValidObjectId } from "mongoose";
 import Match from "../../models/Match";
 import Session from "../../models/Session";
 import { connectDB } from "./db";
@@ -11,6 +11,25 @@ import { getMatchAccessCookieName, hasValidMatchAccess } from "./match-access";
 import { serializePublicMatch, serializePublicSession } from "./public-data";
 import { hasCompleteTossState, hydrateLegacyTossState, normalizeLegacyTossState } from "./match-toss";
 
+const SERVER_DATA_CACHE_TTL_MS = 15000;
+
+const globalServerDataCache = globalThis.__gvServerDataCache || {
+  sessionsIndex: {
+    value: null,
+    expiresAt: 0,
+    pending: null,
+  },
+  directorSessions: {
+    value: null,
+    expiresAt: 0,
+    pending: null,
+  },
+};
+
+if (!globalThis.__gvServerDataCache) {
+  globalThis.__gvServerDataCache = globalServerDataCache;
+}
+
 async function resolveSessionMatches(sessions) {
   const resolvedBySessionId = new Map();
   const unresolvedSessionIds = sessions
@@ -21,18 +40,47 @@ async function resolveSessionMatches(sessions) {
     return resolvedBySessionId;
   }
 
-  const fallbackMatches = await Promise.all(
-    unresolvedSessionIds.map((sessionId) =>
-      Match.findOne({ sessionId })
-        .select(
-          "teamA teamB teamAName teamBName score outs innings innings1 innings2 isOngoing result _id updatedAt sessionId"
-        )
-        .sort({ updatedAt: -1 })
-        .lean()
-    )
-  );
+  const fallbackMatchSessionIds = unresolvedSessionIds
+    .map((sessionId) => String(sessionId || ""))
+    .filter((sessionId) => isValidObjectId(sessionId))
+    .map((sessionId) => new Types.ObjectId(sessionId));
 
-  fallbackMatches.filter(Boolean).forEach((match) => {
+  if (!fallbackMatchSessionIds.length) {
+    return resolvedBySessionId;
+  }
+
+  const fallbackMatches = await Match.aggregate([
+    {
+      $match: {
+        sessionId: { $in: fallbackMatchSessionIds },
+      },
+    },
+    {
+      $project: {
+        teamA: 1,
+        teamB: 1,
+        teamAName: 1,
+        teamBName: 1,
+        score: 1,
+        outs: 1,
+        innings: 1,
+        innings1: 1,
+        innings2: 1,
+        isOngoing: 1,
+        result: 1,
+        updatedAt: 1,
+        sessionId: 1,
+        tossWinner: 1,
+        tossDecision: 1,
+        matchImageUrl: 1,
+      },
+    },
+    {
+      $sort: { updatedAt: -1, _id: -1 },
+    },
+  ]);
+
+  fallbackMatches.forEach((match) => {
     const sessionId = String(match.sessionId || "");
     if (sessionId && !resolvedBySessionId.has(sessionId)) {
       resolvedBySessionId.set(sessionId, match);
@@ -40,6 +88,30 @@ async function resolveSessionMatches(sessions) {
   });
 
   return resolvedBySessionId;
+}
+
+async function getCachedServerData(cacheEntry, loader) {
+  const now = Date.now();
+
+  if (cacheEntry.value && cacheEntry.expiresAt > now) {
+    return cacheEntry.value;
+  }
+
+  if (cacheEntry.pending) {
+    return cacheEntry.pending;
+  }
+
+  cacheEntry.pending = loader()
+    .then((value) => {
+      cacheEntry.value = value;
+      cacheEntry.expiresAt = Date.now() + SERVER_DATA_CACHE_TTL_MS;
+      return value;
+    })
+    .finally(() => {
+      cacheEntry.pending = null;
+    });
+
+  return cacheEntry.pending;
 }
 
 async function findMatchForSession(session) {
@@ -52,7 +124,7 @@ async function findMatchForSession(session) {
   return Match.findOne({ sessionId: session._id }).sort({ updatedAt: -1 }).lean();
 }
 
-export async function loadSessionsIndexData() {
+async function readSessionsIndexData() {
   await connectDB();
 
   const sessions = (await Session.find()
@@ -92,6 +164,13 @@ export async function loadSessionsIndexData() {
         ),
     };
   });
+}
+
+export async function loadSessionsIndexData() {
+  return getCachedServerData(
+    globalServerDataCache.sessionsIndex,
+    readSessionsIndexData
+  );
 }
 
 export async function loadSessionViewData(sessionId) {
@@ -339,7 +418,7 @@ export async function loadHomeLiveBannerData() {
   };
 }
 
-export async function loadDirectorSessionsList() {
+async function readDirectorSessionsList() {
   await connectDB();
 
   const sessions = (await Session.find()
@@ -386,6 +465,13 @@ export async function loadDirectorSessionsList() {
     });
 
   return mappedSessions;
+}
+
+export async function loadDirectorSessionsList() {
+  return getCachedServerData(
+    globalServerDataCache.directorSessions,
+    readDirectorSessionsList
+  );
 }
 
 export async function loadDirectorConsoleData() {

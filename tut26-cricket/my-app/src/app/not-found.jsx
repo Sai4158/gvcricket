@@ -27,7 +27,7 @@ const itemVariants = {
 };
 
 // IMPORTANT: Create a motion-enhanced Link component
-const MotionLink = motion(Link);
+const MotionLink = motion.create(Link);
 
 export default function NotFound() {
   return (
@@ -50,9 +50,9 @@ export default function NotFound() {
           <Image
             src="/gvLogo.png"
             alt="GV Cricket"
-            width={220}
-            height={220}
-            className="mx-auto h-28 w-28 object-contain drop-shadow-[0_0_32px_rgba(220,38,38,0.18)] sm:h-36 sm:w-36"
+            width={280}
+            height={280}
+            className="mx-auto h-36 w-36 object-contain drop-shadow-[0_0_32px_rgba(220,38,38,0.18)] sm:h-44 sm:w-44"
             priority
           />
         </motion.div>

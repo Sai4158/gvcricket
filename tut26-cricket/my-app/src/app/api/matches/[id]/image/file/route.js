@@ -9,7 +9,7 @@ import Match from "../../../../../../models/Match";
 
 export const runtime = "nodejs";
 
-export async function GET(_req, { params }) {
+export async function GET(req, { params }) {
   const { id } = await params;
 
   try {
@@ -51,10 +51,14 @@ export async function GET(_req, { params }) {
       return jsonError("Match image is invalid.", 415);
     }
 
+    const hasVersionParam = req.nextUrl.searchParams.has("v");
+
     return new Response(buffer, {
       headers: {
         "Content-Type": mimeType,
-        "Cache-Control": "public, max-age=600, stale-while-revalidate=86400",
+        "Cache-Control": hasVersionParam
+          ? "public, max-age=31536000, immutable"
+          : "public, max-age=600, stale-while-revalidate=86400",
         "Content-Length": String(buffer.length),
         "X-Content-Type-Options": "nosniff",
       },

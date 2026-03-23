@@ -222,6 +222,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const previousEnabledRef = useRef(false);
   const previousWalkieEnabledRef = useRef(false);
   const previousWalkieRequestStateRef = useRef("idle");
+  const initialWalkieStateResolvedRef = useRef(false);
   const micPrepareRequestedRef = useRef(false);
   const lastStreamUpdateRef = useRef(initialData?.updatedAt || "");
   const announcerAutoEnabledMatchRef = useRef("");
@@ -286,13 +287,17 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
   const currentLiveEventId = match?.lastLiveEvent?.id || "";
   const isLiveMatch = Boolean(match?.isOngoing && !match?.result);
+  const spectatorWalkieSignalActive = Boolean(
+    isLiveMatch &&
+      (activePanel === "walkie" || spectatorWalkieEnabled || quickWalkieTalking)
+  );
   const walkie = useWalkieTalkie({
     matchId: match?._id || "",
     enabled: Boolean(match?._id && isLiveMatch),
     role: "spectator",
     displayName: sessionData?.name ? `${sessionData.name} Spectator` : "Spectator",
     autoConnectAudio: spectatorWalkieEnabled,
-    signalingActive: Boolean(match?._id && isLiveMatch),
+    signalingActive: spectatorWalkieSignalActive,
   });
 
   const speakSequenceWithDuck = useCallback(
@@ -445,6 +450,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     previousEnabledRef.current = false;
     previousWalkieEnabledRef.current = false;
     previousWalkieRequestStateRef.current = "idle";
+    initialWalkieStateResolvedRef.current = false;
     announcerAutoEnabledMatchRef.current = "";
     announcerInitialSummaryRef.current = "";
     announcerGestureReplayRef.current = "";
@@ -471,39 +477,33 @@ export default function SessionViewClient({ sessionId, initialData }) {
   }, [match?._id, match?.lastLiveEvent?.id, match?.lastLiveEvent?.type]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadSharedWalkieState() {
-      if (!match?._id || !isLiveMatch) {
+    if (!match?._id || !isLiveMatch) {
+      initialWalkieStateResolvedRef.current = false;
+      queueMicrotask(() => {
         setSpectatorWalkieEnabled(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(`/api/matches/${match._id}/walkie`, {
-          cache: "no-store",
-        });
-        if (!response.ok) {
-          return;
-        }
-
-        const payload = await response.json().catch(() => null);
-        if (cancelled) {
-          return;
-        }
-
-        const nextEnabled = Boolean(payload?.walkie?.enabled);
-        setSpectatorWalkieEnabled(nextEnabled);
-      } catch {
-      }
+      });
+      return;
     }
 
-    void loadSharedWalkieState();
+    const hasResolvedSnapshot =
+      Number(walkie.snapshot?.version || 0) > 0 ||
+      Boolean(walkie.snapshot?.updatedAt);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [isLiveMatch, match?._id]);
+    if (!hasResolvedSnapshot || initialWalkieStateResolvedRef.current) {
+      return;
+    }
+
+    initialWalkieStateResolvedRef.current = true;
+    queueMicrotask(() => {
+      setSpectatorWalkieEnabled(Boolean(walkie.snapshot?.enabled));
+    });
+  }, [
+    isLiveMatch,
+    match?._id,
+    walkie.snapshot?.enabled,
+    walkie.snapshot?.updatedAt,
+    walkie.snapshot?.version,
+  ]);
 
   useEffect(() => {
     if (!match?._id || !isLiveMatch) {

@@ -1,10 +1,67 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { FaArrowRight } from "react-icons/fa";
 import PendingLink from "../shared/PendingLink";
 import SafeMatchImage from "../shared/SafeMatchImage";
 
 export default function LiveNowBanner({ liveMatch }) {
-  if (!liveMatch) {
+  const [fetchedLiveMatch, setFetchedLiveMatch] = useState(null);
+  const currentLiveMatch = liveMatch || fetchedLiveMatch;
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const loadLiveMatch = async () => {
+      if (document.visibilityState === "hidden") {
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/home/live-banner", {
+          cache: "default",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = await response.json().catch(() => null);
+        if (!cancelled) {
+          setFetchedLiveMatch(payload?.liveMatch || null);
+        }
+      } catch (_error) {
+        // Ignore banner refresh failures and keep the last known live match.
+      }
+    };
+
+    if (!liveMatch) {
+      void loadLiveMatch();
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void loadLiveMatch();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [liveMatch]);
+
+  if (!currentLiveMatch) {
     return null;
   }
 
@@ -22,7 +79,7 @@ export default function LiveNowBanner({ liveMatch }) {
       className="pointer-events-none absolute inset-x-0 top-0 z-40 flex justify-start px-4 pr-20 pt-5 md:justify-center md:px-6 md:pr-6 md:pt-7"
     >
       <PendingLink
-        href={`/session/${liveMatch.sessionId}/view`}
+        href={`/session/${currentLiveMatch.sessionId}/view`}
         pendingLabel="Opening live score..."
         pendingClassName="pending-shimmer"
         primeAudioOnClick
@@ -34,8 +91,8 @@ export default function LiveNowBanner({ liveMatch }) {
             <div className="relative z-10 flex min-w-0 items-center gap-2.5 md:gap-3">
               <div className="relative h-[3.35rem] w-[3.35rem] shrink-0 overflow-hidden rounded-[18px] md:h-[4rem] md:w-[4rem]">
                 <SafeMatchImage
-                  src={liveMatch.matchImageUrl || ""}
-                  alt={`${liveMatch.teamAName} vs ${liveMatch.teamBName}`}
+                  src={currentLiveMatch.matchImageUrl || ""}
+                  alt={`${currentLiveMatch.teamAName} vs ${currentLiveMatch.teamBName}`}
                   fill
                   sizes="64px"
                   className="object-cover"
@@ -47,12 +104,12 @@ export default function LiveNowBanner({ liveMatch }) {
                   Live Now
                 </div>
                 <div className="truncate text-[14px] font-semibold leading-tight text-white md:text-[15px]">
-                  {liveMatch.teamAName} vs {liveMatch.teamBName}
+                  {currentLiveMatch.teamAName} vs {currentLiveMatch.teamBName}
                 </div>
                 <div className="text-[11px] text-white/74 md:text-xs">
                   {pending
                     ? "Opening live score..."
-                    : `${liveMatch.score}/${liveMatch.outs} - View score now`}
+                    : `${currentLiveMatch.score}/${currentLiveMatch.outs} - View score now`}
                 </div>
               </div>
             </div>

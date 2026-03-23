@@ -1,5 +1,5 @@
 import { isValidObjectId } from "mongoose";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Session from "../../../models/Session";
 import { connectDB } from "../../lib/db";
 import TeamSelectionPageClient from "./TeamSelectionPageClient";
@@ -14,9 +14,19 @@ export default async function TeamSelectionPage({ params }) {
   }
 
   await connectDB();
-  const exists = await Session.exists({ _id: id, isDraft: true });
-  if (!exists) {
+  const session = await Session.findById(id).select(
+    "_id isDraft match tossWinner tossDecision"
+  );
+  if (!session) {
     notFound();
+  }
+
+  if (session.match) {
+    if (session.tossWinner && session.tossDecision) {
+      redirect(`/match/${session.match}`);
+    }
+
+    redirect(`/toss/${session.match}`);
   }
 
   return <TeamSelectionPageClient />;

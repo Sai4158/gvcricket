@@ -33,11 +33,15 @@ export default function SafeMatchImage({
     onFallbackChange?.(isFallback);
   }, [isFallback, onFallbackChange]);
 
+  const shouldBypassOptimization =
+    imageProps.unoptimized ?? imageSrc !== GV_MATCH_FALLBACK_IMAGE;
+
   return (
     <Image
       {...imageProps}
       src={imageSrc}
       alt={alt}
+      unoptimized={shouldBypassOptimization}
       className={isFallback && fallbackClassName ? fallbackClassName : className}
       onError={() => {
         if (imageSrc === GV_MATCH_FALLBACK_IMAGE) {

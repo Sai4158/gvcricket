@@ -16,8 +16,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 export const preferredRegion = ["iad1"];
 
-const SESSION_PAD = "0".repeat(4096);
-const PING_PAD = "0".repeat(4096);
+const STREAM_HEARTBEAT_INTERVAL_MS = 15_000;
+const STREAM_CATCHUP_INTERVAL_MS = 30_000;
+const STREAM_BOOTSTRAP_PAD = "0".repeat(64);
 
 function sseHeaders() {
   return {
@@ -100,7 +101,7 @@ export async function GET(request, { params }) {
     }
   };
 
-  const scheduleHeartbeat = (delay = 4000) => {
+  const scheduleHeartbeat = (delay = STREAM_HEARTBEAT_INTERVAL_MS) => {
     if (closed) {
       return;
     }
@@ -181,7 +182,6 @@ export async function GET(request, { params }) {
       !(await send("session", {
         ...payload,
         updatedAt: new Date().toISOString(),
-        pad: SESSION_PAD,
       }))
     ) {
       return null;
@@ -196,7 +196,7 @@ export async function GET(request, { params }) {
     }
 
     try {
-      if (!(await send("ping", { ok: true, ts: Date.now(), pad: PING_PAD }))) {
+      if (!(await send("ping", { ok: true, ts: Date.now() }))) {
         return;
       }
     } catch (error) {
@@ -220,7 +220,7 @@ export async function GET(request, { params }) {
     }
 
     catchupDone = true;
-    scheduleCatchup(liveUpdatesReady ? 12000 : 1000);
+    scheduleCatchup(liveUpdatesReady ? STREAM_CATCHUP_INTERVAL_MS : 1000);
   };
 
   void (async () => {
@@ -231,7 +231,7 @@ export async function GET(request, { params }) {
         ok: true,
         ts: Date.now(),
         init: true,
-        pad: PING_PAD,
+        pad: STREAM_BOOTSTRAP_PAD,
       });
 
       try {
@@ -251,7 +251,7 @@ export async function GET(request, { params }) {
       }
 
       scheduleHeartbeat();
-      scheduleCatchup(liveUpdatesReady ? 12000 : 1200);
+      scheduleCatchup(liveUpdatesReady ? STREAM_CATCHUP_INTERVAL_MS : 1200);
     } catch (error) {
       await send("error", { message: "Live updates are temporarily unavailable." });
       await stopStream();

@@ -65,6 +65,7 @@ const DIRECTOR_AUDIO_METADATA_CACHE_KEY = "gv-director-audio-metadata-v1";
 const DIRECTOR_SESSIONS_CACHE_KEY = "gv-director-sessions-v1";
 const DIRECTOR_AUDIO_LIBRARY_CACHE_TTL_MS = 10 * 60 * 1000;
 const DIRECTOR_AUDIO_ORDER_SAVE_DELAY_MS = 20_000;
+const DIRECTOR_SESSIONS_REFRESH_MIN_GAP_MS = 1500;
 let directorAudioLibraryMemoryCache = null;
 let directorAudioLibraryPromise = null;
 let directorSessionsMemoryCache = null;
@@ -724,6 +725,8 @@ export default function DirectorConsoleClient({
   const ambientAudioSessionTypeRef = useRef("");
   const lastDirectorAnnouncedLiveEventRef = useRef("");
   const lastHandledSharedSoundEffectEventRef = useRef("");
+  const directorSessionsRefreshPromiseRef = useRef(null);
+  const lastDirectorSessionsRefreshAtRef = useRef(0);
   const pendingDirectorAnnouncementRef = useRef(null);
   const libraryPointerDragRef = useRef({
     pointerId: null,
@@ -1010,34 +1013,59 @@ export default function DirectorConsoleClient({
     if (!authorized) {
       return [];
     }
-    try {
-      const response = await fetch("/api/director/sessions", {
-        cache: "no-store",
-      });
-      const payload = await response.json().catch(() => ({ sessions: [] }));
-      if (!response.ok) {
-        return [];
-      }
-      const nextSessions = Array.isArray(payload.sessions)
-        ? payload.sessions
-        : [];
-      const hasLiveSessions = nextSessions.some((item) => item.isLive);
-      const currentManagedStillLive = Boolean(
-        managedSessionId &&
-          nextSessions.some(
-            (item) => item.session?._id === managedSessionId && item.isLive,
-          ),
-      );
-      writeCachedDirectorSessions(nextSessions);
-      setSessions(nextSessions);
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      return sessions;
+    }
+    if (directorSessionsRefreshPromiseRef.current) {
+      return directorSessionsRefreshPromiseRef.current;
+    }
+    if (Date.now() - lastDirectorSessionsRefreshAtRef.current < DIRECTOR_SESSIONS_REFRESH_MIN_GAP_MS) {
+      return sessions;
+    }
+    directorSessionsRefreshPromiseRef.current = (async () => {
+      try {
+        const response = await fetch("/api/director/sessions", {
+          cache: "no-store",
+        });
+        const payload = await response.json().catch(() => ({ sessions: [] }));
+        if (!response.ok) {
+          return [];
+        }
+        const nextSessions = Array.isArray(payload.sessions)
+          ? payload.sessions
+          : [];
+        const hasLiveSessions = nextSessions.some((item) => item.isLive);
+        const currentManagedStillLive = Boolean(
+          managedSessionId &&
+            nextSessions.some(
+              (item) => item.session?._id === managedSessionId && item.isLive,
+            ),
+        );
+        writeCachedDirectorSessions(nextSessions);
+        setSessions(nextSessions);
 
-      const nextLiveSessionId = getPreferredLiveSessionId(
-        nextSessions,
-        preferredSessionIdRef.current,
-      );
+        const nextLiveSessionId = getPreferredLiveSessionId(
+          nextSessions,
+          preferredSessionIdRef.current,
+        );
 
-      if (nextLiveSessionId) {
-        setSelectedSessionId((current) => {
+        if (nextLiveSessionId) {
+          setSelectedSessionId((current) => {
+            if (
+              current &&
+              nextSessions.some(
+                (item) => item.session?._id === current && item.isLive,
+              )
+            ) {
+              return current;
+            }
+            return nextLiveSessionId;
+          });
+        } else {
+          setSelectedSessionId("");
+        }
+
+        setManagedSessionId((current) => {
           if (
             current &&
             nextSessions.some(
@@ -1046,33 +1074,24 @@ export default function DirectorConsoleClient({
           ) {
             return current;
           }
-          return nextLiveSessionId;
+          return "";
         });
-      } else {
-        setSelectedSessionId("");
-      }
 
-      setManagedSessionId((current) => {
-        if (
-          current &&
-          nextSessions.some(
-            (item) => item.session?._id === current && item.isLive,
-          )
-        ) {
-          return current;
+        if (!hasLiveSessions || (managedSessionId && !currentManagedStillLive)) {
+          setShowPicker(true);
         }
-        return "";
-      });
 
-      if (!hasLiveSessions || (managedSessionId && !currentManagedStillLive)) {
-        setShowPicker(true);
+        lastDirectorSessionsRefreshAtRef.current = Date.now();
+        return nextSessions;
+      } catch {
+        return [];
+      } finally {
+        directorSessionsRefreshPromiseRef.current = null;
       }
+    })();
 
-      return nextSessions;
-    } catch {
-      return [];
-    }
-  }, [authorized, managedSessionId]);
+    return directorSessionsRefreshPromiseRef.current;
+  }, [authorized, managedSessionId, sessions]);
 
   useEffect(() => {
     if (!authorized) {
@@ -1101,10 +1120,6 @@ export default function DirectorConsoleClient({
 
     void refreshIfActive();
 
-    const intervalId = window.setInterval(() => {
-      void refreshIfActive();
-    }, showPicker || !managedSessionId ? 5000 : 15000);
-
     const handleFocus = () => {
       void refreshIfActive();
     };
@@ -1120,7 +1135,6 @@ export default function DirectorConsoleClient({
 
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
@@ -1141,7 +1155,7 @@ export default function DirectorConsoleClient({
 
     directorAudioLibraryPromise = (async () => {
       const response = await fetch("/api/director/audio-library", {
-        cache: "no-store",
+        cache: "default",
       });
       const payload = await response
         .json()
@@ -1710,7 +1724,7 @@ export default function DirectorConsoleClient({
       ? `${managedSession.session.name} Director`
       : "Director",
     autoConnectAudio: directorWalkieAvailable && directorWalkieOn,
-    signalingActive: directorWalkieAvailable,
+    signalingActive: directorWalkieAvailable && directorWalkieOn,
   });
   const directorWalkieSharedEnabled = Boolean(walkie.snapshot?.enabled);
   const directorWalkieRequestState = walkie.requestState || "idle";

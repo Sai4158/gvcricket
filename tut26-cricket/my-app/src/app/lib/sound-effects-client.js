@@ -166,7 +166,7 @@ export async function fetchCachedSoundEffectsLibrary({ force = false } = {}) {
 
   soundEffectsLibraryPromise = (async () => {
     const response = await fetch("/api/director/audio-library", {
-      cache: "no-store",
+      cache: "default",
     });
     const payload = await response
       .json()
@@ -192,4 +192,9 @@ export async function fetchCachedSoundEffectsLibrary({ force = false } = {}) {
   });
 
   return soundEffectsLibraryPromise;
+}
+
+export function clearCachedSoundEffectsLibrary() {
+  soundEffectsLibraryMemoryCache = null;
+  soundEffectsLibraryPromise = null;
 }

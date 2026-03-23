@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   FaArrowLeft,
   FaArrowRight,
+  FaCircle,
   FaInfoCircle,
+  FaRedo,
 } from "react-icons/fa";
 import TeamsInfoModal from "../../components/teams/InfoModal";
 import TeamRoster, {
@@ -22,6 +24,15 @@ import {
 } from "../../lib/pending-session-image";
 import { primeUiAudio } from "../../lib/page-audio";
 import StepFlow from "../../components/shared/StepFlow";
+import useSpeechAnnouncer from "../../components/live/useSpeechAnnouncer";
+import { CoinHeads, CoinTails, SpinningCoin } from "../../components/toss/CoinArt";
+
+const TEAM_SETUP_TOSS_ANNOUNCER_SETTINGS = {
+  enabled: true,
+  muted: false,
+  volume: 1,
+  mode: "full",
+};
 
 export default function TeamSelectionPageClient() {
   const { id: sessionId } = useParams();
@@ -43,7 +54,15 @@ export default function TeamSelectionPageClient() {
   const [error, setError] = useState("");
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [imageUploadState, setImageUploadState] = useState("idle");
+  const [tossStatus, setTossStatus] = useState("choosing");
+  const [tossCountdown, setTossCountdown] = useState(3);
+  const [tossCall, setTossCall] = useState("");
+  const [tossSide, setTossSide] = useState("");
   const imageUploadPromiseRef = useRef(null);
+  const spokenCountdownRef = useRef(null);
+  const { speak, prime, stop } = useSpeechAnnouncer(
+    TEAM_SETUP_TOSS_ANNOUNCER_SETTINGS
+  );
 
   const uploadDraftImageIfNeeded = useCallback(async () => {
     if (typeof window === "undefined") {
@@ -114,6 +133,82 @@ export default function TeamSelectionPageClient() {
     };
   }, [draftTokenKey, sessionId, uploadDraftImageIfNeeded]);
 
+  useEffect(() => {
+    if (tossStatus !== "counting" || tossCountdown <= 0) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setTossCountdown((current) => current - 1);
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [tossCountdown, tossStatus]);
+
+  useEffect(() => {
+    if (
+      tossStatus !== "counting" ||
+      tossCountdown <= 0 ||
+      spokenCountdownRef.current === tossCountdown
+    ) {
+      return;
+    }
+
+    const didSpeak = speak(String(tossCountdown), { interrupt: true });
+    if (didSpeak) {
+      spokenCountdownRef.current = tossCountdown;
+    }
+  }, [speak, tossCountdown, tossStatus]);
+
+  useEffect(() => {
+    if (tossStatus !== "counting" || tossCountdown !== 0 || !tossCall) {
+      return undefined;
+    }
+
+    const resultTimer = window.setTimeout(() => {
+      const nextSide = Math.random() < 0.5 ? "heads" : "tails";
+      setTossSide(nextSide);
+      setTossStatus("finished");
+      speak(
+        `${nextSide} wins. Winner gets to pick the first player. Please edit team names, players and overs, then proceed to match toss on the next step.`,
+        {
+          interrupt: true,
+          priority: 3,
+        }
+      );
+    }, 700);
+
+    return () => window.clearTimeout(resultTimer);
+  }, [speak, tossCall, tossCountdown, tossStatus]);
+
+  useEffect(() => () => stop(), [stop]);
+
+  const handleTossChoice = (choice) => {
+    stop();
+    setError("");
+    setTossCall(choice);
+    setTossSide("");
+    spokenCountdownRef.current = null;
+    prime({ userGesture: true });
+    setTossCountdown(3);
+    setTossStatus("counting");
+    window.setTimeout(() => {
+      const didSpeak = speak("3", { userGesture: true, interrupt: true });
+      if (didSpeak) {
+        spokenCountdownRef.current = 3;
+      }
+    }, 0);
+  };
+
+  const redoCompactToss = () => {
+    stop();
+    setTossStatus("choosing");
+    setTossCountdown(3);
+    setTossCall("");
+    setTossSide("");
+    spokenCountdownRef.current = null;
+  };
+
   const deleteDraftSession = async () => {
     if (typeof window === "undefined") return;
     const draftToken = window.sessionStorage.getItem(draftTokenKey);
@@ -137,11 +232,13 @@ export default function TeamSelectionPageClient() {
   };
 
   const handleBack = async () => {
+    stop();
     await deleteDraftSession();
     router.push("/session/new");
   };
 
   const handleSubmit = async () => {
+    stop();
     const finalTeamAName = teamA.name.trim();
     const finalTeamBName = teamB.name.trim();
     const finalTeamAPlayers = teamA.players.map((player) => player.trim()).filter(Boolean);
@@ -189,7 +286,7 @@ export default function TeamSelectionPageClient() {
         );
       }
 
-      await response.json();
+      await response.json().catch(() => ({}));
       router.push(`/toss/${sessionId}`);
     } catch (caughtError) {
       setError(caughtError.message);
@@ -227,14 +324,112 @@ export default function TeamSelectionPageClient() {
               text="TEAM SELECTION"
               variant="hero-bright"
               simplifyMotion
-              className="text-[2.2rem] font-semibold uppercase tracking-[-0.045em] sm:text-[2.95rem]"
+              className="text-[2.45rem] font-semibold uppercase tracking-[-0.05em] sm:text-[3.2rem]"
               lineClassName="leading-[0.94]"
             />
           </div>
           <p className="mx-auto mt-4 max-w-xl text-center text-sm leading-6 text-zinc-400 sm:text-base">
-            Set team names, squad size, and overs before the toss.
+            Optional toss first, then teams and overs.
           </p>
         </header>
+
+        <section className="mb-8">
+          <div className="relative overflow-hidden rounded-[30px] border border-amber-400/18 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.12),transparent_34%),linear-gradient(180deg,rgba(20,20,24,0.96),rgba(10,10,14,0.98))] p-5 shadow-[0_18px_45px_rgba(0,0,0,0.22)]">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 overflow-hidden bg-[linear-gradient(90deg,rgba(59,130,246,0.96)_0%,rgba(96,165,250,0.88)_36%,rgba(251,113,133,0.86)_64%,rgba(239,68,68,0.96)_100%)] shadow-[0_0_18px_rgba(96,165,250,0.22)]" />
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),transparent_18%)]" />
+            <div className="mb-4 text-center">
+              <LiquidSportText
+                as="h2"
+                text={["WINNER PICKS", "FIRST PLAYER"]}
+                variant="hero-bright"
+                simplifyMotion
+                className="text-[1.36rem] font-semibold uppercase tracking-[0.08em] sm:text-[1.52rem]"
+                lineClassName="leading-[1.24]"
+              />
+            </div>
+
+            <div className="mb-4 flex justify-end">
+              {tossStatus !== "choosing" ? (
+                <button
+                  type="button"
+                  onClick={redoCompactToss}
+                  className="btn-ui btn-ui-quiet inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em]"
+                >
+                  <FaRedo className="text-[0.8rem]" />
+                  Redo
+                </button>
+              ) : null}
+            </div>
+
+            <div className="rounded-[28px] border border-white/10 bg-black/20 px-5 py-6">
+              <div className="flex min-h-[240px] flex-col items-center justify-center text-center">
+                {tossStatus === "choosing" ? (
+                  <>
+                    <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-400">
+                      <FaCircle className="text-[8px] text-amber-300" />
+                      Pick Call
+                    </div>
+                    <div className="mb-5 scale-[0.88]">
+                      <motion.div
+                        animate={{ rotateY: 720 }}
+                        transition={{
+                          duration: 6,
+                          ease: "linear",
+                          repeat: Number.POSITIVE_INFINITY,
+                        }}
+                        className="[transform-style:preserve-3d]"
+                      >
+                        <SpinningCoin />
+                      </motion.div>
+                    </div>
+                    <div className="grid w-full max-w-sm grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleTossChoice("heads")}
+                        className="btn-ui btn-ui-glass-dark rounded-[24px] px-4 py-4 text-base font-bold uppercase tracking-[0.22em]"
+                      >
+                        Heads
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleTossChoice("tails")}
+                        className="btn-ui btn-ui-glass-dark-alt rounded-[24px] px-4 py-4 text-base font-bold uppercase tracking-[0.22em]"
+                      >
+                        Tails
+                      </button>
+                    </div>
+                  </>
+                ) : tossStatus === "counting" ? (
+                  <>
+                    <motion.div
+                      className="mb-3 [transform-style:preserve-3d]"
+                      animate={{ rotateY: 1440 }}
+                      transition={{ duration: 2.2, ease: "easeInOut" }}
+                    >
+                      <SpinningCoin />
+                    </motion.div>
+                    <p className="text-6xl font-black text-white">{tossCountdown}</p>
+                    <p className="mt-2 text-xs uppercase tracking-[0.24em] text-amber-200/70">
+                      {tossCall}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="mb-4 scale-[0.88]">
+                      {tossSide === "heads" ? <CoinHeads /> : <CoinTails />}
+                    </div>
+                    <p className="text-2xl font-black uppercase tracking-[0.14em] text-white">
+                      {tossSide}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                      Scroll and proceed to match toss
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
 
         <section className="grid md:grid-cols-2 gap-8 mb-10">
           <TeamRoster color="blue" roster={teamA} setRoster={setTeamA} />

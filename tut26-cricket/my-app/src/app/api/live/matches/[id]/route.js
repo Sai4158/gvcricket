@@ -11,6 +11,10 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 export const preferredRegion = ["iad1"];
 
+const STREAM_HEARTBEAT_INTERVAL_MS = 15_000;
+const STREAM_CATCHUP_INTERVAL_MS = 30_000;
+const STREAM_BOOTSTRAP_PAD = "0".repeat(64);
+
 function sseHeaders() {
   return {
     "Content-Type": "text/event-stream",
@@ -90,7 +94,7 @@ export async function GET(request, { params }) {
         }
       };
 
-      const scheduleHeartbeat = (delay = 4000) => {
+      const scheduleHeartbeat = (delay = STREAM_HEARTBEAT_INTERVAL_MS) => {
         if (closed) {
           return;
         }
@@ -152,7 +156,6 @@ export async function GET(request, { params }) {
           send("match", {
             match: nextPublicMatch,
             updatedAt: new Date().toISOString(),
-            pad: "0".repeat(1024),
           });
         };
 
@@ -162,7 +165,7 @@ export async function GET(request, { params }) {
           }
 
           try {
-            if (!send("ping", { ok: true, ts: Date.now(), pad: "0".repeat(2048) })) {
+            if (!send("ping", { ok: true, ts: Date.now() })) {
               return;
             }
           } catch (error) {
@@ -186,7 +189,7 @@ export async function GET(request, { params }) {
         }
 
         bootstrapCatchupDone = true;
-        scheduleBootstrapCatchup(liveUpdatesReady ? 12000 : 1000);
+        scheduleBootstrapCatchup(liveUpdatesReady ? STREAM_CATCHUP_INTERVAL_MS : 1000);
       };
 
         await pushMatch();
@@ -194,7 +197,7 @@ export async function GET(request, { params }) {
           ok: true,
           ts: Date.now(),
           init: true,
-          pad: "0".repeat(2048),
+          pad: STREAM_BOOTSTRAP_PAD,
         });
 
         try {
@@ -214,7 +217,7 @@ export async function GET(request, { params }) {
         }
 
         scheduleHeartbeat();
-        scheduleBootstrapCatchup(liveUpdatesReady ? 12000 : 1200);
+        scheduleBootstrapCatchup(liveUpdatesReady ? STREAM_CATCHUP_INTERVAL_MS : 1200);
 
         request.signal.addEventListener("abort", () => {
           stopStream();

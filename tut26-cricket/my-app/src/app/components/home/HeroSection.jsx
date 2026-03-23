@@ -82,7 +82,7 @@ export default function HeroSection({ liveMatch = null }) {
     video.muted = true;
     video.defaultMuted = true;
     video.playsInline = true;
-    video.preload = "auto";
+    video.preload = "metadata";
     video.setAttribute("muted", "");
     video.setAttribute("autoplay", "");
     video.setAttribute("playsinline", "true");
@@ -119,13 +119,17 @@ export default function HeroSection({ liveMatch = null }) {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         tryPlay();
+        return;
       }
+
+      video.pause();
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       isMounted = false;
+      video.pause();
       video.removeEventListener("loadedmetadata", handleLoadedMetadata);
       video.removeEventListener("loadeddata", markReady);
       video.removeEventListener("canplay", handleLoadedMetadata);
@@ -162,7 +166,7 @@ export default function HeroSection({ liveMatch = null }) {
           loop
           muted
           playsInline
-          preload="auto"
+          preload="metadata"
           disablePictureInPicture
           aria-hidden="true"
         >
