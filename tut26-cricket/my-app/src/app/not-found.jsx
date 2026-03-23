@@ -46,19 +46,19 @@ export default function NotFound() {
         initial="hidden"
         animate="visible"
       >
-        <motion.div variants={itemVariants} className="mb-6">
+        <motion.div variants={itemVariants} className="mb-2">
           <Image
             src="/gvLogo.png"
             alt="GV Cricket"
-            width={280}
-            height={280}
-            className="mx-auto h-36 w-36 object-contain drop-shadow-[0_0_32px_rgba(220,38,38,0.18)] sm:h-44 sm:w-44"
+            width={1800}
+            height={1800}
+            className="mx-auto h-[22rem] w-[22rem] object-contain drop-shadow-[0_0_42px_rgba(220,38,38,0.2)] sm:h-[28rem] sm:w-[28rem]"
             priority
           />
         </motion.div>
 
         <motion.h2
-          className="mb-2 text-xs font-semibold uppercase tracking-[0.38em] text-rose-200/72"
+          className="mb-1 text-xs font-semibold uppercase tracking-[0.38em] text-rose-200/72"
           variants={itemVariants}
         >
           Page Not Found

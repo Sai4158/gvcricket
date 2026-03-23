@@ -19,6 +19,8 @@ import StepFlow from "../shared/StepFlow";
 import LiquidSportText from "../home/LiquidSportText";
 
 const getDraftTokenKey = (sessionId) => `session_${sessionId}_draftToken`;
+const getTossPromptHandoffKey = (sessionId) =>
+  `session_${sessionId}_tossPromptPrimed_v1`;
 const TOSS_ANNOUNCER_SETTINGS = {
   enabled: true,
   muted: false,
@@ -145,6 +147,17 @@ export default function TossPageClient({
       return;
     }
 
+    if (typeof window !== "undefined") {
+      const handoffPrompt = window.sessionStorage.getItem(
+        getTossPromptHandoffKey(sessionId)
+      );
+      if (handoffPrompt) {
+        window.sessionStorage.removeItem(getTossPromptHandoffKey(sessionId));
+        choicePromptedRef.current = true;
+        return;
+      }
+    }
+
     const teamName = getTeamBundle(matchDetails, "teamA").name;
     const nextChoicePrompt = buildTossChoicePrompt(teamName);
     prime();
@@ -153,15 +166,17 @@ export default function TossPageClient({
       priority: 2,
       interrupt: true,
     });
-  }, [matchDetails, prime, speak, status]);
+  }, [matchDetails, prime, sessionId, speak, status]);
 
   useEffect(() => {
     if (status !== "counting" || countdown <= 0 || spokenCountdownRef.current === countdown) {
       return;
     }
 
-    spokenCountdownRef.current = countdown;
-    speak(String(countdown), { interrupt: true });
+    const didSpeak = speak(String(countdown), { interrupt: true });
+    if (didSpeak) {
+      spokenCountdownRef.current = countdown;
+    }
   }, [countdown, speak, status]);
 
   useEffect(() => {
@@ -190,13 +205,16 @@ export default function TossPageClient({
     announcedResultRef.current = "";
     choicePromptedRef.current = true;
     prime({ userGesture: true });
-    if (speak("3", { userGesture: true, interrupt: true })) {
-      spokenCountdownRef.current = 3;
-    }
     setPlayerChoice(choice);
     setCountdown(3);
     setTossResult({ side: null, winnerName: null, call: null });
     setStatus("counting");
+    window.setTimeout(() => {
+      const didSpeak = speak("3", { userGesture: true, interrupt: true });
+      if (didSpeak) {
+        spokenCountdownRef.current = 3;
+      }
+    }, 0);
   };
 
   const startMatch = async (decision) => {
