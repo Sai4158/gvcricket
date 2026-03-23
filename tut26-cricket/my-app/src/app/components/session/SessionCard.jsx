@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   FaArrowUpRightFromSquare,
@@ -11,10 +11,11 @@ import {
 } from "react-icons/fa6";
 import { formatRelativeTime } from "./formatRelativeTime";
 import PendingLink from "../shared/PendingLink";
-import SafeMatchImage, {
+import {
   GV_MATCH_FALLBACK_IMAGE,
   resolveSafeMatchImage,
 } from "../shared/SafeMatchImage";
+import MatchImageCarousel from "../shared/MatchImageCarousel";
 import { primeUiAudio } from "../../lib/page-audio";
 
 function buildStatusMeta(session) {
@@ -72,11 +73,15 @@ function SessionCard({
   onUmpireClick,
   onDirectorClick,
   shouldBlockCardOpen,
+  onImageHold,
 }) {
   const router = useRouter();
+  const cardRef = useRef(null);
+  const [shouldLoadGallery, setShouldLoadGallery] = useState(false);
   const isLive = session.isLive;
   const statusMeta = buildStatusMeta(session);
-  const cardImage = session.matchImageUrl || "";
+  const matchImages = Array.isArray(session.matchImages) ? session.matchImages : [];
+  const cardImage = matchImages[0]?.url || session.matchImageUrl || "";
   const hasUploadedCardImage =
     resolveSafeMatchImage(cardImage) !== GV_MATCH_FALLBACK_IMAGE;
   const scoreHref =
@@ -92,6 +97,40 @@ function SessionCard({
   const dateLabel = formatSessionDateLabel(session);
   const canOpenCard = Boolean(scoreHref);
 
+  useEffect(() => {
+    if (!hasUploadedCardImage || shouldLoadGallery) {
+      return undefined;
+    }
+
+    const element = cardRef.current;
+    if (!element || typeof IntersectionObserver === "undefined") {
+      const frameId = window.requestAnimationFrame(() => {
+        setShouldLoadGallery(true);
+      });
+      return () => {
+        window.cancelAnimationFrame(frameId);
+      };
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldLoadGallery(true);
+          observer.disconnect();
+        }
+      },
+      {
+        rootMargin: "320px 0px",
+        threshold: 0.01,
+      }
+    );
+
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasUploadedCardImage, shouldLoadGallery]);
+
   const handleCardOpen = () => {
     if (!scoreHref || shouldBlockCardOpen?.()) {
       return;
@@ -103,6 +142,7 @@ function SessionCard({
 
   return (
     <div
+      ref={cardRef}
       role={canOpenCard ? "link" : undefined}
       tabIndex={canOpenCard ? 0 : undefined}
       aria-label={canOpenCard ? `Open ${session.name || "session"}` : undefined}
@@ -191,20 +231,34 @@ function SessionCard({
           <div className="relative mt-6 overflow-hidden rounded-[20px] border border-white/8 bg-black/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-[linear-gradient(180deg,rgba(0,0,0,0.72),rgba(0,0,0,0))] px-4 py-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-zinc-300/85">
-                Match image
+                {matchImages.length > 1 ? "Match images" : "Match image"}
               </p>
             </div>
-            <div className="relative aspect-[16/8.8]">
-              <SafeMatchImage
-                src={cardImage}
-                alt={`${session.name || "Session"} match image`}
-                fill
-                sizes="(max-width: 768px) 100vw, 33vw"
-                className="object-cover object-center"
-                fallbackClassName="object-cover object-center"
-              />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(7,7,10,0.08),rgba(7,7,10,0.18))]" />
+            <div
+              onPointerDown={(event) => event.stopPropagation()}
+              onPointerUp={(event) => event.stopPropagation()}
+              onPointerLeave={(event) => event.stopPropagation()}
+              onPointerCancel={(event) => event.stopPropagation()}
+            >
+              {shouldLoadGallery ? (
+                <MatchImageCarousel
+                  images={matchImages.length ? matchImages : [{ id: "cover", url: cardImage }]}
+                  alt={`${session.name || "Session"} match image`}
+                  compact
+                  className="relative"
+                  imageClassName="object-cover object-center"
+                  fallbackClassName="object-cover object-center"
+                  onImageHold={(image, index, event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onImageHold?.(session, image, index);
+                  }}
+                />
+              ) : (
+                <div className="aspect-[16/8.8] w-full bg-[linear-gradient(180deg,rgba(22,22,28,0.9),rgba(10,10,14,0.96))]" />
+              )}
             </div>
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(7,7,10,0.08),rgba(7,7,10,0.18))]" />
           </div>
         ) : (
           <div className="mt-6 rounded-[20px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.03),transparent_28%),linear-gradient(180deg,rgba(0,0,0,0.18),rgba(0,0,0,0.32))] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">

@@ -1,7 +1,5 @@
 import { connectDB } from "../../../../lib/db";
 import { ensureLiveUpdates, subscribeToMatch } from "../../../../lib/live-updates";
-import { buildSessionMirrorUpdate } from "../../../../lib/match-engine";
-import { hydrateLegacyTossState } from "../../../../lib/match-toss";
 import { serializePublicMatch } from "../../../../lib/public-data";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
@@ -12,8 +10,89 @@ export const maxDuration = 300;
 export const preferredRegion = ["iad1"];
 
 const STREAM_HEARTBEAT_INTERVAL_MS = 15_000;
-const STREAM_CATCHUP_INTERVAL_MS = 30_000;
+const STREAM_CATCHUP_INTERVAL_MS = 180_000;
+const STREAM_FALLBACK_POLL_INTERVAL_MS = 5_000;
+const LIVE_MATCH_SNAPSHOT_CACHE_TTL_MS = 1_000;
 const STREAM_BOOTSTRAP_PAD = "0".repeat(64);
+const LIVE_MATCH_FIELDS =
+  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory";
+const FALLBACK_SESSION_FIELDS =
+  "tossWinner tossDecision teamAName teamBName teamA teamB";
+const globalMatchSnapshotCache =
+  globalThis.__gvLiveMatchSnapshotCache || new Map();
+
+if (!globalThis.__gvLiveMatchSnapshotCache) {
+  globalThis.__gvLiveMatchSnapshotCache = globalMatchSnapshotCache;
+}
+
+function pruneMatchSnapshotCache(now = Date.now()) {
+  if (globalMatchSnapshotCache.size < 100) {
+    return;
+  }
+
+  for (const [key, entry] of globalMatchSnapshotCache.entries()) {
+    if (!entry?.pending && Number(entry?.expiresAt || 0) <= now) {
+      globalMatchSnapshotCache.delete(key);
+    }
+  }
+}
+
+function getMatchSnapshotCacheEntry(matchId) {
+  pruneMatchSnapshotCache();
+  const key = String(matchId || "");
+  if (!globalMatchSnapshotCache.has(key)) {
+    globalMatchSnapshotCache.set(key, {
+      value: null,
+      expiresAt: 0,
+      pending: null,
+    });
+  }
+
+  return globalMatchSnapshotCache.get(key);
+}
+
+async function readLiveMatchSnapshot(matchId) {
+  const match = await Match.findById(matchId).select(LIVE_MATCH_FIELDS).lean();
+  const fallbackSession =
+    match?.sessionId
+      ? await Session.findById(match.sessionId)
+          .select(FALLBACK_SESSION_FIELDS)
+          .lean()
+      : null;
+  const publicMatch = serializePublicMatch(match, fallbackSession, {
+    includeActionHistory: true,
+  });
+
+  return {
+    publicMatch,
+    serialized: JSON.stringify(publicMatch),
+  };
+}
+
+async function getCachedLiveMatchSnapshot(matchId, { force = false } = {}) {
+  const cacheEntry = getMatchSnapshotCacheEntry(matchId);
+  const now = Date.now();
+
+  if (!force && cacheEntry.value && cacheEntry.expiresAt > now) {
+    return cacheEntry.value;
+  }
+
+  if (cacheEntry.pending) {
+    return cacheEntry.pending;
+  }
+
+  cacheEntry.pending = readLiveMatchSnapshot(matchId)
+    .then((value) => {
+      cacheEntry.value = value;
+      cacheEntry.expiresAt = Date.now() + LIVE_MATCH_SNAPSHOT_CACHE_TTL_MS;
+      return value;
+    })
+    .finally(() => {
+      cacheEntry.pending = null;
+    });
+
+  return cacheEntry.pending;
+}
 
 function sseHeaders() {
   return {
@@ -41,7 +120,6 @@ export async function GET(request, { params }) {
       let closed = false;
       let didCleanup = false;
       let lastSerializedMatch = "";
-      let bootstrapCatchupDone = false;
       let liveUpdatesReady = false;
       let heartbeatLoop = async () => {};
       let bootstrapCatchupLoop = async () => {};
@@ -121,33 +199,17 @@ export async function GET(request, { params }) {
       try {
         await connectDB();
 
-        const pushMatch = async () => {
+        const pushMatch = async ({ force = false } = {}) => {
           if (closed) {
             return;
           }
-          const match = await Match.findById(id);
-          const fallbackSession =
-            match && match.sessionId
-              ? await Session.findById(match.sessionId).select(
-                  "tossWinner tossDecision teamAName teamBName teamA teamB"
-                )
-              : null;
+          const {
+            publicMatch: nextPublicMatch,
+            serialized: nextSerializedMatch,
+          } = await getCachedLiveMatchSnapshot(id, { force });
           if (closed) {
             return;
           }
-
-          if (match && hydrateLegacyTossState(match, fallbackSession)) {
-            await match.save();
-            await Session.findByIdAndUpdate(match.sessionId, {
-              $set: buildSessionMirrorUpdate(match),
-            });
-          }
-
-          const nextMatch = serializePublicMatch(match, fallbackSession);
-          const nextPublicMatch = serializePublicMatch(match, fallbackSession, {
-            includeActionHistory: true,
-          });
-          const nextSerializedMatch = JSON.stringify(nextPublicMatch);
           if (nextSerializedMatch === lastSerializedMatch) {
             return;
           }
@@ -177,20 +239,23 @@ export async function GET(request, { params }) {
           scheduleHeartbeat();
         };
 
-      bootstrapCatchupLoop = async () => {
-        if (closed) {
-          return;
-        }
+        bootstrapCatchupLoop = async () => {
+          if (closed) {
+            return;
+          }
 
-        try {
-          await pushMatch();
-        } catch (error) {
-          console.error("Match SSE bootstrap catchup failed:", error);
-        }
+          try {
+            await pushMatch();
+          } catch (error) {
+            console.error("Match SSE bootstrap catchup failed:", error);
+          }
 
-        bootstrapCatchupDone = true;
-        scheduleBootstrapCatchup(liveUpdatesReady ? STREAM_CATCHUP_INTERVAL_MS : 1000);
-      };
+          scheduleBootstrapCatchup(
+            liveUpdatesReady
+              ? STREAM_CATCHUP_INTERVAL_MS
+              : STREAM_FALLBACK_POLL_INTERVAL_MS
+          );
+        };
 
         await pushMatch();
         send("ping", {
@@ -206,7 +271,7 @@ export async function GET(request, { params }) {
             liveUpdatesReady = true;
             cleanup = subscribeToMatch(id, async () => {
               try {
-                await pushMatch();
+                await pushMatch({ force: true });
               } catch (error) {
                 console.error("Match SSE push failed:", error);
               }
@@ -217,7 +282,9 @@ export async function GET(request, { params }) {
         }
 
         scheduleHeartbeat();
-        scheduleBootstrapCatchup(liveUpdatesReady ? STREAM_CATCHUP_INTERVAL_MS : 1200);
+        scheduleBootstrapCatchup(
+          liveUpdatesReady ? STREAM_CATCHUP_INTERVAL_MS : 1200
+        );
 
         request.signal.addEventListener("abort", () => {
           stopStream();

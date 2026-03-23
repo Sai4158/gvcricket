@@ -14,6 +14,7 @@ import LiquidLoader from "../shared/LiquidLoader";
 function WalkieInlineTalkButton({
   active = false,
   finishing = false,
+  pending = false,
   countdown = 0,
   finishDelayLeft = 0,
   onPrepare,
@@ -92,7 +93,7 @@ function WalkieInlineTalkButton({
   }, [active, starting]);
 
   const live = active || finishing;
-  const pending = starting && !live;
+  const pendingState = pending || (starting && !live);
 
   return (
     <button
@@ -118,7 +119,7 @@ function WalkieInlineTalkButton({
       className={`inline-flex min-w-[154px] touch-none select-none items-center justify-center gap-2 rounded-full px-2 py-2 text-xs font-semibold transition ${
         live
           ? "bg-[linear-gradient(135deg,#d1fae5_0%,#34d399_35%,#10b981_100%)] text-black shadow-[0_14px_34px_rgba(16,185,129,0.28)]"
-          : pending
+          : pendingState
           ? "border border-cyan-300/30 bg-cyan-500/12 text-cyan-50 shadow-[0_14px_34px_rgba(34,211,238,0.18)]"
           : "border border-white/14 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:border-emerald-200/28 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))]"
       }`}
@@ -136,7 +137,7 @@ function WalkieInlineTalkButton({
         className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
           live
             ? "bg-black/12"
-            : pending
+            : pendingState
             ? "bg-cyan-400/12 text-cyan-100"
             : "bg-emerald-400/12 text-emerald-200"
         }`}
@@ -145,12 +146,12 @@ function WalkieInlineTalkButton({
       </span>
       <span className="whitespace-nowrap">
         {finishing
-          ? `Finishing ${finishDelayLeft || 1}s`
+          ? "Live"
           : active
-          ? `Live ${countdown}s`
-          : pending
-          ? "Connecting"
-          : "Press & hold"}
+          ? "Live"
+          : pendingState
+          ? "Talk"
+          : "Talk"}
       </span>
     </button>
   );
@@ -163,6 +164,7 @@ export function WalkieNotice({
   attention = false,
   quickTalkEnabled = false,
   quickTalkActive = false,
+  quickTalkPending = false,
   quickTalkFinishing = false,
   quickTalkCountdown = 0,
   quickTalkFinishDelayLeft = 0,
@@ -181,7 +183,17 @@ export function WalkieNotice({
     attentionMode !== "off" &&
     attentionMode !== "none" &&
     Boolean(attentionMode);
-  const displayNotice = notice || (quickTalkEnabled ? "Walkie is live. Hold here to talk instantly." : "");
+  const displayNotice =
+    notice ||
+    (quickTalkEnabled
+      ? quickTalkPending
+        ? "Connecting live channel..."
+        : quickTalkActive
+        ? `Live on. ${quickTalkCountdown || 0}s running.`
+        : quickTalkFinishing
+        ? `Connected. ${quickTalkFinishDelayLeft || 1}s left.`
+        : "Connection live. Speak after short beep."
+      : "");
   if (!displayNotice && !quickTalkEnabled) return null;
 
   const attentionClasses = attentionActive
@@ -220,6 +232,7 @@ export function WalkieNotice({
       {quickTalkEnabled ? (
         <WalkieInlineTalkButton
           active={quickTalkActive}
+          pending={quickTalkPending}
           finishing={quickTalkFinishing}
           countdown={quickTalkCountdown}
           finishDelayLeft={quickTalkFinishDelayLeft}

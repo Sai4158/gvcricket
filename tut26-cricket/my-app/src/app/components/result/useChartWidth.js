@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 export default function useChartWidth() {
   const containerRef = useRef(null);
+  const widthRef = useRef(0);
   const [width, setWidth] = useState(0);
 
   useEffect(() => {
@@ -11,7 +12,12 @@ export default function useChartWidth() {
     if (!element) return undefined;
 
     const updateWidth = () => {
-      setWidth(Math.max(0, Math.floor(element.getBoundingClientRect().width)));
+      const nextWidth = Math.max(0, Math.floor(element.getBoundingClientRect().width));
+      if (nextWidth === widthRef.current) {
+        return;
+      }
+      widthRef.current = nextWidth;
+      setWidth(nextWidth);
     };
 
     updateWidth();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   FaBookOpen,
@@ -102,6 +102,9 @@ function ActionIconButton({
   talking = false,
   badge,
   badgeClass = "",
+  statusText = "",
+  statusClass = "",
+  holdStatusText = "",
   compact = false,
 }) {
   const holdTimerRef = useRef(null);
@@ -109,6 +112,7 @@ function ActionIconButton({
   const suppressClickRef = useRef(false);
   const feedbackTriggeredRef = useRef(false);
   const pointerIdRef = useRef(null);
+  const [holdPreviewActive, setHoldPreviewActive] = useState(false);
 
   const clearHoldTimer = () => {
     if (holdTimerRef.current) {
@@ -123,6 +127,7 @@ function ActionIconButton({
       return;
     }
 
+    setHoldPreviewActive(true);
     onPressFeedback?.();
     feedbackTriggeredRef.current = true;
     void onPressStart?.();
@@ -135,6 +140,7 @@ function ActionIconButton({
 
   const endPress = () => {
     clearHoldTimer();
+    setHoldPreviewActive(false);
     if (!holdStartedRef.current) {
       return;
     }
@@ -258,6 +264,21 @@ function ActionIconButton({
       >
         {label}
       </span>
+      {statusText || (holdPreviewActive && holdStatusText) ? (
+        <span
+          className={`w-full text-left text-[10px] font-semibold uppercase tracking-[0.16em] ${
+            holdPreviewActive && holdStatusText ? "text-cyan-200" : statusClass || "text-zinc-400"
+          }`}
+          style={{
+            userSelect: "none",
+            WebkitUserSelect: "none",
+            WebkitTouchCallout: "none",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          {holdPreviewActive && holdStatusText ? holdStatusText : statusText}
+        </span>
+      ) : null}
     </motion.button>
   );
 }
@@ -310,32 +331,33 @@ export default function MatchActionGrid({
             colorClass="text-emerald-300"
             active={isWalkieActive}
             talking={isWalkieTalking}
-            badge={
+            statusText={
               isWalkieTalking
-                ? "Live"
+                ? "Live on"
                 : isWalkieBusyByOther
-                ? walkieBusyLabel || "Busy"
+                ? walkieBusyLabel || "Live"
                 : isWalkieLoading
                 ? "Connecting"
                 : isWalkieFinishing
-                ? "Finishing"
+                ? "Connected"
                 : isWalkieActive
-                ? "On"
-                : "Off"
+                ? "Hold to talk"
+                : ""
             }
-            badgeClass={
+            statusClass={
               isWalkieTalking
-                ? "border-cyan-400/30 bg-cyan-500/15 text-cyan-100"
+                ? "text-cyan-100"
                 : isWalkieBusyByOther
-                ? "border-amber-400/25 bg-amber-500/12 text-amber-100"
+                ? "text-amber-100"
                 : isWalkieLoading
-                ? "border-sky-400/25 bg-sky-500/12 text-sky-100"
+                ? "text-sky-100"
                 : isWalkieFinishing
-                ? "border-amber-400/25 bg-amber-500/12 text-amber-100"
+                ? "text-emerald-100"
                 : isWalkieActive
-                ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
-                : "border-rose-400/20 bg-rose-500/10 text-rose-200"
+                ? "text-emerald-200"
+                : "text-zinc-500"
             }
+            holdStatusText="Trying"
           />
           <ActionIconButton
             onClick={onCommentary}

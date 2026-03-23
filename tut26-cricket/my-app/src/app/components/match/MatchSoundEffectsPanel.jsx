@@ -6,6 +6,7 @@ import {
   FaGripVertical,
   FaMusic,
   FaPause,
+  FaPlay,
   FaVolumeUp,
 } from "react-icons/fa";
 
@@ -25,6 +26,7 @@ export default function MatchSoundEffectsPanel({
   error = "",
   activeEffectId = "",
   activeEffectStatus = "idle",
+  activeEffectCurrentTime = 0,
   effectDurations = {},
   onToggle,
   onMinimize,
@@ -244,6 +246,19 @@ export default function MatchSoundEffectsPanel({
     clearDragState();
   }, [clearDragState]);
 
+  const handleEffectTap = useCallback((file, isActive) => {
+    if (isDisabled) {
+      return;
+    }
+
+    if (isActive) {
+      onStopEffect?.();
+      return;
+    }
+
+    void onPlayEffect?.(file);
+  }, [isDisabled, onPlayEffect, onStopEffect]);
+
   return (
     <section
       className={`relative mt-6 overflow-hidden rounded-[30px] border px-4 py-4 transition ${
@@ -314,6 +329,18 @@ export default function MatchSoundEffectsPanel({
             <div className="grid grid-cols-2 gap-3">
               {files.map((file) => {
                 const isActive = activeEffectId === file.id;
+                const effectDuration = Number(effectDurations[file.id] || 0);
+                const effectCurrentTime = isActive
+                  ? Math.min(
+                      effectDuration > 0 ? effectDuration : activeEffectCurrentTime,
+                      Math.max(0, Number(activeEffectCurrentTime || 0)),
+                    )
+                  : 0;
+                const statusText = isActive
+                  ? activeEffectStatus === "loading"
+                    ? "Loading..."
+                    : "Tap to pause"
+                  : "Tap to play";
                 return (
                   <div
                     key={file.id}
@@ -324,17 +351,13 @@ export default function MatchSoundEffectsPanel({
                     onDragOver={(event) => handleDragOver(event, file.id)}
                     onDrop={(event) => handleDrop(event, file.id)}
                     onDragEnd={clearDragState}
-                    onClick={() => {
-                      if (!isDisabled) {
-                        void onPlayEffect?.(file);
-                      }
-                    }}
+                    onClick={() => handleEffectTap(file, isActive)}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(event) => {
                       if ((event.key === "Enter" || event.key === " ") && !isDisabled) {
                         event.preventDefault();
-                        void onPlayEffect?.(file);
+                        handleEffectTap(file, isActive);
                       }
                     }}
                     className={`rounded-[24px] border px-4 py-4 text-left transition ${
@@ -402,30 +425,38 @@ export default function MatchSoundEffectsPanel({
                       <div className="mt-3 flex items-end justify-between gap-2">
                         <div className="space-y-1 text-xs text-zinc-400">
                           <div className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">
-                            {isActive
-                              ? activeEffectStatus === "loading"
-                                ? "Loading..."
-                                : "Playing"
-                              : "Tap to play"}
+                            {statusText}
                           </div>
                           <div className="text-[11px] text-zinc-500">
-                            {formatAudioTime(effectDurations[file.id] || 0)}
+                            {`${formatAudioTime(effectCurrentTime)} / ${formatAudioTime(
+                              effectDuration,
+                            )}`}
                           </div>
                         </div>
-                        {isActive ? (
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              onStopEffect?.();
-                            }}
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/8 text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)]"
-                            aria-label={`Stop ${file.label}`}
-                          >
-                            <FaPause className="text-xs" />
-                          </button>
-                        ) : null}
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            handleEffectTap(file, isActive);
+                          }}
+                          className={`inline-flex h-10 w-10 items-center justify-center rounded-full border text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] transition ${
+                            isActive
+                              ? "border-emerald-300/20 bg-emerald-500/12"
+                              : "border-white/10 bg-white/8"
+                          }`}
+                          aria-label={`${isActive ? "Pause" : "Play"} ${file.label}`}
+                        >
+                          {isActive ? (
+                            activeEffectStatus === "loading" ? (
+                              <FaMusic className="text-xs" />
+                            ) : (
+                              <FaPause className="text-xs" />
+                            )
+                          ) : (
+                            <FaPlay className="translate-x-[1px] text-xs" />
+                          )}
+                        </button>
                       </div>
                     </div>
                   </div>

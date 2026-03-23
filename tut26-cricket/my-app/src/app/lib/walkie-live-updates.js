@@ -7,12 +7,16 @@ import WalkieState from "../../models/WalkieState";
 const emitter = globalThis.__gvWalkieLiveEmitter || new EventEmitter();
 globalThis.__gvWalkieLiveEmitter = emitter;
 emitter.setMaxListeners(1000);
+const WATCHER_IDLE_SHUTDOWN_MS = 60_000;
 
 const state = globalThis.__gvWalkieLiveState || {
   initialized: false,
   initializing: null,
   stateWatcher: null,
   messageWatcher: null,
+  stateSubscribers: new Map(),
+  messageSubscribers: new Map(),
+  idleShutdownTimer: null,
 };
 globalThis.__gvWalkieLiveState = state;
 
@@ -40,6 +44,63 @@ export function publishWalkieStateUpdate(matchId) {
 
 export function publishWalkieMessage(matchId, participantId) {
   emitWalkieMessage(matchId, participantId);
+}
+
+function clearIdleShutdownTimer() {
+  if (state.idleShutdownTimer) {
+    clearTimeout(state.idleShutdownTimer);
+    state.idleShutdownTimer = null;
+  }
+}
+
+function getTotalSubscriberCount() {
+  let total = 0;
+
+  for (const count of state.stateSubscribers.values()) {
+    total += Number(count || 0);
+  }
+
+  for (const count of state.messageSubscribers.values()) {
+    total += Number(count || 0);
+  }
+
+  return total;
+}
+
+async function closeWatchers() {
+  clearIdleShutdownTimer();
+
+  const stateWatcher = state.stateWatcher;
+  const messageWatcher = state.messageWatcher;
+  state.stateWatcher = null;
+  state.messageWatcher = null;
+  state.initialized = false;
+
+  await Promise.allSettled([
+    stateWatcher?.close?.(),
+    messageWatcher?.close?.(),
+  ]);
+}
+
+function scheduleIdleShutdown() {
+  if (getTotalSubscriberCount() > 0) {
+    clearIdleShutdownTimer();
+    return;
+  }
+
+  if (state.idleShutdownTimer) {
+    return;
+  }
+
+  state.idleShutdownTimer = setTimeout(() => {
+    state.idleShutdownTimer = null;
+
+    if (getTotalSubscriberCount() > 0) {
+      return;
+    }
+
+    void closeWatchers();
+  }, WATCHER_IDLE_SHUTDOWN_MS);
 }
 
 async function startWatchers() {
@@ -81,6 +142,8 @@ async function startWatchers() {
 }
 
 export async function ensureWalkieLiveUpdates() {
+  clearIdleShutdownTimer();
+
   if (state.initialized) return;
   if (state.initializing) {
     await state.initializing;
@@ -99,13 +162,37 @@ export async function ensureWalkieLiveUpdates() {
 }
 
 export function subscribeToWalkieState(matchId, callback) {
+  clearIdleShutdownTimer();
   const eventName = `walkie-state:${String(matchId)}`;
+  const currentCount = Number(state.stateSubscribers.get(eventName) || 0);
+  state.stateSubscribers.set(eventName, currentCount + 1);
   emitter.on(eventName, callback);
-  return () => emitter.off(eventName, callback);
+  return () => {
+    emitter.off(eventName, callback);
+    const nextCount = Number(state.stateSubscribers.get(eventName) || 0) - 1;
+    if (nextCount <= 0) {
+      state.stateSubscribers.delete(eventName);
+    } else {
+      state.stateSubscribers.set(eventName, nextCount);
+    }
+    scheduleIdleShutdown();
+  };
 }
 
 export function subscribeToWalkieMessages(matchId, participantId, callback) {
+  clearIdleShutdownTimer();
   const eventName = `walkie-message:${String(matchId)}:${String(participantId)}`;
+  const currentCount = Number(state.messageSubscribers.get(eventName) || 0);
+  state.messageSubscribers.set(eventName, currentCount + 1);
   emitter.on(eventName, callback);
-  return () => emitter.off(eventName, callback);
+  return () => {
+    emitter.off(eventName, callback);
+    const nextCount = Number(state.messageSubscribers.get(eventName) || 0) - 1;
+    if (nextCount <= 0) {
+      state.messageSubscribers.delete(eventName);
+    } else {
+      state.messageSubscribers.set(eventName, nextCount);
+    }
+    scheduleIdleShutdown();
+  };
 }

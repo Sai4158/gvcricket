@@ -24,6 +24,19 @@ const OverSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const MatchImageEntrySchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true, trim: true },
+    url: { type: String, default: "", trim: true },
+    publicId: { type: String, default: "", trim: true },
+    storageUrlEnc: { type: String, default: "", trim: true },
+    storageUrlHash: { type: String, default: "", trim: true },
+    uploadedAt: { type: Date, default: null },
+    uploadedBy: { type: String, default: "", trim: true },
+  },
+  { _id: false }
+);
+
 const MatchSchema = new mongoose.Schema(
   {
     teamA: { type: [String], required: true },
@@ -56,6 +69,7 @@ const MatchSchema = new mongoose.Schema(
     widesInRow: { type: Number, default: 0 },
     balls: [BallSchema],
     images: { type: [String], default: [] },
+    matchImages: { type: [MatchImageEntrySchema], default: [] },
     announcer: { type: mongoose.Schema.Types.Mixed, default: {} },
     uiMeta: { type: mongoose.Schema.Types.Mixed, default: {} },
     mediaUpdatedAt: { type: Date, default: null },
@@ -84,7 +98,9 @@ const MatchSchema = new mongoose.Schema(
 );
 
 MatchSchema.index({ sessionId: 1 });
+MatchSchema.index({ sessionId: 1, updatedAt: -1, _id: -1 });
 MatchSchema.index({ isOngoing: 1, createdAt: -1 });
+MatchSchema.index({ isOngoing: 1, updatedAt: -1, _id: -1 });
 MatchSchema.index({ updatedAt: -1 });
 
 export default mongoose.models.Match || mongoose.model("Match", MatchSchema);

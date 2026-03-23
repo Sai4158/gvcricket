@@ -1,5 +1,6 @@
 import { getTeamBundle } from "./team-utils";
 import { getPublicMatchImagePath } from "./match-image-secure";
+import { getPublicMatchImages } from "./match-image-gallery";
 import { isSafeMatchImageUrl } from "./match-image";
 import { hasCompleteTossState, normalizeLegacyTossState } from "./match-toss";
 
@@ -16,6 +17,9 @@ export function serializePublicMatch(
       : matchDocument;
   const match = normalizeLegacyTossState(rawMatch, fallbackState);
   const includeActionHistory = Boolean(options.includeActionHistory);
+  const publicImages = getPublicMatchImages(match, {
+    matchId: String(match._id || ""),
+  });
 
   return {
     _id: String(match._id),
@@ -38,7 +42,8 @@ export function serializePublicMatch(
     innings2: match.innings2 || { team: "", score: 0, history: [] },
     tossReady: hasCompleteTossState(match, fallbackState),
     balls: Array.isArray(match.balls) ? match.balls : [],
-    matchImageUrl: getPublicMatchImagePath(match),
+    matchImageUrl: publicImages[0]?.url || getPublicMatchImagePath(match),
+    matchImages: publicImages,
     announcerEnabled: Boolean(match.announcerEnabled),
     announcerMode: match.announcerMode || "",
     lastLiveEvent: match.lastLiveEvent || null,
@@ -64,6 +69,9 @@ export function serializePublicSession(sessionDocument) {
     typeof sessionDocument.toObject === "function"
       ? sessionDocument.toObject()
       : sessionDocument;
+  const publicImages = getPublicMatchImages(session, {
+    matchId: String(session.match?._id || session.match || ""),
+  });
 
   const teamA = getTeamBundle(session, "teamA");
   const teamB = getTeamBundle(session, "teamB");
@@ -82,9 +90,11 @@ export function serializePublicSession(sessionDocument) {
     teamBName: teamB.name,
     teamA: teamA.players,
     teamB: teamB.players,
-    matchImageUrl: isSafeMatchImageUrl(session.matchImageUrl || "")
-      ? session.matchImageUrl || ""
-      : getPublicMatchImagePath({
+    matchImageUrl:
+      publicImages[0]?.url ||
+      (isSafeMatchImageUrl(session.matchImageUrl || "")
+        ? session.matchImageUrl || ""
+        : getPublicMatchImagePath({
           _id: session.match?._id || session.match || "",
           matchImageUrl: session.matchImageUrl || "",
           matchImageStorageUrlEnc: session.matchImageStorageUrlEnc || "",
@@ -92,7 +102,8 @@ export function serializePublicSession(sessionDocument) {
           matchImagePublicId: session.matchImagePublicId || "",
           matchImageUploadedAt: session.matchImageUploadedAt || null,
           updatedAt: session.updatedAt || null,
-        }),
+        })),
+    matchImages: publicImages,
     announcerEnabled: Boolean(session.announcerEnabled),
     announcerMode: session.announcerMode || "",
     lastEventType: session.lastEventType || "",

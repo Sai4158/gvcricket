@@ -27,6 +27,7 @@ import SessionCard from "./SessionCard";
 import LiquidSportText from "../home/LiquidSportText";
 import ImagePinModal from "../shared/ImagePinModal";
 import { ModalBase } from "../match/MatchBaseModals";
+import MatchImageUploader from "../match/MatchImageUploader";
 
 const SORT_OPTIONS = [
   { value: "live-newest", label: "Live first" },
@@ -38,12 +39,26 @@ const SORT_OPTIONS = [
 ];
 
 const PAGE_SIZE_OPTIONS = [
-  { value: "20", label: "20" },
-  { value: "40", label: "40" },
-  { value: "50", label: "50" },
-  { value: "80", label: "80" },
-  { value: "all", label: "All" },
+  { value: "12", label: "12" },
+  { value: "24", label: "24" },
+  { value: "36", label: "36" },
+  { value: "48", label: "48" },
 ];
+
+const FILTER_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "live", label: "Live" },
+  { value: "completed", label: "Completed" },
+];
+
+function normalizeSearchValue(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getTimestampMs(value) {
+  const timestamp = Date.parse(String(value || ""));
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
 
 function buildSearchText(session) {
   return [
@@ -53,19 +68,18 @@ function buildSearchText(session) {
     session.date,
     session.isLive ? "live live now" : "completed ended final score",
     session.result,
-    session.updatedAt ? new Date(session.updatedAt).toLocaleString() : "",
-    session.createdAt ? new Date(session.createdAt).toLocaleString() : "",
+    session.updatedAt,
+    session.createdAt,
   ]
+    .map(normalizeSearchValue)
     .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
+    .join(" ");
 }
 
 function sortSessions(items, sortValue) {
   const sessions = [...items];
   const byUpdatedDesc = (left, right) =>
-    new Date(right.updatedAt || right.createdAt || 0).getTime() -
-    new Date(left.updatedAt || left.createdAt || 0).getTime();
+    right.__updatedAtMs - left.__updatedAtMs;
 
   switch (sortValue) {
     case "newest":
@@ -79,11 +93,11 @@ function sortSessions(items, sortValue) {
       });
     case "a-z":
       return sessions.sort((left, right) =>
-        String(left.name || "").localeCompare(String(right.name || ""))
+        left.__sortName.localeCompare(right.__sortName)
       );
     case "z-a":
       return sessions.sort((left, right) =>
-        String(right.name || "").localeCompare(String(left.name || ""))
+        right.__sortName.localeCompare(left.__sortName)
       );
     case "live-newest":
     default:
@@ -127,15 +141,19 @@ export default function SessionsPageClient({ initialSessions }) {
   });
   const [manageSubmitting, setManageSubmitting] = useState(false);
   const [manageError, setManageError] = useState("");
+  const [imageActionContext, setImageActionContext] = useState(null);
+  const [imageDeleteContext, setImageDeleteContext] = useState(null);
+  const [imageReplaceContext, setImageReplaceContext] = useState(null);
+  const [imageActionError, setImageActionError] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("live-newest");
   const [filterBy, setFilterBy] = useState("all");
-  const [pageSizeValue, setPageSizeValue] = useState("20");
+  const [pageSizeValue, setPageSizeValue] = useState("24");
   const [page, setPage] = useState(1);
   const [isGoingHome, setIsGoingHome] = useState(false);
   const router = useRouter();
-  const deferredSearchQuery = useDeferredValue(searchInput.trim().toLowerCase());
+  const deferredSearchQuery = useDeferredValue(normalizeSearchValue(searchInput));
   const secretHoldTimerRef = useRef(null);
   const suppressCardOpenUntilRef = useRef(0);
 
@@ -149,6 +167,10 @@ export default function SessionsPageClient({ initialSessions }) {
   }, [deferredSearchQuery]);
 
   useEffect(() => {
+    setPage(1);
+  }, [filterBy, pageSizeValue, sortBy]);
+
+  useEffect(() => {
     return () => {
       if (secretHoldTimerRef.current) {
         window.clearTimeout(secretHoldTimerRef.current);
@@ -159,16 +181,28 @@ export default function SessionsPageClient({ initialSessions }) {
 
   const indexedSessions = useMemo(
     () =>
-      sessions.map((session) => ({
-        ...session,
-        __searchText: buildSearchText(session),
-      })),
+      sessions.map((session) => {
+        const updatedAtMs = getTimestampMs(session.updatedAt || session.createdAt);
+        return {
+          ...session,
+          __searchText: buildSearchText(session),
+          __sortName: normalizeSearchValue(session.name || ""),
+          __updatedAtMs: updatedAtMs,
+        };
+      }),
     [sessions]
   );
 
+  const searchTerms = useMemo(
+    () => searchQuery.split(/\s+/).filter(Boolean),
+    [searchQuery]
+  );
+
   const filteredSessions = useMemo(() => {
-    const searched = searchQuery
-      ? indexedSessions.filter((session) => session.__searchText.includes(searchQuery))
+    const searched = searchTerms.length
+      ? indexedSessions.filter((session) =>
+          searchTerms.every((term) => session.__searchText.includes(term))
+        )
       : indexedSessions;
 
     const filtered = searched.filter((session) => {
@@ -178,21 +212,16 @@ export default function SessionsPageClient({ initialSessions }) {
     });
 
     return sortSessions(filtered, sortBy);
-  }, [filterBy, indexedSessions, searchQuery, sortBy]);
+  }, [filterBy, indexedSessions, searchTerms, sortBy]);
 
-  const pageSize = pageSizeValue === "all" ? filteredSessions.length || 1 : Number(pageSizeValue);
+  const pageSize = Number(pageSizeValue);
   const totalPages = Math.max(1, Math.ceil(filteredSessions.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const pageStart = filteredSessions.length ? (currentPage - 1) * pageSize : 0;
-  const paginatedSessions =
-    pageSizeValue === "all"
-      ? filteredSessions
-      : filteredSessions.slice(pageStart, pageStart + pageSize);
+  const paginatedSessions = filteredSessions.slice(pageStart, pageStart + pageSize);
   const showingFrom = filteredSessions.length ? pageStart + 1 : 0;
   const showingTo = filteredSessions.length
-    ? pageSizeValue === "all"
-      ? filteredSessions.length
-      : Math.min(filteredSessions.length, pageStart + pageSize)
+    ? Math.min(filteredSessions.length, pageStart + pageSize)
     : 0;
 
   useEffect(() => {
@@ -207,6 +236,43 @@ export default function SessionsPageClient({ initialSessions }) {
   const handleOpenDirectorPin = useCallback((nextSession) => {
     setPinError("");
     setPinPrompt({ mode: "director", session: nextSession });
+  }, []);
+
+  const mergeMatchImageUpdateIntoSession = useCallback((sessionId, updatedMatch) => {
+    setSessions((current) =>
+      current.map((session) =>
+        session._id === sessionId
+          ? {
+              ...session,
+              matchImageUrl: updatedMatch?.matchImageUrl || "",
+              matchImages: Array.isArray(updatedMatch?.matchImages)
+                ? updatedMatch.matchImages
+                : [],
+              updatedAt: updatedMatch?.updatedAt || session.updatedAt,
+            }
+          : session
+      )
+    );
+  }, []);
+
+  const handleOpenImageActions = useCallback((session, image) => {
+    if (!session?.match) {
+      return;
+    }
+
+    setImageActionError("");
+    setImageActionContext({
+      sessionId: session._id,
+      matchId: session.match,
+      image,
+    });
+  }, []);
+
+  const closeImageActionFlows = useCallback(() => {
+    setImageActionContext(null);
+    setImageDeleteContext(null);
+    setImageReplaceContext(null);
+    setImageActionError("");
   }, []);
 
   const clearSecretHoldTimer = useCallback(() => {
@@ -383,6 +449,37 @@ export default function SessionsPageClient({ initialSessions }) {
     }
   }, [closeSessionManager, manageSessionContext, manageSubmitting]);
 
+  const handleDeleteSessionImage = useCallback(
+    async (pin) => {
+      if (!imageDeleteContext?.matchId) {
+        throw new Error("Match image is not ready.");
+      }
+
+      const response = await fetch(
+        `/api/matches/${imageDeleteContext.matchId}/image`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pin,
+            imageId: imageDeleteContext.image?.id || "",
+          }),
+        }
+      );
+      const payload = await response
+        .json()
+        .catch(() => ({ message: "Could not remove the image." }));
+
+      if (!response.ok) {
+        throw new Error(payload.message || "Could not remove the image.");
+      }
+
+      mergeMatchImageUpdateIntoSession(imageDeleteContext.sessionId, payload);
+      closeImageActionFlows();
+    },
+    [closeImageActionFlows, imageDeleteContext, mergeMatchImageUpdateIntoSession]
+  );
+
   const handlePinSubmit = async (pin) => {
     if (!pinPrompt?.session?.match || !pinPrompt.session.isLive) return;
 
@@ -537,11 +634,7 @@ export default function SessionsPageClient({ initialSessions }) {
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              {[
-                { value: "all", label: "All" },
-                { value: "live", label: "Live" },
-                { value: "completed", label: "Completed" },
-              ].map((pill) => (
+              {FILTER_OPTIONS.map((pill) => (
                 <button
                   key={pill.value}
                   type="button"
@@ -596,6 +689,7 @@ export default function SessionsPageClient({ initialSessions }) {
                       onUmpireClick={handleOpenUmpirePin}
                       onDirectorClick={handleOpenDirectorPin}
                       shouldBlockCardOpen={shouldBlockCardOpen}
+                      onImageHold={handleOpenImageActions}
                     />
                   </div>
                 ))}
@@ -768,6 +862,116 @@ export default function SessionsPageClient({ initialSessions }) {
               </div>
             </div>
           </ModalBase>
+        ) : null}
+        {imageActionContext ? (
+          <ModalBase
+            title="Match Images"
+            onExit={closeImageActionFlows}
+            panelClassName="max-w-sm"
+          >
+            <div className="space-y-3">
+              {imageActionError ? (
+                <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                  {imageActionError}
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  setImageReplaceContext({
+                    ...imageActionContext,
+                    mode: "add",
+                  });
+                  setImageActionContext(null);
+                }}
+                className="w-full rounded-2xl border border-emerald-300/16 bg-[linear-gradient(180deg,rgba(10,18,18,0.98),rgba(9,32,28,0.96)_56%,rgba(6,95,70,0.74))] px-4 py-3 text-sm font-semibold text-emerald-50 transition hover:brightness-110"
+              >
+                Add Image
+              </button>
+              {imageActionContext.image?.id ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageReplaceContext({
+                        ...imageActionContext,
+                        mode: "replace",
+                      });
+                      setImageActionContext(null);
+                    }}
+                    className="w-full rounded-2xl border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(10,16,26,0.96),rgba(8,47,73,0.78))] px-4 py-3 text-sm font-semibold text-cyan-50 transition hover:brightness-110"
+                  >
+                    Replace This Image
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageDeleteContext(imageActionContext);
+                      setImageActionContext(null);
+                    }}
+                    className="w-full rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/15"
+                  >
+                    Delete This Image
+                  </button>
+                </>
+              ) : null}
+            </div>
+          </ModalBase>
+        ) : null}
+        {imageReplaceContext ? (
+          <ModalBase
+            title={imageReplaceContext.mode === "replace" ? "Replace Match Image" : "Add Match Image"}
+            onExit={closeImageActionFlows}
+            panelClassName="max-w-md"
+            bodyClassName="max-h-[calc(100vh-7rem)]"
+          >
+            <MatchImageUploader
+              matchId={String(imageReplaceContext.matchId)}
+              existingImageUrl={
+                imageReplaceContext.mode === "replace"
+                  ? imageReplaceContext.image?.url || ""
+                  : ""
+              }
+              targetImageId={
+                imageReplaceContext.mode === "replace"
+                  ? imageReplaceContext.image?.id || ""
+                  : ""
+              }
+              appendOnUpload={imageReplaceContext.mode !== "replace"}
+              onUploaded={(updatedMatch) => {
+                mergeMatchImageUpdateIntoSession(
+                  imageReplaceContext.sessionId,
+                  updatedMatch
+                );
+                closeImageActionFlows();
+              }}
+              title={
+                imageReplaceContext.mode === "replace"
+                  ? "Replace the current image"
+                  : "Upload a new match image"
+              }
+              description={
+                imageReplaceContext.mode === "replace"
+                  ? "Replace this image in the match gallery."
+                  : "Add one more image to the match gallery."
+              }
+              primaryLabel={
+                imageReplaceContext.mode === "replace"
+                  ? "Replace Image"
+                  : "Add Image"
+              }
+            />
+          </ModalBase>
+        ) : null}
+        {imageDeleteContext ? (
+          <ImagePinModal
+            isOpen={Boolean(imageDeleteContext)}
+            title="Delete image"
+            subtitle="Enter the 6-digit PIN to remove this image."
+            confirmLabel="Delete image"
+            onConfirm={handleDeleteSessionImage}
+            onClose={closeImageActionFlows}
+          />
         ) : null}
         {isInfoModalOpen ? (
           <InfoModal onExit={() => setIsInfoModalOpen(false)} />

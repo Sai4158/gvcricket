@@ -138,6 +138,7 @@ export async function PATCH(req, { params }) {
           teamBName: session.teamBName,
           overs: session.overs,
           tossWinner: session.tossWinner,
+          matchImages: session.matchImages,
           matchImageUrl: session.matchImageUrl,
           matchImagePublicId: session.matchImagePublicId,
           matchImageUploadedAt: session.matchImageUploadedAt,

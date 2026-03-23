@@ -72,14 +72,22 @@ export function validateMatchImageBuffer(buffer, mimeType) {
   return { ok: true };
 }
 
-export function buildPublicMatchImageUrl(matchId, version = "") {
+export function buildPublicMatchImageUrl(matchId, version = "", imageId = "") {
   const safeId = String(matchId || "").trim();
   if (!/^[a-f0-9]{24}$/i.test(safeId)) {
     return "";
   }
 
-  const versionSuffix = version ? `?v=${encodeURIComponent(String(version))}` : "";
-  return `/api/matches/${safeId}/image/file${versionSuffix}`;
+  const searchParams = new URLSearchParams();
+  if (imageId) {
+    searchParams.set("imageId", String(imageId));
+  }
+  if (version) {
+    searchParams.set("v", String(version));
+  }
+
+  const query = searchParams.toString();
+  return `/api/matches/${safeId}/image/file${query ? `?${query}` : ""}`;
 }
 
 export function isSafeRemoteMatchImageUrl(value) {

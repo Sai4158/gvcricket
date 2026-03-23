@@ -197,6 +197,16 @@ const HOLD_BUTTON_INTERACTION_PROPS = {
 
 const ANNOUNCER_AUTO_RESET_DELAY_MS = 1500;
 const ANNOUNCER_GESTURE_READ_DELAY_MS = 2000;
+const SIX_PRE_EFFECT_DELAY_MS = 1000;
+
+function isSixBoundaryScoreEvent(event) {
+  return Boolean(
+    event?.type === "score_update" &&
+      !event?.ball?.isOut &&
+      !event?.ball?.extraType &&
+      Number(event?.ball?.runs) === 6,
+  );
+}
 
 export default function SessionViewClient({ sessionId, initialData }) {
   const [copied, setCopied] = useState(false);
@@ -233,6 +243,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const deferredAnnouncementRef = useRef(null);
   const soundEffectPlayingRef = useRef(false);
   const shouldResumeAfterSoundEffectRef = useRef(false);
+  const skipNextBoundaryLeadRef = useRef(false);
+  const pendingSoundEffectTimerRef = useRef(null);
+  const pendingManualScoreAnnouncementRef = useRef(null);
+  const activeBoundarySoundEffectRef = useRef(false);
   const previousSoundEffectMatchIdRef = useRef(initialData?.match?._id || "");
   const lastHandledSoundEffectEventRef = useRef(
     initialData?.match?.lastLiveEvent?.type === "sound_effect"
@@ -262,6 +276,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     url: sessionId ? `/api/live/sessions/${sessionId}` : null,
     event: "session",
     enabled: Boolean(sessionId),
+    disconnectWhenHidden: false,
     onMessage: (payload) => {
       if (payload.updatedAt && payload.updatedAt === lastStreamUpdateRef.current) {
         return;
@@ -332,6 +347,28 @@ export default function SessionViewClient({ sessionId, initialData }) {
         return false;
       }
 
+      if (soundEffectPlayingRef.current) {
+        pendingManualScoreAnnouncementRef.current = {
+          items: [
+            {
+              text,
+              pauseAfterMs: 0,
+              rate: 0.8,
+            },
+          ],
+          options: {
+            key: `spectator-current-score-deferred-${match._id}`,
+            priority: 4,
+            interrupt: true,
+            minGapMs: 0,
+            ignoreEnabled: true,
+            userGesture: Boolean(options.userGesture),
+          },
+          restoreAfterMs: 2400,
+        };
+        return true;
+      }
+
       return speakSequenceWithDuck(
         [
           {
@@ -364,10 +401,24 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
   const resumeSpectatorAnnouncementsAfterSoundEffect = useCallback(() => {
     soundEffectPlayingRef.current = false;
+    activeBoundarySoundEffectRef.current = false;
+    const pendingManualScore = pendingManualScoreAnnouncementRef.current;
+    pendingManualScoreAnnouncementRef.current = null;
     if (!shouldResumeAfterSoundEffectRef.current) {
       shouldResumeAfterSoundEffectRef.current = false;
       interruptedAnnouncementQueueRef.current = [];
       deferredAnnouncementRef.current = null;
+      if (
+        pendingManualScore &&
+        settings.enabled &&
+        settings.mode !== "silent"
+      ) {
+        speakSequenceWithDuck(
+          pendingManualScore.items,
+          pendingManualScore.options,
+          pendingManualScore.restoreAfterMs,
+        );
+      }
       return;
     }
     shouldResumeAfterSoundEffectRef.current = false;
@@ -386,6 +437,13 @@ export default function SessionViewClient({ sessionId, initialData }) {
     deferredAnnouncementRef.current = null;
 
     if (!resumeQueue.length) {
+      if (pendingManualScore) {
+        speakSequenceWithDuck(
+          pendingManualScore.items,
+          pendingManualScore.options,
+          pendingManualScore.restoreAfterMs,
+        );
+      }
       return;
     }
 
@@ -396,13 +454,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
     const resumeRestoreAfterMs = Math.max(
       2400,
       ...resumeQueue.map((entry) => Number(entry.restoreAfterMs || 0)),
+      Number(pendingManualScore?.restoreAfterMs || 0),
     );
 
     speakSequenceWithDuck(
-      resumeItems,
+      [...resumeItems, ...(pendingManualScore?.items || [])],
       {
         key: `spectator-resume-${Date.now()}`,
-        priority: resumePriority,
+        priority: Math.max(resumePriority, pendingManualScore ? 4 : 1),
         interrupt: true,
         minGapMs: 0,
       },
@@ -413,6 +472,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const {
     audioRef: soundEffectsAudioRef,
     playEffect: playLiveSoundEffect,
+    stop: stopLiveSoundEffect,
   } = useLiveSoundEffectsPlayer({
     volume: 0.95,
     onBeforePlay: () => {
@@ -425,6 +485,18 @@ export default function SessionViewClient({ sessionId, initialData }) {
     },
     onAfterEnd: resumeSpectatorAnnouncementsAfterSoundEffect,
   });
+
+  const cancelBoundarySoundEffectSequence = useCallback(() => {
+    activeBoundarySoundEffectRef.current = false;
+    shouldResumeAfterSoundEffectRef.current = false;
+    skipNextBoundaryLeadRef.current = false;
+    if (pendingSoundEffectTimerRef.current) {
+      window.clearTimeout(pendingSoundEffectTimerRef.current);
+      pendingSoundEffectTimerRef.current = null;
+    }
+    stop();
+    stopLiveSoundEffect();
+  }, [stop, stopLiveSoundEffect]);
 
   const showTemporaryWalkieNotice = useCallback((message, duration = 2600) => {
     setLocalWalkieNotice(message);
@@ -446,6 +518,12 @@ export default function SessionViewClient({ sessionId, initialData }) {
       window.clearTimeout(announcerResetTimerRef.current);
       announcerResetTimerRef.current = null;
     }
+    if (pendingSoundEffectTimerRef.current) {
+      window.clearTimeout(pendingSoundEffectTimerRef.current);
+      pendingSoundEffectTimerRef.current = null;
+    }
+    activeBoundarySoundEffectRef.current = false;
+    pendingManualScoreAnnouncementRef.current = null;
     lastAnnouncedEventRef.current = "";
     previousEnabledRef.current = false;
     previousWalkieEnabledRef.current = false;
@@ -461,7 +539,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
     });
     clearAnnouncementTimers();
     stop();
-  }, [clearAnnouncementTimers, match?._id, stop]);
+    stopLiveSoundEffect();
+  }, [clearAnnouncementTimers, match?._id, stop, stopLiveSoundEffect]);
 
   useEffect(() => {
     const nextMatchId = match?._id || "";
@@ -717,10 +796,16 @@ export default function SessionViewClient({ sessionId, initialData }) {
       match,
       settings.mode
     );
-    if (!items.length) return;
+    const shouldSkipBoundaryLead =
+      skipNextBoundaryLeadRef.current && isSixBoundaryScoreEvent(event);
+    if (shouldSkipBoundaryLead) {
+      skipNextBoundaryLeadRef.current = false;
+    }
+    const nextItems = shouldSkipBoundaryLead ? items.slice(1) : items;
+    if (!nextItems.length) return;
     if (soundEffectPlayingRef.current) {
       deferredAnnouncementRef.current = {
-        items,
+        items: nextItems,
         options: {
           key: event.id,
           priority,
@@ -733,7 +818,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       return;
     }
     const spoke = speakSequenceWithDuck(
-      items,
+      nextItems,
       {
         key: event.id,
         priority,
@@ -790,25 +875,92 @@ export default function SessionViewClient({ sessionId, initialData }) {
     shouldResumeAfterSoundEffectRef.current = Boolean(
       liveEvent.resumeAnnouncements
     );
-    void playLiveSoundEffect(
-      {
-        id: liveEvent.effectId || liveEvent.effectFileName || liveEvent.id,
-        fileName: liveEvent.effectFileName || liveEvent.effectId || "",
-        label: liveEvent.effectLabel || "Sound effect",
-        src: liveEvent.effectSrc || "",
-      },
-      { userGesture: false },
-    ).then((played) => {
-      if (!played) {
-        resumeSpectatorAnnouncementsAfterSoundEffect();
+    const effectToPlay = {
+      id: liveEvent.effectId || liveEvent.effectFileName || liveEvent.id,
+      fileName: liveEvent.effectFileName || liveEvent.effectId || "",
+      label: liveEvent.effectLabel || "Sound effect",
+      src: liveEvent.effectSrc || "",
+    };
+    const playIncomingSoundEffect = () => {
+      void playLiveSoundEffect(effectToPlay, { userGesture: false }).then((played) => {
+        if (!played) {
+          resumeSpectatorAnnouncementsAfterSoundEffect();
+        }
+      });
+    };
+    const preAnnouncementText = String(liveEvent.preAnnouncementText || "").trim();
+
+    if (
+      liveEvent.trigger === "score_boundary" &&
+      preAnnouncementText &&
+      settings.enabled &&
+      settings.mode !== "silent"
+    ) {
+      activeBoundarySoundEffectRef.current = true;
+      soundEffectPlayingRef.current = true;
+      skipNextBoundaryLeadRef.current = true;
+      clearAnnouncementTimers();
+      const interruptedQueue = interruptAndCapture();
+      if (interruptedQueue?.length) {
+        interruptedAnnouncementQueueRef.current = interruptedQueue;
       }
-    });
+      stop();
+      speakSequenceWithDuck(
+        [
+          {
+            text: preAnnouncementText,
+            pauseAfterMs: 0,
+            rate: 0.8,
+          },
+        ],
+        {
+          key: `${liveEvent.id}:pre`,
+          priority: 4,
+          interrupt: true,
+          minGapMs: 0,
+          ignoreEnabled: true,
+        },
+        Math.max(
+          2200,
+          Number(liveEvent.preAnnouncementDelayMs || SIX_PRE_EFFECT_DELAY_MS) + 900,
+        ),
+      );
+      if (pendingSoundEffectTimerRef.current) {
+        window.clearTimeout(pendingSoundEffectTimerRef.current);
+      }
+      pendingSoundEffectTimerRef.current = window.setTimeout(() => {
+        pendingSoundEffectTimerRef.current = null;
+        playIncomingSoundEffect();
+      }, Number(liveEvent.preAnnouncementDelayMs || SIX_PRE_EFFECT_DELAY_MS));
+      return;
+    }
+
+    playIncomingSoundEffect();
   }, [
+    cancelBoundarySoundEffectSequence,
+    clearAnnouncementTimers,
+    interruptAndCapture,
     match?.lastLiveEvent,
     playLiveSoundEffect,
     resumeSpectatorAnnouncementsAfterSoundEffect,
+    settings.enabled,
+    settings.mode,
     settings.playScoreSoundEffects,
+    speakSequenceWithDuck,
+    stop,
+    stopLiveSoundEffect,
   ]);
+
+  useEffect(() => {
+    const liveEvent = match?.lastLiveEvent;
+    if (!liveEvent || !activeBoundarySoundEffectRef.current) {
+      return;
+    }
+
+    if (liveEvent.type === "undo") {
+      cancelBoundarySoundEffectSequence();
+    }
+  }, [cancelBoundarySoundEffectSequence, match?.lastLiveEvent]);
 
   useEffect(() => {
     return () => {
@@ -819,6 +971,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
       if (announcerResetTimerRef.current) {
         window.clearTimeout(announcerResetTimerRef.current);
         announcerResetTimerRef.current = null;
+      }
+      if (pendingSoundEffectTimerRef.current) {
+        window.clearTimeout(pendingSoundEffectTimerRef.current);
+        pendingSoundEffectTimerRef.current = null;
       }
       clearAnnouncementTimers();
       if (walkieNoticeTimerRef.current) {

@@ -81,6 +81,13 @@ function messageFor(error, fallback) {
   return error?.message || fallback;
 }
 
+function walkieMessageFor(error, fallback) {
+  if (isRtmPublishDisconnectedError(error)) {
+    return "Walkie is reconnecting. Try again.";
+  }
+  return messageFor(error, fallback);
+}
+
 function isExpectedWalkieTransportError(error) {
   const rawCode = String(error?.code || "");
   const rawName = String(error?.name || "");
@@ -154,6 +161,22 @@ function isRtcUidConflictError(error) {
   const rawMessage = String(error?.message || "");
   const haystack = `${rawCode} ${rawName} ${rawMessage}`.toUpperCase();
   return haystack.includes("UID_CONFLICT");
+}
+
+function isRtmPublishDisconnectedError(error) {
+  const rawCode = String(error?.code || "");
+  const rawName = String(error?.name || "");
+  const rawMessage = String(error?.message || "");
+  const haystack = `${rawCode} ${rawName} ${rawMessage}`.toUpperCase();
+
+  return (
+    haystack.includes("-10025") ||
+    haystack.includes("RTM SERVICE IS NOT CONNECTED") ||
+    haystack.includes("NOT CONNECTED") ||
+    haystack.includes("CONNECTION CLOSED") ||
+    haystack.includes("CONNECTION LOST") ||
+    haystack.includes("DISCONNECTED")
+  );
 }
 
 function walkieConsole(level, event, details = {}) {
@@ -355,11 +378,17 @@ async function waitForRtcConnected(client, timeoutMs = 1200) {
 
 function playWalkieCue(type) {
   if (type === "start") {
-    playUiTone({ frequency: 920, durationMs: 110, type: "sine", volume: 0.045 });
+    playUiTone({ frequency: 980, durationMs: 240, type: "sine", volume: 0.11 });
+    window.setTimeout(() => {
+      playUiTone({ frequency: 1180, durationMs: 220, type: "sine", volume: 0.095 });
+    }, 130);
     return;
   }
 
-  playUiTone({ frequency: 620, durationMs: 130, type: "triangle", volume: 0.04 });
+  playUiTone({ frequency: 640, durationMs: 220, type: "triangle", volume: 0.085 });
+  window.setTimeout(() => {
+    playUiTone({ frequency: 520, durationMs: 180, type: "triangle", volume: 0.07 });
+  }, 140);
 }
 
 export function shouldReceiveWalkieAudio({ participantId = "", snapshot = EMPTY } = {}) {
@@ -468,6 +497,8 @@ export default function useWalkieTalkie({
   const preparePromiseRef = useRef(null);
   const startTalkingPromiseRef = useRef(null);
   const cancelPendingStartRef = useRef(false);
+  const ensureRtmSessionHandlerRef = useRef(null);
+  const cleanupSignalingHandlerRef = useRef(null);
 
   const rtmClientRef = useRef(null);
   const rtmReadyPromiseRef = useRef(null);
@@ -506,6 +537,7 @@ export default function useWalkieTalkie({
   const signalingRetryTimerRef = useRef(null);
   const remoteAudioLingerTimerRef = useRef(null);
   const presenceRefreshTimerRef = useRef(null);
+  const connectCueLoopTimerRef = useRef(null);
   const presenceRefreshInFlightRef = useRef(false);
   const presenceRefreshPendingRef = useRef(false);
   const mountedRef = useRef(false);
@@ -597,6 +629,33 @@ export default function useWalkieTalkie({
     if (noticeRef.current === safe) return;
     noticeRef.current = safe;
     setNotice(safe);
+  }, []);
+
+  const stopConnectingCueLoop = useCallback(() => {
+    clearTimer(connectCueLoopTimerRef);
+  }, []);
+
+  const startConnectingCueLoop = useCallback(() => {
+    if (typeof window === "undefined" || connectCueLoopTimerRef.current) {
+      return;
+    }
+
+    const playConnectPattern = () => {
+      playUiTone({ frequency: 880, durationMs: 180, type: "sine", volume: 0.09 });
+      window.setTimeout(() => {
+        playUiTone({ frequency: 980, durationMs: 180, type: "sine", volume: 0.095 });
+      }, 170);
+      window.setTimeout(() => {
+        playUiTone({ frequency: 1080, durationMs: 180, type: "sine", volume: 0.1 });
+      }, 340);
+    };
+
+    const loop = () => {
+      playConnectPattern();
+      connectCueLoopTimerRef.current = window.setTimeout(loop, 980);
+    };
+
+    loop();
   }, []);
 
   const stopRemoteAudioPlayback = useCallback((uid = "") => {
@@ -1199,6 +1258,60 @@ export default function useWalkieTalkie({
     [syncSnapshot]
   );
 
+  const publishWalkieMessage = useCallback(
+    async (payload, { client = rtmClientRef.current, bestEffort = false } = {}) => {
+      const message =
+        typeof payload === "string" ? payload : JSON.stringify(payload);
+      let activeClient = client;
+      let lastError = null;
+
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+          if (!activeClient || !rtmLoggedInRef.current || !rtmSubscribedRef.current) {
+            activeClient = await ensureRtmSessionHandlerRef.current?.();
+          }
+
+          const channelName = signalingChannelRef.current;
+          if (!activeClient || !channelName) {
+            throw new Error("Walkie signaling is reconnecting.");
+          }
+
+          await activeClient.publish(channelName, message);
+          return true;
+        } catch (publishError) {
+          lastError = publishError;
+          if (!isRtmPublishDisconnectedError(publishError) || attempt >= 2) {
+            if (bestEffort) {
+              walkieConsole("warn", "Walkie publish skipped", {
+                stage: "rtm-publish",
+                message: messageFor(
+                  publishError,
+                  "Walkie message could not be sent.",
+                ),
+              });
+              return false;
+            }
+            throw publishError;
+          }
+
+          rtmReadyPromiseRef.current = null;
+          try {
+            await cleanupSignalingHandlerRef.current?.();
+          } catch {
+            // Retry with a fresh RTM session below.
+          }
+          activeClient = null;
+        }
+      }
+
+      if (bestEffort) {
+        return false;
+      }
+      throw lastError || new Error("Walkie signaling is reconnecting.");
+    },
+    [],
+  );
+
   const broadcastMetadataState = useCallback(
     async (client = rtmClientRef.current, nextState = metadataStateRef.current) => {
       if (!client || !signalingChannelRef.current) return;
@@ -1206,16 +1319,16 @@ export default function useWalkieTalkie({
         enabled: Boolean(nextState?.enabled),
         pendingRequests: filterAgoraWalkieRequests(nextState?.pendingRequests),
       };
-      await client.publish(
-        signalingChannelRef.current,
-        JSON.stringify({
+      await publishWalkieMessage(
+        {
           type: "walkie-sync-state",
           enabled: normalized.enabled,
           pendingRequests: normalized.pendingRequests,
-        })
+        },
+        { client, bestEffort: true },
       );
     },
-    []
+    [publishWalkieMessage]
   );
 
   const refreshPresenceSnapshot = useCallback(
@@ -1610,11 +1723,11 @@ export default function useWalkieTalkie({
       if (shouldRequestSync) {
         lastSyncRequestAtRef.current = now;
         try {
-          await client.publish(
-            channelName,
-            JSON.stringify({
+          await publishWalkieMessage(
+            {
               type: "walkie-sync-request",
-            })
+            },
+            { client, bestEffort: true },
           );
         } catch (syncRequestError) {
           walkieConsole("warn", "Walkie sync request skipped", {
@@ -1654,7 +1767,10 @@ export default function useWalkieTalkie({
     scheduleRequestReset,
     syncSnapshot,
     updateNotice,
+    publishWalkieMessage,
   ]);
+
+  ensureRtmSessionHandlerRef.current = ensureRtmSession;
 
   const prepareToTalk = useCallback(async () => {
     if (preparePromiseRef.current) {
@@ -1780,6 +1896,8 @@ export default function useWalkieTalkie({
     await rtmCleanupPromiseRef.current;
   }, [syncSnapshot]);
 
+  cleanupSignalingHandlerRef.current = cleanupSignaling;
+
   const runWithControlMetadata = useCallback(
     async (updater) => {
       const schedule = metadataOperationRef.current.catch(() => {}).then(async () => {
@@ -1822,11 +1940,13 @@ export default function useWalkieTalkie({
       if (!ownsSpeakerLock) {
         if (startTalkingPromiseRef.current) {
           cancelPendingStartRef.current = true;
+          stopConnectingCueLoop();
           setClaiming(false);
           setManualAudioReady(false);
           return true;
         }
         if (manualAudioReady || rtcJoinedRef.current || rtcTrackRef.current) {
+          stopConnectingCueLoop();
           setManualAudioReady(false);
           await cleanupTransport();
           return true;
@@ -1834,6 +1954,7 @@ export default function useWalkieTalkie({
         setIsSelfTalking(false);
         setIsFinishing(false);
         setFinishDelayLeft(0);
+        stopConnectingCueLoop();
         return false;
       }
       const immediateStop =
@@ -1846,6 +1967,7 @@ export default function useWalkieTalkie({
       setIsSelfTalking(false);
       setIsFinishing(!immediateStop);
       setFinishDelayLeft(immediateStop ? 0 : Math.ceil(releaseDelayMs / 1000));
+      stopConnectingCueLoop();
       clearTimer(finishTimerRef, window.clearInterval);
       if (!immediateStop) {
         finishTimerRef.current = window.setInterval(() => {
@@ -1863,20 +1985,19 @@ export default function useWalkieTalkie({
         await cleanupLocalTrack();
         try {
           const client = await ensureRtmSession();
-          const channelName = signalingChannelRef.current;
-          await client.publish(
-            channelName,
-            JSON.stringify({
+          await publishWalkieMessage(
+            {
               type: "walkie-speaker-ended",
               participantId: selfId,
               userId: signalingUserIdRef.current,
               transmissionId: currentTransmissionId,
               reason,
               message: reason === "disabled" ? "Walkie-talkie is off." : "Channel is free.",
-            })
+            },
+            { client, bestEffort: true },
           );
         } catch (releaseError) {
-          setError(messageFor(releaseError, "Could not release walkie."));
+          setError(walkieMessageFor(releaseError, "Could not release walkie."));
           walkieConsole("error", "Walkie release failed", {
             stage: "speaker-release",
             message: messageFor(releaseError, "Could not release walkie."),
@@ -1903,6 +2024,8 @@ export default function useWalkieTalkie({
       ensureParticipantId,
       ensureRtmSession,
       manualAudioReady,
+      publishWalkieMessage,
+      stopConnectingCueLoop,
       syncSnapshot,
       updateNotice,
     ]
@@ -1959,6 +2082,7 @@ export default function useWalkieTalkie({
         cancelPendingStartRef.current = false;
         setClaiming(false);
         setManualAudioReady(false);
+        stopConnectingCueLoop();
         return false;
       }
 
@@ -1967,16 +2091,17 @@ export default function useWalkieTalkie({
         cancelPendingStartRef.current = false;
         setClaiming(false);
         setManualAudioReady(false);
+        stopConnectingCueLoop();
         updateNotice("Enable Audio once on this device for Safari walkie.");
         return false;
       }
 
+      startConnectingCueLoop();
       let lastError = null;
       for (let attempt = 1; attempt <= 3; attempt += 1) {
         updateNotice(TALK_RETRY_MESSAGES[Math.min(attempt - 1, TALK_RETRY_MESSAGES.length - 1)]);
         try {
           const client = await ensureRtmSession();
-          const channelName = signalingChannelRef.current;
           const { track } = await ensurePublishedTrack();
           if (typeof track.setMuted === "function") await track.setMuted(false);
           await wait(40);
@@ -1997,9 +2122,8 @@ export default function useWalkieTalkie({
             transmissionId,
           };
 
-          await client.publish(
-            channelName,
-            JSON.stringify({
+          await publishWalkieMessage(
+            {
               type: "walkie-speaker-started",
               userId: signalingUserIdRef.current,
               participantId: participant.participantId,
@@ -2009,7 +2133,8 @@ export default function useWalkieTalkie({
               expiresAt: nextSpeaker.expiresAt,
               transmissionId,
               message: `${participant.name} is talking.`,
-            })
+            },
+            { client },
           );
 
           activeSpeakerRef.current = nextSpeaker;
@@ -2017,11 +2142,13 @@ export default function useWalkieTalkie({
           if (cancelPendingStartRef.current) {
             cancelPendingStartRef.current = false;
             setClaiming(false);
+            stopConnectingCueLoop();
             await stopTalking();
             return false;
           }
           startCountdown(nextSpeaker.expiresAt);
           setIsSelfTalking(true);
+          stopConnectingCueLoop();
           playWalkieCue("start");
           updateNotice("");
           setClaiming(false);
@@ -2047,11 +2174,12 @@ export default function useWalkieTalkie({
       setManualAudioReady(false);
       cancelPendingStartRef.current = false;
       activeSpeakerRef.current = null;
+      stopConnectingCueLoop();
       syncSnapshot();
       clearTimer(countdownTimerRef, window.clearInterval);
       setCountdown(0);
       setFinishDelayLeft(0);
-      const message = messageFor(lastError, "Could not start walkie audio.");
+      const message = walkieMessageFor(lastError, "Could not start walkie audio.");
       setError(message);
       if (isExpectedWalkieTransportError(lastError)) {
         updateNotice("Retrying audio...");
@@ -2077,9 +2205,12 @@ export default function useWalkieTalkie({
       enableManualSignaling,
       isSafari,
       prepareToTalk,
+      publishWalkieMessage,
       role,
+      startConnectingCueLoop,
       startCountdown,
       startTalkingPromiseRef,
+      stopConnectingCueLoop,
       stopTalking,
       syncSnapshot,
       cleanupTransport,
@@ -2100,7 +2231,7 @@ export default function useWalkieTalkie({
       return false;
     }
     const client = await ensureRtmSession().catch((requestError) => {
-      setError(messageFor(requestError, "Could not request walkie."));
+      setError(walkieMessageFor(requestError, "Could not request walkie."));
       return null;
     });
     if (!client) return false;
@@ -2166,9 +2297,8 @@ export default function useWalkieTalkie({
         return true;
       }
 
-      await client.publish(
-        signalingChannelRef.current,
-        JSON.stringify({
+      await publishWalkieMessage(
+        {
           type: "walkie-request",
           requestId: request.requestId,
           participantId: request.participantId,
@@ -2177,7 +2307,8 @@ export default function useWalkieTalkie({
           signalingUserId: request.signalingUserId,
           requestedAt: request.requestedAt,
           expiresAt: request.expiresAt,
-        })
+        },
+        { client },
       );
       walkieConsole("info", "Walkie requested", {
         participantId: request.participantId,
@@ -2185,7 +2316,7 @@ export default function useWalkieTalkie({
       });
       return true;
     } catch (requestError) {
-      const message = messageFor(requestError, "Could not request walkie.");
+      const message = walkieMessageFor(requestError, "Could not request walkie.");
       setError(message);
       setRequestState("idle");
       walkieConsole("error", "Walkie request failed", {
@@ -2204,6 +2335,7 @@ export default function useWalkieTalkie({
     ensureParticipantId,
     ensureRtmSession,
     enableManualSignaling,
+    publishWalkieMessage,
     role,
     runWithControlMetadata,
     scheduleRequestReset,
@@ -2223,7 +2355,6 @@ export default function useWalkieTalkie({
         try {
           setError("");
           const client = await ensureRtmSession();
-          const channelName = signalingChannelRef.current;
           await runWithControlMetadata((current) => ({
             enabled: Boolean(nextEnabled),
             pendingRequests: nextEnabled ? current.pendingRequests : [],
@@ -2234,12 +2365,12 @@ export default function useWalkieTalkie({
             syncSnapshot();
           }
 
-          await client.publish(
-            channelName,
-            JSON.stringify({
+          await publishWalkieMessage(
+            {
               type: "walkie-enabled",
               enabled: Boolean(nextEnabled),
-            })
+            },
+            { client },
           );
 
           if (!nextEnabled) {
@@ -2259,7 +2390,7 @@ export default function useWalkieTalkie({
           });
           return true;
         } catch (toggleError) {
-          setError(messageFor(toggleError, "Could not update walkie."));
+          setError(walkieMessageFor(toggleError, "Could not update walkie."));
           walkieConsole("error", "Walkie toggle failed", {
             stage: "toggle-enabled",
             message: messageFor(toggleError, "Could not update walkie."),
@@ -2280,6 +2411,7 @@ export default function useWalkieTalkie({
       enableManualSignaling,
       isFinishing,
       isSelfTalking,
+      publishWalkieMessage,
       runWithControlMetadata,
       stopTalking,
       syncSnapshot,
@@ -2298,7 +2430,6 @@ export default function useWalkieTalkie({
       try {
         setError("");
         const client = await ensureRtmSession();
-        const channelName = signalingChannelRef.current;
         let targetRequest = null;
         await runWithControlMetadata((current) => {
           targetRequest = current.pendingRequests.find((item) => item.requestId === requestId) || null;
@@ -2311,13 +2442,13 @@ export default function useWalkieTalkie({
           };
         });
 
-        await client.publish(
-          channelName,
-          JSON.stringify({
+        await publishWalkieMessage(
+          {
             type: action === "accept" ? "walkie-request-accepted" : "walkie-request-dismissed",
             requestId,
             participantId: targetRequest?.participantId || "",
-          })
+          },
+          { client },
         );
         if (action === "accept") {
           updateNotice("Walkie-talkie is live.");
@@ -2329,7 +2460,7 @@ export default function useWalkieTalkie({
         });
         return true;
       } catch (respondError) {
-        setError(messageFor(respondError, "Could not update walkie request."));
+        setError(walkieMessageFor(respondError, "Could not update walkie request."));
         walkieConsole("error", "Walkie request resolve failed", {
           stage: "request-response",
           action,
@@ -2343,7 +2474,13 @@ export default function useWalkieTalkie({
 
       return respondPromiseRef.current;
     },
-    [enableManualSignaling, ensureRtmSession, runWithControlMetadata, updateNotice]
+    [
+      enableManualSignaling,
+      ensureRtmSession,
+      publishWalkieMessage,
+      runWithControlMetadata,
+      updateNotice,
+    ]
   );
 
   const acceptRequest = useCallback((requestId) => respond(requestId, "accept"), [respond]);
@@ -2362,7 +2499,7 @@ export default function useWalkieTalkie({
       }
       return true;
     } catch (unlockError) {
-      setError(messageFor(unlockError, "Could not enable walkie audio."));
+      setError(walkieMessageFor(unlockError, "Could not enable walkie audio."));
       walkieConsole("error", "Walkie audio unlock failed", {
         stage: "audio-unlock",
         message: messageFor(unlockError, "Could not enable walkie audio."),
@@ -2398,9 +2535,8 @@ export default function useWalkieTalkie({
           participant
         ) {
           try {
-            await rtmClientRef.current.publish(
-              signalingChannelRef.current,
-              JSON.stringify({
+            await publishWalkieMessage(
+              {
                 type: "walkie-refresh-request",
                 requestId,
                 participantId: participant,
@@ -2408,7 +2544,8 @@ export default function useWalkieTalkie({
                 name: defaultDisplayName(role, displayName),
                 requestedAt: nowIso(),
                 message: `${defaultDisplayName(role, displayName)} refreshed walkie signal.`,
-              })
+              },
+              { client: rtmClientRef.current, bestEffort: true },
             );
           } catch (refreshBroadcastError) {
             walkieConsole("warn", "Walkie refresh broadcast skipped", {
@@ -2455,6 +2592,7 @@ export default function useWalkieTalkie({
       displayName,
       ensureParticipantId,
       matchId,
+      publishWalkieMessage,
       resetRtcSessionForReload,
       role,
       stopTalking,
@@ -2504,8 +2642,9 @@ export default function useWalkieTalkie({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      stopConnectingCueLoop();
     };
-  }, []);
+  }, [stopConnectingCueLoop]);
 
   useEffect(() => {
     if (typeof document === "undefined") {
@@ -2606,7 +2745,7 @@ export default function useWalkieTalkie({
         return;
       }
 
-      const message = messageFor(connectError, "Walkie live connection is unavailable.");
+      const message = walkieMessageFor(connectError, "Walkie live connection is unavailable.");
       if (classification === "recoverable") {
         const failureCount = signalingRecoverableFailuresRef.current + 1;
         signalingRecoverableFailuresRef.current = failureCount;
@@ -2723,7 +2862,7 @@ export default function useWalkieTalkie({
             return;
           }
 
-          const message = messageFor(joinError, "Could not connect walkie audio.");
+          const message = walkieMessageFor(joinError, "Could not connect walkie audio.");
           await cleanupTransport();
 
           if (isExpectedWalkieTransportError(joinError)) {

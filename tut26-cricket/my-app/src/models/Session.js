@@ -1,5 +1,18 @@
 import mongoose from "mongoose";
 
+const MatchImageEntrySchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true, trim: true },
+    url: { type: String, default: "", trim: true },
+    publicId: { type: String, default: "", trim: true },
+    storageUrlEnc: { type: String, default: "", trim: true },
+    storageUrlHash: { type: String, default: "", trim: true },
+    uploadedAt: { type: Date, default: null },
+    uploadedBy: { type: String, default: "", trim: true },
+  },
+  { _id: false }
+);
+
 const SessionSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -20,6 +33,7 @@ const SessionSchema = new mongoose.Schema(
     teamA: { type: [String], default: [] },
     teamB: { type: [String], default: [] },
     images: { type: [String], default: [] },
+    matchImages: { type: [MatchImageEntrySchema], default: [] },
     announcer: { type: mongoose.Schema.Types.Mixed, default: {} },
     uiMeta: { type: mongoose.Schema.Types.Mixed, default: {} },
     mediaUpdatedAt: { type: Date, default: null },
@@ -46,6 +60,7 @@ const SessionSchema = new mongoose.Schema(
 
 SessionSchema.index({ isDraft: 1, createdAt: -1 });
 SessionSchema.index({ isLive: 1, createdAt: -1 });
+SessionSchema.index({ createdAt: -1, _id: -1 });
 SessionSchema.index({ match: 1 });
 
 export default mongoose.models.Session ||

@@ -60,6 +60,8 @@ const IPL_HORN_EFFECT = {
   label: "ipl theme song",
   src: "/audio/effects/ipl_theme_song.mp3",
 };
+const SIX_PRE_EFFECT_TEXT = "Umpire has given 6 runs.";
+const SIX_PRE_EFFECT_DELAY_MS = 1000;
 
 const SOUND_EFFECT_DURATION_CACHE_KEY = "gv-sound-effect-durations-v1";
 
@@ -117,6 +119,7 @@ export default function MatchPageClient({
   const interruptedUmpireAnnouncementQueueRef = useRef([]);
   const soundEffectPlayingRef = useRef(false);
   const shouldResumeAfterSoundEffectRef = useRef(false);
+  const pendingManualScoreAnnouncementRef = useRef(null);
   const previousSoundEffectMatchIdRef = useRef(initialMatch?._id || "");
   const lastSoundEffectTriggerRef = useRef({ effectId: "", at: 0 });
   const lastHandledSoundEffectEventRef = useRef(
@@ -125,6 +128,10 @@ export default function MatchPageClient({
       : "",
   );
   const localSoundEffectRequestIdRef = useRef("");
+  const skipNextBoundaryLeadRef = useRef(false);
+  const activeBoundarySequenceRef = useRef(false);
+  const boundarySequenceVersionRef = useRef(0);
+  const boundarySequenceTimerRef = useRef(null);
   const { authStatus, authError, authSubmitting, submitPin } = useMatchAccess(
     matchId,
     initialAuthStatus
@@ -144,10 +151,29 @@ export default function MatchPageClient({
     useSpeechAnnouncer(umpireSettings);
   const resumeUmpireAnnouncementsAfterSoundEffect = useCallback(() => {
     soundEffectPlayingRef.current = false;
+    activeBoundarySequenceRef.current = false;
+    const pendingManualScore = pendingManualScoreAnnouncementRef.current;
+    pendingManualScoreAnnouncementRef.current = null;
+
     if (!shouldResumeAfterSoundEffectRef.current) {
       shouldResumeAfterSoundEffectRef.current = false;
       interruptedUmpireAnnouncementQueueRef.current = [];
       deferredUmpireAnnouncementRef.current = null;
+      if (
+        pendingManualScore &&
+        umpireSettings.enabled &&
+        umpireSettings.mode !== "silent"
+      ) {
+        localAnnouncementIdRef.current += 1;
+        speakSequence(pendingManualScore.items, {
+          key: `umpire-manual-score-${localAnnouncementIdRef.current}`,
+          priority: 4,
+          interrupt: true,
+          minGapMs: 0,
+          userGesture: true,
+          ignoreEnabled: true,
+        });
+      }
       return;
     }
     shouldResumeAfterSoundEffectRef.current = false;
@@ -168,16 +194,31 @@ export default function MatchPageClient({
     deferredUmpireAnnouncementRef.current = null;
 
     if (!resumeQueue.length) {
+      if (pendingManualScore) {
+        localAnnouncementIdRef.current += 1;
+        speakSequence(pendingManualScore.items, {
+          key: `umpire-manual-score-${localAnnouncementIdRef.current}`,
+          priority: 4,
+          interrupt: true,
+          minGapMs: 0,
+          userGesture: true,
+          ignoreEnabled: true,
+        });
+      }
       return;
     }
 
     localAnnouncementIdRef.current += 1;
     speakSequence(
-      resumeQueue.flatMap((entry) => entry.items || []),
+      [
+        ...resumeQueue.flatMap((entry) => entry.items || []),
+        ...(pendingManualScore?.items || []),
+      ],
       {
         key: `umpire-resume-${localAnnouncementIdRef.current}`,
         priority: Math.max(
-          ...resumeQueue.map((entry) => Number(entry.options?.priority || 1))
+          ...resumeQueue.map((entry) => Number(entry.options?.priority || 1)),
+          pendingManualScore ? 4 : 1,
         ),
         interrupt: true,
         minGapMs: 0,
@@ -188,6 +229,7 @@ export default function MatchPageClient({
   const {
     audioRef: soundEffectsAudioRef,
     activeEffectId: activeSoundEffectId,
+    currentTime: activeSoundEffectCurrentTime,
     needsUnlock: soundEffectsNeedsUnlock,
     playEffect: playLocalSoundEffect,
     status: activeSoundEffectStatus,
@@ -308,17 +350,51 @@ export default function MatchPageClient({
 
   useEffect(() => {
     return () => {
+      if (boundarySequenceTimerRef.current) {
+        window.clearTimeout(boundarySequenceTimerRef.current);
+        boundarySequenceTimerRef.current = null;
+      }
       if (umpireAnnouncementTimerRef.current) {
         window.clearTimeout(umpireAnnouncementTimerRef.current);
         umpireAnnouncementTimerRef.current = null;
       }
       pendingUmpireAnnouncementRef.current = null;
       deferredUmpireAnnouncementRef.current = null;
+      pendingManualScoreAnnouncementRef.current = null;
       interruptedUmpireAnnouncementQueueRef.current = [];
+      activeBoundarySequenceRef.current = false;
       soundEffectPlayingRef.current = false;
       shouldResumeAfterSoundEffectRef.current = false;
     };
   }, []);
+
+  const cancelBoundarySequence = useCallback(
+    ({ stopEffect = false } = {}) => {
+      boundarySequenceVersionRef.current += 1;
+      activeBoundarySequenceRef.current = false;
+      skipNextBoundaryLeadRef.current = false;
+      shouldResumeAfterSoundEffectRef.current = false;
+
+      if (boundarySequenceTimerRef.current) {
+        window.clearTimeout(boundarySequenceTimerRef.current);
+        boundarySequenceTimerRef.current = null;
+      }
+      if (umpireAnnouncementTimerRef.current) {
+        window.clearTimeout(umpireAnnouncementTimerRef.current);
+        umpireAnnouncementTimerRef.current = null;
+      }
+
+      pendingUmpireAnnouncementRef.current = null;
+      deferredUmpireAnnouncementRef.current = null;
+      interruptedUmpireAnnouncementQueueRef.current = [];
+      stop();
+
+      if (stopEffect) {
+        stopActiveSoundEffect();
+      }
+    },
+    [stop, stopActiveSoundEffect]
+  );
 
   useEffect(() => {
     if (!isLiveMatch || !walkie.pendingRequests?.length) {
@@ -427,10 +503,24 @@ export default function MatchPageClient({
       nextMatch || match,
       umpireSettings.mode
     );
+    const shouldSkipBoundaryLead =
+      skipNextBoundaryLeadRef.current &&
+      !isOut &&
+      !extraType &&
+      Number(runs) === 6;
+    if (shouldSkipBoundaryLead) {
+      skipNextBoundaryLeadRef.current = false;
+    }
+    const sequenceItems = shouldSkipBoundaryLead
+      ? sequence.items.slice(1)
+      : sequence.items;
 
-    if (!sequence.items.length) return;
+    if (!sequenceItems.length) return;
 
-    pendingUmpireAnnouncementRef.current = sequence;
+    pendingUmpireAnnouncementRef.current = {
+      ...sequence,
+      items: sequenceItems,
+    };
     if (umpireAnnouncementTimerRef.current) {
       window.clearTimeout(umpireAnnouncementTimerRef.current);
     }
@@ -445,15 +535,55 @@ export default function MatchPageClient({
     isOut = false,
     extraType = null
   ) => {
+    if (activeBoundarySequenceRef.current || soundEffectPlayingRef.current) {
+      cancelBoundarySequence({ stopEffect: true });
+    }
+
     const shouldPlayBoundaryHorn =
-      !isOut && !extraType && (Number(runs) === 4 || Number(runs) === 6);
+      !isOut && !extraType && Number(runs) === 6;
 
     if (shouldPlayBoundaryHorn && umpireSettings.playScoreSoundEffects !== false) {
+      const boundarySequenceVersion = boundarySequenceVersionRef.current + 1;
+      boundarySequenceVersionRef.current = boundarySequenceVersion;
+      activeBoundarySequenceRef.current = true;
+      handleScoreEvent(runs, isOut, extraType);
+
+      if (umpireSettings.enabled && umpireSettings.mode !== "silent") {
+        speak(SIX_PRE_EFFECT_TEXT, {
+          key: "umpire-six-pre",
+          rate: 0.8,
+          interrupt: true,
+          minGapMs: 0,
+          userGesture: true,
+        });
+        await new Promise((resolve) => {
+          boundarySequenceTimerRef.current = window.setTimeout(() => {
+            boundarySequenceTimerRef.current = null;
+            resolve();
+          }, SIX_PRE_EFFECT_DELAY_MS);
+        });
+
+        if (boundarySequenceVersion !== boundarySequenceVersionRef.current) {
+          return;
+        }
+      }
+
+      skipNextBoundaryLeadRef.current = true;
       await triggerSharedSoundEffect(IPL_HORN_EFFECT, {
         userGesture: true,
         resumeAnnouncements: true,
         trigger: "score_boundary",
+        preAnnouncementText: SIX_PRE_EFFECT_TEXT,
+        preAnnouncementDelayMs: SIX_PRE_EFFECT_DELAY_MS,
       });
+
+      if (boundarySequenceVersion !== boundarySequenceVersionRef.current) {
+        return;
+      }
+
+      activeBoundarySequenceRef.current = false;
+      announceUmpireAction(runs, isOut, extraType);
+      return;
     }
 
     announceUmpireAction(runs, isOut, extraType);
@@ -471,7 +601,7 @@ export default function MatchPageClient({
     }
 
     if (soundEffectPlayingRef.current) {
-      deferredUmpireAnnouncementRef.current = {
+      pendingManualScoreAnnouncementRef.current = {
         items: [
           {
             text,
@@ -621,6 +751,8 @@ export default function MatchPageClient({
         userGesture = true,
         resumeAnnouncements = false,
         trigger = "manual",
+        preAnnouncementText = "",
+        preAnnouncementDelayMs = 0,
       } = {}
     ) => {
       if (!match?._id || !isLiveMatch || !file?.src || !file?.id) {
@@ -648,6 +780,8 @@ export default function MatchPageClient({
             clientRequestId,
             resumeAnnouncements,
             trigger,
+            preAnnouncementText,
+            preAnnouncementDelayMs,
           }),
         });
         if (!response.ok) {
@@ -741,11 +875,7 @@ export default function MatchPageClient({
   ]);
 
   const handleAnnouncedUndo = async () => {
-    if (umpireAnnouncementTimerRef.current) {
-      window.clearTimeout(umpireAnnouncementTimerRef.current);
-      umpireAnnouncementTimerRef.current = null;
-    }
-    pendingUmpireAnnouncementRef.current = null;
+    cancelBoundarySequence({ stopEffect: true });
     const undoEvent = createUndoLiveEvent(match);
     const undoSequence = buildLiveScoreAnnouncementSequence(
       undoEvent,
@@ -923,6 +1053,12 @@ export default function MatchPageClient({
                   onDismiss={walkie.dismissNotice}
                   quickTalkEnabled={!umpireRemoteSpeakerState.isRemoteTalking}
                   quickTalkActive={walkie.isSelfTalking}
+                  quickTalkPending={Boolean(
+                    walkie.claiming ||
+                      walkie.preparingToTalk ||
+                      walkie.recoveringAudio ||
+                      walkie.recoveringSignaling
+                  )}
                   quickTalkFinishing={walkie.isFinishing}
                   quickTalkCountdown={walkie.countdown}
                   quickTalkFinishDelayLeft={walkie.finishDelayLeft}
@@ -993,6 +1129,7 @@ export default function MatchPageClient({
               error={soundEffectError}
               activeEffectId={activeSoundEffectId}
               activeEffectStatus={activeSoundEffectStatus}
+              activeEffectCurrentTime={activeSoundEffectCurrentTime}
               effectDurations={soundEffectDurations}
               needsUnlock={soundEffectsNeedsUnlock}
               onToggle={toggleSoundEffectsPanel}

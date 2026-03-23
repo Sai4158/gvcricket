@@ -3,7 +3,6 @@ import crypto from "node:crypto";
 const COOKIE_PREFIX = "gv_match_access_";
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
 const ADMIN_ROLE = "admin";
-const DEFAULT_MANAGE_PIN = "636363";
 
 function getConfiguredPinValue() {
   return (
@@ -15,7 +14,12 @@ function getConfiguredPinValue() {
 }
 
 function getConfiguredManagePinValue() {
-  return process.env.SESSION_MANAGE_PIN || DEFAULT_MANAGE_PIN;
+  return (
+    process.env.SESSION_MANAGE_PIN ||
+    process.env.MATCH_MEDIA_PIN ||
+    process.env.UMPIRE_PIN ||
+    ""
+  );
 }
 
 function getConfiguredPinHashValue() {
@@ -43,7 +47,7 @@ function getManageSecret() {
     process.env.SESSION_MANAGE_ACCESS_SECRET ||
     process.env.SESSION_MANAGE_PIN ||
     process.env.MATCH_ACCESS_SECRET ||
-    "gv-cricket-manage-secret"
+    getAccessSecret()
   );
 }
 

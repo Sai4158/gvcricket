@@ -3,18 +3,16 @@
 import dynamic from "next/dynamic";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
-import { FaArrowLeft, FaDownload } from "react-icons/fa";
+import { AnimatePresence } from "framer-motion";
+import { FaArrowLeft } from "react-icons/fa";
 import useEventSource from "../live/useEventSource";
 import LiquidSportText from "../home/LiquidSportText";
 import MatchHeroBackdrop from "../match/MatchHeroBackdrop";
 import MatchImageUploader from "../match/MatchImageUploader";
 import { ModalBase } from "../match/MatchBaseModals";
 import ImagePinModal from "../shared/ImagePinModal";
-import SafeMatchImage, {
-  GV_MATCH_FALLBACK_IMAGE,
-  resolveSafeMatchImage,
-} from "../shared/SafeMatchImage";
+import SafeMatchImage from "../shared/SafeMatchImage";
+import MatchImageCarousel from "../shared/MatchImageCarousel";
 import { calculateInningsSummary } from "../../lib/match-stats";
 import CongratulationsCard from "./CongratulationsCard";
 import EnhancedScorecard from "./EnhancedScorecard";
@@ -35,12 +33,12 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   const [streamError, setStreamError] = useState("");
   const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
   const [isImageActionsOpen, setIsImageActionsOpen] = useState(false);
-  const [isReplaceModalOpen, setIsReplaceModalOpen] = useState(false);
+  const [imageUploadMode, setImageUploadMode] = useState("");
   const [removeError, setRemoveError] = useState("");
   const [showConfetti, setShowConfetti] = useState(true);
+  const [activeGalleryImageId, setActiveGalleryImageId] = useState("");
+  const [zoomedImage, setZoomedImage] = useState(null);
   const lastStreamUpdateRef = useRef(initialMatch?.updatedAt || "");
-  const imageHoldTimerRef = useRef(null);
-  const imageHoldTriggeredRef = useRef(false);
 
   const confettiPieces = useMemo(
     () =>
@@ -59,15 +57,6 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   useEffect(() => {
     const timeout = window.setTimeout(() => setShowConfetti(false), 5000);
     return () => window.clearTimeout(timeout);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (imageHoldTimerRef.current) {
-        window.clearTimeout(imageHoldTimerRef.current);
-        imageHoldTimerRef.current = null;
-      }
-    };
   }, []);
 
   useEventSource({
@@ -92,6 +81,12 @@ export default function ResultPageClient({ matchId, initialMatch }) {
     },
   });
 
+  const matchImages = Array.isArray(match?.matchImages) ? match.matchImages : [];
+  const activeGalleryImage =
+    matchImages.find((image) => image.id === activeGalleryImageId) ||
+    matchImages[0] ||
+    null;
+
   if (streamError) {
     return (
       <main className="min-h-screen bg-zinc-950 flex items-center justify-center">
@@ -110,15 +105,12 @@ export default function ResultPageClient({ matchId, initialMatch }) {
 
   const innings1Summary = calculateInningsSummary(match.innings1);
   const innings2Summary = calculateInningsSummary(match.innings2);
-  const resolvedMatchImage = resolveSafeMatchImage(match?.matchImageUrl || "");
-  const hasUploadedMatchImage =
-    resolvedMatchImage !== GV_MATCH_FALLBACK_IMAGE;
 
   const handleRemoveImage = async (pin) => {
     const response = await fetch(`/api/matches/${matchId}/image`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pin }),
+      body: JSON.stringify({ pin, imageId: activeGalleryImage?.id || "" }),
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -130,87 +122,6 @@ export default function ResultPageClient({ matchId, initialMatch }) {
       setRemoveError("");
       setIsRemoveModalOpen(false);
     });
-  };
-
-  const clearImageHoldTimer = () => {
-    if (imageHoldTimerRef.current) {
-      window.clearTimeout(imageHoldTimerRef.current);
-      imageHoldTimerRef.current = null;
-    }
-  };
-
-  const handleImageHoldStart = () => {
-    imageHoldTriggeredRef.current = false;
-    clearImageHoldTimer();
-    imageHoldTimerRef.current = window.setTimeout(() => {
-      imageHoldTriggeredRef.current = true;
-      setRemoveError("");
-      setIsImageActionsOpen(true);
-    }, 520);
-  };
-
-  const handleImageHoldEnd = () => {
-    clearImageHoldTimer();
-    window.setTimeout(() => {
-      imageHoldTriggeredRef.current = false;
-    }, 0);
-  };
-
-  const handleImageClickCapture = (event) => {
-    if (imageHoldTriggeredRef.current) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-  };
-
-  const handleDownloadImage = async () => {
-    const imageUrl = resolveSafeMatchImage(match?.matchImageUrl || "");
-    const baseName = String(match?.name || "gv-cricket-match-image")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "gv-cricket-match-image";
-
-    try {
-      const response = await fetch(imageUrl, { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error("Image fetch failed.");
-      }
-
-      const blob = await response.blob();
-      const extension =
-        blob.type === "image/jpeg"
-          ? "jpg"
-          : blob.type === "image/webp"
-            ? "webp"
-            : "png";
-      const file = new File([blob], `${baseName}.${extension}`, {
-        type: blob.type || "image/png",
-      });
-
-      if (
-        typeof navigator !== "undefined" &&
-        navigator.canShare &&
-        navigator.share &&
-        navigator.canShare({ files: [file] })
-      ) {
-        await navigator.share({
-          files: [file],
-          title: match?.name || "GV Cricket Match Image",
-        });
-        return;
-      }
-
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = objectUrl;
-      link.download = file.name;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-    } catch {
-      window.open(imageUrl, "_blank", "noopener,noreferrer");
-    }
   };
 
   return (
@@ -297,49 +208,33 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           />
         </section>
 
-        <section className="space-y-4">
+        <section id="match-image" className="scroll-mt-24 space-y-4">
           <div
             className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.94),rgba(10,10,14,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.35)]"
-            onPointerDown={handleImageHoldStart}
-            onPointerUp={handleImageHoldEnd}
-            onPointerLeave={handleImageHoldEnd}
-            onPointerCancel={handleImageHoldEnd}
             onContextMenu={(event) => event.preventDefault()}
-            onClickCapture={handleImageClickCapture}
             style={{ WebkitUserSelect: "none", userSelect: "none" }}
           >
-            <div className="bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))]">
-              <SafeMatchImage
-                src={match?.matchImageUrl || ""}
-                alt={match.name || "Match cover"}
-                width={1600}
-                height={900}
-                className="mx-auto h-auto max-h-[70vh] w-full object-contain"
-                fallbackClassName="mx-auto h-auto max-h-[56vh] w-full object-contain bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))] p-10 sm:p-14"
-                sizes="(max-width: 768px) 100vw, 1200px"
-                draggable={false}
-                onDragStart={(event) => event.preventDefault()}
-              />
-            </div>
-            <button
-              type="button"
-              aria-label="Save image"
-              onPointerDown={(event) => {
-                event.stopPropagation();
-                clearImageHoldTimer();
+            <MatchImageCarousel
+              images={matchImages.length ? matchImages : [{ id: "fallback", url: "" }]}
+              alt={match.name || "Match cover"}
+              showFallback
+              imageClassName="object-contain object-center bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))]"
+              fallbackClassName="object-contain object-center bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))] p-10 sm:p-14"
+              className="bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))]"
+              onActiveImageChange={(image) => {
+                setActiveGalleryImageId(image?.url ? image.id || "" : "");
               }}
-              onPointerUp={(event) => {
-                event.stopPropagation();
+              onImageTap={(image) => {
+                setZoomedImage(image || null);
               }}
-              onClick={(event) => {
+              onImageHold={(image, _index, event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                void handleDownloadImage();
+                setActiveGalleryImageId(image?.url ? image.id || "" : "");
+                setRemoveError("");
+                setIsImageActionsOpen(true);
               }}
-              className="absolute bottom-4 right-4 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/16 bg-black/45 text-white shadow-[0_14px_40px_rgba(0,0,0,0.38)] backdrop-blur-md transition hover:scale-[1.03] hover:bg-black/55"
-            >
-              <FaDownload className="text-base" />
-            </button>
+            />
           </div>
           {removeError ? (
             <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
@@ -405,67 +300,105 @@ export default function ResultPageClient({ matchId, initialMatch }) {
             panelClassName="max-w-sm"
           >
             <div className="space-y-3">
-              <p className="text-sm leading-6 text-zinc-400">
-                Choose what you want to do with this match image.
-              </p>
               <button
                 type="button"
                 onClick={() => {
                   setIsImageActionsOpen(false);
-                  setIsReplaceModalOpen(true);
+                  setImageUploadMode("add");
                 }}
                 className="w-full rounded-2xl border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(10,16,26,0.96),rgba(8,47,73,0.78))] px-4 py-3 text-sm font-semibold text-cyan-50 transition hover:brightness-110"
               >
-                {hasUploadedMatchImage ? "Replace Image" : "Add Image"}
+                Add Image
               </button>
-              {hasUploadedMatchImage ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsImageActionsOpen(false);
-                  setRemoveError("");
-                  setIsRemoveModalOpen(true);
-                }}
-                className="w-full rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/15"
-              >
-                Delete Image
-              </button>
+              {activeGalleryImage?.id ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsImageActionsOpen(false);
+                      setImageUploadMode("replace");
+                    }}
+                    className="w-full rounded-2xl border border-emerald-300/16 bg-[linear-gradient(180deg,rgba(10,18,18,0.98),rgba(9,32,28,0.96)_56%,rgba(6,95,70,0.74))] px-4 py-3 text-sm font-semibold text-emerald-50 transition hover:brightness-110"
+                  >
+                    Replace This Image
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsImageActionsOpen(false);
+                      setRemoveError("");
+                      setIsRemoveModalOpen(true);
+                    }}
+                    className="w-full rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/15"
+                  >
+                    Delete This Image
+                  </button>
+                </>
               ) : null}
             </div>
           </ModalBase>
         ) : null}
       </AnimatePresence>
       <AnimatePresence>
-        {isReplaceModalOpen ? (
+        {Boolean(imageUploadMode) ? (
           <ModalBase
-            title={
-              resolveSafeMatchImage(match?.matchImageUrl || "") ===
-              GV_MATCH_FALLBACK_IMAGE
-                ? "Add Match Image"
-                : "Replace Match Image"
-            }
-            onExit={() => setIsReplaceModalOpen(false)}
+            title={imageUploadMode === "replace" ? "Replace Match Image" : "Add Match Image"}
+            onExit={() => setImageUploadMode("")}
             panelClassName="max-w-md"
             bodyClassName="max-h-[calc(100vh-7rem)]"
           >
             <MatchImageUploader
               matchId={String(match._id)}
-              existingImageUrl={match?.matchImageUrl || ""}
+              existingImageUrl={
+                imageUploadMode === "replace" ? activeGalleryImage?.url || "" : ""
+              }
+              targetImageId={
+                imageUploadMode === "replace" ? activeGalleryImage?.id || "" : ""
+              }
+              appendOnUpload={imageUploadMode !== "replace"}
               onUploaded={(updatedMatch) => {
                 startTransition(() => {
                   setMatch(updatedMatch);
                   setRemoveError("");
-                  setIsReplaceModalOpen(false);
+                  setImageUploadMode("");
                 });
               }}
-              title={hasUploadedMatchImage ? "Replace the current image" : "Upload a match image"}
-              description={
-                !hasUploadedMatchImage
-                  ? "Upload a match image for this game. You can press and hold the cover any time to add, save, replace, or delete it."
-                  : "Upload a fresh match image. Press and hold the cover image any time to save, replace, or delete it."
+              title={
+                imageUploadMode === "replace"
+                  ? "Replace the current image"
+                  : "Upload a match image"
               }
-              primaryLabel={hasUploadedMatchImage ? "Replace Image" : "Upload Image"}
+              description={
+                imageUploadMode === "replace"
+                  ? "Replace this image in the gallery."
+                  : "Add a new image to this match gallery."
+              }
+              primaryLabel={
+                imageUploadMode === "replace" ? "Replace Image" : "Add Image"
+              }
             />
+          </ModalBase>
+        ) : null}
+      </AnimatePresence>
+      <AnimatePresence>
+        {zoomedImage?.url ? (
+          <ModalBase
+            title=""
+            onExit={() => setZoomedImage(null)}
+            panelClassName="max-w-5xl bg-black/95"
+            bodyClassName="max-h-[calc(100vh-4rem)] p-0"
+          >
+            <div className="overflow-hidden rounded-[24px] bg-black">
+              <SafeMatchImage
+                src={zoomedImage.url}
+                alt={match.name || "Match image"}
+                width={2000}
+                height={1400}
+                className="mx-auto h-auto max-h-[82vh] w-full object-contain"
+                fallbackClassName="mx-auto h-auto max-h-[82vh] w-full object-contain bg-black p-10"
+                sizes="100vw"
+              />
+            </div>
           </ModalBase>
         ) : null}
       </AnimatePresence>

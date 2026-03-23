@@ -18,19 +18,43 @@ export default function useLiveSoundEffectsPlayer({
 } = {}) {
   const audioRef = useRef(null);
   const bufferedPlaybackRef = useRef(null);
+  const playbackTimerRef = useRef(null);
   const playRequestRef = useRef(0);
   const resolvedSrcByEffectRef = useRef(new Map());
   const activeEffectRef = useRef(null);
   const isIosSafari = useMemo(() => isIOSSafari(), []);
   const [activeEffectId, setActiveEffectId] = useState("");
+  const [currentTime, setCurrentTime] = useState(0);
   const [status, setStatus] = useState("idle");
   const [needsUnlock, setNeedsUnlock] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(isUiAudioUnlocked());
 
-  const resetPlaybackState = useCallback(() => {
-    setActiveEffectId("");
-    setStatus("idle");
+  const clearPlaybackTimer = useCallback(() => {
+    if (playbackTimerRef.current) {
+      window.clearInterval(playbackTimerRef.current);
+      playbackTimerRef.current = null;
+    }
   }, []);
+
+  const resetPlaybackState = useCallback(() => {
+    clearPlaybackTimer();
+    activeEffectRef.current = null;
+    setActiveEffectId("");
+    setCurrentTime(0);
+    setStatus("idle");
+  }, [clearPlaybackTimer]);
+
+  const startBufferedPlaybackTimer = useCallback(() => {
+    clearPlaybackTimer();
+    playbackTimerRef.current = window.setInterval(() => {
+      const activePlayback = bufferedPlaybackRef.current;
+      if (!activePlayback) {
+        return;
+      }
+
+      setCurrentTime(activePlayback.getCurrentTime());
+    }, 90);
+  }, [clearPlaybackTimer]);
 
   useEffect(() => {
     return subscribeUiAudioUnlock((nextValue) => {
@@ -62,6 +86,16 @@ export default function useLiveSoundEffectsPlayer({
       resetPlaybackState();
     };
 
+    const handlePause = () => {
+      if (!audio.ended) {
+        setCurrentTime(audio.currentTime || 0);
+      }
+    };
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime || 0);
+    };
+
     const handleLoadedMetadata = () => {
       const activeEffect = activeEffectRef.current;
       const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
@@ -74,15 +108,19 @@ export default function useLiveSoundEffectsPlayer({
     audio.addEventListener("ended", handleEnded);
     audio.addEventListener("playing", handlePlaying);
     audio.addEventListener("error", handleError);
+    audio.addEventListener("pause", handlePause);
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
     audio.addEventListener("canplay", handleLoadedMetadata);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
 
     return () => {
       audio.removeEventListener("ended", handleEnded);
       audio.removeEventListener("playing", handlePlaying);
       audio.removeEventListener("error", handleError);
+      audio.removeEventListener("pause", handlePause);
       audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
       audio.removeEventListener("canplay", handleLoadedMetadata);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
     };
   }, [onAfterEnd, onDuration, resetPlaybackState]);
 
@@ -157,6 +195,7 @@ export default function useLiveSoundEffectsPlayer({
       playRequestRef.current = requestId;
       stop({ clearSource: false, preserveRequest: true });
       setActiveEffectId(effect.id || effect.fileName || effect.src);
+      setCurrentTime(0);
       setStatus("loading");
 
       const unlocked = await prime({ userGesture });
@@ -191,6 +230,8 @@ export default function useLiveSoundEffectsPlayer({
             onDuration?.(effect, bufferedPlayback.duration);
           }
           setStatus("playing");
+          setCurrentTime(0);
+          startBufferedPlaybackTimer();
           return true;
         }
       } catch {
@@ -240,6 +281,7 @@ export default function useLiveSoundEffectsPlayer({
       try {
         await audio.play();
         setStatus("playing");
+        setCurrentTime(audio.currentTime || 0);
         return true;
       } catch {
         resetPlaybackState();
@@ -253,6 +295,7 @@ export default function useLiveSoundEffectsPlayer({
       onDuration,
       prime,
       resetPlaybackState,
+      startBufferedPlaybackTimer,
       stop,
       volume,
     ],
@@ -264,6 +307,7 @@ export default function useLiveSoundEffectsPlayer({
     audioRef,
     activeEffectId,
     audioUnlocked,
+    currentTime,
     isPlaying: status === "loading" || status === "playing",
     needsUnlock,
     playEffect,

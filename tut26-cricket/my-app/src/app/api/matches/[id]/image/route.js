@@ -11,15 +11,15 @@ import {
   isValidManagePin,
 } from "../../../../lib/match-access";
 import {
-  buildPublicMatchImageUrl,
   isSafeRemoteMatchImageUrl,
   normalizeMatchImageMetadata,
   validateMatchImageBuffer,
 } from "../../../../lib/match-image";
 import {
-  encryptMatchImageSourceUrl,
-  hashMatchImageSourceUrl,
-} from "../../../../lib/match-image-secure";
+  applyStoredMatchImages,
+  createStoredMatchImageEntry,
+  getStoredMatchImages,
+} from "../../../../lib/match-image-gallery";
 import { moderateMatchImageBuffer } from "../../../../lib/match-image-moderation";
 import { serializePublicMatch } from "../../../../lib/public-data";
 import { getRequestMeta } from "../../../../lib/request-meta";
@@ -31,8 +31,13 @@ import {
 import { secretPinPayloadSchema } from "../../../../lib/validators";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
+import { z } from "zod";
 
 export const runtime = "nodejs";
+
+const deleteImagePayloadSchema = secretPinPayloadSchema.extend({
+  imageId: z.string().trim().max(80).optional().default(""),
+});
 
 function getMatchImageModerationMode() {
   return String(process.env.MATCH_IMAGE_MODERATION_MODE || "best-effort").trim().toLowerCase();
@@ -199,19 +204,37 @@ export async function POST(req, { params }) {
       throw new Error("Remote image URL was rejected.");
     }
 
-    match.matchImageUrl = buildPublicMatchImageUrl(
-      id,
-      imageMetadata.matchImagePublicId || imageMetadata.matchImageUploadedAt?.getTime()
-    );
-    match.matchImagePublicId = imageMetadata.matchImagePublicId;
-    match.matchImageStorageUrlEnc = encryptMatchImageSourceUrl(
-      imageMetadata.matchImageUrl
-    );
-    match.matchImageStorageUrlHash = hashMatchImageSourceUrl(
-      imageMetadata.matchImageUrl
-    );
-    match.matchImageUploadedAt = imageMetadata.matchImageUploadedAt;
-    match.matchImageUploadedBy = "admin";
+    const targetImageId = String(parsedRequest.value.get("imageId") || "").trim();
+    const shouldAppend =
+      String(parsedRequest.value.get("append") || "")
+        .trim()
+        .toLowerCase() === "1";
+    const nextEntry = createStoredMatchImageEntry({
+      matchId: id,
+      sourceUrl: imageMetadata.matchImageUrl,
+      publicId: imageMetadata.matchImagePublicId,
+      uploadedAt: imageMetadata.matchImageUploadedAt,
+      uploadedBy: "admin",
+      id: targetImageId || "",
+    });
+
+    let nextImages = getStoredMatchImages(match, { matchId: id });
+    if (targetImageId) {
+      const hasExistingTarget = nextImages.some((entry) => entry.id === targetImageId);
+      nextImages = hasExistingTarget
+        ? nextImages.map((entry) =>
+            entry.id === targetImageId ? { ...nextEntry, id: targetImageId } : entry
+          )
+        : [...nextImages, { ...nextEntry, id: targetImageId }];
+    } else if (shouldAppend) {
+      nextImages = [...nextImages, nextEntry];
+    } else if (nextImages.length > 0) {
+      nextImages = [{ ...nextEntry, id: nextImages[0].id }, ...nextImages.slice(1)];
+    } else {
+      nextImages = [nextEntry];
+    }
+
+    applyStoredMatchImages(match, nextImages, { matchId: id });
     match.mediaUpdatedAt = new Date();
     match.lastEventType = "image_update";
     match.lastEventText = "Match image updated.";
@@ -296,7 +319,7 @@ export async function DELETE(req, { params }) {
   }
 
   try {
-    const parsedRequest = await parseJsonRequest(req, secretPinPayloadSchema, {
+    const parsedRequest = await parseJsonRequest(req, deleteImagePayloadSchema, {
       maxBytes: 2048,
     });
     if (!parsedRequest.ok) {
@@ -322,12 +345,13 @@ export async function DELETE(req, { params }) {
       return jsonError("Match not found.", 404);
     }
 
-    match.matchImageUrl = "";
-    match.matchImagePublicId = "";
-    match.matchImageStorageUrlEnc = "";
-    match.matchImageStorageUrlHash = "";
-    match.matchImageUploadedAt = null;
-    match.matchImageUploadedBy = "";
+    const targetImageId = String(parsedRequest.value.imageId || "").trim();
+    const currentImages = getStoredMatchImages(match, { matchId: id });
+    const nextImages = targetImageId
+      ? currentImages.filter((entry) => entry.id !== targetImageId)
+      : currentImages.slice(1);
+
+    applyStoredMatchImages(match, nextImages, { matchId: id });
     match.mediaUpdatedAt = new Date();
     match.lastEventType = "image_update";
     match.lastEventText = "Match image removed.";

@@ -12,6 +12,16 @@ import { serializePublicMatch, serializePublicSession } from "./public-data";
 import { hasCompleteTossState, hydrateLegacyTossState, normalizeLegacyTossState } from "./match-toss";
 
 const SERVER_DATA_CACHE_TTL_MS = 15000;
+const PUBLIC_SESSION_FIELDS =
+  "_id name date overs isLive isDraft match tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcerEnabled announcerMode lastEventType lastEventText createdAt updatedAt";
+const READ_ONLY_PUBLIC_MATCH_FIELDS =
+  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt";
+const PUBLIC_MATCH_FIELDS = `${READ_ONLY_PUBLIC_MATCH_FIELDS} actionHistory`;
+const SESSION_MATCH_SUMMARY_FIELDS =
+  "_id teamA teamB teamAName teamBName tossWinner tossDecision score outs innings innings1 innings2 isOngoing result updatedAt sessionId matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy createdAt";
+const FALLBACK_SESSION_FIELDS =
+  "tossWinner tossDecision teamAName teamBName teamA teamB";
+const NON_DRAFT_SESSION_FILTER = { isDraft: false };
 
 const globalServerDataCache = globalThis.__gvServerDataCache || {
   sessionsIndex: {
@@ -70,6 +80,7 @@ async function resolveSessionMatches(sessions) {
         result: 1,
         updatedAt: 1,
         sessionId: 1,
+        matchImages: 1,
         tossWinner: 1,
         tossDecision: 1,
         matchImageUrl: 1,
@@ -118,23 +129,27 @@ async function findMatchForSession(session) {
   if (!session) return null;
 
   if (session.match) {
-    return Match.findById(session.match).lean();
+    return Match.findById(session.match).select(READ_ONLY_PUBLIC_MATCH_FIELDS).lean();
   }
 
-  return Match.findOne({ sessionId: session._id }).sort({ updatedAt: -1 }).lean();
+  return Match.findOne({ sessionId: session._id })
+    .select(READ_ONLY_PUBLIC_MATCH_FIELDS)
+    .sort({ updatedAt: -1 })
+    .lean();
 }
 
 async function readSessionsIndexData() {
   await connectDB();
 
-  const sessions = (await Session.find()
+  const sessions = await Session.find(NON_DRAFT_SESSION_FILTER)
+    .select(PUBLIC_SESSION_FIELDS)
     .populate({
       path: "match",
-      select:
-        "teamA teamB teamAName teamBName tossWinner tossDecision score outs innings innings1 innings2 isOngoing result _id updatedAt",
+      select: SESSION_MATCH_SUMMARY_FIELDS,
+      options: { lean: true },
     })
-    .sort({ createdAt: -1 }))
-    .filter((session) => !session?.isDraft);
+    .sort({ createdAt: -1 })
+    .lean();
 
   const fallbackMatchesBySessionId = await resolveSessionMatches(sessions);
 
@@ -145,14 +160,19 @@ async function readSessionsIndexData() {
       resolvedMatch = normalizeLegacyTossState(resolvedMatch, session);
     }
     const publicMatch = serializePublicMatch(resolvedMatch, session);
+    const publicSession = serializePublicSession({
+      ...session,
+      tossWinner: resolvedMatch?.tossWinner || session.tossWinner || "",
+      tossDecision: resolvedMatch?.tossDecision || session.tossDecision || "",
+      match: resolvedMatch?._id || session.match,
+    });
 
     return {
-      ...serializePublicSession({
-        ...(typeof session.toObject === "function" ? session.toObject() : session),
-        tossWinner: resolvedMatch?.tossWinner || session.tossWinner || "",
-        tossDecision: resolvedMatch?.tossDecision || session.tossDecision || "",
-        match: resolvedMatch?._id || session.match,
-      }),
+      ...publicSession,
+      matchImages:
+        publicMatch?.matchImages?.length > 0
+          ? publicMatch.matchImages
+          : publicSession.matchImages || [],
       updatedAt: resolvedMatch?.updatedAt || session.updatedAt,
       isLive: resolvedMatch ? Boolean(resolvedMatch.isOngoing) : Boolean(session.isLive),
       result: resolvedMatch?.result || session.result || "",
@@ -180,7 +200,9 @@ export async function loadSessionViewData(sessionId) {
 
   await connectDB();
 
-  const session = await Session.findById(sessionId).lean();
+  const session = await Session.findById(sessionId)
+    .select(PUBLIC_SESSION_FIELDS)
+    .lean();
   if (!session) {
     return { found: false, session: null, match: null, updatedAt: "" };
   }
@@ -201,14 +223,16 @@ export async function loadPublicMatchData(matchId) {
   }
 
   await connectDB();
-  const match = await Match.findById(matchId).lean();
+  const match = await Match.findById(matchId)
+    .select(READ_ONLY_PUBLIC_MATCH_FIELDS)
+    .lean();
   if (!match) {
     return null;
   }
   const fallbackSession =
     match.sessionId
       ? await Session.findById(match.sessionId)
-          .select("tossWinner tossDecision teamAName teamBName teamA teamB")
+          .select(FALLBACK_SESSION_FIELDS)
           .lean()
       : null;
   return serializePublicMatch(match, fallbackSession);
@@ -228,7 +252,7 @@ export async function loadTossPageData(matchId) {
 
   await connectDB();
   const match = await Match.findById(matchId)
-    .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
+    .select(`adminAccessVersion ${PUBLIC_MATCH_FIELDS}`)
     .lean();
 
   if (match) {
@@ -253,7 +277,7 @@ export async function loadTossPageData(matchId) {
   }
 
   const session = await Session.findById(matchId)
-    .select("_id name teamA teamB teamAName teamBName overs match isLive tossWinner matchImageUrl matchImagePublicId matchImageUploadedAt matchImageUploadedBy updatedAt createdAt")
+    .select(PUBLIC_SESSION_FIELDS)
     .lean();
 
   if (!session) {
@@ -269,7 +293,7 @@ export async function loadTossPageData(matchId) {
 
   if (session.match) {
     const linkedMatch = await Match.findById(session.match)
-      .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
+      .select(`adminAccessVersion ${PUBLIC_MATCH_FIELDS}`)
       .lean();
 
     if (linkedMatch) {
@@ -332,7 +356,7 @@ export async function loadMatchAccessData(matchId) {
 
   await connectDB();
   const match = await Match.findById(matchId)
-    .select("_id adminAccessVersion teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImageUrl announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory")
+    .select(`adminAccessVersion ${PUBLIC_MATCH_FIELDS}`)
     ;
 
   if (!match) {
@@ -349,9 +373,7 @@ export async function loadMatchAccessData(matchId) {
 
   const fallbackSession =
     match && match.sessionId
-      ? await Session.findById(match.sessionId).select(
-          "tossWinner tossDecision teamAName teamBName teamA teamB"
-        )
+      ? await Session.findById(match.sessionId).select(FALLBACK_SESSION_FIELDS)
       : null;
 
   if (authorized && hydrateLegacyTossState(match, fallbackSession)) {
@@ -372,19 +394,21 @@ export async function loadMatchAccessData(matchId) {
 export async function loadHomeLiveBannerData() {
   await connectDB();
 
-  const match = (await Match.find({ isOngoing: true })
+  const match = await Match.findOne({
+    isOngoing: true,
+    $or: [{ result: "" }, { result: null }, { result: { $exists: false } }],
+  })
+    .select(SESSION_MATCH_SUMMARY_FIELDS)
     .sort({ updatedAt: -1, _id: -1 })
-    .limit(12)
-    .lean())
-    .find((candidate) => !candidate?.result);
+    .lean();
 
   if (!match) {
     return null;
   }
 
   const session = match.sessionId
-    ? await Session.findById(match.sessionId).lean()
-    : await Session.findOne({ match: match._id }).lean();
+    ? await Session.findById(match.sessionId).select(PUBLIC_SESSION_FIELDS).lean()
+    : await Session.findOne({ match: match._id }).select(PUBLIC_SESSION_FIELDS).lean();
 
   if (!session || !match) {
     return null;
@@ -421,14 +445,15 @@ export async function loadHomeLiveBannerData() {
 async function readDirectorSessionsList() {
   await connectDB();
 
-  const sessions = (await Session.find()
+  const sessions = await Session.find(NON_DRAFT_SESSION_FILTER)
+    .select(PUBLIC_SESSION_FIELDS)
     .populate({
       path: "match",
-      select:
-        "teamA teamB teamAName teamBName score outs innings innings1 innings2 isOngoing result _id updatedAt sessionId matchImageUrl",
+      select: SESSION_MATCH_SUMMARY_FIELDS,
+      options: { lean: true },
     })
-    .sort({ createdAt: -1, _id: -1 }))
-    .filter((session) => !session?.isDraft);
+    .sort({ createdAt: -1, _id: -1 })
+    .lean();
 
   const fallbackMatchesBySessionId = await resolveSessionMatches(sessions);
 
@@ -437,7 +462,7 @@ async function readDirectorSessionsList() {
       const resolvedMatch =
         session.match || fallbackMatchesBySessionId.get(String(session._id)) || null;
       const publicSession = serializePublicSession({
-        ...(typeof session.toObject === "function" ? session.toObject() : session),
+        ...session,
         match: resolvedMatch?._id || session.match,
       });
       const publicMatch = serializePublicMatch(resolvedMatch, session);
@@ -480,7 +505,7 @@ export async function loadDirectorConsoleData() {
   const cookieStore = await cookies();
   const directorToken = cookieStore.get(getDirectorAccessCookieName())?.value;
   const authorized = hasValidDirectorAccess(directorToken);
-  const sessions = await loadDirectorSessionsList();
+  const sessions = authorized ? await loadDirectorSessionsList() : [];
 
   return {
     authorized,

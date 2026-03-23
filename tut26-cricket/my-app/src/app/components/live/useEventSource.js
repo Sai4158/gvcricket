@@ -36,10 +36,12 @@ export default function useEventSource({
     }
 
     const handleVisibilityChange = () => {
-      setIsPageVisible(readPageVisibility());
+      setIsPageVisible((current) => {
+        const next = readPageVisibility();
+        return current === next ? current : next;
+      });
     };
 
-    handleVisibilityChange();
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {

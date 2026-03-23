@@ -150,7 +150,7 @@ function buildBallEventLine(ball) {
 }
 
 function buildUndoAnnouncementLine() {
-  return "Umpire has undone the last ball. The score for that ball has been removed. Umpire will redo this ball.";
+  return "Umpire has removed the score for this ball. Umpire will redo this ball.";
 }
 
 function buildProgressReminder(event, match) {
@@ -462,6 +462,11 @@ export function createSoundEffectLiveEvent(match, effect, options = {}) {
     clientRequestId: options.clientRequestId || "",
     resumeAnnouncements: Boolean(options.resumeAnnouncements),
     trigger: options.trigger === "score_boundary" ? "score_boundary" : "manual",
+    preAnnouncementText: String(options.preAnnouncementText || "").trim(),
+    preAnnouncementDelayMs: Math.max(
+      0,
+      Number(options.preAnnouncementDelayMs || 0),
+    ),
     createdAt: new Date().toISOString(),
   };
 }
@@ -661,7 +666,7 @@ export function buildUmpireTapAnnouncement(event, mode = "simple") {
   }
 
   if (event.type === "undo") {
-    return "Undo.";
+    return "Umpire has removed the score for this ball. Umpire will redo this ball.";
   }
 
   if (event.type === "match_end") {

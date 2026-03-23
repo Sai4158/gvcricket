@@ -11,8 +11,6 @@ import {
   hasValidMatchAccess,
 } from "../../../../lib/match-access";
 import {
-  getMatchSubscriberCount,
-  getSessionSubscriberCount,
   publishMatchUpdate,
 } from "../../../../lib/live-updates";
 import { getRequestMeta } from "../../../../lib/request-meta";
@@ -48,6 +46,8 @@ const soundEffectRequestSchema = z
       .optional(),
     resumeAnnouncements: z.boolean().optional(),
     trigger: z.enum(["manual", "score_boundary"]).optional(),
+    preAnnouncementText: z.string().trim().max(180).optional(),
+    preAnnouncementDelayMs: z.coerce.number().int().min(0).max(4000).optional(),
   })
   .strict();
 
@@ -136,30 +136,6 @@ export async function POST(req, { params }) {
       return jsonError("Sound effect not found.", 404);
     }
 
-    const matchSubscriberCount = getMatchSubscriberCount(match._id);
-    const sessionSubscriberCount = match.sessionId
-      ? getSessionSubscriberCount(match.sessionId)
-      : 0;
-    const remoteLiveListenerCount = Math.max(
-      0,
-      matchSubscriberCount + sessionSubscriberCount - 1,
-    );
-
-    if (remoteLiveListenerCount === 0) {
-      return Response.json(
-        {
-          ok: true,
-          skippedRelay: true,
-          remoteLiveListenerCount,
-        },
-        {
-          headers: {
-            "Cache-Control": "no-store",
-          },
-        },
-      );
-    }
-
     const liveEvent = createSoundEffectLiveEvent(match, effect, {
       clientRequestId: parsedRequest.value.clientRequestId || "",
       resumeAnnouncements: Boolean(parsedRequest.value.resumeAnnouncements),
@@ -167,6 +143,8 @@ export async function POST(req, { params }) {
         parsedRequest.value.trigger === "score_boundary"
           ? "score_boundary"
           : "manual",
+      preAnnouncementText: parsedRequest.value.preAnnouncementText || "",
+      preAnnouncementDelayMs: parsedRequest.value.preAnnouncementDelayMs || 0,
     });
     const updatedMatch = await Match.findByIdAndUpdate(
       id,

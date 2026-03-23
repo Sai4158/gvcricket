@@ -6,15 +6,14 @@ import { writeAuditLog } from "../../../../lib/audit-log";
 import { connectDB } from "../../../../lib/db";
 import { publishMatchUpdate, publishSessionUpdate } from "../../../../lib/live-updates";
 import {
-  buildPublicMatchImageUrl,
   isSafeRemoteMatchImageUrl,
   normalizeMatchImageMetadata,
   validateMatchImageBuffer,
 } from "../../../../lib/match-image";
 import {
-  encryptMatchImageSourceUrl,
-  hashMatchImageSourceUrl,
-} from "../../../../lib/match-image-secure";
+  applyStoredMatchImages,
+  createStoredMatchImageEntry,
+} from "../../../../lib/match-image-gallery";
 import { moderateMatchImageBuffer } from "../../../../lib/match-image-moderation";
 import { serializePublicSession } from "../../../../lib/public-data";
 import { getRequestMeta } from "../../../../lib/request-meta";
@@ -182,48 +181,45 @@ export async function POST(req, { params }) {
       throw new Error("Remote image URL was rejected.");
     }
 
-    session.matchImageUrl = session.match
-      ? buildPublicMatchImageUrl(
-          session.match,
-          imageMetadata.matchImagePublicId || imageMetadata.matchImageUploadedAt?.getTime()
-        )
-      : imageMetadata.matchImageUrl;
-    session.matchImagePublicId = imageMetadata.matchImagePublicId;
-    session.matchImageStorageUrlEnc = encryptMatchImageSourceUrl(
-      imageMetadata.matchImageUrl
-    );
-    session.matchImageStorageUrlHash = hashMatchImageSourceUrl(
-      imageMetadata.matchImageUrl
-    );
-    session.matchImageUploadedAt = imageMetadata.matchImageUploadedAt;
-    session.matchImageUploadedBy = "draft";
+    const draftGalleryEntry = createStoredMatchImageEntry({
+      matchId: session.match ? String(session.match) : "",
+      sourceUrl: imageMetadata.matchImageUrl,
+      publicId: imageMetadata.matchImagePublicId,
+      uploadedAt: imageMetadata.matchImageUploadedAt,
+      uploadedBy: "draft",
+    });
+    applyStoredMatchImages(session, [draftGalleryEntry], {
+      matchId: session.match ? String(session.match) : "",
+    });
     session.mediaUpdatedAt = new Date();
     await session.save();
 
     if (session.match) {
-      await Match.findByIdAndUpdate(session.match, {
-        $set: {
-          matchImageUrl: buildPublicMatchImageUrl(
-            session.match,
-            imageMetadata.matchImagePublicId || imageMetadata.matchImageUploadedAt?.getTime()
-          ),
-          matchImagePublicId: imageMetadata.matchImagePublicId,
-          matchImageStorageUrlEnc: session.matchImageStorageUrlEnc,
-          matchImageStorageUrlHash: session.matchImageStorageUrlHash,
-          matchImageUploadedAt: session.matchImageUploadedAt,
-          matchImageUploadedBy: session.matchImageUploadedBy,
-          mediaUpdatedAt: session.mediaUpdatedAt,
-          lastEventType: "image_update",
-          lastEventText: "Match image updated.",
-          lastLiveEvent: {
-            id: `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`,
-            type: "image_update",
-            summaryText: "Match image updated.",
-            createdAt: new Date().toISOString(),
-          },
-        },
-      });
-      publishMatchUpdate(session.match);
+      const linkedMatch = await Match.findById(session.match);
+      if (linkedMatch) {
+        const matchGalleryEntry = createStoredMatchImageEntry({
+          matchId: String(linkedMatch._id),
+          sourceUrl: imageMetadata.matchImageUrl,
+          publicId: imageMetadata.matchImagePublicId,
+          uploadedAt: imageMetadata.matchImageUploadedAt,
+          uploadedBy: "draft",
+          id: draftGalleryEntry.id,
+        });
+        applyStoredMatchImages(linkedMatch, [matchGalleryEntry], {
+          matchId: String(linkedMatch._id),
+        });
+        linkedMatch.mediaUpdatedAt = session.mediaUpdatedAt;
+        linkedMatch.lastEventType = "image_update";
+        linkedMatch.lastEventText = "Match image updated.";
+        linkedMatch.lastLiveEvent = {
+          id: `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`,
+          type: "image_update",
+          summaryText: "Match image updated.",
+          createdAt: new Date().toISOString(),
+        };
+        await linkedMatch.save();
+        publishMatchUpdate(session.match);
+      }
     }
 
     publishSessionUpdate(session._id);

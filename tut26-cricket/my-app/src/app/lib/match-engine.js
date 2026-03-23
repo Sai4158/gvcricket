@@ -583,6 +583,7 @@ export function buildSessionMirrorUpdate(matchDocument) {
     overs: match?.overs ?? null,
     tossWinner: match?.tossWinner || "",
     tossDecision: match?.tossDecision || "",
+    matchImages: Array.isArray(match?.matchImages) ? match.matchImages : [],
     matchImageUrl: match?.matchImageUrl || "",
     matchImagePublicId: match?.matchImagePublicId || "",
     matchImageUploadedAt: match?.matchImageUploadedAt || null,

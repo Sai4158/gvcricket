@@ -30,6 +30,7 @@ export const preferredRegion = ["iad1"];
 
 const WALKIE_HEARTBEAT_INTERVAL_MS = 8000;
 const WALKIE_HEARTBEAT_START_DELAY_MS = 4000;
+const WALKIE_FALLBACK_POLL_INTERVAL_MS = 2000;
 const WALKIE_BOOT_PAD = "0".repeat(256);
 const WALKIE_PING_PAD = "0".repeat(64);
 
@@ -200,7 +201,7 @@ export async function GET(request, { params }) {
     }, delay);
   };
 
-  const schedulePoll = (delay = 800) => {
+  const schedulePoll = (delay = WALKIE_FALLBACK_POLL_INTERVAL_MS) => {
     if (closed || hasChangeStreamUpdates) {
       return;
     }
@@ -416,7 +417,7 @@ export async function GET(request, { params }) {
         } catch (error) {
           console.error("Walkie change streams unavailable.", error);
           hasChangeStreamUpdates = false;
-          schedulePoll(500);
+          schedulePoll();
         }
       })();
 

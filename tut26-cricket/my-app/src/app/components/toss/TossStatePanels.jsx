@@ -1,6 +1,6 @@
 "use client";
 import { useMemo } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { FaCircle } from "react-icons/fa";
 import LoadingButton from "../shared/LoadingButton";
 import { CoinHeads, CoinTails, SpinningCoin } from "./CoinArt";
@@ -33,9 +33,10 @@ export default function TossStatePanels({
   onDecision,
 }) {
   const { winnerName, side } = tossResult;
+  const reduceMotion = useReducedMotion();
   const confettiPieces = useMemo(
     () =>
-      Array.from({ length: 20 }, (_, index) => ({
+      Array.from({ length: reduceMotion ? 10 : 20 }, (_, index) => ({
         id: index,
         left: `${(index * 19) % 100}%`,
         delay: `${(index % 6) * 0.14}s`,
@@ -43,7 +44,7 @@ export default function TossStatePanels({
         rotate: `${(index % 2 === 0 ? 1 : -1) * (12 + index * 3)}deg`,
         color: ["#f6b400", "#fde68a", "#ffffff", "#f59e0b"][index % 4],
       })),
-    []
+    [reduceMotion]
   );
 
   return (
@@ -86,12 +87,16 @@ export default function TossStatePanels({
 
             <div className="py-8 flex justify-center">
               <motion.div
-                animate={{ rotateY: 720 }}
-                transition={{
-                  duration: 6,
-                  ease: "linear",
-                  repeat: Number.POSITIVE_INFINITY,
-                }}
+                animate={reduceMotion ? undefined : { rotateY: 720 }}
+                transition={
+                  reduceMotion
+                    ? undefined
+                    : {
+                        duration: 6,
+                        ease: "linear",
+                        repeat: Number.POSITIVE_INFINITY,
+                      }
+                }
                 className="transform-3d"
               >
                 <SpinningCoin />
@@ -138,8 +143,11 @@ export default function TossStatePanels({
             className="flex min-h-117 flex-col items-center justify-center text-center"
           >
             <motion.div
-              animate={{ rotateY: 1440 }}
-              transition={{ duration: 2.2, ease: "easeInOut" }}
+              animate={{ rotateY: reduceMotion ? 360 : 1440 }}
+              transition={{
+                duration: reduceMotion ? 0.9 : 2.2,
+                ease: "easeInOut",
+              }}
               className="transform-3d"
             >
               <SpinningCoin />
