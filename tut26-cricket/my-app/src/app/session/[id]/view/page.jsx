@@ -7,13 +7,15 @@ import {
 } from "../../../lib/site-metadata";
 import { loadSessionViewData } from "../../../lib/server-data";
 import { notFound, redirect } from "next/navigation";
+import { cache } from "react";
 
 export const dynamic = "force-dynamic";
 const SHARE_IMAGE_SIZE = { width: 1200, height: 630 };
+const loadSessionViewDataCached = cache(loadSessionViewData);
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
-  const initialData = await loadSessionViewData(id);
+  const initialData = await loadSessionViewDataCached(id);
   const session = initialData?.session || {};
   const match = initialData?.match || {};
   const matchup = getMatchupLabel({
@@ -73,7 +75,7 @@ export async function generateMetadata({ params }) {
 
 export default async function ViewSessionPage({ params }) {
   const { id } = await params;
-  const initialData = await loadSessionViewData(id);
+  const initialData = await loadSessionViewDataCached(id);
 
   if (!initialData?.found || !initialData?.session) {
     notFound();

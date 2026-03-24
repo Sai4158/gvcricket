@@ -345,13 +345,14 @@ export function MatchImageModal({ match, onUploaded, onClose }) {
       <MatchImageUploader
         matchId={String(match._id)}
         existingImageUrl={match?.matchImageUrl || ""}
+        existingImageCount={Array.isArray(match?.matchImages) ? match.matchImages.length : 0}
         onUploaded={(updatedMatch) => {
           onUploaded(updatedMatch);
           onClose();
         }}
-        title={match?.matchImageUrl ? "Replace the current image" : "Upload a match image"}
-        description="Upload a team photo, ground photo, poster, or winning team picture. Safe raster images only."
-        primaryLabel={match?.matchImageUrl ? "Replace Image" : "Upload Image"}
+        title={match?.matchImageUrl ? "Replace Match Image" : "Add Match Image"}
+        description="JPG, PNG, or WebP."
+        primaryLabel={match?.matchImageUrl ? "Save Changes" : "Upload Images"}
       />
     </ModalBase>
   );

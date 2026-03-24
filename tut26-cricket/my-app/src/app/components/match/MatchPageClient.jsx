@@ -61,7 +61,17 @@ const IPL_HORN_EFFECT = {
   src: "/audio/effects/ipl_theme_song.mp3",
 };
 const SIX_PRE_EFFECT_TEXT = "Umpire has given 6 runs.";
-const SIX_PRE_EFFECT_DELAY_MS = 1000;
+const SIX_PRE_EFFECT_RATE = 0.8;
+
+function estimateSpeechLeadDelayMs(text, rate = 1) {
+  const words = String(text || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+  const safeRate = Math.max(0.7, Number(rate) || 1);
+  const estimatedMs = Math.round((Math.max(words, 1) / (180 * safeRate)) * 60000 + 250);
+  return Math.max(1600, Math.min(2600, estimatedMs));
+}
 
 const SOUND_EFFECT_DURATION_CACHE_KEY = "gv-sound-effect-durations-v1";
 
@@ -374,6 +384,7 @@ export default function MatchPageClient({
       activeBoundarySequenceRef.current = false;
       skipNextBoundaryLeadRef.current = false;
       shouldResumeAfterSoundEffectRef.current = false;
+      soundEffectPlayingRef.current = false;
 
       if (boundarySequenceTimerRef.current) {
         window.clearTimeout(boundarySequenceTimerRef.current);
@@ -386,6 +397,7 @@ export default function MatchPageClient({
 
       pendingUmpireAnnouncementRef.current = null;
       deferredUmpireAnnouncementRef.current = null;
+      pendingManualScoreAnnouncementRef.current = null;
       interruptedUmpireAnnouncementQueueRef.current = [];
       stop();
 
@@ -544,6 +556,10 @@ export default function MatchPageClient({
 
     if (shouldPlayBoundaryHorn && umpireSettings.playScoreSoundEffects !== false) {
       const boundarySequenceVersion = boundarySequenceVersionRef.current + 1;
+      const sixLeadDelayMs = estimateSpeechLeadDelayMs(
+        SIX_PRE_EFFECT_TEXT,
+        SIX_PRE_EFFECT_RATE
+      );
       boundarySequenceVersionRef.current = boundarySequenceVersion;
       activeBoundarySequenceRef.current = true;
       handleScoreEvent(runs, isOut, extraType);
@@ -551,7 +567,7 @@ export default function MatchPageClient({
       if (umpireSettings.enabled && umpireSettings.mode !== "silent") {
         speak(SIX_PRE_EFFECT_TEXT, {
           key: "umpire-six-pre",
-          rate: 0.8,
+          rate: SIX_PRE_EFFECT_RATE,
           interrupt: true,
           minGapMs: 0,
           userGesture: true,
@@ -560,7 +576,7 @@ export default function MatchPageClient({
           boundarySequenceTimerRef.current = window.setTimeout(() => {
             boundarySequenceTimerRef.current = null;
             resolve();
-          }, SIX_PRE_EFFECT_DELAY_MS);
+          }, sixLeadDelayMs);
         });
 
         if (boundarySequenceVersion !== boundarySequenceVersionRef.current) {
@@ -574,7 +590,7 @@ export default function MatchPageClient({
         resumeAnnouncements: true,
         trigger: "score_boundary",
         preAnnouncementText: SIX_PRE_EFFECT_TEXT,
-        preAnnouncementDelayMs: SIX_PRE_EFFECT_DELAY_MS,
+        preAnnouncementDelayMs: sixLeadDelayMs,
       });
 
       if (boundarySequenceVersion !== boundarySequenceVersionRef.current) {
@@ -875,11 +891,25 @@ export default function MatchPageClient({
   ]);
 
   const handleAnnouncedUndo = async () => {
+    if (!match?.undoCount || !currentInningsHasHistory) {
+      return;
+    }
+
     cancelBoundarySequence({ stopEffect: true });
-    const undoEvent = createUndoLiveEvent(match);
+    let previewMatch = match;
+    try {
+      previewMatch = applyMatchAction(match, {
+        actionId: `umpire-preview:${Date.now()}`,
+        type: "undo_last",
+      });
+    } catch {
+      previewMatch = match;
+    }
+
+    const undoEvent = createUndoLiveEvent(previewMatch);
     const undoSequence = buildLiveScoreAnnouncementSequence(
       undoEvent,
-      match,
+      previewMatch,
       umpireSettings.mode
     );
     speakImmediateUmpireSequence(undoSequence, "umpire-undo");

@@ -60,7 +60,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   }, []);
 
   useEventSource({
-    url: matchId ? `/api/live/matches/${matchId}` : null,
+    url: matchId ? `/api/live/matches/${matchId}?history=0` : null,
     event: "match",
     enabled: Boolean(matchId) && Boolean(!match || match.isOngoing),
     onMessage: (payload) => {
@@ -352,6 +352,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
               existingImageUrl={
                 imageUploadMode === "replace" ? activeGalleryImage?.url || "" : ""
               }
+              existingImageCount={matchImages.length}
               targetImageId={
                 imageUploadMode === "replace" ? activeGalleryImage?.id || "" : ""
               }
@@ -365,16 +366,16 @@ export default function ResultPageClient({ matchId, initialMatch }) {
               }}
               title={
                 imageUploadMode === "replace"
-                  ? "Replace the current image"
-                  : "Upload a match image"
+                  ? "Replace Match Image"
+                  : "Add Match Image"
               }
               description={
                 imageUploadMode === "replace"
-                  ? "Replace this image in the gallery."
-                  : "Add a new image to this match gallery."
+                  ? "Replace the selected gallery image."
+                  : "Build the gallery, then upload once."
               }
               primaryLabel={
-                imageUploadMode === "replace" ? "Replace Image" : "Add Image"
+                imageUploadMode === "replace" ? "Save Changes" : "Upload Images"
               }
             />
           </ModalBase>

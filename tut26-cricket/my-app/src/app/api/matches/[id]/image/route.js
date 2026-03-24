@@ -60,7 +60,7 @@ export async function POST(req, { params }) {
   const meta = getRequestMeta(req);
   const uploadLimit = enforceRateLimit({
     key: `match-image:${id}:${meta.ip}`,
-    limit: 4,
+    limit: 12,
     windowMs: 60 * 1000,
     blockMs: 60 * 1000,
   });

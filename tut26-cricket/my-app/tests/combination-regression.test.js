@@ -4,7 +4,7 @@ import {
   applyMatchAction,
   applySafeMatchPatch,
 } from "../src/app/lib/match-engine.js";
-import { buildPublicMatchImageUrl } from "../src/app/lib/match-image.js";
+import { buildSignedMatchImageUrl } from "../src/app/lib/match-image-secure.js";
 import { serializePublicMatch } from "../src/app/lib/public-data.js";
 import {
   claimWalkieSpeaker,
@@ -228,7 +228,7 @@ test("image serialization stays safe during scoring and fallback paths stay stab
   const protectedImagePublic = serializePublicMatch(protectedImageMatch);
   assert.equal(
     protectedImagePublic.matchImageUrl,
-    buildPublicMatchImageUrl(match._id, "public123")
+    buildSignedMatchImageUrl(match._id, "public123", "cover")
   );
   assert.equal(protectedImagePublic.score, 4);
 

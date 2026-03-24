@@ -1,6 +1,5 @@
-import "server-only";
-
 import crypto from "node:crypto";
+import { createRequire } from "node:module";
 import { isSafeRemoteMatchImageUrl } from "./match-image";
 import {
   buildSignedMatchImageUrl,
@@ -8,6 +7,17 @@ import {
   getPublicMatchImagePath,
   hashMatchImageSourceUrl,
 } from "./match-image-secure";
+
+const require = createRequire(import.meta.url);
+
+const shouldEnforceServerOnly =
+  process.env.NODE_ENV === "development" ||
+  process.env.NODE_ENV === "production" ||
+  Boolean(process.env.NEXT_RUNTIME);
+
+if (shouldEnforceServerOnly) {
+  require("server-only");
+}
 
 function toIsoDate(value) {
   const date = value ? new Date(value) : null;

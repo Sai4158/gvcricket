@@ -897,6 +897,7 @@ export default function DirectorConsoleClient({
   useEffect(() => {
     if (initialSessions?.length) {
       writeCachedDirectorSessions(initialSessions);
+      lastDirectorSessionsRefreshAtRef.current = Date.now();
     }
   }, [initialSessions]);
 
@@ -1674,7 +1675,7 @@ export default function DirectorConsoleClient({
   useEventSource({
     url:
       authorized && managedSession?.match?._id
-        ? `/api/live/matches/${managedSession.match._id}`
+        ? `/api/live/matches/${managedSession.match._id}?history=0`
         : null,
     event: "match",
     enabled: Boolean(authorized && managedSession?.match?._id),

@@ -56,7 +56,9 @@ export function serializePublicMatch(
             : [],
         }
       : {}),
-    undoCount: Array.isArray(match.actionHistory) ? match.actionHistory.length : 0,
+    undoCount: Array.isArray(match.actionHistory)
+      ? match.actionHistory.length
+      : Number(match.undoCount || 0),
     createdAt: match.createdAt || null,
     updatedAt: match.updatedAt || null,
   };

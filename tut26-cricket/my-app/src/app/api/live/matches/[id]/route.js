@@ -16,6 +16,8 @@ const LIVE_MATCH_SNAPSHOT_CACHE_TTL_MS = 1_000;
 const STREAM_BOOTSTRAP_PAD = "0".repeat(64);
 const LIVE_MATCH_FIELDS =
   "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory";
+const READ_ONLY_LIVE_MATCH_FIELDS =
+  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcerEnabled announcerMode lastLiveEvent lastEventType lastEventText createdAt updatedAt";
 const FALLBACK_SESSION_FIELDS =
   "tossWinner tossDecision teamAName teamBName teamA teamB";
 const globalMatchSnapshotCache =
@@ -37,9 +39,9 @@ function pruneMatchSnapshotCache(now = Date.now()) {
   }
 }
 
-function getMatchSnapshotCacheEntry(matchId) {
+function getMatchSnapshotCacheEntry(matchId, includeActionHistory) {
   pruneMatchSnapshotCache();
-  const key = String(matchId || "");
+  const key = `${String(matchId || "")}:${includeActionHistory ? "full" : "readonly"}`;
   if (!globalMatchSnapshotCache.has(key)) {
     globalMatchSnapshotCache.set(key, {
       value: null,
@@ -51,8 +53,10 @@ function getMatchSnapshotCacheEntry(matchId) {
   return globalMatchSnapshotCache.get(key);
 }
 
-async function readLiveMatchSnapshot(matchId) {
-  const match = await Match.findById(matchId).select(LIVE_MATCH_FIELDS).lean();
+async function readLiveMatchSnapshot(matchId, { includeActionHistory = true } = {}) {
+  const match = await Match.findById(matchId)
+    .select(includeActionHistory ? LIVE_MATCH_FIELDS : READ_ONLY_LIVE_MATCH_FIELDS)
+    .lean();
   const fallbackSession =
     match?.sessionId
       ? await Session.findById(match.sessionId)
@@ -60,7 +64,7 @@ async function readLiveMatchSnapshot(matchId) {
           .lean()
       : null;
   const publicMatch = serializePublicMatch(match, fallbackSession, {
-    includeActionHistory: true,
+    includeActionHistory,
   });
 
   return {
@@ -69,8 +73,11 @@ async function readLiveMatchSnapshot(matchId) {
   };
 }
 
-async function getCachedLiveMatchSnapshot(matchId, { force = false } = {}) {
-  const cacheEntry = getMatchSnapshotCacheEntry(matchId);
+async function getCachedLiveMatchSnapshot(
+  matchId,
+  { force = false, includeActionHistory = true } = {}
+) {
+  const cacheEntry = getMatchSnapshotCacheEntry(matchId, includeActionHistory);
   const now = Date.now();
 
   if (!force && cacheEntry.value && cacheEntry.expiresAt > now) {
@@ -81,7 +88,7 @@ async function getCachedLiveMatchSnapshot(matchId, { force = false } = {}) {
     return cacheEntry.pending;
   }
 
-  cacheEntry.pending = readLiveMatchSnapshot(matchId)
+  cacheEntry.pending = readLiveMatchSnapshot(matchId, { includeActionHistory })
     .then((value) => {
       cacheEntry.value = value;
       cacheEntry.expiresAt = Date.now() + LIVE_MATCH_SNAPSHOT_CACHE_TTL_MS;
@@ -110,6 +117,8 @@ function encodeEvent(event, data) {
 
 export async function GET(request, { params }) {
   const { id } = await params;
+  const includeActionHistory =
+    request.nextUrl.searchParams.get("history") !== "0";
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -206,7 +215,10 @@ export async function GET(request, { params }) {
           const {
             publicMatch: nextPublicMatch,
             serialized: nextSerializedMatch,
-          } = await getCachedLiveMatchSnapshot(id, { force });
+          } = await getCachedLiveMatchSnapshot(id, {
+            force,
+            includeActionHistory,
+          });
           if (closed) {
             return;
           }

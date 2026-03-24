@@ -150,7 +150,7 @@ function buildBallEventLine(ball) {
 }
 
 function buildUndoAnnouncementLine() {
-  return "Umpire has removed the score for this ball. Umpire will redo this ball.";
+  return "Umpire has undone the last ball. The score for that ball has been removed. Umpire will redo this ball.";
 }
 
 function buildProgressReminder(event, match) {
@@ -666,7 +666,7 @@ export function buildUmpireTapAnnouncement(event, mode = "simple") {
   }
 
   if (event.type === "undo") {
-    return "Umpire has removed the score for this ball. Umpire will redo this ball.";
+    return "Undo.";
   }
 
   if (event.type === "match_end") {

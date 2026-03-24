@@ -223,6 +223,9 @@ export default function SessionsPageClient({ initialSessions }) {
   const showingTo = filteredSessions.length
     ? Math.min(filteredSessions.length, pageStart + pageSize)
     : 0;
+  const imageReplaceSession = imageReplaceContext
+    ? sessions.find((session) => session._id === imageReplaceContext.sessionId) || null
+    : null;
 
   useEffect(() => {
     setPage((current) => Math.min(current, totalPages));
@@ -932,6 +935,7 @@ export default function SessionsPageClient({ initialSessions }) {
                   ? imageReplaceContext.image?.url || ""
                   : ""
               }
+              existingImageCount={Array.isArray(imageReplaceSession?.matchImages) ? imageReplaceSession.matchImages.length : 0}
               targetImageId={
                 imageReplaceContext.mode === "replace"
                   ? imageReplaceContext.image?.id || ""
@@ -947,18 +951,18 @@ export default function SessionsPageClient({ initialSessions }) {
               }}
               title={
                 imageReplaceContext.mode === "replace"
-                  ? "Replace the current image"
-                  : "Upload a new match image"
+                  ? "Replace Match Image"
+                  : "Add Match Image"
               }
               description={
                 imageReplaceContext.mode === "replace"
-                  ? "Replace this image in the match gallery."
-                  : "Add one more image to the match gallery."
+                  ? "Replace the selected gallery image."
+                  : "Build the gallery, then upload once."
               }
               primaryLabel={
                 imageReplaceContext.mode === "replace"
-                  ? "Replace Image"
-                  : "Add Image"
+                  ? "Save Changes"
+                  : "Upload Images"
               }
             />
           </ModalBase>

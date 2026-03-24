@@ -29,8 +29,15 @@ function hasSignedInternalMatchImageUrl(value) {
 function getImageSecret() {
   const secret =
     process.env.MATCH_IMAGE_SECRET || process.env.MATCH_ACCESS_SECRET || "";
+  const allowFallbackSecret = process.env.NODE_ENV !== "production";
 
   if (!secret) {
+    if (allowFallbackSecret) {
+      return crypto
+        .createHash("sha256")
+        .update("gv-cricket-test-match-image-secret")
+        .digest();
+    }
     throw new Error("Match image secret is not configured.");
   }
 
