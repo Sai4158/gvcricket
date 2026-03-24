@@ -725,7 +725,7 @@ export default function DirectorConsoleClient({
   const ambientAudioSessionTypeRef = useRef("");
   const lastDirectorAnnouncedLiveEventRef = useRef("");
   const lastHandledSharedSoundEffectEventRef = useRef("");
-  const soundEffectPlaybackCutoffRef = useRef(Date.now());
+  const soundEffectPlaybackCutoffRef = useRef(0);
   const directorSessionsRefreshPromiseRef = useRef(null);
   const lastDirectorSessionsRefreshAtRef = useRef(0);
   const pendingDirectorAnnouncementRef = useRef(null);
@@ -873,6 +873,10 @@ export default function DirectorConsoleClient({
   );
 
   useEffect(() => subscribeUiAudioUnlock(setAudioUnlocked), []);
+
+  useEffect(() => {
+    soundEffectPlaybackCutoffRef.current = Date.now();
+  }, []);
 
   useEffect(() => {
     if (audioUnlocked) {

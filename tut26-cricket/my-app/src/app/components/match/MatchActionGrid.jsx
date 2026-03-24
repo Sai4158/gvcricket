@@ -1,12 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   FaBookOpen,
   FaImage,
+  FaInfoCircle,
   FaRegClock,
   FaShareAlt,
+  FaTimes,
   FaUserEdit,
 } from "react-icons/fa";
 import { LuUndo2 } from "react-icons/lu";
@@ -85,6 +87,18 @@ function AnnounceIcon() {
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+function ActionHelpItem({ icon, title, description, colorClass }) {
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/[0.04] p-3">
+      <div className={`mt-0.5 text-2xl ${colorClass}`}>{icon}</div>
+      <div className="min-w-0">
+        <h4 className="text-sm font-semibold text-white">{title}</h4>
+        <p className="mt-1 text-xs leading-5 text-zinc-400">{description}</p>
+      </div>
+    </div>
   );
 }
 
@@ -313,12 +327,28 @@ export default function MatchActionGrid({
   isCommentaryTalking = false,
   isAnnounceActive = false,
 }) {
+  const [showHelp, setShowHelp] = useState(false);
+
   return (
-    <div className="mt-8 flex justify-center border-t border-zinc-700 pt-6">
-      <div className="space-y-5">
-        <p className="text-center text-[12px] text-white">
-          Hold to talk or read. Tap to open.
-        </p>
+    <>
+      <div className="mt-8 flex justify-center border-t border-zinc-700 pt-6">
+        <div className="space-y-5">
+          <div className="flex items-center justify-center gap-2">
+            <p className="text-center text-[12px] text-white">
+              Hold to talk or read. Tap to open.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                onPressFeedback?.();
+                setShowHelp(true);
+              }}
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full text-cyan-300 transition hover:text-cyan-200 active:scale-95"
+              aria-label="Open action help"
+            >
+              <FaInfoCircle className="text-sm" />
+            </button>
+          </div>
         <div className="grid grid-cols-3 gap-x-4 gap-y-6">
           <ActionIconButton
             onClick={onWalkie}
@@ -446,6 +476,104 @@ export default function MatchActionGrid({
           />
         </div>
       </div>
-    </div>
+      </div>
+
+      <AnimatePresence>
+        {showHelp ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center sm:p-6"
+            onClick={() => setShowHelp(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ duration: 0.18 }}
+              onClick={(event) => event.stopPropagation()}
+              className="w-full max-w-[34rem] overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,24,0.98),rgba(8,8,12,0.99))] shadow-[0_28px_90px_rgba(0,0,0,0.5)]"
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-white/8 px-4 py-4 sm:px-5">
+                <div>
+                  <h3 className="text-lg font-black tracking-[-0.02em] text-white">
+                    Action Icons
+                  </h3>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Quick guide for each button.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowHelp(false)}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-300 transition hover:bg-white/[0.08] hover:text-white active:scale-[0.97]"
+                  aria-label="Close action help"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              <div className="max-h-[70vh] space-y-3 overflow-y-auto px-4 py-4 sm:px-5">
+                <ActionHelpItem
+                  icon={<WalkieIcon />}
+                  title="Walkie-Talkie"
+                  description="Talk to the umpire team live. Hold to speak when walkie is on."
+                  colorClass="text-emerald-300"
+                />
+                <ActionHelpItem
+                  icon={<AnnounceIcon />}
+                  title="Announcer / Effects"
+                  description="Open score voice and sound effect settings."
+                  colorClass="text-cyan-300"
+                />
+                <ActionHelpItem
+                  icon={<LuUndo2 />}
+                  title="Undo"
+                  description="Remove the last ball and score entry."
+                  colorClass="text-zinc-300"
+                />
+                <ActionHelpItem
+                  icon={<CommentaryIcon />}
+                  title="Loudspeaker"
+                  description="Use the speaker mic for live voice output."
+                  colorClass="text-amber-300"
+                />
+                <ActionHelpItem
+                  icon={<FaUserEdit />}
+                  title="Edit Teams"
+                  description="Change team names and team details."
+                  colorClass="text-sky-400"
+                />
+                <ActionHelpItem
+                  icon={<FaRegClock />}
+                  title="Edit Overs / Innings"
+                  description="Update overs and innings settings."
+                  colorClass="text-amber-400"
+                />
+                <ActionHelpItem
+                  icon={<FaBookOpen />}
+                  title="History"
+                  description="See the over-by-over match history."
+                  colorClass="text-violet-400"
+                />
+                <ActionHelpItem
+                  icon={<FaImage />}
+                  title="Image"
+                  description="Add or manage match images."
+                  colorClass="text-zinc-200"
+                />
+                <ActionHelpItem
+                  icon={<FaShareAlt />}
+                  title="Share"
+                  description="Copy and share the live match link."
+                  colorClass="text-green-400"
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </>
   );
 }

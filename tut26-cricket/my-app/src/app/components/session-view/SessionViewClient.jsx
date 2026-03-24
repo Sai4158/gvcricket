@@ -113,7 +113,10 @@ function LoudspeakerIcon() {
 
 function PaMicSpeakerIcon() {
   return (
-    <span className="inline-flex h-7 w-7 items-center justify-center text-[1.05rem]" aria-hidden="true">
+    <span
+      className="inline-flex h-7 w-7 items-center justify-center text-[1.05rem]"
+      aria-hidden="true"
+    >
       <FaBullhorn />
     </span>
   );
@@ -137,8 +140,8 @@ function IosGlassSwitch({ checked, onChange, label, disabled = false }) {
         disabled
           ? "cursor-not-allowed border-white/8 bg-white/4 opacity-55"
           : checked
-          ? "border-emerald-300/35 bg-[linear-gradient(180deg,rgba(16,185,129,0.92),rgba(6,95,70,0.92))] shadow-[0_12px_28px_rgba(16,185,129,0.24)]"
-          : "border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.06))] shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]"
+            ? "border-emerald-300/35 bg-[linear-gradient(180deg,rgba(16,185,129,0.92),rgba(6,95,70,0.92))] shadow-[0_12px_28px_rgba(16,185,129,0.24)]"
+            : "border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.06))] shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]"
       }`}
     >
       <span
@@ -161,7 +164,9 @@ function countLegalBallsLocal(history = []) {
     const balls = Array.isArray(over?.balls) ? over.balls : [];
     return (
       total +
-      balls.filter((ball) => ball?.extraType !== "wide" && ball?.extraType !== "noball").length
+      balls.filter(
+        (ball) => ball?.extraType !== "wide" && ball?.extraType !== "noball",
+      ).length
     );
   }, 0);
 }
@@ -172,7 +177,7 @@ function formatOversLeftLocal(match) {
   const ballsLeft = Math.max(totalBalls - legalBalls, 0);
   const overs = Math.floor(ballsLeft / 6);
   const balls = ballsLeft % 6;
-  return balls > 0 ? `${overs}.${balls} overs left` : `${overs} overs left`;
+  return balls > 0 ? `${overs}.${balls} overs` : `${overs} overs`;
 }
 
 const HOLD_BUTTON_INTERACTION_PROPS = {
@@ -202,9 +207,9 @@ const SIX_PRE_EFFECT_DELAY_MS = 1000;
 function isSixBoundaryScoreEvent(event) {
   return Boolean(
     event?.type === "score_update" &&
-      !event?.ball?.isOut &&
-      !event?.ball?.extraType &&
-      Number(event?.ball?.runs) === 6,
+    !event?.ball?.isOut &&
+    !event?.ball?.extraType &&
+    Number(event?.ball?.runs) === 6,
   );
 }
 
@@ -253,13 +258,13 @@ export default function SessionViewClient({ sessionId, initialData }) {
       ? initialData.match.lastLiveEvent.id || ""
       : "",
   );
-  const soundEffectPlaybackCutoffRef = useRef(Date.now());
+  const soundEffectPlaybackCutoffRef = useRef(0);
   const router = useRouter();
   const sessionData = data?.session;
   const match = data?.match;
   const { settings, updateSetting } = useAnnouncementSettings(
     "spectator",
-    match?._id || sessionId || ""
+    match?._id || sessionId || "",
   );
   const micMonitor = useLocalMicMonitor();
   const {
@@ -279,7 +284,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
     enabled: Boolean(sessionId),
     disconnectWhenHidden: false,
     onMessage: (payload) => {
-      if (payload.updatedAt && payload.updatedAt === lastStreamUpdateRef.current) {
+      if (
+        payload.updatedAt &&
+        payload.updatedAt === lastStreamUpdateRef.current
+      ) {
         return;
       }
 
@@ -304,16 +312,22 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const currentLiveEventId = match?.lastLiveEvent?.id || "";
   const isLiveMatch = Boolean(match?.isOngoing && !match?.result);
   const spectatorWalkieSignalActive = Boolean(
-    isLiveMatch && (spectatorWalkieEnabled || quickWalkieTalking)
+    isLiveMatch && (spectatorWalkieEnabled || quickWalkieTalking),
   );
   const walkie = useWalkieTalkie({
     matchId: match?._id || "",
     enabled: Boolean(match?._id && isLiveMatch),
     role: "spectator",
-    displayName: sessionData?.name ? `${sessionData.name} Spectator` : "Spectator",
+    displayName: sessionData?.name
+      ? `${sessionData.name} Spectator`
+      : "Spectator",
     autoConnectAudio: spectatorWalkieEnabled,
     signalingActive: spectatorWalkieSignalActive,
   });
+
+  useEffect(() => {
+    soundEffectPlaybackCutoffRef.current = Date.now();
+  }, []);
 
   const speakSequenceWithDuck = useCallback(
     (items, options = {}, restoreAfterMs = 2600) => {
@@ -333,7 +347,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
       return true;
     },
-    [speakSequence]
+    [speakSequence],
   );
 
   const announceCurrentScore = useCallback(
@@ -385,10 +399,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
           ignoreEnabled: true,
           userGesture: Boolean(options.userGesture),
         },
-        2400
+        2400,
       );
     },
-    [currentLiveEventId, match, speakSequenceWithDuck]
+    [currentLiveEventId, match, speakSequenceWithDuck],
   );
 
   const clearAnnouncementTimers = useCallback(() => {
@@ -431,7 +445,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
     const resumeQueue = [
       ...interruptedAnnouncementQueueRef.current,
-      ...(deferredAnnouncementRef.current ? [deferredAnnouncementRef.current] : []),
+      ...(deferredAnnouncementRef.current
+        ? [deferredAnnouncementRef.current]
+        : []),
     ];
     interruptedAnnouncementQueueRef.current = [];
     deferredAnnouncementRef.current = null;
@@ -465,7 +481,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         interrupt: true,
         minGapMs: 0,
       },
-      resumeRestoreAfterMs
+      resumeRestoreAfterMs,
     );
   }, [settings.enabled, settings.mode, speakSequenceWithDuck]);
 
@@ -623,7 +639,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
   ]);
 
   useEffect(() => {
-    const announcerEnabled = Boolean(match && isLiveMatch && settings.enabled && settings.mode !== "silent");
+    const announcerEnabled = Boolean(
+      match && isLiveMatch && settings.enabled && settings.mode !== "silent",
+    );
 
     if (!announcerEnabled) {
       if (previousEnabledRef.current) {
@@ -644,10 +662,20 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
 
     previousEnabledRef.current = true;
-  }, [clearAnnouncementTimers, isLiveMatch, match, prime, settings.enabled, settings.mode, stop]);
+  }, [
+    clearAnnouncementTimers,
+    isLiveMatch,
+    match,
+    prime,
+    settings.enabled,
+    settings.mode,
+    stop,
+  ]);
 
   useEffect(() => {
-    const announcerEnabled = Boolean(match && isLiveMatch && settings.enabled && settings.mode !== "silent");
+    const announcerEnabled = Boolean(
+      match && isLiveMatch && settings.enabled && settings.mode !== "silent",
+    );
     if (!announcerEnabled || !match?._id) {
       return;
     }
@@ -657,7 +685,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
       return;
     }
 
-    const queuedWhileWaitingForGesture = announcerStatus === "waiting_for_gesture";
+    const queuedWhileWaitingForGesture =
+      announcerStatus === "waiting_for_gesture";
     const spoke = announceCurrentScore();
     if (!spoke && !queuedWhileWaitingForGesture) {
       return;
@@ -677,7 +706,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
   useEffect(() => {
     const announcerEnabled = Boolean(
-      match && isLiveMatch && settings.enabled && settings.mode !== "silent"
+      match && isLiveMatch && settings.enabled && settings.mode !== "silent",
     );
     const initialSummaryKey = match?._id
       ? `${match._id}:${currentLiveEventId || "snapshot"}`
@@ -724,7 +753,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
   useEffect(() => {
     const announcerEnabled = Boolean(
-      match && isLiveMatch && settings.enabled && settings.mode !== "silent"
+      match && isLiveMatch && settings.enabled && settings.mode !== "silent",
     );
     const initialSummaryKey = match?._id
       ? `${match._id}:${currentLiveEventId || "snapshot"}`
@@ -749,7 +778,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
         announcerAutoReadTimerRef.current = null;
       }
       prime({ userGesture: true });
-      const spoke = announceCurrentScore({ userGesture: true, interrupt: true });
+      const spoke = announceCurrentScore({
+        userGesture: true,
+        interrupt: true,
+      });
       if (spoke) {
         announcerInitialSummaryRef.current = initialSummaryKey;
       }
@@ -789,11 +821,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
     if (lastAnnouncedEventRef.current === event.id) return;
 
-    const { items, priority, restoreAfterMs } = buildLiveScoreAnnouncementSequence(
-      event,
-      match,
-      settings.mode
-    );
+    const { items, priority, restoreAfterMs } =
+      buildLiveScoreAnnouncementSequence(event, match, settings.mode);
     const shouldSkipBoundaryLead =
       skipNextBoundaryLeadRef.current && isSixBoundaryScoreEvent(event);
     if (shouldSkipBoundaryLead) {
@@ -823,7 +852,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         interrupt: true,
         minGapMs: 0,
       },
-      restoreAfterMs
+      restoreAfterMs,
     );
     if (!spoke && announcerStatus === "waiting_for_gesture") {
       lastAnnouncedEventRef.current = event.id;
@@ -878,7 +907,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       return;
     }
     shouldResumeAfterSoundEffectRef.current = Boolean(
-      liveEvent.resumeAnnouncements
+      liveEvent.resumeAnnouncements,
     );
     const effectToPlay = {
       id: liveEvent.effectId || liveEvent.effectFileName || liveEvent.id,
@@ -887,13 +916,17 @@ export default function SessionViewClient({ sessionId, initialData }) {
       src: liveEvent.effectSrc || "",
     };
     const playIncomingSoundEffect = () => {
-      void playLiveSoundEffect(effectToPlay, { userGesture: false }).then((played) => {
-        if (!played) {
-          resumeSpectatorAnnouncementsAfterSoundEffect();
-        }
-      });
+      void playLiveSoundEffect(effectToPlay, { userGesture: false }).then(
+        (played) => {
+          if (!played) {
+            resumeSpectatorAnnouncementsAfterSoundEffect();
+          }
+        },
+      );
     };
-    const preAnnouncementText = String(liveEvent.preAnnouncementText || "").trim();
+    const preAnnouncementText = String(
+      liveEvent.preAnnouncementText || "",
+    ).trim();
 
     if (
       liveEvent.trigger === "score_boundary" &&
@@ -927,16 +960,20 @@ export default function SessionViewClient({ sessionId, initialData }) {
         },
         Math.max(
           2200,
-          Number(liveEvent.preAnnouncementDelayMs || SIX_PRE_EFFECT_DELAY_MS) + 900,
+          Number(liveEvent.preAnnouncementDelayMs || SIX_PRE_EFFECT_DELAY_MS) +
+            900,
         ),
       );
       if (pendingSoundEffectTimerRef.current) {
         window.clearTimeout(pendingSoundEffectTimerRef.current);
       }
-      pendingSoundEffectTimerRef.current = window.setTimeout(() => {
-        pendingSoundEffectTimerRef.current = null;
-        playIncomingSoundEffect();
-      }, Number(liveEvent.preAnnouncementDelayMs || SIX_PRE_EFFECT_DELAY_MS));
+      pendingSoundEffectTimerRef.current = window.setTimeout(
+        () => {
+          pendingSoundEffectTimerRef.current = null;
+          playIncomingSoundEffect();
+        },
+        Number(liveEvent.preAnnouncementDelayMs || SIX_PRE_EFFECT_DELAY_MS),
+      );
       return;
     }
 
@@ -1018,7 +1055,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
           interrupt: true,
           ignoreEnabled: true,
         },
-        1800
+        1800,
       );
       previousWalkieEnabledRef.current = walkieEnabled;
       return undefined;
@@ -1076,7 +1113,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
           interrupt: true,
           ignoreEnabled: true,
         },
-        1800
+        1800,
       );
       return;
     }
@@ -1119,7 +1156,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const handleShare = async () => {
     const shareUrl = buildShareUrl(
       `/session/${sessionId}/view`,
-      window.location.origin
+      window.location.origin,
     );
 
     try {
@@ -1165,7 +1202,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
       prime({ userGesture });
     },
-    [prime, settings.enabled, settings.mode, updateSetting]
+    [prime, settings.enabled, settings.mode, updateSetting],
   );
 
   const handleOpenAnnouncePanel = useCallback(() => {
@@ -1199,7 +1236,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
     (event) => {
       if (
         event.target instanceof Element &&
-        event.target.closest("button, input, select, textarea, a, [role='switch']")
+        event.target.closest(
+          "button, input, select, textarea, a, [role='switch']",
+        )
       ) {
         return;
       }
@@ -1216,7 +1255,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         }, 220);
       }, 180);
     },
-    [handleQuickAnnounce]
+    [handleQuickAnnounce],
   );
 
   const handleAnnouncerCardPressEnd = useCallback(() => {
@@ -1231,7 +1270,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
   };
 
   const handleWalkieLauncherPressStart = () => {
-    if (!walkie.snapshot?.enabled || !spectatorWalkieEnabled || !walkie.canTalk) {
+    if (
+      !walkie.snapshot?.enabled ||
+      !spectatorWalkieEnabled ||
+      !walkie.canTalk
+    ) {
       return;
     }
 
@@ -1385,7 +1428,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
             userGesture: true,
             ignoreEnabled: true,
           },
-          1200
+          1200,
         );
         const requested = await walkie.requestEnable();
         if (!requested) {
@@ -1400,7 +1443,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       showTemporaryWalkieNotice,
       speakSequenceWithDuck,
       walkie,
-    ]
+    ],
   );
 
   const handleWalkieSignalRefresh = useCallback(async () => {
@@ -1416,7 +1459,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
       showTemporaryWalkieNotice("Signal refreshed. Walkie stays on.", 3400);
       return;
     }
-    showTemporaryWalkieNotice("Walkie refresh is waiting for the live channel.", 3400);
+    showTemporaryWalkieNotice(
+      "Walkie refresh is waiting for the live channel.",
+      3400,
+    );
   }, [showTemporaryWalkieNotice, walkie]);
 
   const handleSpeakerSwitchChange = useCallback(
@@ -1444,7 +1490,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       await micMonitor.stop({ resumeMedia: true });
       setActivePanel((current) => (current === "mic" ? null : current));
     },
-    [micMonitor]
+    [micMonitor],
   );
 
   const handleAnnounceSwitchChange = useCallback(
@@ -1465,14 +1511,17 @@ export default function SessionViewClient({ sessionId, initialData }) {
       stop();
       setActivePanel((current) => (current === "announce" ? null : current));
     },
-    [announceCurrentScore, prime, settings.mode, stop, updateSetting]
+    [announceCurrentScore, prime, settings.mode, stop, updateSetting],
   );
 
   if (!sessionId) return <SplashMsg>No Session ID provided.</SplashMsg>;
-  if (streamError) return <SplashMsg>Could not load the session data.</SplashMsg>;
+  if (streamError)
+    return <SplashMsg>Could not load the session data.</SplashMsg>;
   if (!sessionData) return <SplashMsg loading>Loading Session...</SplashMsg>;
   if (!match) {
-    return <SplashMsg>The match for this session has not started yet.</SplashMsg>;
+    return (
+      <SplashMsg>The match for this session has not started yet.</SplashMsg>
+    );
   }
 
   const teamA = getTeamBundle(match, "teamA");
@@ -1480,14 +1529,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const announcerStatusText = !isSupported
     ? "Speech is not supported in this browser."
     : needsGesture && !audioUnlocked
-    ? "Tap Read Live Score once to enable audio on this device."
-    : needsGesture
-    ? "Tap once to enable the announcer on this device."
-    : announcerStatus === "blocked"
-    ? "Speech is blocked. Check your browser audio settings."
-    : settings.enabled
-    ? "Announces every new score update."
-    : "Turn it on to hear live score updates.";
+      ? "Tap Read Live Score once to enable audio on this device."
+      : needsGesture
+        ? "Tap once to enable the announcer on this device."
+        : announcerStatus === "blocked"
+          ? "Speech is blocked. Check your browser audio settings."
+          : settings.enabled
+            ? "Announces every new score update."
+            : "Turn it on to hear live score updates.";
   const showWalkieLauncher = Boolean(match?._id && isLiveMatch);
   const speakerMicOn = Boolean(micMonitor.isActive || micMonitor.isPaused);
   const walkieCardTalking = quickWalkieTalking || walkie.isSelfTalking;
@@ -1507,9 +1556,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const walkieNeedsLocalEnableNotice = Boolean(walkieUi.needsLocalEnableNotice);
   const walkieLoading = Boolean(
     walkie.preparingToTalk ||
-      walkie.claiming ||
-      walkie.recoveringAudio ||
-      walkie.recoveringSignaling
+    walkie.claiming ||
+    walkie.recoveringAudio ||
+    walkie.recoveringSignaling,
   );
   const walkieRemoteSpeakerState = getWalkieRemoteSpeakerState({
     snapshot: walkie.snapshot,
@@ -1524,54 +1573,57 @@ export default function SessionViewClient({ sessionId, initialData }) {
       ? "Reconnecting walkie..."
       : "Connecting walkie..."
     : walkieRemoteSpeakerState.isRemoteTalking
-    ? walkieRemoteSpeakerState.shortStatus
-    : walkieCardFinishing
-    ? "Finishing..."
-    : walkieCardTalking
-    ? "You are live."
-    : walkiePendingRequest
-    ? "Waiting for umpire approval."
-    : walkie.snapshot?.enabled && walkieSwitchOn
-    ? "Tap and hold to talk."
-    : walkie.snapshot?.enabled
-    ? walkieUi.notice
-    : "Turn it on to request access.";
+      ? walkieRemoteSpeakerState.shortStatus
+      : walkieCardFinishing
+        ? "Finishing..."
+        : walkieCardTalking
+          ? "You are live."
+          : walkiePendingRequest
+            ? "Waiting for umpire approval."
+            : walkie.snapshot?.enabled && walkieSwitchOn
+              ? "Tap and hold to talk."
+              : walkie.snapshot?.enabled
+                ? walkieUi.notice
+                : "Turn it on to request access.";
   const shouldSurfaceWalkieNotice = Boolean(
-    walkie.snapshot?.enabled || walkieSwitchOn || walkieNeedsLocalEnableNotice
+    walkie.snapshot?.enabled || walkieSwitchOn || walkieNeedsLocalEnableNotice,
   );
   const hideGenericSharedWalkieNotice = Boolean(
     !localWalkieNotice &&
-      (walkie.notice === "Walkie-talkie is live." || walkie.notice === "Walkie-talkie is off.")
+    (walkie.notice === "Walkie-talkie is live." ||
+      walkie.notice === "Walkie-talkie is off."),
   );
   const rawWalkieNotice = walkieUi.notice
     ? walkieUi.notice
     : localWalkieNotice ||
-      (shouldSurfaceWalkieNotice && !hideGenericSharedWalkieNotice ? walkie.notice || "" : "");
-  const walkieStatusNotice =
-    walkieRemoteSpeakerState.isRemoteTalking
-      ? walkieRemoteSpeakerState.title
-      : walkie.snapshot?.enabled && !walkieCardTalking
+      (shouldSurfaceWalkieNotice && !hideGenericSharedWalkieNotice
+        ? walkie.notice || ""
+        : "");
+  const walkieStatusNotice = walkieRemoteSpeakerState.isRemoteTalking
+    ? walkieRemoteSpeakerState.title
+    : walkie.snapshot?.enabled && !walkieCardTalking
       ? walkie.snapshot?.busy
         ? walkie.snapshot?.activeSpeakerRole === "umpire"
           ? "Umpire is talking."
           : walkie.snapshot?.activeSpeakerRole === "director"
-          ? "Director is talking."
-          : walkie.snapshot?.activeSpeakerRole === "spectator"
-          ? "Spectator is talking."
-          : "Live channel is busy."
+            ? "Director is talking."
+            : walkie.snapshot?.activeSpeakerRole === "spectator"
+              ? "Spectator is talking."
+              : "Live channel is busy."
         : "Channel is free."
       : "";
   const walkieNoticeText =
-    rawWalkieNotice === "Retrying audio..." || rawWalkieNotice === "Retrying live walkie..."
+    rawWalkieNotice === "Retrying audio..." ||
+    rawWalkieNotice === "Retrying live walkie..."
       ? walkieStatusNotice || rawWalkieNotice
       : rawWalkieNotice || walkieStatusNotice;
   const speakerCardDescription = speakerCardTalking
     ? "Live now."
     : micMonitor.isStarting
-    ? "Starting mic..."
-    : speakerMicOn
-    ? "Hold to talk."
-    : "Use phone as a mic.";
+      ? "Starting mic..."
+      : speakerMicOn
+        ? "Hold to talk."
+        : "Use phone as a mic.";
   const announcerCardDescription = announceSwitchOn
     ? "Reads each update."
     : "Turn on for scores.";
@@ -1580,11 +1632,15 @@ export default function SessionViewClient({ sessionId, initialData }) {
       ? match?.innings2?.history || []
       : match?.innings1?.history || [];
   const hasRecordedOvers = activeInningsHistory.some(
-    (over) => Array.isArray(over?.balls) && over.balls.length > 0
+    (over) => Array.isArray(over?.balls) && over.balls.length > 0,
   );
   let trackerHistory = activeInningsHistory;
 
-  if (!hasRecordedOvers && Array.isArray(match?.balls) && match.balls.length > 0) {
+  if (
+    !hasRecordedOvers &&
+    Array.isArray(match?.balls) &&
+    match.balls.length > 0
+  ) {
     const inningsKey = match?.innings === "second" ? "innings2" : "innings1";
     const reconstructedMatch = {
       innings: match?.innings === "second" ? "second" : "first",
@@ -1596,14 +1652,19 @@ export default function SessionViewClient({ sessionId, initialData }) {
       addBallToHistory(reconstructedMatch, ball);
     }
 
-    trackerHistory = reconstructedMatch[inningsKey]?.history || activeInningsHistory;
+    trackerHistory =
+      reconstructedMatch[inningsKey]?.history || activeInningsHistory;
   }
   const launcherCardClass =
     "relative w-full overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.05),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.06),transparent_28%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] text-left shadow-[0_18px_50px_rgba(0,0,0,0.32)] backdrop-blur-sm transition-transform hover:-translate-y-0.5";
-  const innings1Complete = match?.innings === "second" || Boolean(match?.result);
+  const innings1Complete =
+    match?.innings === "second" || Boolean(match?.result);
   const innings2Complete = match?.innings === "second" && !isLiveMatch;
   const targetRuns = Number(match?.innings1?.score || 0) + 1;
-  const runsNeeded = Math.max(0, targetRuns - Number(match?.innings2?.score || 0));
+  const runsNeeded = Math.max(
+    0,
+    targetRuns - Number(match?.innings2?.score || 0),
+  );
   const inningsCards =
     match?.innings === "second"
       ? [
@@ -1625,7 +1686,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
             inningsData: match.innings1,
             statusLabel: innings1Complete ? "Innings completed" : "",
             targetSummary:
-              Number(match?.innings1?.score || 0) > 0 ? `Target set: ${targetRuns}` : "",
+              Number(match?.innings1?.score || 0) > 0
+                ? `Target set: ${targetRuns}`
+                : "",
           },
         ]
       : [
@@ -1633,7 +1696,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
             key: "innings1",
             title: match.innings1?.team || teamA.name,
             inningsData: match.innings1,
-            statusLabel: isLiveMatch ? "Live" : innings1Complete ? "Innings completed" : "",
+            statusLabel: isLiveMatch
+              ? "Live"
+              : innings1Complete
+                ? "Innings completed"
+                : "",
             targetSummary: "",
           },
           {
@@ -1710,294 +1777,312 @@ export default function SessionViewClient({ sessionId, initialData }) {
       >
         <div className="w-full max-w-4xl mt-1">
           {showWalkieLauncher ? (
-            <div className={`${launcherCardClass} mb-4 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.08),transparent_26%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-3`}>
-            <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-linear-to-r from-transparent via-emerald-300/50 to-transparent" />
             <div
-              className="flex w-full flex-col gap-4"
-              style={{
-                userSelect: "none",
-                WebkitUserSelect: "none",
-                WebkitTouchCallout: "none",
-              }}
+              className={`${launcherCardClass} mb-4 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.08),transparent_26%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-3`}
             >
-              <div className="flex items-start gap-3">
-                <span className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg shadow-[0_12px_26px_rgba(16,185,129,0.16)] ${
-                  walkieCardTalking
-                    ? "bg-emerald-500 text-black"
-                    : "bg-emerald-500/14 text-emerald-300"
-                }`}>
-                  {walkieCardTalking ? <FaMicrophone /> : <DualWalkieIcon />}
-                </span>
-                <span
-                  className="min-w-0 flex-1"
-                  style={{
-                    userSelect: "none",
-                    WebkitUserSelect: "none",
-                    WebkitTouchCallout: "none",
-                  }}
+              <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-linear-to-r from-transparent via-emerald-300/50 to-transparent" />
+              <div
+                className="flex w-full flex-col gap-4"
+                style={{
+                  userSelect: "none",
+                  WebkitUserSelect: "none",
+                  WebkitTouchCallout: "none",
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <span
+                    className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg shadow-[0_12px_26px_rgba(16,185,129,0.16)] ${
+                      walkieCardTalking
+                        ? "bg-emerald-500 text-black"
+                        : "bg-emerald-500/14 text-emerald-300"
+                    }`}
+                  >
+                    {walkieCardTalking ? <FaMicrophone /> : <DualWalkieIcon />}
+                  </span>
+                  <span
+                    className="min-w-0 flex-1"
+                    style={{
+                      userSelect: "none",
+                      WebkitUserSelect: "none",
+                      WebkitTouchCallout: "none",
+                    }}
+                  >
+                    <span className="block text-[13px] font-semibold uppercase tracking-[0.18em] text-white">
+                      Walkie-Talkie
+                    </span>
+                    <span className="mt-1 block text-sm leading-5 text-zinc-400">
+                      {walkieCardDescription}
+                    </span>
+                  </span>
+                  <div className="shrink-0 pt-0.5">
+                    <IosGlassSwitch
+                      checked={walkieSwitchOn}
+                      onChange={handleWalkieSwitchChange}
+                      label="Toggle walkie-talkie for this device"
+                      disabled={
+                        walkie.requestState === "pending" ||
+                        walkie.updatingEnabled
+                      }
+                    />
+                  </div>
+                </div>
+                <div
+                  className={
+                    walkieSwitchOn ||
+                    localWalkieNotice ||
+                    walkie.notice ||
+                    walkieNeedsLocalEnableNotice
+                      ? "min-h-18"
+                      : ""
+                  }
                 >
-                  <span className="block text-[13px] font-semibold uppercase tracking-[0.18em] text-white">
-                    Walkie-Talkie
-                  </span>
-                  <span className="mt-1 block text-sm leading-5 text-zinc-400">
-                    {walkieCardDescription}
-                  </span>
-                </span>
-                <div className="shrink-0 pt-0.5">
-                  <IosGlassSwitch
-                    checked={walkieSwitchOn}
-                    onChange={handleWalkieSwitchChange}
-                    label="Toggle walkie-talkie for this device"
-                    disabled={walkie.requestState === "pending" || walkie.updatingEnabled}
+                  <WalkieNotice
+                    embedded
+                    notice={walkieNoticeText}
+                    attention={walkieUi.attentionMode}
+                    onDismiss={() => {
+                      setLocalWalkieNotice("");
+                      walkie.dismissNotice();
+                    }}
                   />
                 </div>
-              </div>
-              <div
-                className={
-                  walkieSwitchOn ||
-                  localWalkieNotice ||
-                  walkie.notice ||
-                  walkieNeedsLocalEnableNotice
-                    ? "min-h-18"
-                    : ""
-                }
-              >
-                <WalkieNotice
-                  embedded
-                  notice={walkieNoticeText}
-                  attention={walkieUi.attentionMode}
-                  onDismiss={() => {
-                    setLocalWalkieNotice("");
-                    walkie.dismissNotice();
-                  }}
-                />
-              </div>
-              {walkieSwitchOn ? (
-                <div className="flex flex-col items-center justify-center pt-1 pb-1">
-                  {walkieRemoteSpeakerState.isRemoteTalking ? (
-                    <div className="w-full max-w-[320px] rounded-[28px] border border-cyan-300/18 bg-[linear-gradient(180deg,rgba(10,18,26,0.92),rgba(8,10,16,0.98))] px-5 py-4 text-center shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
-                      <div className="mb-2 inline-flex items-center rounded-full border border-cyan-300/18 bg-cyan-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100">
-                        {walkieRemoteSpeakerState.capsuleLabel}
+                {walkieSwitchOn ? (
+                  <div className="flex flex-col items-center justify-center pt-1 pb-1">
+                    {walkieRemoteSpeakerState.isRemoteTalking ? (
+                      <div className="w-full max-w-[320px] rounded-[28px] border border-cyan-300/18 bg-[linear-gradient(180deg,rgba(10,18,26,0.92),rgba(8,10,16,0.98))] px-5 py-4 text-center shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
+                        <div className="mb-2 inline-flex items-center rounded-full border border-cyan-300/18 bg-cyan-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100">
+                          {walkieRemoteSpeakerState.capsuleLabel}
+                        </div>
+                        <p className="text-sm font-medium text-white">
+                          {walkieRemoteSpeakerState.title}
+                        </p>
+                        <p className="mt-2 text-xs leading-5 text-zinc-400">
+                          {walkieRemoteSpeakerState.detail}
+                        </p>
                       </div>
-                      <p className="text-sm font-medium text-white">{walkieRemoteSpeakerState.title}</p>
-                      <p className="mt-2 text-xs leading-5 text-zinc-400">{walkieRemoteSpeakerState.detail}</p>
-                    </div>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        aria-label="Tap and hold walkie-talkie mic"
-                        {...HOLD_BUTTON_INTERACTION_PROPS}
-                        onPointerDown={(event) => {
-                          event.preventDefault();
-                          handleWalkieLauncherPressStart();
-                        }}
-                        onPointerUp={(event) => {
-                          event.preventDefault();
-                          void handleWalkieLauncherPressEnd();
-                        }}
-                        onPointerCancel={(event) => {
-                          event.preventDefault();
-                          void handleWalkieLauncherPressEnd();
-                        }}
-                        onPointerLeave={(event) => {
-                          event.preventDefault();
-                          void handleWalkieLauncherPressEnd();
-                        }}
-                        className={`inline-flex h-24 w-24 items-center justify-center rounded-full border transition ${
-                          walkieCardTalking
-                            ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_28px_rgba(16,185,129,0.38)]"
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          aria-label="Tap and hold walkie-talkie mic"
+                          {...HOLD_BUTTON_INTERACTION_PROPS}
+                          onPointerDown={(event) => {
+                            event.preventDefault();
+                            handleWalkieLauncherPressStart();
+                          }}
+                          onPointerUp={(event) => {
+                            event.preventDefault();
+                            void handleWalkieLauncherPressEnd();
+                          }}
+                          onPointerCancel={(event) => {
+                            event.preventDefault();
+                            void handleWalkieLauncherPressEnd();
+                          }}
+                          onPointerLeave={(event) => {
+                            event.preventDefault();
+                            void handleWalkieLauncherPressEnd();
+                          }}
+                          className={`inline-flex h-24 w-24 items-center justify-center rounded-full border transition ${
+                            walkieCardTalking
+                              ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_28px_rgba(16,185,129,0.38)]"
+                              : walkieLoading
+                                ? "border-cyan-300/40 bg-cyan-500/12 text-cyan-100 shadow-[0_0_22px_rgba(34,211,238,0.16)]"
+                                : walkieCardFinishing
+                                  ? "border-amber-300/40 bg-amber-500/12 text-amber-100 shadow-[0_0_22px_rgba(245,158,11,0.18)]"
+                                  : "border-white/12 bg-white/5 text-white"
+                          }`}
+                        >
+                          {walkieCardTalking ? (
+                            <FaMicrophone className="text-[2rem]" />
+                          ) : walkieLoading ? (
+                            <FaMicrophone className="animate-pulse text-[2rem]" />
+                          ) : (
+                            <FaMicrophoneSlash className="text-[2rem]" />
+                          )}
+                        </button>
+                        <span
+                          className="mt-3 text-xs font-medium tracking-[0.18em] text-zinc-400 uppercase"
+                          style={{
+                            userSelect: "none",
+                            WebkitUserSelect: "none",
+                            WebkitTouchCallout: "none",
+                            WebkitTapHighlightColor: "transparent",
+                            touchAction: "none",
+                          }}
+                        >
+                          {walkieCardTalking
+                            ? "Release to stop"
                             : walkieLoading
-                            ? "border-cyan-300/40 bg-cyan-500/12 text-cyan-100 shadow-[0_0_22px_rgba(34,211,238,0.16)]"
-                            : walkieCardFinishing
-                            ? "border-amber-300/40 bg-amber-500/12 text-amber-100 shadow-[0_0_22px_rgba(245,158,11,0.18)]"
-                            : "border-white/12 bg-white/5 text-white"
-                        }`}
-                      >
-                        {walkieCardTalking ? (
-                          <FaMicrophone className="text-[2rem]" />
-                        ) : walkieLoading ? (
-                          <FaMicrophone className="animate-pulse text-[2rem]" />
-                        ) : (
-                          <FaMicrophoneSlash className="text-[2rem]" />
-                        )}
-                      </button>
-                      <span
-                        className="mt-3 text-xs font-medium tracking-[0.18em] text-zinc-400 uppercase"
-                        style={{
-                          userSelect: "none",
-                          WebkitUserSelect: "none",
-                          WebkitTouchCallout: "none",
-                          WebkitTapHighlightColor: "transparent",
-                          touchAction: "none",
-                        }}
-                      >
-                        {walkieCardTalking
-                          ? "Release to stop"
-                          : walkieLoading
-                            ? "Connecting..."
-                          : walkieCardFinishing
-                            ? "Finishing..."
-                            : "Tap and hold to talk"}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void handleWalkieSignalRefresh();
-                        }}
-                        disabled={walkieLoading}
-                        className="mt-4 inline-flex min-h-11 items-center justify-center rounded-full border border-cyan-300/18 bg-[linear-gradient(180deg,rgba(34,211,238,0.14),rgba(8,18,24,0.82))] px-5 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-100 shadow-[0_16px_32px_rgba(8,145,178,0.18)] transition hover:border-cyan-200/30 hover:bg-[linear-gradient(180deg,rgba(56,189,248,0.18),rgba(10,18,24,0.86))] disabled:cursor-not-allowed disabled:opacity-55"
-                      >
-                        {walkieLoading ? "Refreshing..." : "Refresh signal"}
-                      </button>
-                    </>
-                  )}
-                </div>
-              ) : null}
-            </div>
+                              ? "Connecting..."
+                              : walkieCardFinishing
+                                ? "Finishing..."
+                                : "Tap and hold to talk"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleWalkieSignalRefresh();
+                          }}
+                          disabled={walkieLoading}
+                          className="mt-4 inline-flex min-h-11 items-center justify-center rounded-full border border-cyan-300/18 bg-[linear-gradient(180deg,rgba(34,211,238,0.14),rgba(8,18,24,0.82))] px-5 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-100 shadow-[0_16px_32px_rgba(8,145,178,0.18)] transition hover:border-cyan-200/30 hover:bg-[linear-gradient(180deg,rgba(56,189,248,0.18),rgba(10,18,24,0.86))] disabled:cursor-not-allowed disabled:opacity-55"
+                        >
+                          {walkieLoading ? "Refreshing..." : "Refresh signal"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ) : null}
+              </div>
             </div>
           ) : null}
 
           <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
             <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setActivePanel("mic")}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                setActivePanel("mic");
-              }
-            }}
-            className={`${launcherCardClass} min-h-34.5 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.11),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-3.5`}
-            aria-label="Open loudspeaker"
-          >
-            <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-linear-to-r from-transparent via-amber-300/50 to-transparent" />
-            <div className="flex h-full flex-col">
-              <div className="flex items-center justify-between gap-3">
-                <span
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-base text-black shadow-[0_12px_26px_rgba(16,185,129,0.28)]"
-                  aria-hidden="true"
-                >
-                  <PaMicSpeakerIcon />
-                </span>
-                <span className="shrink-0 pt-0.5">
-                  <IosGlassSwitch
-                    checked={speakerSwitchOn}
-                    onChange={(nextChecked) => {
-                      void handleSpeakerSwitchChange(nextChecked);
-                    }}
-                    label="Toggle loudspeaker"
-                  />
-                </span>
-              </div>
-              <div className="pt-4">
-                <span className="block text-[13px] font-semibold uppercase tracking-[0.18em] text-white">
-                  Loudspeaker
-                </span>
-                <span className="mt-1.5 block max-w-56 text-[13px] leading-5 text-zinc-400">
-                  {speakerCardDescription}
-                </span>
-              </div>
-              {speakerMicOn ? (
-                <div className="mt-auto flex justify-end pt-3">
-                  <button
-                    type="button"
-                    aria-label="Hold loudspeaker"
-                    {...HOLD_BUTTON_INTERACTION_PROPS}
-                    onClick={(event) => event.stopPropagation()}
-                    onPointerDown={(event) => {
-                      event.stopPropagation();
-                      event.preventDefault();
-                      handleSpeakerLauncherPressStart();
-                    }}
-                    onPointerUp={(event) => {
-                      event.stopPropagation();
-                      event.preventDefault();
-                      void handleSpeakerLauncherPressEnd();
-                    }}
-                    onPointerCancel={(event) => {
-                      event.stopPropagation();
-                      event.preventDefault();
-                      void handleSpeakerLauncherPressEnd();
-                    }}
-                    onPointerLeave={(event) => {
-                      event.stopPropagation();
-                      event.preventDefault();
-                      void handleSpeakerLauncherPressEnd();
-                    }}
-                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${
-                      speakerCardTalking
-                        ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_24px_rgba(16,185,129,0.35)]"
-                        : "border-white/12 bg-white/5 text-white"
-                    }`}
+              role="button"
+              tabIndex={0}
+              onClick={() => setActivePanel("mic")}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setActivePanel("mic");
+                }
+              }}
+              className={`${launcherCardClass} min-h-34.5 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.11),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-3.5`}
+              aria-label="Open loudspeaker"
+            >
+              <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-linear-to-r from-transparent via-amber-300/50 to-transparent" />
+              <div className="flex h-full flex-col">
+                <div className="flex items-center justify-between gap-3">
+                  <span
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-base text-black shadow-[0_12px_26px_rgba(16,185,129,0.28)]"
+                    aria-hidden="true"
                   >
-                    {speakerCardTalking ? <FaMicrophone /> : <FaMicrophoneSlash />}
-                  </button>
+                    <PaMicSpeakerIcon />
+                  </span>
+                  <span className="shrink-0 pt-0.5">
+                    <IosGlassSwitch
+                      checked={speakerSwitchOn}
+                      onChange={(nextChecked) => {
+                        void handleSpeakerSwitchChange(nextChecked);
+                      }}
+                      label="Toggle loudspeaker"
+                    />
+                  </span>
                 </div>
-              ) : null}
-            </div>
+                <div className="pt-4">
+                  <span className="block text-[13px] font-semibold uppercase tracking-[0.18em] text-white">
+                    Loudspeaker
+                  </span>
+                  <span className="mt-1.5 block max-w-56 text-[13px] leading-5 text-zinc-400">
+                    {speakerCardDescription}
+                  </span>
+                </div>
+                {speakerMicOn ? (
+                  <div className="mt-auto flex justify-end pt-3">
+                    <button
+                      type="button"
+                      aria-label="Hold loudspeaker"
+                      {...HOLD_BUTTON_INTERACTION_PROPS}
+                      onClick={(event) => event.stopPropagation()}
+                      onPointerDown={(event) => {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        handleSpeakerLauncherPressStart();
+                      }}
+                      onPointerUp={(event) => {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        void handleSpeakerLauncherPressEnd();
+                      }}
+                      onPointerCancel={(event) => {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        void handleSpeakerLauncherPressEnd();
+                      }}
+                      onPointerLeave={(event) => {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        void handleSpeakerLauncherPressEnd();
+                      }}
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${
+                        speakerCardTalking
+                          ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_24px_rgba(16,185,129,0.35)]"
+                          : "border-white/12 bg-white/5 text-white"
+                      }`}
+                    >
+                      {speakerCardTalking ? (
+                        <FaMicrophone />
+                      ) : (
+                        <FaMicrophoneSlash />
+                      )}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <div
-            role="button"
-            tabIndex={0}
-            onClick={() => {
-              if (suppressAnnouncerCardClickRef.current || announcerHoldStartedRef.current) {
-                announcerHoldStartedRef.current = false;
-                return;
-              }
-              handleOpenAnnouncePanel();
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                if (
+                  suppressAnnouncerCardClickRef.current ||
+                  announcerHoldStartedRef.current
+                ) {
+                  announcerHoldStartedRef.current = false;
+                  return;
+                }
                 handleOpenAnnouncePanel();
-              }
-            }}
-            onPointerDown={handleAnnouncerCardPressStart}
-            onPointerUp={handleAnnouncerCardPressEnd}
-            onPointerCancel={handleAnnouncerCardPressEnd}
-            onPointerLeave={handleAnnouncerCardPressEnd}
-            className={`${launcherCardClass} min-h-34.5 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.08),transparent_24%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-3.5`}
-            aria-label="Open score announcer"
-          >
-            <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-linear-to-r from-transparent via-violet-300/46 to-transparent" />
-            <div className="flex h-full flex-col">
-              <div className="flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleQuickAnnounce();
-                  }}
-                  aria-label="Announce current score"
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-400/14 text-sm text-violet-200 transition hover:bg-violet-400/20"
-                >
-                  <FaBullhorn />
-                </button>
-                <span className="shrink-0 pt-0.5">
-                  <IosGlassSwitch
-                    checked={announceSwitchOn}
-                    onChange={handleAnnounceSwitchChange}
-                    label="Toggle score announcer"
-                  />
-                </span>
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  handleOpenAnnouncePanel();
+                }
+              }}
+              onPointerDown={handleAnnouncerCardPressStart}
+              onPointerUp={handleAnnouncerCardPressEnd}
+              onPointerCancel={handleAnnouncerCardPressEnd}
+              onPointerLeave={handleAnnouncerCardPressEnd}
+              className={`${launcherCardClass} min-h-34.5 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.08),transparent_24%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] px-4 py-3.5`}
+              aria-label="Open score announcer"
+            >
+              <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-linear-to-r from-transparent via-violet-300/46 to-transparent" />
+              <div className="flex h-full flex-col">
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleQuickAnnounce();
+                    }}
+                    aria-label="Announce current score"
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-400/14 text-sm text-violet-200 transition hover:bg-violet-400/20"
+                  >
+                    <FaBullhorn />
+                  </button>
+                  <span className="shrink-0 pt-0.5">
+                    <IosGlassSwitch
+                      checked={announceSwitchOn}
+                      onChange={handleAnnounceSwitchChange}
+                      label="Toggle score announcer"
+                    />
+                  </span>
+                </div>
+                <div className="pt-4">
+                  <span className="block text-[13px] font-semibold uppercase tracking-[0.18em] text-white">
+                    Score Announcer
+                  </span>
+                  <span className="mt-1.5 block max-w-56 text-[13px] leading-5 text-zinc-400">
+                    {announcerCardDescription}
+                  </span>
+                </div>
+                <div className="mt-auto flex justify-end pt-3">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-zinc-400">
+                    <FaBullhorn className="text-sm" />
+                  </span>
+                </div>
               </div>
-              <div className="pt-4">
-                <span className="block text-[13px] font-semibold uppercase tracking-[0.18em] text-white">
-                  Score Announcer
-                </span>
-                <span className="mt-1.5 block max-w-56 text-[13px] leading-5 text-zinc-400">
-                  {announcerCardDescription}
-                </span>
-              </div>
-              <div className="mt-auto flex justify-end pt-3">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-zinc-400">
-                  <FaBullhorn className="text-sm" />
-                </span>
-              </div>
-            </div>
             </div>
           </div>
         </div>
@@ -2050,7 +2135,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
       {activePanel === "announce" ? (
         <OptionalFeatureBoundary
           fallback={
-            <ModalBase title="Unavailable" onExit={() => setActivePanel(null)} hideHeader>
+            <ModalBase
+              title="Unavailable"
+              onExit={() => setActivePanel(null)}
+              hideHeader
+            >
               <div className="rounded-2xl border border-white/8 bg-white/3 px-4 py-3 text-center text-sm text-zinc-400">
                 Score announcer is unavailable right now.
               </div>
@@ -2070,18 +2159,18 @@ export default function SessionViewClient({ sessionId, initialData }) {
                 if (nextEnabled) {
                   prime({ userGesture: true });
                   speakSequenceWithDuck(
-                  [
-                    {
-                      text: "Score announcer is now on.",
-                      pauseAfterMs: 420,
-                      rate: 0.82,
-                    },
-                    {
-                      text: "I will announce the next update.",
-                      pauseAfterMs: 0,
-                      rate: 0.81,
-                    },
-                  ],
+                    [
+                      {
+                        text: "Score announcer is now on.",
+                        pauseAfterMs: 420,
+                        rate: 0.82,
+                      },
+                      {
+                        text: "I will announce the next update.",
+                        pauseAfterMs: 0,
+                        rate: 0.81,
+                      },
+                    ],
                     {
                       key: "spectator-voice-enabled",
                       priority: 3,
@@ -2089,7 +2178,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                       userGesture: true,
                       ignoreEnabled: true,
                     },
-                    1700
+                    1700,
                   );
                 } else {
                   stop();
@@ -2110,7 +2199,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
                     priority: 3,
                     userGesture: true,
                   },
-                  2400
+                  2400,
                 )
               }
               announceLabel="Read Live Score"

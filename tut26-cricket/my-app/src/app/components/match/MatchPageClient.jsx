@@ -164,7 +164,7 @@ export default function MatchPageClient({
       ? initialMatch.lastLiveEvent.id || ""
       : "",
   );
-  const soundEffectPlaybackCutoffRef = useRef(Date.now());
+  const soundEffectPlaybackCutoffRef = useRef(0);
   const localSoundEffectRequestIdRef = useRef("");
   const skipNextBoundaryLeadRef = useRef(false);
   const activeBoundarySequenceRef = useRef(false);
@@ -343,6 +343,10 @@ export default function MatchPageClient({
     participantId: walkie.participantId,
     isSelfTalking: walkie.isSelfTalking,
   });
+
+  useEffect(() => {
+    soundEffectPlaybackCutoffRef.current = Date.now();
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
