@@ -28,14 +28,14 @@ import {
   parseJsonRequest,
   parseMultipartRequest,
 } from "../../../../lib/request-security";
-import { pinPayloadSchema } from "../../../../lib/validators";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 import { z } from "zod";
 
 export const runtime = "nodejs";
 
-const deleteImagePayloadSchema = pinPayloadSchema.extend({
+const deleteImagePayloadSchema = z.object({
+  pin: z.string().trim().optional().default(""),
   imageId: z.string().trim().max(80).optional().default(""),
 });
 
@@ -364,7 +364,23 @@ export async function DELETE(req, { params }) {
       return jsonError(parsedRequest.message, parsedRequest.status);
     }
 
-    if (!isValidUmpirePin(parsedRequest.value.pin)) {
+    await connectDB();
+    const match = await Match.findById(id);
+    if (!match) {
+      return jsonError("Match not found.", 404);
+    }
+
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get(getMatchAccessCookieName(id))?.value;
+    const hasCookieAccess = hasValidMatchAccess(
+      id,
+      accessToken,
+      Number(match.adminAccessVersion || 1)
+    );
+    const hasPinAccess =
+      Boolean(parsedRequest.value.pin) && isValidUmpirePin(parsedRequest.value.pin);
+
+    if (!hasCookieAccess && !hasPinAccess) {
       await writeAuditLog({
         action: "match_media_delete_denied",
         targetType: "match",
@@ -377,14 +393,15 @@ export async function DELETE(req, { params }) {
       return jsonError("Incorrect PIN.", 401);
     }
 
-    await connectDB();
-    const match = await Match.findById(id);
-    if (!match) {
-      return jsonError("Match not found.", 404);
-    }
-
     const targetImageId = String(parsedRequest.value.imageId || "").trim();
     const currentImages = getStoredMatchImages(match, { matchId: id });
+    if (!currentImages.length) {
+      return Response.json(serializePublicMatch(match), {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      });
+    }
     const nextImages = targetImageId
       ? currentImages.filter((entry) => entry.id !== targetImageId)
       : currentImages.slice(1);
@@ -399,11 +416,12 @@ export async function DELETE(req, { params }) {
       summaryText: "Match image removed.",
       createdAt: new Date().toISOString(),
     };
-    await match.save();
-
-    await Session.findByIdAndUpdate(match.sessionId, {
-      $set: buildSessionMirrorUpdate(match),
-    });
+    await Promise.all([
+      match.save(),
+      Session.findByIdAndUpdate(match.sessionId, {
+        $set: buildSessionMirrorUpdate(match),
+      }),
+    ]);
     publishMatchUpdate(match._id);
     publishSessionUpdate(match.sessionId);
 

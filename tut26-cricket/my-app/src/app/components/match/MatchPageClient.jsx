@@ -708,7 +708,7 @@ export default function MatchPageClient({
 
       await triggerSharedSoundEffect(configuredScoreEffect, {
         userGesture: true,
-        resumeAnnouncements: true,
+        resumeAnnouncements: false,
         trigger: "score_boundary",
         preAnnouncementText: leadText,
         preAnnouncementDelayMs: leadDelayMs,
@@ -878,6 +878,15 @@ export default function MatchPageClient({
         return;
       }
 
+      if (
+        activeSoundEffectId === file.id &&
+        (activeSoundEffectStatus === "loading" ||
+          activeSoundEffectStatus === "playing")
+      ) {
+        stopActiveSoundEffect();
+        return;
+      }
+
       const now = Date.now();
       if (
         lastSoundEffectTriggerRef.current.effectId === file.id &&
@@ -923,11 +932,14 @@ export default function MatchPageClient({
       }
     },
     [
+      activeSoundEffectId,
+      activeSoundEffectStatus,
       isLiveMatch,
       match?._id,
       matchId,
       playLocalSoundEffect,
       resumeUmpireAnnouncementsAfterSoundEffect,
+      stopActiveSoundEffect,
     ],
   );
 

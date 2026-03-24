@@ -38,11 +38,13 @@ export default function MatchSoundEffectsPanel({
   const effectCount = Array.isArray(files) ? files.length : 0;
   const [draggingId, setDraggingId] = useState("");
   const [dropTargetId, setDropTargetId] = useState("");
+  const [pendingEffectId, setPendingEffectId] = useState("");
   const pointerDragRef = useRef({
     pointerId: null,
     activeId: "",
     targetId: "",
   });
+  const pendingEffectTimerRef = useRef(null);
   const usePointerReorder = useMemo(() => {
     if (typeof window === "undefined") {
       return false;
@@ -246,16 +248,58 @@ export default function MatchSoundEffectsPanel({
     clearDragState();
   }, [clearDragState]);
 
+  useEffect(() => {
+    if (activeEffectStatus === "loading" || activeEffectStatus === "playing") {
+      if (pendingEffectTimerRef.current) {
+        window.clearTimeout(pendingEffectTimerRef.current);
+        pendingEffectTimerRef.current = null;
+      }
+      return undefined;
+    }
+
+    if (!pendingEffectId) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setPendingEffectId("");
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [activeEffectStatus, pendingEffectId]);
+
+  useEffect(() => () => {
+    if (pendingEffectTimerRef.current) {
+      window.clearTimeout(pendingEffectTimerRef.current);
+      pendingEffectTimerRef.current = null;
+    }
+  }, []);
+
   const handleEffectTap = useCallback((file, isActive) => {
     if (isDisabled) {
       return;
     }
 
     if (isActive) {
+      if (pendingEffectTimerRef.current) {
+        window.clearTimeout(pendingEffectTimerRef.current);
+        pendingEffectTimerRef.current = null;
+      }
+      setPendingEffectId("");
       onStopEffect?.();
       return;
     }
 
+    setPendingEffectId(file.id || "");
+    if (pendingEffectTimerRef.current) {
+      window.clearTimeout(pendingEffectTimerRef.current);
+    }
+    pendingEffectTimerRef.current = window.setTimeout(() => {
+      pendingEffectTimerRef.current = null;
+      setPendingEffectId("");
+    }, 1800);
     void onPlayEffect?.(file);
   }, [isDisabled, onPlayEffect, onStopEffect]);
 
@@ -328,7 +372,12 @@ export default function MatchSoundEffectsPanel({
           ) : effectCount ? (
             <div className="grid grid-cols-2 gap-3">
               {files.map((file) => {
-                const isActive = activeEffectId === file.id;
+                const isPlayingActive =
+                  activeEffectId === file.id &&
+                  (activeEffectStatus === "loading" ||
+                    activeEffectStatus === "playing");
+                const isPendingActive = pendingEffectId === file.id;
+                const isActive = isPlayingActive || isPendingActive;
                 const effectDuration = Number(effectDurations[file.id] || 0);
                 const effectCurrentTime = isActive
                   ? Math.min(
@@ -428,9 +477,11 @@ export default function MatchSoundEffectsPanel({
                             {statusText}
                           </div>
                           <div className="text-[11px] text-zinc-500">
-                            {`${formatAudioTime(effectCurrentTime)} / ${formatAudioTime(
-                              effectDuration,
-                            )}`}
+                            {isActive
+                              ? `${formatAudioTime(effectCurrentTime)} / ${formatAudioTime(
+                                  effectDuration,
+                                )}`
+                              : formatAudioTime(effectDuration)}
                           </div>
                         </div>
                         <button
@@ -446,6 +497,7 @@ export default function MatchSoundEffectsPanel({
                               : "border-white/10 bg-white/8"
                           }`}
                           aria-label={`${isActive ? "Pause" : "Play"} ${file.label}`}
+                          aria-pressed={isActive}
                         >
                           {isActive ? (
                             activeEffectStatus === "loading" ? (
