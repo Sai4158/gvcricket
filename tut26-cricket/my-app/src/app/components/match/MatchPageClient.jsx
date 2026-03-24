@@ -62,6 +62,7 @@ const IPL_HORN_EFFECT = {
 };
 const SIX_PRE_EFFECT_TEXT = "Umpire has given 6 runs.";
 const SIX_PRE_EFFECT_RATE = 0.8;
+const SIX_PRE_EFFECT_GAP_MS = 1000;
 
 function estimateSpeechLeadDelayMs(text, rate = 1) {
   const words = String(text || "")
@@ -71,6 +72,10 @@ function estimateSpeechLeadDelayMs(text, rate = 1) {
   const safeRate = Math.max(0.7, Number(rate) || 1);
   const estimatedMs = Math.round((Math.max(words, 1) / (180 * safeRate)) * 60000 + 250);
   return Math.max(1600, Math.min(2600, estimatedMs));
+}
+
+function estimateBoundaryLeadDelayMs(text, rate = 1) {
+  return estimateSpeechLeadDelayMs(text, rate) + SIX_PRE_EFFECT_GAP_MS;
 }
 
 const SOUND_EFFECT_DURATION_CACHE_KEY = "gv-sound-effect-durations-v1";
@@ -556,7 +561,7 @@ export default function MatchPageClient({
 
     if (shouldPlayBoundaryHorn && umpireSettings.playScoreSoundEffects !== false) {
       const boundarySequenceVersion = boundarySequenceVersionRef.current + 1;
-      const sixLeadDelayMs = estimateSpeechLeadDelayMs(
+      const sixLeadDelayMs = estimateBoundaryLeadDelayMs(
         SIX_PRE_EFFECT_TEXT,
         SIX_PRE_EFFECT_RATE
       );

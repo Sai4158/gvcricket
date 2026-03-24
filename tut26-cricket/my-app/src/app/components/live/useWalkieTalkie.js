@@ -2919,7 +2919,13 @@ export default function useWalkieTalkie({
         participantId &&
         snapshot.enabled &&
         hasWalkieToken &&
-        (autoConnectAudio || manualAudioReady || canTalk)
+        (
+          shouldMaintainAudioTransport ||
+          manualAudioReady ||
+          canTalk ||
+          isSelfTalking ||
+          isFinishing
+        )
     );
 
     if (!shouldPrefetchRtcToken) {
@@ -2933,8 +2939,11 @@ export default function useWalkieTalkie({
     enabled,
     fetchRtcToken,
     hasWalkieToken,
+    isFinishing,
+    isSelfTalking,
     manualAudioReady,
     participantId,
+    shouldMaintainAudioTransport,
     snapshot.enabled,
   ]);
 
