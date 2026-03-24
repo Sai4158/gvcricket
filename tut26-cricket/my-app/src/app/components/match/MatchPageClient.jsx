@@ -143,24 +143,14 @@ export default function MatchPageClient({
   initialAuthStatus,
   initialMatch,
 }) {
-  const initialCachedSoundEffectFiles = sortSoundEffectsByOrder(
-    readCachedSoundEffectsLibrary(),
-    readCachedSoundEffectsOrder(),
-  );
   const router = useRouter();
   const [modal, setModal] = useState({ type: null });
   const [infoText, setInfoText] = useState(null);
   const [soundEffectsOpen, setSoundEffectsOpen] = useState(false);
-  const [soundEffectFiles, setSoundEffectFiles] = useState(
-    initialCachedSoundEffectFiles,
-  );
-  const [soundEffectLibraryStatus, setSoundEffectLibraryStatus] = useState(
-    initialCachedSoundEffectFiles.length ? "ready" : "idle",
-  );
+  const [soundEffectFiles, setSoundEffectFiles] = useState([]);
+  const [soundEffectLibraryStatus, setSoundEffectLibraryStatus] = useState("idle");
   const [soundEffectError, setSoundEffectError] = useState("");
-  const [soundEffectDurations, setSoundEffectDurations] = useState(
-    () => readCachedSoundEffectDurations(),
-  );
+  const [soundEffectDurations, setSoundEffectDurations] = useState({});
   const [activeCommentaryAction, setActiveCommentaryAction] = useState("");
   const [activeCommentaryPreviewId, setActiveCommentaryPreviewId] = useState("");
   const localAnnouncementIdRef = useRef(0);
@@ -185,6 +175,30 @@ export default function MatchPageClient({
   const activeBoundarySequenceRef = useRef(false);
   const boundarySequenceVersionRef = useRef(0);
   const boundarySequenceTimerRef = useRef(null);
+
+  useEffect(() => {
+    const restoreTimer = window.setTimeout(() => {
+      const cachedFiles = sortSoundEffectsByOrder(
+        readCachedSoundEffectsLibrary(),
+        readCachedSoundEffectsOrder(),
+      );
+      const cachedDurations = readCachedSoundEffectDurations();
+
+      if (cachedFiles.length) {
+        setSoundEffectFiles(cachedFiles);
+        setSoundEffectLibraryStatus("ready");
+      }
+
+      if (Object.keys(cachedDurations).length) {
+        setSoundEffectDurations(cachedDurations);
+      }
+    }, 0);
+
+    return () => {
+      window.clearTimeout(restoreTimer);
+    };
+  }, []);
+
   const { authStatus, authError, authSubmitting, submitPin } = useMatchAccess(
     matchId,
     initialAuthStatus
@@ -671,7 +685,7 @@ export default function MatchPageClient({
 
     const configuredScoreEffect =
       umpireSettings.playScoreSoundEffects !== false
-        ? findConfiguredScoreSoundEffect(runs, isOut, extraType)
+        ? await resolveConfiguredScoreSoundEffect(runs, isOut, extraType)
         : null;
     const scorePreview = buildUmpireScorePreview(runs, isOut, extraType);
 
@@ -825,6 +839,45 @@ export default function MatchPageClient({
     warmKnownSoundEffects,
   ]);
 
+  const resolveConfiguredScoreSoundEffect = useCallback(
+    async (runs, isOut = false, extraType = null) => {
+      let nextEffect = findConfiguredScoreSoundEffect(runs, isOut, extraType);
+      if (nextEffect) {
+        return nextEffect;
+      }
+
+      const effectKey = getScoreSoundEffectEventKey(runs, isOut, extraType);
+      if (!effectKey) {
+        return null;
+      }
+
+      const configuredEffectId = String(
+        umpireSettings.scoreSoundEffectMap?.[effectKey] || "",
+      ).trim();
+      if (!configuredEffectId) {
+        return null;
+      }
+
+      if (configuredEffectId === IPL_HORN_EFFECT.id) {
+        return IPL_HORN_EFFECT;
+      }
+
+      if (!soundEffectFiles.length && soundEffectLibraryStatus === "idle") {
+        await loadSoundEffectsLibrary();
+        nextEffect = findConfiguredScoreSoundEffect(runs, isOut, extraType);
+      }
+
+      return nextEffect;
+    },
+    [
+      findConfiguredScoreSoundEffect,
+      loadSoundEffectsLibrary,
+      soundEffectFiles.length,
+      soundEffectLibraryStatus,
+      umpireSettings.scoreSoundEffectMap,
+    ],
+  );
+
   useEffect(() => {
     if (!soundEffectFiles.length) {
       return;
@@ -832,35 +885,6 @@ export default function MatchPageClient({
 
     warmKnownSoundEffects(soundEffectFiles);
   }, [soundEffectFiles, warmKnownSoundEffects]);
-
-  useEffect(() => {
-    const hasAssignedScoreEffect = Object.values(
-      umpireSettings.scoreSoundEffectMap || {},
-    ).some((value) => String(value || "").trim().length > 0);
-
-    if (
-      !isLiveMatch ||
-      !hasAssignedScoreEffect ||
-      soundEffectFiles.length ||
-      soundEffectLibraryStatus !== "idle"
-    ) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      void loadSoundEffectsLibrary();
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [
-    isLiveMatch,
-    loadSoundEffectsLibrary,
-    soundEffectFiles.length,
-    soundEffectLibraryStatus,
-    umpireSettings.scoreSoundEffectMap,
-  ]);
 
   const toggleSoundEffectsPanel = useCallback(() => {
     setSoundEffectsOpen((current) => {

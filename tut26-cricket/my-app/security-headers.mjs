@@ -49,7 +49,7 @@ export function buildContentSecurityPolicy() {
     "img-src 'self' data: blob: https://i.ibb.co https://ibb.co https://i.ytimg.com https://vercel.com https://*.vercel.com",
     "font-src 'self' data: https://fonts.gstatic.com",
     `connect-src ${connectSrc.join(" ")}`,
-    "media-src 'self' blob:",
+    "media-src 'self' blob: data:",
     "worker-src 'self' blob:",
     "child-src 'self' blob:",
     "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://vercel.live",

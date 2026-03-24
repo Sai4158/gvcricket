@@ -103,6 +103,12 @@ function persistSettings(role, settings) {
 }
 
 export default function useAnnouncementSettings(role, scopeKey = "") {
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+
   const subscribe = useMemo(
     () => (onStoreChange) => {
       if (typeof window === "undefined") {
@@ -141,12 +147,12 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
 
   const rawValue = useSyncExternalStore(
     subscribe,
-    () => readRawValue(role),
+    () => (hydrated ? readRawValue(role) : ""),
     () => ""
   );
   const enabledValue = useSyncExternalStore(
     subscribe,
-    () => readEnabledValue(role, scopeKey),
+    () => (hydrated ? readEnabledValue(role, scopeKey) : ""),
     () => ""
   );
 
