@@ -147,6 +147,7 @@ export default function MatchPageClient({
   const [soundEffectLibraryStatus, setSoundEffectLibraryStatus] = useState("idle");
   const [soundEffectError, setSoundEffectError] = useState("");
   const [soundEffectDurations, setSoundEffectDurations] = useState({});
+  const [activeCommentaryAction, setActiveCommentaryAction] = useState("");
   const localAnnouncementIdRef = useRef(0);
   const lastWalkieRequestSignatureRef = useRef("");
   const umpireAnnouncementTimerRef = useRef(null);
@@ -308,6 +309,8 @@ export default function MatchPageClient({
       });
     },
   });
+  const isAnySoundEffectActive =
+    activeSoundEffectStatus === "loading" || activeSoundEffectStatus === "playing";
   const {
     match,
     error,
@@ -707,7 +710,7 @@ export default function MatchPageClient({
     handleScoreEvent(runs, isOut, extraType);
   };
 
-  const handleManualScoreAnnouncement = () => {
+  const handleManualScoreAnnouncement = useCallback(() => {
     if (!match) {
       return;
     }
@@ -743,7 +746,13 @@ export default function MatchPageClient({
       ignoreEnabled: true,
       interrupt: true,
     });
-  };
+  }, [match, soundEffectPlayingRef, speak]);
+
+  const stopCommentaryPlayback = useCallback(() => {
+    cancelBoundarySequence({ stopEffect: true });
+    stop();
+    setActiveCommentaryAction("");
+  }, [cancelBoundarySequence, stop]);
 
   const ensureUmpireScoreFeedbackEnabled = () => {
     if (!umpireSettings.enabled) {
@@ -791,6 +800,35 @@ export default function MatchPageClient({
       );
     }
   }, [soundEffectFiles.length, soundEffectLibraryStatus]);
+
+  useEffect(() => {
+    const hasAssignedScoreEffect = Object.values(
+      umpireSettings.scoreSoundEffectMap || {},
+    ).some((value) => String(value || "").trim().length > 0);
+
+    if (
+      !isLiveMatch ||
+      !hasAssignedScoreEffect ||
+      soundEffectFiles.length ||
+      soundEffectLibraryStatus !== "idle"
+    ) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void loadSoundEffectsLibrary();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [
+    isLiveMatch,
+    loadSoundEffectsLibrary,
+    soundEffectFiles.length,
+    soundEffectLibraryStatus,
+    umpireSettings.scoreSoundEffectMap,
+  ]);
 
   const toggleSoundEffectsPanel = useCallback(() => {
     setSoundEffectsOpen((current) => {
@@ -922,15 +960,28 @@ export default function MatchPageClient({
   const handlePreviewCommentarySoundEffect = useCallback(
     async (file) => {
       if (!file?.src || !file?.id) {
+        stopCommentaryPlayback();
         return false;
+      }
+
+      if (activeSoundEffectId === file.id && isAnySoundEffectActive) {
+        stopCommentaryPlayback();
+        return true;
       }
 
       cancelBoundarySequence({ stopEffect: true });
       setSoundEffectError("");
       shouldResumeAfterSoundEffectRef.current = false;
+      setActiveCommentaryAction("event-preview");
       return playLocalSoundEffect(file, { userGesture: true });
     },
-    [cancelBoundarySequence, playLocalSoundEffect]
+    [
+      activeSoundEffectId,
+      cancelBoundarySequence,
+      isAnySoundEffectActive,
+      playLocalSoundEffect,
+      stopCommentaryPlayback,
+    ]
   );
 
   const handleTestCommentarySequence = useCallback(
@@ -952,6 +1003,7 @@ export default function MatchPageClient({
         (configuredEffectId === IPL_HORN_EFFECT.id ? IPL_HORN_EFFECT : null);
 
       cancelBoundarySequence({ stopEffect: true });
+      setActiveCommentaryAction("test-sequence");
 
       if (umpireSettings.enabled && umpireSettings.mode !== "silent") {
         speak(leadText, {
@@ -1015,6 +1067,50 @@ export default function MatchPageClient({
       umpireSettings.scoreSoundEffectMap,
     ]
   );
+
+  const handleCommentaryReadScoreAction = useCallback(() => {
+    if (
+      activeCommentaryAction === "read-score" &&
+      (status === "speaking" || isAnySoundEffectActive)
+    ) {
+      stopCommentaryPlayback();
+      return;
+    }
+
+    setActiveCommentaryAction("read-score");
+    handleManualScoreAnnouncement();
+  }, [
+    activeCommentaryAction,
+    handleManualScoreAnnouncement,
+    isAnySoundEffectActive,
+    status,
+    stopCommentaryPlayback,
+  ]);
+
+  const handleCommentaryTestSequenceAction = useCallback((eventKey = "six") => {
+    if (
+      activeCommentaryAction === "test-sequence" &&
+      (status === "speaking" || isAnySoundEffectActive)
+    ) {
+      stopCommentaryPlayback();
+      return;
+    }
+
+    void handleTestCommentarySequence(eventKey);
+  }, [
+    activeCommentaryAction,
+    handleTestCommentarySequence,
+    isAnySoundEffectActive,
+    status,
+    stopCommentaryPlayback,
+  ]);
+  const isReadScoreActionActive =
+    activeCommentaryAction === "read-score" &&
+    (status === "speaking" || isAnySoundEffectActive);
+  const isTestSequenceActionActive =
+    (activeCommentaryAction === "test-sequence" ||
+      activeCommentaryAction === "event-preview") &&
+    (status === "speaking" || isAnySoundEffectActive);
 
   const handleReorderSoundEffects = useCallback((activeId, targetId) => {
     if (!activeId || !targetId || activeId === targetId) {
@@ -1479,7 +1575,7 @@ export default function MatchPageClient({
                       ? voiceName
                       : ""
                     : "",
-                  onAnnounceNow: handleManualScoreAnnouncement,
+                  onAnnounceNow: handleCommentaryReadScoreAction,
                   announceLabel: "Read Score",
                   announceDisabled: false,
                   showScoreSoundEffectsToggle: true,
@@ -1490,7 +1586,9 @@ export default function MatchPageClient({
                       : readCachedSoundEffectsLibrary(),
                   previewingSoundEffectId: activeSoundEffectId,
                   onPreviewSoundEffect: handlePreviewCommentarySoundEffect,
-                  onTestSequence: handleTestCommentarySequence,
+                  onTestSequence: handleCommentaryTestSequenceAction,
+                  announceIsActive: isReadScoreActionActive,
+                  testSequenceIsActive: isTestSequenceActionActive,
                 }
               : null
           }

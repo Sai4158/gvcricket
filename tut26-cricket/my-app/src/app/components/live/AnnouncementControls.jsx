@@ -8,6 +8,7 @@ import {
   FaCompactDisc,
   FaEdit,
   FaMicrophone,
+  FaPause,
   FaPlay,
   FaTimes,
   FaVolumeMute,
@@ -60,48 +61,59 @@ function SoundAssignmentRow({
   event,
   selectedLabel,
   selectedId,
+  isPreviewing = false,
+  onTogglePreview,
   onEdit,
-  onPreview,
-  previewing = false,
 }) {
   const accent = getAccentClasses(event.accent);
+  const hasAssignedSound = Boolean(selectedId);
 
   return (
-    <div className="relative overflow-hidden rounded-[22px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-3.5">
+    <div className="relative overflow-hidden rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-3">
       <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accent.glow}`} />
-      <div className="relative flex items-center gap-3">
-        <div className={`inline-flex min-w-[72px] justify-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${accent.badge}`}>
-          {event.label}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-white">
-            {selectedLabel || "No sound"}
-          </p>
-          <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-zinc-500">
-            {selectedId ? "Assigned" : "Silent"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onPreview}
-            disabled={!selectedId}
-            className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40 ${
-              previewing ? "ring-2 ring-emerald-400/35" : ""
-            }`}
-            aria-label={`Preview ${event.label} sound`}
-          >
-            <FaPlay className="text-xs" />
-          </button>
-          <button
-            type="button"
-            onClick={onEdit}
-            className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${accent.button}`}
-          >
-            <FaEdit className="text-[10px]" />
-            Edit
-          </button>
-        </div>
+      <div className="relative flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={onTogglePreview}
+          disabled={!hasAssignedSound}
+          className={`flex min-w-0 flex-1 items-center gap-3 rounded-[18px] border px-3 py-2.5 text-left transition ${
+            hasAssignedSound
+              ? `border-white/10 bg-white/[0.04] hover:bg-white/[0.06] ${isPreviewing ? "ring-2 ring-emerald-400/30" : ""}`
+              : "cursor-not-allowed border-white/8 bg-white/[0.03] opacity-80"
+          }`}
+          aria-label={
+            hasAssignedSound
+              ? `${isPreviewing ? "Pause" : "Play"} ${event.label} sound`
+              : `${event.label} has no sound selected`
+          }
+        >
+          <div className={`inline-flex min-w-[84px] justify-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${accent.badge}`}>
+            {event.label}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-white">
+              {selectedLabel || "No sound"}
+            </p>
+            <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-zinc-500">
+              {hasAssignedSound
+                ? isPreviewing
+                  ? "Tap to pause"
+                  : "Tap to play"
+                : "Tap edit to choose"}
+            </p>
+          </div>
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-white">
+            {isPreviewing ? <FaPause className="text-xs" /> : <FaPlay className="text-xs" />}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={onEdit}
+          className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition ${accent.button}`}
+          aria-label={`Edit ${event.label} sound`}
+        >
+          <FaEdit className="text-[11px]" />
+        </button>
       </div>
     </div>
   );
@@ -181,9 +193,9 @@ function SoundPickerSheet({
                     className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-white transition hover:bg-white/[0.08] ${
                       isPreviewing ? "ring-2 ring-emerald-400/35" : ""
                     }`}
-                    aria-label={`Preview ${option.label}`}
+                    aria-label={`${isPreviewing ? "Pause" : "Preview"} ${option.label}`}
                   >
-                    <FaPlay className="text-xs" />
+                    {isPreviewing ? <FaPause className="text-xs" /> : <FaPlay className="text-xs" />}
                   </button>
                   <button
                     type="button"
@@ -266,6 +278,8 @@ export default function AnnouncementControls({
   onPreviewSoundEffect,
   onTestSequence,
   previewingSoundEffectId = "",
+  announceIsActive = false,
+  testSequenceIsActive = false,
 }) {
   const [isHolding, setIsHolding] = useState(false);
   const [editingEventKey, setEditingEventKey] = useState("");
@@ -345,13 +359,13 @@ export default function AnnouncementControls({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-300/82">
-                Live Voice
+                Umpire
               </p>
               <h3 className="mt-1 text-[1.65rem] font-black tracking-[-0.03em] text-white">
                 {title}
               </h3>
               <p className="mt-1 text-sm text-zinc-400">
-                Calls, gap, effect, then score update.
+                Simple score calls and effect picks.
               </p>
             </div>
           </div>
@@ -368,7 +382,7 @@ export default function AnnouncementControls({
           </button>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <div className="rounded-[22px] border border-white/8 bg-white/[0.04] p-3.5">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -377,6 +391,9 @@ export default function AnnouncementControls({
                 </p>
                 <p className="mt-1 text-sm font-semibold text-white">
                   {settings.enabled ? "On" : "Off"}
+                </p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Score announcer on each tap.
                 </p>
               </div>
               <IosSwitch
@@ -391,16 +408,6 @@ export default function AnnouncementControls({
           </div>
 
           <div className="rounded-[22px] border border-white/8 bg-white/[0.04] p-3.5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
-              Voice
-            </p>
-            <p className="mt-1 truncate text-sm font-semibold text-white">
-              {statusText || "Tap Read Score once"}
-            </p>
-            <p className="mt-1 text-xs text-zinc-500">Current device voice</p>
-          </div>
-
-          <div className="rounded-[22px] border border-white/8 bg-white/[0.04] p-3.5">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
@@ -408,6 +415,9 @@ export default function AnnouncementControls({
                 </p>
                 <p className="mt-1 text-sm font-semibold text-white">
                   {settings.playScoreSoundEffects !== false ? "On" : "Off"}
+                </p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Sound effects after runs and outs.
                 </p>
               </div>
               <IosSwitch
@@ -423,22 +433,6 @@ export default function AnnouncementControls({
           </div>
         </div>
 
-        <div className="relative mt-4 overflow-hidden rounded-[24px] border border-emerald-300/12 bg-[linear-gradient(180deg,rgba(16,185,129,0.08),rgba(255,255,255,0.03))] p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-300/82">
-            Smart Sequence
-          </p>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {["Umpire call", "1s gap", "Sound FX", "Score update"].map((step) => (
-              <div
-                key={step}
-                className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.18em] text-zinc-200"
-              >
-                {step}
-              </div>
-            ))}
-          </div>
-        </div>
-
         {showScoreEffectAssignments ? (
           <div className="relative mt-4 rounded-[24px] border border-white/8 bg-white/[0.03] p-3 sm:p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -447,7 +441,7 @@ export default function AnnouncementControls({
                   Event Sounds
                 </p>
                 <p className="mt-1 text-sm text-zinc-400">
-                  Choose what plays after the umpire call.
+                  Tap a row to play or pause. Tap edit to change.
                 </p>
               </div>
               <span className="rounded-full border border-white/8 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-300">
@@ -462,19 +456,16 @@ export default function AnnouncementControls({
                   event={item}
                   selectedId={item.selectedId}
                   selectedLabel={item.selectedLabel}
-                  previewing={previewingSoundEffectId === item.selectedId}
-                  onEdit={() => setEditingEventKey(item.key)}
-                  onPreview={() => {
+                  isPreviewing={Boolean(item.selectedId && previewingSoundEffectId === item.selectedId)}
+                  onTogglePreview={() => {
                     if (!item.selectedId) {
                       return;
                     }
-                    const selectedEffect = soundEffectOptions.find(
-                      (option) => option.id === item.selectedId
+                    void onPreviewSoundEffect?.(
+                      soundEffectOptions.find((option) => option.id === item.selectedId) || null
                     );
-                    if (selectedEffect) {
-                      void onPreviewSoundEffect?.(selectedEffect);
-                    }
                   }}
+                  onEdit={() => setEditingEventKey(item.key)}
                 />
               ))}
             </div>
@@ -512,14 +503,21 @@ export default function AnnouncementControls({
               type="button"
               onClick={onAnnounceNow}
               disabled={announceDisabled}
-              className={`inline-flex items-center justify-center gap-2 rounded-[22px] px-4 py-3.5 text-sm font-semibold transition ${
+              className={`inline-flex flex-col items-start justify-center gap-1 rounded-[22px] px-4 py-3.5 text-left text-sm font-semibold transition ${
                 announceDisabled
                   ? "cursor-not-allowed bg-zinc-900 text-zinc-500"
+                  : announceIsActive
+                  ? "bg-white/[0.1] text-white ring-2 ring-white/10"
                   : "bg-white/[0.06] text-white hover:bg-white/[0.1]"
               }`}
             >
-              <FaVolumeUp />
-              {announceLabel}
+              <span className="inline-flex items-center gap-2">
+                {announceIsActive ? <FaPause /> : <FaVolumeUp />}
+                {announceIsActive ? "Pause Score" : announceLabel}
+              </span>
+              <span className="text-xs font-medium text-zinc-400">
+                Say the current score now.
+              </span>
             </button>
           ) : null}
           <button
@@ -528,10 +526,19 @@ export default function AnnouncementControls({
               void onTestSequence?.(editingEventKey || "six");
             }}
             disabled={!onTestSequence}
-            className="inline-flex items-center justify-center gap-2 rounded-[22px] border border-emerald-300/16 bg-emerald-400/10 px-4 py-3.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/16 disabled:cursor-not-allowed disabled:opacity-45"
+            className={`inline-flex flex-col items-start justify-center gap-1 rounded-[22px] border px-4 py-3.5 text-left text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+              testSequenceIsActive
+                ? "border-emerald-300/24 bg-emerald-400/16 text-emerald-100 ring-2 ring-emerald-400/20"
+                : "border-emerald-300/16 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/16"
+            }`}
           >
-            <FaPlay className="text-xs" />
-            Test Sequence
+            <span className="inline-flex items-center gap-2">
+              {testSequenceIsActive ? <FaPause className="text-xs" /> : <FaPlay className="text-xs" />}
+              {testSequenceIsActive ? "Pause Test" : "Test Sequence"}
+            </span>
+            <span className="text-xs font-medium text-emerald-100/70">
+              Preview call, gap, effect, and score.
+            </span>
           </button>
         </div>
       </section>

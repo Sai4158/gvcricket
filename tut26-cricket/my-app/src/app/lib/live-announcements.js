@@ -154,7 +154,7 @@ function buildBallEventLine(ball) {
 }
 
 function buildUndoAnnouncementLine() {
-  return "Umpire has removed the score for the last ball. The ball will be replayed.";
+  return "Umpire has undone the last ball. The score for that ball has been removed. Umpire will redo this ball.";
 }
 
 function buildProgressReminder(event, match) {

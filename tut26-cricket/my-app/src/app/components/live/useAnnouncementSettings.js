@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 
-const SETTINGS_VERSION = 6;
+const SETTINGS_VERSION = 7;
 
 const DEFAULTS = {
   spectator: {
@@ -138,10 +138,18 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
       }
 
       const parsed = JSON.parse(rawValue);
+      const isLegacyVersion =
+        !parsed?.version || Number(parsed.version) < SETTINGS_VERSION;
 
       return {
         ...DEFAULTS[role],
         ...parsed,
+        ...(role === "umpire" && isLegacyVersion
+          ? {
+              enabled: true,
+              playScoreSoundEffects: true,
+            }
+          : {}),
         version: SETTINGS_VERSION,
       };
     } catch (error) {
