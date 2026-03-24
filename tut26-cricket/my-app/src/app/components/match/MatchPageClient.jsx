@@ -1494,6 +1494,7 @@ export default function MatchPageClient({
             onHistory={() => setModal({ type: "history" })}
             onImage={() => setModal({ type: "image" })}
             onCommentary={() => {
+              void prime({ userGesture: true });
               void loadSoundEffectsLibrary();
               setModal({ type: "commentary" });
             }}

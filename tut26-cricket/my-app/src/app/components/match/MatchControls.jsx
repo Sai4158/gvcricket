@@ -37,10 +37,14 @@ function ButtonWithInfo({
       <button
         type="button"
         onPointerDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        onClick={(event) => {
+          event.preventDefault();
           event.stopPropagation();
           setInfoText(info);
         }}
-        onPointerUp={() => setTimeout(() => setInfoText(null), 2000)}
         aria-label="Show scoring help"
         className="press-feedback absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-black/30 text-zinc-100 shadow-[0_6px_16px_rgba(0,0,0,0.25)] transition-colors hover:bg-black/40 hover:text-white"
       >

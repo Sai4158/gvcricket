@@ -96,7 +96,14 @@ function ActionHelpItem({ icon, title, description, colorClass }) {
       <div className={`mt-0.5 text-2xl ${colorClass}`}>{icon}</div>
       <div className="min-w-0">
         <h4 className="text-sm font-semibold text-white">{title}</h4>
-        <p className="mt-1 text-xs leading-5 text-zinc-400">{description}</p>
+        <ul className="mt-1 space-y-1 text-xs leading-5 text-zinc-400">
+          {description.map((item) => (
+            <li key={item} className="flex items-start gap-2">
+              <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-zinc-500" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );
@@ -328,6 +335,7 @@ export default function MatchActionGrid({
   isAnnounceActive = false,
 }) {
   const [showHelp, setShowHelp] = useState(false);
+  const closeHelp = () => setShowHelp(false);
 
   return (
     <>
@@ -485,7 +493,7 @@ export default function MatchActionGrid({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center sm:p-6"
-            onClick={() => setShowHelp(false)}
+            onClick={closeHelp}
           >
             <motion.div
               initial={{ opacity: 0, y: 20, scale: 0.98 }}
@@ -495,6 +503,21 @@ export default function MatchActionGrid({
               onClick={(event) => event.stopPropagation()}
               className="w-full max-w-[34rem] overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,24,0.98),rgba(8,8,12,0.99))] shadow-[0_28px_90px_rgba(0,0,0,0.5)]"
             >
+              <motion.div
+                drag="y"
+                dragDirectionLock
+                dragElastic={0.12}
+                dragConstraints={{ top: 0, bottom: 220 }}
+                dragPropagation={false}
+                onDragEnd={(_, info) => {
+                  if (info.offset.y > 120 || info.velocity.y > 800) {
+                    closeHelp();
+                  }
+                }}
+                className="flex cursor-grab justify-center pt-2 active:cursor-grabbing sm:hidden"
+              >
+                <span className="h-1.5 w-12 rounded-full bg-white/15" />
+              </motion.div>
               <div className="flex items-start justify-between gap-4 border-b border-white/8 px-4 py-4 sm:px-5">
                 <div>
                   <h3 className="text-lg font-black tracking-[-0.02em] text-white">
@@ -506,7 +529,7 @@ export default function MatchActionGrid({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowHelp(false)}
+                  onClick={closeHelp}
                   className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-300 transition hover:bg-white/[0.08] hover:text-white active:scale-[0.97]"
                   aria-label="Close action help"
                 >
@@ -518,55 +541,91 @@ export default function MatchActionGrid({
                 <ActionHelpItem
                   icon={<WalkieIcon />}
                   title="Walkie-Talkie"
-                  description="Talk to the umpire team live. Hold to speak when walkie is on."
+                  description={[
+                    "Talk live with the umpire team.",
+                    "Hold to speak when walkie is on.",
+                    "See live status while it connects or stays busy.",
+                  ]}
                   colorClass="text-emerald-300"
                 />
                 <ActionHelpItem
                   icon={<AnnounceIcon />}
                   title="Announcer / Effects"
-                  description="Open score voice and sound effect settings."
+                  description={[
+                    "Open score voice settings.",
+                    "Pick sound effects for 3, 4, 6 and out.",
+                    "Test the announcer and effect flow.",
+                  ]}
                   colorClass="text-cyan-300"
                 />
                 <ActionHelpItem
                   icon={<LuUndo2 />}
                   title="Undo"
-                  description="Remove the last ball and score entry."
+                  description={[
+                    "Remove the last ball.",
+                    "Fix a wrong score tap quickly.",
+                    "Replay the ball after undo.",
+                  ]}
                   colorClass="text-zinc-300"
                 />
                 <ActionHelpItem
                   icon={<CommentaryIcon />}
                   title="Loudspeaker"
-                  description="Use the speaker mic for live voice output."
+                  description={[
+                    "Use the speaker mic live.",
+                    "Hold to talk on loudspeaker.",
+                    "Good for voice updates on the ground.",
+                  ]}
                   colorClass="text-amber-300"
                 />
                 <ActionHelpItem
                   icon={<FaUserEdit />}
                   title="Edit Teams"
-                  description="Change team names and team details."
+                  description={[
+                    "Change team names.",
+                    "Fix team details if needed.",
+                    "Update the match setup view.",
+                  ]}
                   colorClass="text-sky-400"
                 />
                 <ActionHelpItem
                   icon={<FaRegClock />}
                   title="Edit Overs / Innings"
-                  description="Update overs and innings settings."
+                  description={[
+                    "Update over count.",
+                    "Fix innings progress.",
+                    "Adjust match settings if needed.",
+                  ]}
                   colorClass="text-amber-400"
                 />
                 <ActionHelpItem
                   icon={<FaBookOpen />}
                   title="History"
-                  description="See the over-by-over match history."
+                  description={[
+                    "See over-by-over history.",
+                    "Check past balls quickly.",
+                    "Review what was scored earlier.",
+                  ]}
                   colorClass="text-violet-400"
                 />
                 <ActionHelpItem
                   icon={<FaImage />}
                   title="Image"
-                  description="Add or manage match images."
+                  description={[
+                    "Add match images.",
+                    "Manage uploaded photos.",
+                    "Update the match image section.",
+                  ]}
                   colorClass="text-zinc-200"
                 />
                 <ActionHelpItem
                   icon={<FaShareAlt />}
                   title="Share"
-                  description="Copy and share the live match link."
+                  description={[
+                    "Copy the live match link.",
+                    "Share it with others fast.",
+                    "Open the live view on another device.",
+                  ]}
                   colorClass="text-green-400"
                 />
               </div>

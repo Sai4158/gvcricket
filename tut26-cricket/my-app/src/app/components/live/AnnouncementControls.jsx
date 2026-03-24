@@ -155,6 +155,7 @@ function SoundPickerSheet({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="absolute inset-0 z-20 rounded-[28px] bg-[linear-gradient(180deg,rgba(10,10,14,0.96),rgba(4,4,8,0.98))] p-4 backdrop-blur-md"
+          style={{ touchAction: "pan-y" }}
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -170,7 +171,10 @@ function SoundPickerSheet({
             </button>
           </div>
 
-          <div className="mt-4 max-h-[62vh] space-y-2 overflow-y-auto pr-1">
+          <div
+            className="mt-4 max-h-[62vh] space-y-2 overflow-y-auto pr-1"
+            style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
+          >
             <button
               type="button"
               onClick={() => onSelect("")}
@@ -327,6 +331,7 @@ export default function AnnouncementControls({
         return {
           ...event,
           selectedId,
+          selectedEffect,
           selectedLabel: selectedEffect?.label || "",
         };
       }),
@@ -355,8 +360,8 @@ export default function AnnouncementControls({
 
   if (showModernCompactPanel) {
     return (
-      <section className="relative mx-auto max-h-[88vh] max-w-[32rem] overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.1),transparent_24%),linear-gradient(180deg,rgba(16,16,20,0.98),rgba(7,7,11,0.99))] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.48)] backdrop-blur-md sm:p-5">
-        <div className="max-h-[calc(88vh-2rem)] overflow-y-auto pr-1 sm:pr-2">
+      <section className="relative mx-auto max-w-[32rem] overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.1),transparent_24%),linear-gradient(180deg,rgba(16,16,20,0.98),rgba(7,7,11,0.99))] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.48)] backdrop-blur-md sm:p-5">
+        <div className="pr-1 sm:pr-2" style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}>
         <div className="relative">
           <div className="flex items-start gap-3">
             <div
@@ -460,12 +465,10 @@ export default function AnnouncementControls({
                   selectedLabel={item.selectedLabel}
                   isPreviewing={Boolean(item.selectedId && previewingSoundEffectId === item.selectedId)}
                   onTogglePreview={() => {
-                    if (!item.selectedId) {
+                    if (!item.selectedEffect) {
                       return;
                     }
-                    void onPreviewSoundEffect?.(
-                      soundEffectOptions.find((option) => option.id === item.selectedId) || null
-                    );
+                    void onPreviewSoundEffect?.(item.selectedEffect);
                   }}
                   onEdit={() => setEditingEventKey(item.key)}
                 />
