@@ -1800,7 +1800,6 @@ export default function DirectorConsoleClient({
       const sharedEnableMessage =
         walkie.nonUmpireUi?.sharedEnableNotice ||
         NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT;
-      setDirectorWalkieOn(true);
       showTemporaryDirectorWalkieNotice(sharedEnableMessage, 3600);
       speech.speak(
         walkie.nonUmpireUi?.sharedEnableAnnouncement ||

@@ -60,26 +60,30 @@ function SelectedImageTile({
   onRemove,
 }) {
   return (
-    <button
-      type="button"
-      onClick={() => onActivate(item.id)}
+    <div
       className={`group relative overflow-hidden rounded-[22px] border text-left transition ${
         isActive
           ? "border-emerald-300/28 shadow-[0_14px_30px_rgba(16,185,129,0.14)]"
           : "border-white/10"
       }`}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={item.url}
-        alt={`Selected image ${index + 1}`}
-        className="aspect-square w-full object-cover"
-      />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.82))] px-3 pb-2 pt-6 text-left">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/72">
-          Image {index + 1}
-        </span>
-      </div>
+      <button
+        type="button"
+        onClick={() => onActivate(item.id)}
+        className="block w-full text-left"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={item.url}
+          alt={`Selected image ${index + 1}`}
+          className="aspect-square w-full object-cover"
+        />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.82))] px-3 pb-2 pt-6 text-left">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/72">
+            Image {index + 1}
+          </span>
+        </div>
+      </button>
       <button
         type="button"
         onClick={(event) => {
@@ -92,7 +96,7 @@ function SelectedImageTile({
       >
         <FaTimes className="text-xs" />
       </button>
-    </button>
+    </div>
   );
 }
 
@@ -176,7 +180,9 @@ export default function MatchImageUploader({
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState("");
   const [isGalleryPromptOpen, setIsGalleryPromptOpen] = useState(false);
+  const [showPinPrompt, setShowPinPrompt] = useState(false);
   const inputRef = useRef(null);
+  const pinInputRef = useRef(null);
   const browseModeRef = useRef("replace");
   const selectedItemsRef = useRef([]);
 
@@ -211,6 +217,21 @@ export default function MatchImageUploader({
     };
   }, []);
 
+  useEffect(() => {
+    if (!showPinPrompt) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      pinInputRef.current?.focus();
+      pinInputRef.current?.select();
+    }, 20);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [showPinPrompt]);
+
   const replaceSelectedItems = (nextItemsOrUpdater) => {
     setSelectedItems((current) => {
       const nextItems =
@@ -233,6 +254,7 @@ export default function MatchImageUploader({
     replaceSelectedItems([]);
     setPin("");
     setError("");
+    setShowPinPrompt(false);
     if (inputRef.current) {
       inputRef.current.value = "";
     }
@@ -276,6 +298,10 @@ export default function MatchImageUploader({
       current.filter((item) => item.id !== itemId)
     );
     setError("");
+    if (selectedItems.length <= 1) {
+      setShowPinPrompt(false);
+      setPin("");
+    }
   };
 
   const handleRequestAddMore = () => {
@@ -292,23 +318,6 @@ export default function MatchImageUploader({
     openFilePicker("append");
   };
 
-  const validatePinIfProvided = async () => {
-    const nextPin = String(pin || "").trim();
-    if (!nextPin) {
-      return;
-    }
-
-    const response = await fetch("/api/media/pin-check", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pin: nextPin }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || "Incorrect PIN.");
-    }
-  };
-
   const handleUpload = async () => {
     if (!selectedFiles.length || isUploading) {
       return;
@@ -318,17 +327,16 @@ export default function MatchImageUploader({
     setError("");
 
     try {
-      await validatePinIfProvided();
-
       let latestPayload = null;
+      const submittedPin = String(pin || "").trim();
 
       for (const [index, selectedFile] of selectedFiles.entries()) {
         const compressedFile = await compressMatchImage(selectedFile);
         const formData = new FormData();
         formData.append("image", compressedFile);
 
-        if (pin.trim()) {
-          formData.append("pin", pin.trim());
+        if (submittedPin) {
+          formData.append("pin", submittedPin);
         }
 
         const shouldReplaceCurrent = Boolean(targetImageId) && index === 0;
@@ -347,6 +355,12 @@ export default function MatchImageUploader({
 
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
+          if (response.status === 401) {
+            setShowPinPrompt(true);
+            if (!submittedPin) {
+              throw new Error("Enter the 4-digit umpire PIN to upload images.");
+            }
+          }
           throw new Error(payload.message || "Image upload failed.");
         }
 
@@ -416,11 +430,9 @@ export default function MatchImageUploader({
               <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-white/[0.05] text-zinc-300">
                 <FaImage className="text-lg" />
               </div>
-              <h4 className="mt-4 text-lg font-semibold text-white">
-                Add match images
-              </h4>
+              <h4 className="mt-4 text-lg font-semibold text-white">Add match images</h4>
               <p className="mt-2 max-w-xs text-sm leading-6 text-zinc-400">
-                Pick one or more images, then upload them together.
+                Pick all images first. PIN only appears if upload needs it.
               </p>
             </div>
           )}
@@ -493,41 +505,42 @@ export default function MatchImageUploader({
           />
         </div>
 
-        {selectedItems.length > 0 ? (
-          <div className="mt-4 rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4">
-            <div className="mb-3 flex items-center gap-2 text-amber-200">
-              <FaShieldAlt className="text-sm" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-300/82">
-                Admin PIN
-              </p>
+        {showPinPrompt && selectedItems.length > 0 ? (
+          <div className="mt-4 rounded-[24px] border border-amber-300/16 bg-[linear-gradient(180deg,rgba(250,204,21,0.08),rgba(255,255,255,0.03))] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.18)]">
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-400/14 text-amber-300">
+                <FaShieldAlt className="text-sm" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-300/82">
+                  Umpire PIN
+                </p>
+                <p className="mt-1 text-sm text-zinc-300">
+                  Enter the same 4-digit umpire mode PIN once for this upload.
+                </p>
+              </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-              <div>
-                <label
-                  htmlFor={`match-image-pin-${matchId}`}
-                  className="mb-2 block text-xs font-medium text-zinc-400"
-                >
-                  Add all images first, then enter one PIN for the whole upload.
-                </label>
-                <input
-                  id={`match-image-pin-${matchId}`}
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={6}
-                  value={pin}
-                  onChange={(event) => {
-                    setPin(event.target.value.replace(/\D/g, "").slice(0, 6));
-                  }}
-                  placeholder="000000"
-                  className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-lg font-semibold tracking-[0.28em] text-white outline-none transition placeholder:tracking-[0.28em] placeholder:text-zinc-500 focus:border-amber-400/28 focus:bg-white/[0.06]"
-                />
-              </div>
-              <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-xs leading-5 text-zinc-400">
-                {selectedItems.length > 1 || appendOnUpload || existingImageCount > 0
-                  ? "Gallery changes may need the admin PIN."
-                  : "Enter the PIN if this page asks for image access."}
-              </div>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <input
+                ref={pinInputRef}
+                id={`match-image-pin-${matchId}`}
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={4}
+                value={pin}
+                onChange={(event) => {
+                  setPin(event.target.value.replace(/\D/g, "").slice(0, 4));
+                  if (error) {
+                    setError("");
+                  }
+                }}
+                placeholder="0000"
+                className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-base font-semibold tracking-[0.32em] text-white outline-none transition placeholder:tracking-[0.32em] placeholder:text-zinc-500 focus:border-amber-400/28 focus:bg-white/[0.08] sm:max-w-[220px]"
+              />
+              <p className="text-xs leading-5 text-zinc-400">
+                Same PIN as umpire mode. One PIN covers all selected images.
+              </p>
             </div>
           </div>
         ) : null}
@@ -541,12 +554,14 @@ export default function MatchImageUploader({
         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
           <LoadingButton
             onClick={handleUpload}
-            disabled={!selectedItems.length || (pin.length > 0 && pin.length < 6)}
+            disabled={!selectedItems.length || (showPinPrompt && pin.length !== 4)}
             loading={isUploading}
             pendingLabel="Uploading..."
             className="inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#10b981_0%,#059669_100%)] px-5 py-3.5 font-semibold text-black shadow-[0_16px_36px_rgba(16,185,129,0.22)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1"
           >
-            {selectedItems.length > 1
+            {showPinPrompt
+              ? "Confirm Upload"
+              : selectedItems.length > 1
               ? `${primaryLabel} (${selectedItems.length})`
               : primaryLabel}
           </LoadingButton>

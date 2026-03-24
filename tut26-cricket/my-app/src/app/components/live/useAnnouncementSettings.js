@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 
-const SETTINGS_VERSION = 5;
+const SETTINGS_VERSION = 6;
 
 const DEFAULTS = {
   spectator: {
@@ -13,6 +13,12 @@ const DEFAULTS = {
     mode: "full",
     accessibilityMode: false,
     playScoreSoundEffects: true,
+    scoreSoundEffectMap: {
+      out: "",
+      four: "",
+      six: "",
+      three: "",
+    },
   },
   umpire: {
     version: SETTINGS_VERSION,
@@ -22,6 +28,12 @@ const DEFAULTS = {
     mode: "simple",
     accessibilityMode: false,
     playScoreSoundEffects: true,
+    scoreSoundEffectMap: {
+      out: "",
+      four: "",
+      six: "ipl_theme_song.mp3",
+      three: "",
+    },
   },
 };
 

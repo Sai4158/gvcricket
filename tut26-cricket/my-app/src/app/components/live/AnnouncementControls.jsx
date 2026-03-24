@@ -1,8 +1,14 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import { useMemo, useRef, useState } from "react";
 import {
+  FaCheck,
+  FaChevronRight,
+  FaCompactDisc,
+  FaEdit,
   FaMicrophone,
+  FaPlay,
   FaTimes,
   FaVolumeMute,
   FaVolumeUp,
@@ -14,6 +20,197 @@ const MODES = [
   { value: "simple", label: "Simple Calls" },
   { value: "silent", label: "Silent" },
 ];
+const SCORE_EFFECT_EVENTS = [
+  { key: "out", label: "Out", accent: "rose" },
+  { key: "four", label: "4 Runs", accent: "sky" },
+  { key: "six", label: "6 Runs", accent: "amber" },
+  { key: "three", label: "3 Runs", accent: "violet" },
+];
+
+function getAccentClasses(accent) {
+  if (accent === "rose") {
+    return {
+      badge: "border-rose-400/20 bg-rose-400/10 text-rose-200",
+      button: "border-rose-300/18 bg-rose-400/10 text-rose-100 hover:bg-rose-400/16",
+      glow: "from-rose-400/18 via-transparent to-transparent",
+    };
+  }
+  if (accent === "sky") {
+    return {
+      badge: "border-sky-400/20 bg-sky-400/10 text-sky-200",
+      button: "border-sky-300/18 bg-sky-400/10 text-sky-100 hover:bg-sky-400/16",
+      glow: "from-sky-400/18 via-transparent to-transparent",
+    };
+  }
+  if (accent === "violet") {
+    return {
+      badge: "border-violet-400/20 bg-violet-400/10 text-violet-200",
+      button: "border-violet-300/18 bg-violet-400/10 text-violet-100 hover:bg-violet-400/16",
+      glow: "from-violet-400/18 via-transparent to-transparent",
+    };
+  }
+  return {
+    badge: "border-amber-400/20 bg-amber-400/10 text-amber-200",
+    button: "border-amber-300/18 bg-amber-400/10 text-amber-100 hover:bg-amber-400/16",
+    glow: "from-amber-400/18 via-transparent to-transparent",
+  };
+}
+
+function SoundAssignmentRow({
+  event,
+  selectedLabel,
+  selectedId,
+  onEdit,
+  onPreview,
+  previewing = false,
+}) {
+  const accent = getAccentClasses(event.accent);
+
+  return (
+    <div className="relative overflow-hidden rounded-[22px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-3.5">
+      <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accent.glow}`} />
+      <div className="relative flex items-center gap-3">
+        <div className={`inline-flex min-w-[72px] justify-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${accent.badge}`}>
+          {event.label}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-white">
+            {selectedLabel || "No sound"}
+          </p>
+          <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+            {selectedId ? "Assigned" : "Silent"}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onPreview}
+            disabled={!selectedId}
+            className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40 ${
+              previewing ? "ring-2 ring-emerald-400/35" : ""
+            }`}
+            aria-label={`Preview ${event.label} sound`}
+          >
+            <FaPlay className="text-xs" />
+          </button>
+          <button
+            type="button"
+            onClick={onEdit}
+            className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${accent.button}`}
+          >
+            <FaEdit className="text-[10px]" />
+            Edit
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SoundPickerSheet({
+  isOpen,
+  eventLabel,
+  options,
+  selectedId,
+  previewingId = "",
+  onClose,
+  onPreview,
+  onSelect,
+}) {
+  return (
+    <AnimatePresence>
+      {isOpen ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 z-20 rounded-[28px] bg-[linear-gradient(180deg,rgba(10,10,14,0.96),rgba(4,4,8,0.98))] p-4 backdrop-blur-md"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-300/78">
+                Select Sound
+              </p>
+              <h4 className="mt-1 text-lg font-black text-white">{eventLabel}</h4>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
+              aria-label="Close sound picker"
+            >
+              <FaTimes />
+            </button>
+          </div>
+
+          <div className="mt-4 max-h-[340px] space-y-2 overflow-y-auto pr-1">
+            <button
+              type="button"
+              onClick={() => onSelect("")}
+              className={`flex w-full items-center justify-between rounded-[20px] border px-4 py-3 text-left transition ${
+                !selectedId
+                  ? "border-emerald-300/28 bg-emerald-400/12 text-white"
+                  : "border-white/8 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.05]"
+              }`}
+            >
+              <div>
+                <p className="text-sm font-semibold">None</p>
+                <p className="mt-1 text-xs uppercase tracking-[0.18em] text-zinc-500">
+                  No effect after the call
+                </p>
+              </div>
+              {!selectedId ? <FaCheck className="text-emerald-300" /> : null}
+            </button>
+
+            {options.map((option) => {
+              const isSelected = selectedId === option.id;
+              const isPreviewing = previewingId === option.id;
+
+              return (
+                <div
+                  key={option.id}
+                  className={`flex items-center gap-3 rounded-[20px] border px-4 py-3 transition ${
+                    isSelected
+                      ? "border-emerald-300/28 bg-emerald-400/12"
+                      : "border-white/8 bg-white/[0.03]"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onPreview(option)}
+                    className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-white transition hover:bg-white/[0.08] ${
+                      isPreviewing ? "ring-2 ring-emerald-400/35" : ""
+                    }`}
+                    aria-label={`Preview ${option.label}`}
+                  >
+                    <FaPlay className="text-xs" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(option.id)}
+                    className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">
+                        {option.label}
+                      </p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.18em] text-zinc-500">
+                        {option.fileName || option.id}
+                      </p>
+                    </div>
+                    <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">
+                      {isSelected ? <FaCheck className="text-emerald-300" /> : <FaChevronRight />}
+                    </div>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
+}
 
 function getStatusLabel({ enabled, talkState }) {
   if (talkState === "speaking") return "Speaking";
@@ -64,16 +261,28 @@ export default function AnnouncementControls({
   talkError = "",
   simpleMode = false,
   showScoreSoundEffectsToggle = false,
+  showScoreEffectAssignments = false,
+  soundEffectOptions = [],
+  onPreviewSoundEffect,
+  onTestSequence,
+  previewingSoundEffectId = "",
 }) {
   const [isHolding, setIsHolding] = useState(false);
+  const [editingEventKey, setEditingEventKey] = useState("");
   const holdActiveRef = useRef(false);
-  const nextEnabled = !settings.enabled;
   const statusLabel = getStatusLabel({ enabled: settings.enabled, talkState });
   const isLiveSpeaking = talkState === "speaking" || talkState === "listening";
   const isModal = variant === "modal";
   const showTalkBlock = isModal && (onTalkStart || onTalkEnd);
   const showAdvancedControls = !simpleMode;
   const headerIcon = simpleMode ? <FaVolumeUp /> : <FaMicrophone />;
+  const showModernCompactPanel = isModal && simpleMode;
+  const scoreEffectMap = useMemo(
+    () => settings.scoreSoundEffectMap || {},
+    [settings.scoreSoundEffectMap]
+  );
+  const editingEvent =
+    SCORE_EFFECT_EVENTS.find((event) => event.key === editingEventKey) || null;
 
   const statusTone = useMemo(() => {
     if (talkState === "busy") {
@@ -84,6 +293,21 @@ export default function AnnouncementControls({
     }
     return "border-white/10 bg-white/5 text-zinc-300";
   }, [isLiveSpeaking, talkState]);
+
+  const activeSoundAssignments = useMemo(
+    () =>
+      SCORE_EFFECT_EVENTS.map((event) => {
+        const selectedId = String(scoreEffectMap?.[event.key] || "").trim();
+        const selectedEffect =
+          soundEffectOptions.find((option) => option.id === selectedId) || null;
+        return {
+          ...event,
+          selectedId,
+          selectedLabel: selectedEffect?.label || "",
+        };
+      }),
+    [scoreEffectMap, soundEffectOptions]
+  );
 
   const beginHold = async () => {
     if (talkDisabled || holdActiveRef.current) {
@@ -104,6 +328,215 @@ export default function AnnouncementControls({
     setIsHolding(false);
     await onTalkEnd?.();
   };
+
+  if (showModernCompactPanel) {
+    return (
+      <section className="mx-auto max-w-[32rem] overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.1),transparent_24%),linear-gradient(180deg,rgba(16,16,20,0.98),rgba(7,7,11,0.99))] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.48)] backdrop-blur-md sm:p-5">
+        <div className="relative">
+          <div className="flex items-start gap-3">
+            <div
+              className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-lg ${
+                isLiveSpeaking
+                  ? "border-emerald-300/28 bg-emerald-400/15 text-emerald-200 shadow-[0_0_30px_rgba(16,185,129,0.18)]"
+                  : "border-white/10 bg-white/[0.05] text-zinc-100"
+              }`}
+            >
+              <FaCompactDisc />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-300/82">
+                Live Voice
+              </p>
+              <h3 className="mt-1 text-[1.65rem] font-black tracking-[-0.03em] text-white">
+                {title}
+              </h3>
+              <p className="mt-1 text-sm text-zinc-400">
+                Calls, gap, effect, then score update.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingEventKey("");
+              onClose?.();
+            }}
+            className="absolute right-0 top-0 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-400 transition hover:bg-white/[0.08] hover:text-white"
+            aria-label="Close live commentary"
+          >
+            <FaTimes />
+          </button>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-[22px] border border-white/8 bg-white/[0.04] p-3.5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                  Commentary
+                </p>
+                <p className="mt-1 text-sm font-semibold text-white">
+                  {settings.enabled ? "On" : "Off"}
+                </p>
+              </div>
+              <IosSwitch
+                checked={settings.enabled}
+                label={settings.enabled ? "Turn commentary off" : "Turn commentary on"}
+                onChange={(checked) => {
+                  onToggleEnabled?.(checked);
+                  updateSetting("enabled", checked);
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-[22px] border border-white/8 bg-white/[0.04] p-3.5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+              Voice
+            </p>
+            <p className="mt-1 truncate text-sm font-semibold text-white">
+              {statusText || "Tap Read Score once"}
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">Current device voice</p>
+          </div>
+
+          <div className="rounded-[22px] border border-white/8 bg-white/[0.04] p-3.5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                  Effects
+                </p>
+                <p className="mt-1 text-sm font-semibold text-white">
+                  {settings.playScoreSoundEffects !== false ? "On" : "Off"}
+                </p>
+              </div>
+              <IosSwitch
+                checked={settings.playScoreSoundEffects !== false}
+                label={
+                  settings.playScoreSoundEffects !== false
+                    ? "Turn score sound effects off"
+                    : "Turn score sound effects on"
+                }
+                onChange={(checked) => updateSetting("playScoreSoundEffects", checked)}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="relative mt-4 overflow-hidden rounded-[24px] border border-emerald-300/12 bg-[linear-gradient(180deg,rgba(16,185,129,0.08),rgba(255,255,255,0.03))] p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-300/82">
+            Smart Sequence
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {["Umpire call", "1s gap", "Sound FX", "Score update"].map((step) => (
+              <div
+                key={step}
+                className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.18em] text-zinc-200"
+              >
+                {step}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {showScoreEffectAssignments ? (
+          <div className="relative mt-4 rounded-[24px] border border-white/8 bg-white/[0.03] p-3 sm:p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                  Event Sounds
+                </p>
+                <p className="mt-1 text-sm text-zinc-400">
+                  Choose what plays after the umpire call.
+                </p>
+              </div>
+              <span className="rounded-full border border-white/8 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-300">
+                {activeSoundAssignments.filter((item) => item.selectedId).length}/4 set
+              </span>
+            </div>
+
+            <div className="space-y-2.5">
+              {activeSoundAssignments.map((item) => (
+                <SoundAssignmentRow
+                  key={item.key}
+                  event={item}
+                  selectedId={item.selectedId}
+                  selectedLabel={item.selectedLabel}
+                  previewing={previewingSoundEffectId === item.selectedId}
+                  onEdit={() => setEditingEventKey(item.key)}
+                  onPreview={() => {
+                    if (!item.selectedId) {
+                      return;
+                    }
+                    const selectedEffect = soundEffectOptions.find(
+                      (option) => option.id === item.selectedId
+                    );
+                    if (selectedEffect) {
+                      void onPreviewSoundEffect?.(selectedEffect);
+                    }
+                  }}
+                />
+              ))}
+            </div>
+
+            <SoundPickerSheet
+              isOpen={Boolean(editingEvent)}
+              eventLabel={editingEvent?.label || "Sound"}
+              options={soundEffectOptions}
+              selectedId={String(scoreEffectMap?.[editingEvent?.key] || "")}
+              previewingId={previewingSoundEffectId}
+              onClose={() => setEditingEventKey("")}
+              onPreview={(option) => {
+                void onPreviewSoundEffect?.(option);
+              }}
+              onSelect={(nextId) => {
+                updateSetting("scoreSoundEffectMap", {
+                  ...scoreEffectMap,
+                  [editingEvent?.key || ""]: nextId,
+                });
+                setEditingEventKey("");
+              }}
+            />
+          </div>
+        ) : null}
+
+        {talkError ? (
+          <p className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+            {talkError}
+          </p>
+        ) : null}
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {onAnnounceNow ? (
+            <button
+              type="button"
+              onClick={onAnnounceNow}
+              disabled={announceDisabled}
+              className={`inline-flex items-center justify-center gap-2 rounded-[22px] px-4 py-3.5 text-sm font-semibold transition ${
+                announceDisabled
+                  ? "cursor-not-allowed bg-zinc-900 text-zinc-500"
+                  : "bg-white/[0.06] text-white hover:bg-white/[0.1]"
+              }`}
+            >
+              <FaVolumeUp />
+              {announceLabel}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => {
+              void onTestSequence?.(editingEventKey || "six");
+            }}
+            disabled={!onTestSequence}
+            className="inline-flex items-center justify-center gap-2 rounded-[22px] border border-emerald-300/16 bg-emerald-400/10 px-4 py-3.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/16 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <FaPlay className="text-xs" />
+            Test Sequence
+          </button>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section

@@ -42,7 +42,10 @@ function getWicketsInCurrentOver(match) {
 }
 
 function getBallsRemaining(match) {
-  return Math.max(0, safeNumber(match?.overs) * 6 - countLegalBalls(getActiveHistory(match)));
+  return Math.max(
+    0,
+    safeNumber(match?.overs) * 6 - countLegalBalls(getActiveHistory(match)),
+  );
 }
 
 function formatRemainingBalls(match) {
@@ -79,9 +82,9 @@ function isBoundary(ball) {
 function isImportantEvent(ball) {
   return Boolean(
     ball?.isOut ||
-      ball?.extraType === "wide" ||
-      ball?.extraType === "noball" ||
-      isBoundary(ball)
+    ball?.extraType === "wide" ||
+    ball?.extraType === "noball" ||
+    isBoundary(ball),
   );
 }
 
@@ -145,12 +148,13 @@ function buildBallEventLine(ball) {
   if (ball.extraType === "legbye") return "Leg bye.";
 
   if (safeNumber(ball.runs) === 0) return "Dot ball.";
-  if (isBoundary(ball)) return `Umpire has given ${pluralizeRuns(safeNumber(ball.runs))}.`;
+  if (isBoundary(ball))
+    return `Umpire has given ${pluralizeRuns(safeNumber(ball.runs))}.`;
   return buildRunsCall(safeNumber(ball.runs));
 }
 
 function buildUndoAnnouncementLine() {
-  return "Umpire has undone the last ball. The score for that ball has been removed. Umpire will redo this ball.";
+  return "Umpire has removed the score for the last ball. The ball will be replayed.";
 }
 
 function buildProgressReminder(event, match) {
@@ -309,7 +313,9 @@ export function buildSpectatorScoreAnnouncement(event, match) {
         : "0.00";
 
     return [
-      runsNeeded > 0 ? `${runsNeeded} runs needed from ${formatRemainingOvers(match)}.` : "",
+      runsNeeded > 0
+        ? `${runsNeeded} runs needed from ${formatRemainingOvers(match)}.`
+        : "",
       `Required rate is ${requiredRate} per over.`,
       "Best of luck to both teams.",
     ]
@@ -345,7 +351,9 @@ export function buildSpectatorOverCompleteAnnouncement(match) {
   ];
 
   if (oversLeft > 0) {
-    parts.push(oversLeft === 1 ? "1 over is left." : `${oversLeft} overs are left.`);
+    parts.push(
+      oversLeft === 1 ? "1 over is left." : `${oversLeft} overs are left.`,
+    );
   }
 
   const chaseLine = buildChaseEquationLine(match);
@@ -357,7 +365,7 @@ export function buildSpectatorOverCompleteAnnouncement(match) {
     parts.push(
       wicketsInOver === 1
         ? "1 wicket fell in this over."
-        : `${wicketsInOver} wickets fell in this over.`
+        : `${wicketsInOver} wickets fell in this over.`,
     );
   }
 
@@ -370,7 +378,9 @@ export function createScoreLiveEvent(matchBefore, matchAfter, ball) {
   const history = matchAfter[activeInningsKey]?.history ?? [];
   const battingTeam = getBattingTeamBundle(matchAfter);
   const overCompleted =
-    isLegalBall(ball) && countLegalBalls(history) > 0 && countLegalBalls(history) % 6 === 0;
+    isLegalBall(ball) &&
+    countLegalBalls(history) > 0 &&
+    countLegalBalls(history) % 6 === 0;
   const targetChased =
     matchAfter.innings === "second" &&
     matchAfter.score > (matchBefore?.innings1?.score ?? 0);
@@ -412,7 +422,9 @@ export function createMatchCorrectionLiveEvent(matchBefore, matchAfter, patch) {
         ? "Umpire corrected the first innings score."
         : "Umpire corrected the score."
       : "",
-    typeof patch?.overs === "number" ? `Match is now ${safeNumber(matchAfter?.overs)} overs.` : "",
+    typeof patch?.overs === "number"
+      ? `Match is now ${safeNumber(matchAfter?.overs)} overs.`
+      : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -428,9 +440,12 @@ export function createMatchCorrectionLiveEvent(matchBefore, matchAfter, patch) {
     result: matchAfter?.result || "",
     previousInnings1Score: safeNumber(matchBefore?.innings1?.score),
     nextInnings1Score:
-      typeof patch?.innings1Score === "number" ? safeNumber(matchAfter?.innings1?.score) : null,
+      typeof patch?.innings1Score === "number"
+        ? safeNumber(matchAfter?.innings1?.score)
+        : null,
     previousOvers: safeNumber(matchBefore?.overs),
-    nextOvers: typeof patch?.overs === "number" ? safeNumber(matchAfter?.overs) : null,
+    nextOvers:
+      typeof patch?.overs === "number" ? safeNumber(matchAfter?.overs) : null,
     createdAt: new Date().toISOString(),
   };
 }
@@ -452,7 +467,9 @@ export function createSoundEffectLiveEvent(match, effect, options = {}) {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     type: "sound_effect",
-    summaryText: effect?.label ? `${effect.label} sound effect.` : "Sound effect.",
+    summaryText: effect?.label
+      ? `${effect.label} sound effect.`
+      : "Sound effect.",
     score: match?.score ?? 0,
     outs: match?.outs ?? 0,
     effectId: effect?.id || "",
@@ -485,7 +502,7 @@ export function buildSpectatorAnnouncement(event, match, mode = "full") {
     const chaseTeam = match?.innings2?.team || getBattingTeamBundle(match).name;
     const firstInningsScore = scoreLine(
       safeNumber(match?.innings1?.score),
-      safeNumber(match?.innings1?.outs)
+      safeNumber(match?.innings1?.outs),
     );
     const target = safeNumber(match?.innings1?.score) + 1;
 
@@ -521,7 +538,11 @@ export function buildSpectatorAnnouncement(event, match, mode = "full") {
   return buildSpectatorBallAnnouncement(event);
 }
 
-export function buildLiveScoreAnnouncementSequence(event, match, mode = "full") {
+export function buildLiveScoreAnnouncementSequence(
+  event,
+  match,
+  mode = "full",
+) {
   if (!event || mode === "silent") {
     return {
       items: [],
@@ -582,7 +603,9 @@ export function buildCurrentScoreAnnouncement(match) {
   ];
 
   if (oversLeft > 0) {
-    parts.push(oversLeft === 1 ? "1 over is left." : `${oversLeft} overs are left.`);
+    parts.push(
+      oversLeft === 1 ? "1 over is left." : `${oversLeft} overs are left.`,
+    );
   }
 
   if (match?.innings === "second") {
@@ -691,11 +714,15 @@ export function buildUmpireTapAnnouncement(event, mode = "simple") {
 
   if (ball.extraType === "noball") {
     const noBallRuns = Math.max(safeNumber(ball.runs), 0);
-    return noBallRuns > 0 ? `No ball, ${pluralizeRuns(noBallRuns)} taken.` : "No ball.";
+    return noBallRuns > 0
+      ? `No ball, ${pluralizeRuns(noBallRuns)} taken.`
+      : "No ball.";
   }
 
   if (ball.extraType === "bye") {
-    return safeNumber(ball.runs) > 0 ? `Bye, ${pluralizeRuns(safeNumber(ball.runs))}.` : "Bye.";
+    return safeNumber(ball.runs) > 0
+      ? `Bye, ${pluralizeRuns(safeNumber(ball.runs))}.`
+      : "Bye.";
   }
 
   if (ball.extraType === "legbye") {

@@ -364,7 +364,7 @@ export default function MatchActionGrid({
             onHoldStart={onCommentaryHoldStart}
             onPressFeedback={onPressFeedback}
             icon={<AnnounceIcon />}
-            label="Announcer"
+            label="Announcer / Effects"
             colorClass="text-cyan-300"
             active={isAnnounceActive}
             badge={isAnnounceActive ? "On" : "Off"}

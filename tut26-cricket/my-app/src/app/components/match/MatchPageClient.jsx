@@ -13,6 +13,7 @@ import { countLegalBalls } from "../../lib/match-scoring";
 import {
   buildCurrentScoreAnnouncement,
   buildLiveScoreAnnouncementSequence,
+  buildSpectatorScoreAnnouncement,
   createScoreLiveEvent,
   createUndoLiveEvent,
 } from "../../lib/live-announcements";
@@ -63,6 +64,26 @@ const IPL_HORN_EFFECT = {
 const SIX_PRE_EFFECT_TEXT = "Umpire has given 6 runs.";
 const SIX_PRE_EFFECT_RATE = 0.8;
 const SIX_PRE_EFFECT_GAP_MS = 1000;
+const SCORE_EFFECT_KEYS = ["out", "four", "six", "three"];
+
+function getScoreSoundEffectEventKey(runs, isOut = false, extraType = null) {
+  if (extraType) {
+    return "";
+  }
+  if (isOut) {
+    return "out";
+  }
+  if (Number(runs) === 4) {
+    return "four";
+  }
+  if (Number(runs) === 6) {
+    return "six";
+  }
+  if (Number(runs) === 3) {
+    return "three";
+  }
+  return "";
+}
 
 function estimateSpeechLeadDelayMs(text, rate = 1) {
   const words = String(text || "")
@@ -465,7 +486,7 @@ export default function MatchPageClient({
     });
   };
 
-  const speakImmediateUmpireSequence = (sequence, keyPrefix) => {
+  const speakImmediateUmpireSequence = useCallback((sequence, keyPrefix) => {
     if (!sequence?.items?.length || !umpireSettings.enabled || umpireSettings.mode === "silent") {
       return;
     }
@@ -489,27 +510,31 @@ export default function MatchPageClient({
       userGesture: true,
       interrupt: true,
     });
-  };
+  }, [speakSequence, umpireSettings.enabled, umpireSettings.mode]);
 
-  const announceUmpireAction = (runs, isOut = false, extraType = null) => {
-    if (!umpireSettings.enabled || umpireSettings.mode === "silent" || !isLiveMatch) {
-      return;
+  const buildUmpireScorePreview = useCallback((runs, isOut = false, extraType = null) => {
+    if (!match) {
+      return {
+        nextMatch: match,
+        event: null,
+        sequence: { items: [], priority: 2 },
+        leadItem: null,
+        followUpItems: [],
+      };
     }
-
     let nextMatch = match;
-    if (match) {
-      try {
-        nextMatch = applyMatchAction(match, {
-          actionId: `umpire-preview:${Date.now()}`,
-          type: "score_ball",
-          runs,
-          isOut,
-          extraType,
-        });
-      } catch {
-        nextMatch = match;
-      }
+    try {
+      nextMatch = applyMatchAction(match, {
+        actionId: `umpire-preview:${Date.now()}`,
+        type: "score_ball",
+        runs,
+        isOut,
+        extraType,
+      });
+    } catch {
+      nextMatch = match;
     }
+
     const event = createScoreLiveEvent(match, nextMatch || match, {
       runs,
       isOut,
@@ -520,6 +545,74 @@ export default function MatchPageClient({
       nextMatch || match,
       umpireSettings.mode
     );
+    const leadItem = sequence.items?.[0] || null;
+    const followUpItems = sequence.items?.slice(1) || [];
+
+    if (!followUpItems.length) {
+      const followUpText =
+        buildSpectatorScoreAnnouncement(event, nextMatch || match) ||
+        buildCurrentScoreAnnouncement(nextMatch || match);
+      if (followUpText) {
+        followUpItems.push({
+          text: followUpText,
+          pauseAfterMs: 0,
+          rate: 0.8,
+        });
+      }
+    }
+
+    return {
+      nextMatch: nextMatch || match,
+      event,
+      sequence,
+      leadItem,
+      followUpItems,
+    };
+  }, [match, umpireSettings.mode]);
+
+  const findConfiguredScoreSoundEffect = useCallback((runs, isOut = false, extraType = null) => {
+    const effectKey = getScoreSoundEffectEventKey(runs, isOut, extraType);
+    if (!effectKey) {
+      return null;
+    }
+
+    const configuredMap = umpireSettings.scoreSoundEffectMap || {};
+    const configuredEffectId =
+      typeof configuredMap?.[effectKey] === "string" ? configuredMap[effectKey] : "";
+    const effectId = String(configuredEffectId || "").trim();
+    if (!effectId) {
+      return null;
+    }
+
+    const availableEffects = soundEffectFiles.length
+      ? soundEffectFiles
+      : readCachedSoundEffectsLibrary();
+    return (
+      availableEffects.find((effect) => effect?.id === effectId) ||
+      (effectId === IPL_HORN_EFFECT.id ? IPL_HORN_EFFECT : null)
+    );
+  }, [soundEffectFiles, umpireSettings.scoreSoundEffectMap]);
+
+  const announceConfiguredScoreFollowUp = useCallback((followUpItems = []) => {
+    if (!umpireSettings.enabled || umpireSettings.mode === "silent" || !followUpItems.length) {
+      return;
+    }
+
+    speakImmediateUmpireSequence(
+      {
+        items: followUpItems,
+        priority: 2,
+      },
+      "umpire-boundary-score"
+    );
+  }, [speakImmediateUmpireSequence, umpireSettings.enabled, umpireSettings.mode]);
+
+  const announceUmpireAction = (runs, isOut = false, extraType = null) => {
+    if (!umpireSettings.enabled || umpireSettings.mode === "silent" || !isLiveMatch) {
+      return;
+    }
+
+    const { sequence } = buildUmpireScorePreview(runs, isOut, extraType);
     const shouldSkipBoundaryLead =
       skipNextBoundaryLeadRef.current &&
       !isOut &&
@@ -556,23 +649,27 @@ export default function MatchPageClient({
       cancelBoundarySequence({ stopEffect: true });
     }
 
-    const shouldPlayBoundaryHorn =
-      !isOut && !extraType && Number(runs) === 6;
+    const configuredScoreEffect =
+      umpireSettings.playScoreSoundEffects !== false
+        ? findConfiguredScoreSoundEffect(runs, isOut, extraType)
+        : null;
+    const scorePreview = buildUmpireScorePreview(runs, isOut, extraType);
 
-    if (shouldPlayBoundaryHorn && umpireSettings.playScoreSoundEffects !== false) {
+    if (configuredScoreEffect) {
       const boundarySequenceVersion = boundarySequenceVersionRef.current + 1;
-      const sixLeadDelayMs = estimateBoundaryLeadDelayMs(
-        SIX_PRE_EFFECT_TEXT,
-        SIX_PRE_EFFECT_RATE
-      );
+      const leadText = String(scorePreview.leadItem?.text || "").trim();
+      const leadRate = Number(scorePreview.leadItem?.rate || SIX_PRE_EFFECT_RATE);
+      const leadDelayMs = leadText
+        ? estimateBoundaryLeadDelayMs(leadText, leadRate)
+        : 0;
       boundarySequenceVersionRef.current = boundarySequenceVersion;
       activeBoundarySequenceRef.current = true;
       handleScoreEvent(runs, isOut, extraType);
 
-      if (umpireSettings.enabled && umpireSettings.mode !== "silent") {
-        speak(SIX_PRE_EFFECT_TEXT, {
-          key: "umpire-six-pre",
-          rate: SIX_PRE_EFFECT_RATE,
+      if (leadText && umpireSettings.enabled && umpireSettings.mode !== "silent") {
+        speak(leadText, {
+          key: `umpire-score-pre-${configuredScoreEffect.id}`,
+          rate: leadRate,
           interrupt: true,
           minGapMs: 0,
           userGesture: true,
@@ -581,7 +678,7 @@ export default function MatchPageClient({
           boundarySequenceTimerRef.current = window.setTimeout(() => {
             boundarySequenceTimerRef.current = null;
             resolve();
-          }, sixLeadDelayMs);
+          }, leadDelayMs);
         });
 
         if (boundarySequenceVersion !== boundarySequenceVersionRef.current) {
@@ -589,13 +686,12 @@ export default function MatchPageClient({
         }
       }
 
-      skipNextBoundaryLeadRef.current = true;
-      await triggerSharedSoundEffect(IPL_HORN_EFFECT, {
+      await triggerSharedSoundEffect(configuredScoreEffect, {
         userGesture: true,
         resumeAnnouncements: true,
         trigger: "score_boundary",
-        preAnnouncementText: SIX_PRE_EFFECT_TEXT,
-        preAnnouncementDelayMs: sixLeadDelayMs,
+        preAnnouncementText: leadText,
+        preAnnouncementDelayMs: leadDelayMs,
       });
 
       if (boundarySequenceVersion !== boundarySequenceVersionRef.current) {
@@ -603,7 +699,7 @@ export default function MatchPageClient({
       }
 
       activeBoundarySequenceRef.current = false;
-      announceUmpireAction(runs, isOut, extraType);
+      announceConfiguredScoreFollowUp(scorePreview.followUpItems);
       return;
     }
 
@@ -820,6 +916,103 @@ export default function MatchPageClient({
       matchId,
       playLocalSoundEffect,
       resumeUmpireAnnouncementsAfterSoundEffect,
+    ]
+  );
+
+  const handlePreviewCommentarySoundEffect = useCallback(
+    async (file) => {
+      if (!file?.src || !file?.id) {
+        return false;
+      }
+
+      cancelBoundarySequence({ stopEffect: true });
+      setSoundEffectError("");
+      shouldResumeAfterSoundEffectRef.current = false;
+      return playLocalSoundEffect(file, { userGesture: true });
+    },
+    [cancelBoundarySequence, playLocalSoundEffect]
+  );
+
+  const handleTestCommentarySequence = useCallback(
+    async (eventKey = "six") => {
+      const normalizedKey = SCORE_EFFECT_KEYS.includes(eventKey) ? eventKey : "six";
+      const leadText =
+        normalizedKey === "out"
+          ? "Umpire has given 1 out."
+          : normalizedKey === "four"
+          ? "Umpire has given 4 runs."
+          : normalizedKey === "three"
+          ? "Umpire has given 3 runs."
+          : SIX_PRE_EFFECT_TEXT;
+      const configuredEffectId = String(
+        umpireSettings.scoreSoundEffectMap?.[normalizedKey] || ""
+      ).trim();
+      const previewEffect =
+        soundEffectFiles.find((file) => file.id === configuredEffectId) ||
+        (configuredEffectId === IPL_HORN_EFFECT.id ? IPL_HORN_EFFECT : null);
+
+      cancelBoundarySequence({ stopEffect: true });
+
+      if (umpireSettings.enabled && umpireSettings.mode !== "silent") {
+        speak(leadText, {
+          key: `umpire-sequence-test-${normalizedKey}`,
+          rate: 0.8,
+          interrupt: true,
+          minGapMs: 0,
+          userGesture: true,
+          ignoreEnabled: true,
+        });
+        await new Promise((resolve) => {
+          boundarySequenceTimerRef.current = window.setTimeout(() => {
+            boundarySequenceTimerRef.current = null;
+            resolve();
+          }, estimateBoundaryLeadDelayMs(leadText, 0.8));
+        });
+      }
+
+      if (
+        previewEffect &&
+        umpireSettings.playScoreSoundEffects !== false
+      ) {
+        await handlePreviewCommentarySoundEffect(previewEffect);
+        await new Promise((resolve) => {
+          const durationSeconds = Number(soundEffectDurations?.[previewEffect.id] || 0);
+          const waitMs = durationSeconds > 0 ? durationSeconds * 1000 + 180 : 1600;
+          window.setTimeout(resolve, waitMs);
+        });
+      }
+
+      if (umpireSettings.enabled && umpireSettings.mode !== "silent") {
+        speakSequence(
+          [
+            {
+              text: "Score is 42 for 2. This is ball 4.",
+              pauseAfterMs: 0,
+              rate: 0.8,
+            },
+          ],
+          {
+            key: `umpire-sequence-score-${normalizedKey}-${Date.now()}`,
+            priority: 2,
+            interrupt: true,
+            minGapMs: 0,
+            userGesture: true,
+            ignoreEnabled: true,
+          }
+        );
+      }
+    },
+    [
+      cancelBoundarySequence,
+      handlePreviewCommentarySoundEffect,
+      soundEffectDurations,
+      soundEffectFiles,
+      speak,
+      speakSequence,
+      umpireSettings.enabled,
+      umpireSettings.mode,
+      umpireSettings.playScoreSoundEffects,
+      umpireSettings.scoreSoundEffectMap,
     ]
   );
 
@@ -1193,7 +1386,10 @@ export default function MatchPageClient({
             onUndo={handleAnnouncedUndo}
             onHistory={() => setModal({ type: "history" })}
             onImage={() => setModal({ type: "image" })}
-            onCommentary={() => setModal({ type: "commentary" })}
+            onCommentary={() => {
+              void loadSoundEffectsLibrary();
+              setModal({ type: "commentary" });
+            }}
             onCommentaryHoldStart={handleScoreFeedbackHoldStart}
             onWalkie={() => setModal({ type: "walkie" })}
             onMic={() => setModal({ type: "mic" })}
@@ -1287,6 +1483,14 @@ export default function MatchPageClient({
                   announceLabel: "Read Score",
                   announceDisabled: false,
                   showScoreSoundEffectsToggle: true,
+                  showScoreEffectAssignments: true,
+                  soundEffectOptions:
+                    soundEffectFiles.length
+                      ? soundEffectFiles
+                      : readCachedSoundEffectsLibrary(),
+                  previewingSoundEffectId: activeSoundEffectId,
+                  onPreviewSoundEffect: handlePreviewCommentarySoundEffect,
+                  onTestSequence: handleTestCommentarySequence,
                 }
               : null
           }

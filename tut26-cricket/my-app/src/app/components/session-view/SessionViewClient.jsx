@@ -303,8 +303,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const currentLiveEventId = match?.lastLiveEvent?.id || "";
   const isLiveMatch = Boolean(match?.isOngoing && !match?.result);
   const spectatorWalkieSignalActive = Boolean(
-    isLiveMatch &&
-      (activePanel === "walkie" || spectatorWalkieEnabled || quickWalkieTalking)
+    isLiveMatch && (spectatorWalkieEnabled || quickWalkieTalking)
   );
   const walkie = useWalkieTalkie({
     matchId: match?._id || "",
@@ -573,9 +572,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
 
     initialWalkieStateResolvedRef.current = true;
-    queueMicrotask(() => {
-      setSpectatorWalkieEnabled(Boolean(walkie.snapshot?.enabled));
-    });
+    previousWalkieEnabledRef.current = Boolean(walkie.snapshot?.enabled);
   }, [
     isLiveMatch,
     match?._id,
@@ -995,7 +992,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
       })
     ) {
       queueMicrotask(() => {
-        setSpectatorWalkieEnabled(true);
         setLocalWalkieNotice("");
       });
       speakSequenceWithDuck(
@@ -1346,7 +1342,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         setLocalWalkieNotice("");
         setActivePanel((current) => (current === "walkie" ? null : current));
         walkie.dismissNotice();
-        await walkie.deactivateAudio({ restartSignaling: true });
+        await walkie.deactivateAudio();
         return;
       }
 

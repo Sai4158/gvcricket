@@ -451,6 +451,21 @@ export function shouldMaintainWalkieAudioTransport({
   return false;
 }
 
+export function shouldMaintainWalkieSignaling({
+  enabled = false,
+  matchId = "",
+  pageVisible = true,
+  signalingActive = false,
+  manualSignalingActive = false,
+} = {}) {
+  return Boolean(
+    enabled &&
+      matchId &&
+      pageVisible &&
+      (signalingActive || manualSignalingActive)
+  );
+}
+
 export default function useWalkieTalkie({
   matchId,
   enabled,
@@ -541,6 +556,7 @@ export default function useWalkieTalkie({
   const presenceRefreshInFlightRef = useRef(false);
   const presenceRefreshPendingRef = useRef(false);
   const mountedRef = useRef(false);
+  const pageVisibleRef = useRef(isPageVisible);
   const shouldMaintainSignalingRef = useRef(false);
   const signalingPropActiveRef = useRef(Boolean(signalingActive));
   const manualSignalingActiveRef = useRef(false);
@@ -587,9 +603,13 @@ export default function useWalkieTalkie({
     isSelfTalking,
     isFinishing,
   });
-  const shouldMaintainSignaling = Boolean(
-    enabled && matchId && isPageVisible && (signalingActive || manualSignalingActive)
-  );
+  const shouldMaintainSignaling = shouldMaintainWalkieSignaling({
+    enabled,
+    matchId,
+    pageVisible: isPageVisible,
+    signalingActive,
+    manualSignalingActive,
+  });
   const nonUmpireUi = getNonUmpireWalkieUiState({
     sharedEnabled: snapshot.enabled,
     localEnabled: autoConnectAudio,
@@ -599,6 +619,7 @@ export default function useWalkieTalkie({
     hasOwnPendingRequest,
   });
   shouldMaintainSignalingRef.current = shouldMaintainSignaling;
+  pageVisibleRef.current = isPageVisible;
 
   const setManualSignalingActive = useCallback((nextActive) => {
     const next = Boolean(nextActive);
@@ -606,9 +627,13 @@ export default function useWalkieTalkie({
       return;
     }
     manualSignalingActiveRef.current = next;
-    shouldMaintainSignalingRef.current = Boolean(
-      enabled && matchId && (signalingPropActiveRef.current || next)
-    );
+    shouldMaintainSignalingRef.current = shouldMaintainWalkieSignaling({
+      enabled,
+      matchId,
+      pageVisible: pageVisibleRef.current,
+      signalingActive: signalingPropActiveRef.current,
+      manualSignalingActive: next,
+    });
     setManualSignalingActiveState(next);
   }, [enabled, matchId]);
 

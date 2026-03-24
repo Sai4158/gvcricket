@@ -8,7 +8,7 @@ import { publishMatchUpdate, publishSessionUpdate } from "../../../../lib/live-u
 import {
   getMatchAccessCookieName,
   hasValidMatchAccess,
-  isValidManagePin,
+  isValidUmpirePin,
 } from "../../../../lib/match-access";
 import {
   isSafeRemoteMatchImageUrl,
@@ -28,14 +28,14 @@ import {
   parseJsonRequest,
   parseMultipartRequest,
 } from "../../../../lib/request-security";
-import { secretPinPayloadSchema } from "../../../../lib/validators";
+import { pinPayloadSchema } from "../../../../lib/validators";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 import { z } from "zod";
 
 export const runtime = "nodejs";
 
-const deleteImagePayloadSchema = secretPinPayloadSchema.extend({
+const deleteImagePayloadSchema = pinPayloadSchema.extend({
   imageId: z.string().trim().max(80).optional().default(""),
 });
 
@@ -104,7 +104,7 @@ export async function POST(req, { params }) {
       Number(match.adminAccessVersion || 1)
     );
     const pinValue = String(parsedRequest.value.get("pin") || "").trim();
-    const hasPinAccess = Boolean(pinValue) && isValidManagePin(pinValue);
+    const hasPinAccess = Boolean(pinValue) && isValidUmpirePin(pinValue);
 
     if (!hasCookieAccess && !hasPinAccess) {
       await writeAuditLog({
@@ -116,7 +116,7 @@ export async function POST(req, { params }) {
         userAgent: meta.userAgent,
       });
 
-      return jsonError("Manage PIN required for image upload.", 401);
+      return jsonError("Umpire PIN required for image upload.", 401);
     }
 
     const file = parsedRequest.value.get("image");
@@ -326,7 +326,7 @@ export async function DELETE(req, { params }) {
       return jsonError(parsedRequest.message, parsedRequest.status);
     }
 
-    if (!isValidManagePin(parsedRequest.value.pin)) {
+    if (!isValidUmpirePin(parsedRequest.value.pin)) {
       await writeAuditLog({
         action: "match_media_delete_denied",
         targetType: "match",

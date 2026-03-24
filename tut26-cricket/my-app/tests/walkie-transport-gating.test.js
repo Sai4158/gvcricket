@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   classifyWalkieSignalingSetupError,
   shouldMaintainWalkieAudioTransport,
+  shouldMaintainWalkieSignaling,
 } from "../src/app/components/live/useWalkieTalkie.js";
 import {
   didSharedWalkieDisable,
@@ -118,6 +119,52 @@ test("walkie audio transport stays on only when audio is actually needed", () =>
       manualAudioReady: true,
       isSelfTalking: true,
       isFinishing: false,
+    }),
+    true
+  );
+});
+
+test("walkie signaling stays off unless the session truly needs a live signaling state", () => {
+  assert.equal(
+    shouldMaintainWalkieSignaling({
+      enabled: true,
+      matchId: "match-1",
+      pageVisible: true,
+      signalingActive: false,
+      manualSignalingActive: false,
+    }),
+    false
+  );
+
+  assert.equal(
+    shouldMaintainWalkieSignaling({
+      enabled: true,
+      matchId: "match-1",
+      pageVisible: true,
+      signalingActive: true,
+      manualSignalingActive: false,
+    }),
+    true
+  );
+
+  assert.equal(
+    shouldMaintainWalkieSignaling({
+      enabled: true,
+      matchId: "match-1",
+      pageVisible: false,
+      signalingActive: true,
+      manualSignalingActive: true,
+    }),
+    false
+  );
+
+  assert.equal(
+    shouldMaintainWalkieSignaling({
+      enabled: true,
+      matchId: "match-1",
+      pageVisible: true,
+      signalingActive: false,
+      manualSignalingActive: true,
     }),
     true
   );
