@@ -102,7 +102,7 @@ export function Scoreboard({ match, history }) {
         <div className="text-6xl font-bold text-white">{oversDisplay}</div>
         <div className="text-zinc-100 text-sm uppercase tracking-wider">
           Overs <strong>({match.overs})</strong>
-          <strong className="block">({ballsLeft} left)</strong>
+          <strong className="block">({ballsLeft})</strong>
         </div>
       </div>
     </div>

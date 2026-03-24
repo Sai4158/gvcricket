@@ -28,6 +28,35 @@ const SCORE_EFFECT_EVENTS = [
   { key: "three", label: "3 Runs", accent: "violet" },
 ];
 
+function ScrollingSoundLabel({ text = "", active = false }) {
+  const label = String(text || "").trim();
+
+  if (!label) {
+    return <p className="text-sm font-semibold text-white">No sound</p>;
+  }
+
+  if (label.length <= 14) {
+    return <p className="truncate text-sm font-semibold text-white">{label}</p>;
+  }
+
+  return (
+    <div className="overflow-hidden">
+      <motion.div
+        className="flex min-w-max items-center gap-6 whitespace-nowrap text-sm font-semibold text-white"
+        animate={active ? { x: ["0%", "-35%", "0%"] } : { x: 0 }}
+        transition={{
+          duration: 6,
+          ease: "linear",
+          repeat: active ? Number.POSITIVE_INFINITY : 0,
+        }}
+      >
+        <span>{label}</span>
+        <span aria-hidden="true">{label}</span>
+      </motion.div>
+    </div>
+  );
+}
+
 function getAccentClasses(accent) {
   if (accent === "rose") {
     return {
@@ -86,18 +115,12 @@ function SoundAssignmentRow({
             {event.label}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-white">
-              {selectedLabel || "No sound"}
-            </p>
-            <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-zinc-500">
-              {hasAssignedSound
-                ? isPreviewing
-                  ? "Playing"
-                  : "Assigned"
-                : "Silent"}
-            </p>
+            <ScrollingSoundLabel
+              text={selectedLabel || ""}
+              active={hasAssignedSound}
+            />
           </div>
-          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-white">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-white/88">
             {isPreviewing ? <FaPause className="text-xs" /> : <FaPlay className="text-xs" />}
           </span>
         </button>
@@ -464,7 +487,7 @@ export default function AnnouncementControls({
               type="button"
               onClick={onAnnounceNow}
               disabled={announceDisabled}
-              className={`inline-flex flex-col items-start justify-center gap-1 rounded-[22px] px-4 py-3.5 text-left text-sm font-semibold transition active:scale-[0.985] ${
+              className={`inline-flex items-center gap-3 rounded-[22px] px-4 py-3.5 text-left text-sm font-semibold transition active:scale-[0.985] ${
                 announceDisabled
                   ? "cursor-not-allowed bg-zinc-900 text-zinc-500"
                   : announceIsActive
@@ -472,10 +495,10 @@ export default function AnnouncementControls({
                   : "bg-white/[0.06] text-white hover:bg-white/[0.1]"
               }`}
             >
-              <span className="inline-flex items-center gap-2">
-                {announceIsActive ? <FaPause /> : <FaVolumeUp />}
-                {announceIsActive ? "Pause Score" : announceLabel}
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06]">
+                {announceIsActive ? <FaPause className="text-xs" /> : <FaVolumeUp className="text-xs" />}
               </span>
+              <span>{announceIsActive ? "Pause Score" : announceLabel}</span>
             </button>
           ) : null}
           <button
@@ -484,16 +507,16 @@ export default function AnnouncementControls({
               void onTestSequence?.(editingEventKey || "six");
             }}
             disabled={!onTestSequence}
-            className={`inline-flex flex-col items-start justify-center gap-1 rounded-[22px] border px-4 py-3.5 text-left text-sm font-semibold transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-45 ${
+            className={`inline-flex items-center gap-3 rounded-[22px] border px-4 py-3.5 text-left text-sm font-semibold transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-45 ${
               testSequenceIsActive
                 ? "border-emerald-300/24 bg-emerald-400/16 text-emerald-100 ring-2 ring-emerald-400/20"
                 : "border-emerald-300/16 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/16"
             }`}
           >
-            <span className="inline-flex items-center gap-2">
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-300/16 bg-emerald-950/30">
               {testSequenceIsActive ? <FaPause className="text-xs" /> : <FaPlay className="text-xs" />}
-              {testSequenceIsActive ? "Pause Test" : "Test Sequence"}
             </span>
+            <span>{testSequenceIsActive ? "Pause Test" : "Test Sequence"}</span>
           </button>
         </div>
         </div>
