@@ -530,12 +530,16 @@ export default function WalkiePanel({
   onDismissRequest,
 }) {
   const isUmpire = role === "umpire";
+  const spectatorCount = Number(snapshot?.spectatorCount || 0);
+  const directorCount = Number(snapshot?.directorCount || 0);
+  const hasRemoteAudience = spectatorCount + directorCount > 0;
   const walkieActionPending = Boolean(claiming || preparingToTalk || updatingEnabled);
   const walkieRecovering = Boolean(recoveringAudio || recoveringSignaling);
   const remoteSpeakerState = getWalkieRemoteSpeakerState({
     snapshot,
     isSelfTalking,
   });
+  const effectiveCanTalk = Boolean(canTalk && (!isUmpire || hasRemoteAudience));
   const canShowRequestAction = !snapshot?.enabled && !isUmpire;
   const statusText = walkieActionPending
     ? "Connecting"
@@ -549,6 +553,8 @@ export default function WalkiePanel({
     ? "Finishing"
     : isSelfTalking
     ? "You are live"
+    : isUmpire && !hasRemoteAudience
+    ? "Waiting for spectators"
     : "Ready";
   const activeSpeakerLabel = snapshot?.activeSpeakerName
     ? `${snapshot.activeSpeakerName}${
@@ -620,7 +626,9 @@ export default function WalkiePanel({
               ) : null}
               <p className="mt-1 text-xs text-zinc-500">
                 {isUmpire
-                  ? "Talk with spectators and the director."
+                  ? hasRemoteAudience
+                    ? "Talk with spectators and the director."
+                    : "Wait for a spectator or director to join."
                   : role === "director"
                   ? "Talk with the umpire or spectators."
                   : "Talk with the umpire or spectators."}
@@ -644,12 +652,12 @@ export default function WalkiePanel({
         <div className="mt-4 flex items-center justify-center text-sm text-zinc-400">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1">
             <FaUsers />
-            {snapshot?.spectatorCount || 0} spectators
+            {spectatorCount} spectator{spectatorCount === 1 ? "" : "s"}
           </span>
-          {Number(snapshot?.directorCount || 0) > 0 ? (
+          {directorCount > 0 ? (
             <span className="ml-2 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1">
               <FaPhoneVolume />
-              {snapshot?.directorCount || 0} director
+              {directorCount} director{directorCount === 1 ? "" : "s"}
             </span>
           ) : null}
         </div>
@@ -697,7 +705,7 @@ export default function WalkiePanel({
                 finishing={isFinishing}
                 pending={walkieActionPending || walkieRecovering}
                 size={role === "spectator" ? "lg" : "md"}
-                disabled={!canTalk || walkieRecovering}
+                disabled={!effectiveCanTalk || walkieRecovering}
                 countdown={countdown}
                 finishDelayLeft={finishDelayLeft}
                 onPrepare={onPrepareTalking}
@@ -738,7 +746,9 @@ export default function WalkiePanel({
             </div>
           ) : (
             <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-center text-sm text-zinc-400">
-              Walkie-talkie is unavailable right now.
+              {isUmpire && snapshot?.enabled && !hasRemoteAudience
+                ? "Waiting for a spectator or director to join the walkie channel."
+                : "Walkie-talkie is unavailable right now."}
             </div>
           )}
         </div>

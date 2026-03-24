@@ -42,6 +42,7 @@ import {
   readCachedSoundEffectsLibrary,
   readCachedSoundEffectsOrder,
   sortSoundEffectsByOrder,
+  warmCachedSoundEffectAssets,
   writeCachedSoundEffectsLibrary,
   writeCachedSoundEffectsOrder,
 } from "../../lib/sound-effects-client";
@@ -64,7 +65,7 @@ const IPL_HORN_EFFECT = {
 const SIX_PRE_EFFECT_TEXT = "Umpire has given 6 runs.";
 const SIX_PRE_EFFECT_RATE = 0.8;
 const SIX_PRE_EFFECT_GAP_MS = 1000;
-const SCORE_EFFECT_KEYS = ["out", "four", "six", "three"];
+const SCORE_EFFECT_KEYS = ["out", "two", "three", "four", "six"];
 
 function getScoreSoundEffectEventKey(runs, isOut = false, extraType = null) {
   if (extraType) {
@@ -73,14 +74,17 @@ function getScoreSoundEffectEventKey(runs, isOut = false, extraType = null) {
   if (isOut) {
     return "out";
   }
+  if (Number(runs) === 2) {
+    return "two";
+  }
+  if (Number(runs) === 3) {
+    return "three";
+  }
   if (Number(runs) === 4) {
     return "four";
   }
   if (Number(runs) === 6) {
     return "six";
-  }
-  if (Number(runs) === 3) {
-    return "three";
   }
   return "";
 }
@@ -139,15 +143,26 @@ export default function MatchPageClient({
   initialAuthStatus,
   initialMatch,
 }) {
+  const initialCachedSoundEffectFiles = sortSoundEffectsByOrder(
+    readCachedSoundEffectsLibrary(),
+    readCachedSoundEffectsOrder(),
+  );
   const router = useRouter();
   const [modal, setModal] = useState({ type: null });
   const [infoText, setInfoText] = useState(null);
   const [soundEffectsOpen, setSoundEffectsOpen] = useState(false);
-  const [soundEffectFiles, setSoundEffectFiles] = useState([]);
-  const [soundEffectLibraryStatus, setSoundEffectLibraryStatus] = useState("idle");
+  const [soundEffectFiles, setSoundEffectFiles] = useState(
+    initialCachedSoundEffectFiles,
+  );
+  const [soundEffectLibraryStatus, setSoundEffectLibraryStatus] = useState(
+    initialCachedSoundEffectFiles.length ? "ready" : "idle",
+  );
   const [soundEffectError, setSoundEffectError] = useState("");
-  const [soundEffectDurations, setSoundEffectDurations] = useState({});
+  const [soundEffectDurations, setSoundEffectDurations] = useState(
+    () => readCachedSoundEffectDurations(),
+  );
   const [activeCommentaryAction, setActiveCommentaryAction] = useState("");
+  const [activeCommentaryPreviewId, setActiveCommentaryPreviewId] = useState("");
   const localAnnouncementIdRef = useRef(0);
   const lastWalkieRequestSignatureRef = useRef("");
   const umpireAnnouncementTimerRef = useRef(null);
@@ -348,23 +363,20 @@ export default function MatchPageClient({
     soundEffectPlaybackCutoffRef.current = Date.now();
   }, []);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const cachedFiles = readCachedSoundEffectsLibrary();
-      if (cachedFiles.length) {
-        setSoundEffectFiles(
-          sortSoundEffectsByOrder(cachedFiles, readCachedSoundEffectsOrder())
-        );
-        setSoundEffectLibraryStatus("ready");
-      }
+  const warmKnownSoundEffects = useCallback(
+    (files) => {
+      const preferredIds = Object.values(
+        umpireSettings.scoreSoundEffectMap || {},
+      )
+        .map((value) => String(value || "").trim())
+        .filter(Boolean);
 
-      setSoundEffectDurations(readCachedSoundEffectDurations());
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, []);
+      void warmCachedSoundEffectAssets(files, {
+        preferredIds,
+      }).catch(() => {});
+    },
+    [umpireSettings.scoreSoundEffectMap],
+  );
 
   useEffect(() => {
     if (authStatus === "granted" && match && tossPending) {
@@ -756,6 +768,7 @@ export default function MatchPageClient({
   const stopCommentaryPlayback = useCallback(() => {
     cancelBoundarySequence({ stopEffect: true });
     stop();
+    setActiveCommentaryPreviewId("");
     setActiveCommentaryAction("");
   }, [cancelBoundarySequence, stop]);
 
@@ -786,6 +799,7 @@ export default function MatchPageClient({
 
     if (soundEffectFiles.length) {
       setSoundEffectLibraryStatus("ready");
+      warmKnownSoundEffects(soundEffectFiles);
       return;
     }
 
@@ -796,6 +810,7 @@ export default function MatchPageClient({
       const nextFiles = await fetchCachedSoundEffectsLibrary();
       setSoundEffectFiles(nextFiles);
       setSoundEffectLibraryStatus("ready");
+      warmKnownSoundEffects(nextFiles);
     } catch (caughtError) {
       setSoundEffectLibraryStatus("idle");
       setSoundEffectError(
@@ -804,7 +819,19 @@ export default function MatchPageClient({
           : "Could not load sound effects.",
       );
     }
-  }, [soundEffectFiles.length, soundEffectLibraryStatus]);
+  }, [
+    soundEffectFiles,
+    soundEffectLibraryStatus,
+    warmKnownSoundEffects,
+  ]);
+
+  useEffect(() => {
+    if (!soundEffectFiles.length) {
+      return;
+    }
+
+    warmKnownSoundEffects(soundEffectFiles);
+  }, [soundEffectFiles, warmKnownSoundEffects]);
 
   useEffect(() => {
     const hasAssignedScoreEffect = Object.values(
@@ -969,18 +996,32 @@ export default function MatchPageClient({
         return false;
       }
 
-      if (activeSoundEffectId === file.id && isAnySoundEffectActive) {
+      const isCurrentPreview =
+        activeCommentaryAction === "event-preview" &&
+        activeCommentaryPreviewId === file.id;
+
+      if (isCurrentPreview || (activeSoundEffectId === file.id && isAnySoundEffectActive)) {
         stopCommentaryPlayback();
-        return true;
+        return false;
       }
 
       cancelBoundarySequence({ stopEffect: true });
       setSoundEffectError("");
       shouldResumeAfterSoundEffectRef.current = false;
+      setActiveCommentaryPreviewId(file.id);
       setActiveCommentaryAction("event-preview");
-      return playLocalSoundEffect(file, { userGesture: true });
+      const played = await playLocalSoundEffect(file, { userGesture: true });
+      if (!played) {
+        setActiveCommentaryPreviewId("");
+        setActiveCommentaryAction((current) =>
+          current === "event-preview" ? "" : current
+        );
+      }
+      return played;
     },
     [
+      activeCommentaryAction,
+      activeCommentaryPreviewId,
       activeSoundEffectId,
       cancelBoundarySequence,
       isAnySoundEffectActive,
@@ -990,15 +1031,17 @@ export default function MatchPageClient({
   );
 
   const handleTestCommentarySequence = useCallback(
-    async (eventKey = "six") => {
-      const normalizedKey = SCORE_EFFECT_KEYS.includes(eventKey) ? eventKey : "six";
+    async (eventKey = "out") => {
+      const normalizedKey = SCORE_EFFECT_KEYS.includes(eventKey) ? eventKey : "out";
       const leadText =
         normalizedKey === "out"
           ? "Umpire has given 1 out."
-          : normalizedKey === "four"
-          ? "Umpire has given 4 runs."
+          : normalizedKey === "two"
+          ? "Umpire has given 2 runs."
           : normalizedKey === "three"
           ? "Umpire has given 3 runs."
+          : normalizedKey === "four"
+          ? "Umpire has given 4 runs."
           : SIX_PRE_EFFECT_TEXT;
       const configuredEffectId = String(
         umpireSettings.scoreSoundEffectMap?.[normalizedKey] || ""
@@ -1092,7 +1135,7 @@ export default function MatchPageClient({
     stopCommentaryPlayback,
   ]);
 
-  const handleCommentaryTestSequenceAction = useCallback((eventKey = "six") => {
+  const handleCommentaryTestSequenceAction = useCallback((eventKey = "out") => {
     if (
       activeCommentaryAction === "test-sequence" &&
       (status === "speaking" || isAnySoundEffectActive)
@@ -1596,7 +1639,13 @@ export default function MatchPageClient({
                     soundEffectFiles.length
                       ? soundEffectFiles
                       : readCachedSoundEffectsLibrary(),
-                  previewingSoundEffectId: activeSoundEffectId,
+                  previewingSoundEffectId:
+                    activeCommentaryAction === "event-preview" &&
+                    (activeSoundEffectStatus === "loading" ||
+                      activeSoundEffectStatus === "playing")
+                      ? activeCommentaryPreviewId
+                      : "",
+                  previewingSoundEffectStatus: activeSoundEffectStatus,
                   onPreviewSoundEffect: handlePreviewCommentarySoundEffect,
                   onTestSequence: handleCommentaryTestSequenceAction,
                   announceIsActive: isReadScoreActionActive,

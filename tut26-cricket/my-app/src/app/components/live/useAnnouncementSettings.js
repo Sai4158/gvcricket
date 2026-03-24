@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 
-const SETTINGS_VERSION = 7;
+const SETTINGS_VERSION = 8;
 
 const DEFAULTS = {
   spectator: {
@@ -15,9 +15,10 @@ const DEFAULTS = {
     playScoreSoundEffects: true,
     scoreSoundEffectMap: {
       out: "",
+      two: "",
+      three: "",
       four: "",
       six: "",
-      three: "",
     },
   },
   umpire: {
@@ -30,12 +31,30 @@ const DEFAULTS = {
     playScoreSoundEffects: true,
     scoreSoundEffectMap: {
       out: "",
+      two: "",
+      three: "",
       four: "",
       six: "ipl_theme_song.mp3",
-      three: "",
     },
   },
 };
+
+function mergeSettings(role, parsed = {}) {
+  const base = DEFAULTS[role] || {};
+  const parsedMap =
+    parsed?.scoreSoundEffectMap && typeof parsed.scoreSoundEffectMap === "object"
+      ? parsed.scoreSoundEffectMap
+      : {};
+
+  return {
+    ...base,
+    ...parsed,
+    scoreSoundEffectMap: {
+      ...(base.scoreSoundEffectMap || {}),
+      ...parsedMap,
+    },
+  };
+}
 
 function getStorageKey(role) {
   return `gv-announcer-${role}`;
@@ -142,8 +161,7 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
         !parsed?.version || Number(parsed.version) < SETTINGS_VERSION;
 
       return {
-        ...DEFAULTS[role],
-        ...parsed,
+        ...mergeSettings(role, parsed),
         ...(role === "umpire" && isLegacyVersion
           ? {
               enabled: true,

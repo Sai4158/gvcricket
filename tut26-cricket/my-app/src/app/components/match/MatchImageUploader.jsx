@@ -52,6 +52,34 @@ function normalizeSelectedFiles(files) {
   return nextFiles;
 }
 
+function getPlannedGalleryCount({
+  existingImageCount = 0,
+  selectedCount = 0,
+  appendOnUpload = false,
+  targetImageId = "",
+}) {
+  const existingCount = Math.max(0, Number(existingImageCount || 0));
+  const nextSelectedCount = Math.max(0, Number(selectedCount || 0));
+
+  if (!nextSelectedCount) {
+    return existingCount;
+  }
+
+  if (appendOnUpload) {
+    return existingCount + nextSelectedCount;
+  }
+
+  if (targetImageId) {
+    return Math.max(existingCount, 1) + Math.max(0, nextSelectedCount - 1);
+  }
+
+  if (existingCount > 0) {
+    return Math.max(existingCount, nextSelectedCount);
+  }
+
+  return nextSelectedCount;
+}
+
 function SelectedImageTile({
   item,
   isActive,
@@ -170,14 +198,13 @@ export default function MatchImageUploader({
   onUploaded,
   onSkip,
   title = "Add Match Image",
-  description = "JPG, PNG, or WebP.",
   primaryLabel = "Upload Image",
   secondaryLabel = "Skip for Now",
 }) {
   const [selectedItems, setSelectedItems] = useState([]);
   const [activeItemId, setActiveItemId] = useState("");
   const [pin, setPin] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
+  const [submitMode, setSubmitMode] = useState("");
   const [error, setError] = useState("");
   const [isGalleryPromptOpen, setIsGalleryPromptOpen] = useState(false);
   const [showPinPrompt, setShowPinPrompt] = useState(false);
@@ -194,6 +221,15 @@ export default function MatchImageUploader({
     selectedItems.find((item) => item.id === activeItemId) || selectedItems[0] || null;
   const currentPreview = activeItem?.url || existingImageUrl || "";
   const totalGalleryCount = existingImageCount + selectedItems.length;
+  const plannedGalleryCount = getPlannedGalleryCount({
+    existingImageCount,
+    selectedCount: selectedItems.length,
+    appendOnUpload,
+    targetImageId,
+  });
+  const uploadNeedsPin = plannedGalleryCount > 1;
+  const canRemoveCurrentImage = Boolean(existingImageUrl);
+  const isSubmitting = submitMode === "upload" || submitMode === "remove";
 
   useEffect(() => {
     if (!selectedItems.length) {
@@ -210,6 +246,13 @@ export default function MatchImageUploader({
   useEffect(() => {
     selectedItemsRef.current = selectedItems;
   }, [selectedItems]);
+
+  useEffect(() => {
+    if (!uploadNeedsPin) {
+      setShowPinPrompt(false);
+      setPin("");
+    }
+  }, [uploadNeedsPin]);
 
   useEffect(() => {
     return () => {
@@ -255,6 +298,7 @@ export default function MatchImageUploader({
     setPin("");
     setError("");
     setShowPinPrompt(false);
+    setSubmitMode("");
     if (inputRef.current) {
       inputRef.current.value = "";
     }
@@ -319,21 +363,31 @@ export default function MatchImageUploader({
   };
 
   const handleUpload = async () => {
-    if (!selectedFiles.length || isUploading) {
+    if (!selectedFiles.length || isSubmitting) {
       return;
     }
 
-    setIsUploading(true);
+    if (uploadNeedsPin && pin.length !== 4) {
+      setSubmitMode("upload");
+      setShowPinPrompt(true);
+      setError("");
+      return;
+    }
+
+    setSubmitMode("upload");
     setError("");
 
     try {
       let latestPayload = null;
       const submittedPin = String(pin || "").trim();
+      const compressedFiles = await Promise.all(
+        selectedFiles.map((selectedFile) => compressMatchImage(selectedFile))
+      );
 
-      for (const [index, selectedFile] of selectedFiles.entries()) {
-        const compressedFile = await compressMatchImage(selectedFile);
+      for (const [index, compressedFile] of compressedFiles.entries()) {
         const formData = new FormData();
         formData.append("image", compressedFile);
+        formData.append("plannedTotalCount", String(plannedGalleryCount));
 
         if (submittedPin) {
           formData.append("pin", submittedPin);
@@ -357,9 +411,7 @@ export default function MatchImageUploader({
         if (!response.ok) {
           if (response.status === 401) {
             setShowPinPrompt(true);
-            if (!submittedPin) {
-              throw new Error("Enter the 4-digit umpire PIN to upload images.");
-            }
+            throw new Error("Enter the 4-digit umpire PIN to upload images.");
           }
           throw new Error(payload.message || "Image upload failed.");
         }
@@ -372,7 +424,45 @@ export default function MatchImageUploader({
     } catch (caughtError) {
       setError(caughtError.message || "Image upload failed.");
     } finally {
-      setIsUploading(false);
+      setSubmitMode("");
+    }
+  };
+
+  const handleRemoveCurrentImage = async () => {
+    if (!canRemoveCurrentImage || isSubmitting) {
+      return;
+    }
+
+    if (pin.length !== 4) {
+      setSubmitMode("remove");
+      setShowPinPrompt(true);
+      setError("");
+      return;
+    }
+
+    setSubmitMode("remove");
+    setError("");
+
+    try {
+      const response = await fetch(`/api/matches/${matchId}/image`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pin: String(pin || "").trim(),
+          imageId: String(targetImageId || "").trim(),
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.message || "Could not remove the current image.");
+      }
+
+      resetSelectedFiles();
+      onUploaded?.(payload);
+    } catch (caughtError) {
+      setError(caughtError.message || "Could not remove the current image.");
+    } finally {
+      setSubmitMode("");
     }
   };
 
@@ -386,7 +476,10 @@ export default function MatchImageUploader({
             </div>
             <div>
               <h3 className="text-lg font-semibold text-white">{title}</h3>
-              <p className="mt-1 text-sm text-zinc-400">{description}</p>
+              <p className="mt-1 text-sm text-zinc-400">
+                One image uploads without a PIN. Please use the umpire PIN once
+                if you upload more than one image or remove the current image.
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
@@ -432,7 +525,8 @@ export default function MatchImageUploader({
               </div>
               <h4 className="mt-4 text-lg font-semibold text-white">Add match images</h4>
               <p className="mt-2 max-w-xs text-sm leading-6 text-zinc-400">
-                Pick all images first. PIN only appears if upload needs it.
+                Pick images first. One image uploads directly. More than one
+                asks for the umpire PIN before upload starts.
               </p>
             </div>
           )}
@@ -485,12 +579,23 @@ export default function MatchImageUploader({
                 <FaPlus className="text-xs" />
                 Add more
               </button>
+            ) : canRemoveCurrentImage ? (
+              <button
+                type="button"
+                onClick={handleRemoveCurrentImage}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-300/18 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/14"
+              >
+                <FaTimes className="text-xs" />
+                Remove current
+              </button>
             ) : null}
             <div className="min-w-0 flex-1 text-sm text-zinc-400">
               <p className="truncate">
                 {selectedItems.length
                   ? `${selectedItems.length} image${selectedItems.length === 1 ? "" : "s"} selected`
-                  : "JPG, PNG, WebP"}
+                  : canRemoveCurrentImage
+                  ? "Choose a replacement or remove the current image"
+                  : "Choose your match images"}
               </p>
             </div>
           </div>
@@ -516,7 +621,9 @@ export default function MatchImageUploader({
                   Umpire PIN
                 </p>
                 <p className="mt-1 text-sm text-zinc-300">
-                  Enter the same 4-digit umpire mode PIN once for this upload.
+                  {submitMode === "remove"
+                    ? "Please enter the same 4-digit umpire PIN to remove the current image."
+                    : "Please enter the same 4-digit umpire PIN once. Then the upload continues in the background."}
                 </p>
               </div>
             </div>
@@ -539,7 +646,7 @@ export default function MatchImageUploader({
                 className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-base font-semibold tracking-[0.32em] text-white outline-none transition placeholder:tracking-[0.32em] placeholder:text-zinc-500 focus:border-amber-400/28 focus:bg-white/[0.08] sm:max-w-[220px]"
               />
               <p className="text-xs leading-5 text-zinc-400">
-                Same PIN as umpire mode. One PIN covers all selected images.
+                Same PIN as umpire mode.
               </p>
             </div>
           </div>
@@ -553,14 +660,19 @@ export default function MatchImageUploader({
 
         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
           <LoadingButton
-            onClick={handleUpload}
-            disabled={!selectedItems.length || (showPinPrompt && pin.length !== 4)}
-            loading={isUploading}
-            pendingLabel="Uploading..."
+            onClick={showPinPrompt && submitMode === "remove" ? handleRemoveCurrentImage : handleUpload}
+            disabled={
+              ((!selectedItems.length && !(showPinPrompt && submitMode === "remove")) ||
+                (showPinPrompt && pin.length !== 4))
+            }
+            loading={isSubmitting}
+            pendingLabel={submitMode === "remove" ? "Removing..." : "Uploading..."}
             className="inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#10b981_0%,#059669_100%)] px-5 py-3.5 font-semibold text-black shadow-[0_16px_36px_rgba(16,185,129,0.22)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1"
           >
-            {showPinPrompt
-              ? "Confirm Upload"
+            {showPinPrompt && submitMode === "remove"
+              ? "Confirm & Remove"
+              : showPinPrompt
+              ? "Confirm & Upload"
               : selectedItems.length > 1
               ? `${primaryLabel} (${selectedItems.length})`
               : primaryLabel}

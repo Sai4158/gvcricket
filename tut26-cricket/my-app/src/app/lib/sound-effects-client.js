@@ -1,8 +1,11 @@
 "use client";
 
+import { preloadCachedAudioAssets } from "./page-audio";
+
 const SOUND_EFFECT_LIBRARY_CACHE_KEY = "gv-director-audio-library-v1";
 const SOUND_EFFECT_ORDER_STORAGE_KEY = "gv-director-audio-order:global";
 const SOUND_EFFECT_LIBRARY_CACHE_TTL_MS = 10 * 60 * 1000;
+const DEFAULT_SOUND_EFFECT_PRELOAD_LIMIT = 12;
 
 let soundEffectsLibraryMemoryCache = null;
 let soundEffectsLibraryPromise = null;
@@ -192,6 +195,49 @@ export async function fetchCachedSoundEffectsLibrary({ force = false } = {}) {
   });
 
   return soundEffectsLibraryPromise;
+}
+
+export async function warmCachedSoundEffectAssets(
+  files,
+  { preferredIds = [], limit = DEFAULT_SOUND_EFFECT_PRELOAD_LIMIT } = {},
+) {
+  if (!Array.isArray(files) || !files.length) {
+    return;
+  }
+
+  const preferredSet = new Set(
+    Array.isArray(preferredIds)
+      ? preferredIds
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+      : [],
+  );
+
+  const preferredFiles = [];
+  const remainingFiles = [];
+
+  for (const file of files) {
+    if (!file?.src) {
+      continue;
+    }
+
+    if (preferredSet.has(String(file.id || "").trim())) {
+      preferredFiles.push(file);
+    } else {
+      remainingFiles.push(file);
+    }
+  }
+
+  const prioritizedSources = [...preferredFiles, ...remainingFiles]
+    .slice(0, Math.max(1, Number(limit) || DEFAULT_SOUND_EFFECT_PRELOAD_LIMIT))
+    .map((file) => file?.src)
+    .filter(Boolean);
+
+  if (!prioritizedSources.length) {
+    return;
+  }
+
+  await preloadCachedAudioAssets(prioritizedSources);
 }
 
 export function clearCachedSoundEffectsLibrary() {

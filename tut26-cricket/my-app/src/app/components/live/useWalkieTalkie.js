@@ -579,12 +579,18 @@ export default function useWalkieTalkie({
       requestState !== "pending" &&
       !snapshot.enabled
   );
+  const connectedSpectatorCount = Number(snapshot.spectatorCount || 0);
+  const connectedDirectorCount = Number(snapshot.directorCount || 0);
+  const hasRemoteAudience = Boolean(
+    connectedSpectatorCount + connectedDirectorCount > 0
+  );
   const canTalk = Boolean(
     enabled &&
       snapshot.enabled &&
       participantId &&
       hasWalkieToken &&
       !claiming &&
+      (role !== "umpire" || hasRemoteAudience) &&
       (!snapshot.busy || snapshot.activeSpeakerId === participantId)
   );
   const isBusy = Boolean(snapshot.busy);
@@ -2081,6 +2087,17 @@ export default function useWalkieTalkie({
         return false;
       }
       if (
+        role === "umpire" &&
+        Number(snapshotRef.current.spectatorCount || 0) +
+          Number(snapshotRef.current.directorCount || 0) <=
+          0
+      ) {
+        cancelPendingStartRef.current = false;
+        setError("A spectator or director needs to join first.");
+        updateNotice("Waiting for spectators to join.");
+        return false;
+      }
+      if (
         activeSpeakerRef.current?.owner &&
         activeSpeakerRef.current.owner !== signalingUserIdRef.current &&
         new Date(activeSpeakerRef.current.expiresAt || 0).getTime() > Date.now()
@@ -2178,7 +2195,7 @@ export default function useWalkieTalkie({
           updateNotice("");
           setClaiming(false);
           walkieConsole("info", "Walkie speaker started", {
-            channelName,
+            channelName: signalingChannelRef.current,
             participantId: participant.participantId,
             role: participant.role,
             transmissionId,

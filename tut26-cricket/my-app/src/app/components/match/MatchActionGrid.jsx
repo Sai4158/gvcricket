@@ -151,10 +151,10 @@ function ActionIconButton({
     setHoldPreviewActive(true);
     onPressFeedback?.();
     feedbackTriggeredRef.current = true;
-    void onPressStart?.();
     clearHoldTimer();
     holdTimerRef.current = window.setTimeout(() => {
       holdStartedRef.current = true;
+      void onPressStart?.();
       void onHoldStart();
     }, 140);
   };
@@ -501,7 +501,10 @@ export default function MatchActionGrid({
               exit={{ opacity: 0, y: 12, scale: 0.98 }}
               transition={{ duration: 0.18 }}
               onClick={(event) => event.stopPropagation()}
-              className="w-full max-w-[34rem] overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,24,0.98),rgba(8,8,12,0.99))] shadow-[0_28px_90px_rgba(0,0,0,0.5)]"
+              className="flex max-h-[88vh] w-full max-w-[34rem] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,24,0.98),rgba(8,8,12,0.99))] shadow-[0_28px_90px_rgba(0,0,0,0.5)]"
+              style={{
+                touchAction: "auto",
+              }}
             >
               <motion.div
                 drag="y"
@@ -515,6 +518,9 @@ export default function MatchActionGrid({
                   }
                 }}
                 className="flex cursor-grab justify-center pt-2 active:cursor-grabbing sm:hidden"
+                style={{
+                  touchAction: "none",
+                }}
               >
                 <span className="h-1.5 w-12 rounded-full bg-white/15" />
               </motion.div>
@@ -537,7 +543,14 @@ export default function MatchActionGrid({
                 </button>
               </div>
 
-              <div className="max-h-[70vh] space-y-3 overflow-y-auto px-4 py-4 sm:px-5">
+              <div
+                className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 sm:px-5"
+                style={{
+                  touchAction: "pan-y",
+                  WebkitOverflowScrolling: "touch",
+                  overscrollBehavior: "contain",
+                }}
+              >
                 <ActionHelpItem
                   icon={<WalkieIcon />}
                   title="Walkie-Talkie"
@@ -553,7 +566,7 @@ export default function MatchActionGrid({
                   title="Announcer / Effects"
                   description={[
                     "Open score voice settings.",
-                    "Pick sound effects for 3, 4, 6 and out.",
+                    "Pick sound effects for out, 2, 3, 4 and 6.",
                     "Test the announcer and effect flow.",
                   ]}
                   colorClass="text-cyan-300"

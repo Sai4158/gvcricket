@@ -55,6 +55,29 @@ function getSafeUploadName(file) {
   return `match-${crypto.randomBytes(8).toString("hex")}.${safeExtension}`;
 }
 
+function getProjectedGalleryCount({
+  currentCount = 0,
+  targetImageId = "",
+  shouldAppend = false,
+  plannedTotalCount = 0,
+}) {
+  const existingCount = Math.max(0, Number(currentCount || 0));
+  const declaredTotal = Math.max(0, Number(plannedTotalCount || 0));
+
+  let projectedCount = existingCount;
+  if (shouldAppend) {
+    projectedCount = existingCount + 1;
+  } else if (targetImageId) {
+    projectedCount = Math.max(existingCount, 1);
+  } else if (existingCount > 0) {
+    projectedCount = existingCount;
+  } else {
+    projectedCount = 1;
+  }
+
+  return Math.max(projectedCount, declaredTotal);
+}
+
 export async function POST(req, { params }) {
   const { id } = await params;
   const meta = getRequestMeta(req);
@@ -96,6 +119,22 @@ export async function POST(req, { params }) {
       return jsonError("Match not found.", 404);
     }
 
+    const targetImageId = String(parsedRequest.value.get("imageId") || "").trim();
+    const shouldAppend =
+      String(parsedRequest.value.get("append") || "")
+        .trim()
+        .toLowerCase() === "1";
+    const plannedTotalCount = Number(
+      String(parsedRequest.value.get("plannedTotalCount") || "").trim() || 0
+    );
+    const existingImages = getStoredMatchImages(match, { matchId: id });
+    const projectedGalleryCount = getProjectedGalleryCount({
+      currentCount: existingImages.length,
+      targetImageId,
+      shouldAppend,
+      plannedTotalCount,
+    });
+
     const cookieStore = await cookies();
     const accessToken = cookieStore.get(getMatchAccessCookieName(id))?.value;
     const hasCookieAccess = hasValidMatchAccess(
@@ -105,8 +144,9 @@ export async function POST(req, { params }) {
     );
     const pinValue = String(parsedRequest.value.get("pin") || "").trim();
     const hasPinAccess = Boolean(pinValue) && isValidUmpirePin(pinValue);
+    const requiresPinForUpload = projectedGalleryCount > 1;
 
-    if (!hasCookieAccess && !hasPinAccess) {
+    if ((!hasCookieAccess && !hasPinAccess) || (requiresPinForUpload && !hasPinAccess)) {
       await writeAuditLog({
         action: "match_media_upload_denied",
         targetType: "match",
@@ -115,8 +155,12 @@ export async function POST(req, { params }) {
         ip: meta.ip,
         userAgent: meta.userAgent,
       });
-
-      return jsonError("Umpire PIN required for image upload.", 401);
+      return jsonError(
+        requiresPinForUpload
+          ? "Umpire PIN required when uploading more than one match image."
+          : "Umpire PIN required for image upload.",
+        401
+      );
     }
 
     const file = parsedRequest.value.get("image");
@@ -204,11 +248,6 @@ export async function POST(req, { params }) {
       throw new Error("Remote image URL was rejected.");
     }
 
-    const targetImageId = String(parsedRequest.value.get("imageId") || "").trim();
-    const shouldAppend =
-      String(parsedRequest.value.get("append") || "")
-        .trim()
-        .toLowerCase() === "1";
     const nextEntry = createStoredMatchImageEntry({
       matchId: id,
       sourceUrl: imageMetadata.matchImageUrl,
@@ -217,8 +256,7 @@ export async function POST(req, { params }) {
       uploadedBy: "admin",
       id: targetImageId || "",
     });
-
-    let nextImages = getStoredMatchImages(match, { matchId: id });
+    let nextImages = existingImages;
     if (targetImageId) {
       const hasExistingTarget = nextImages.some((entry) => entry.id === targetImageId);
       nextImages = hasExistingTarget

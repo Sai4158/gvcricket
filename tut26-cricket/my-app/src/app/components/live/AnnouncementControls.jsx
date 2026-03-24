@@ -23,9 +23,10 @@ const MODES = [
 ];
 const SCORE_EFFECT_EVENTS = [
   { key: "out", label: "Out", accent: "rose" },
+  { key: "two", label: "2 Runs", accent: "emerald" },
+  { key: "three", label: "3 Runs", accent: "violet" },
   { key: "four", label: "4 Runs", accent: "sky" },
   { key: "six", label: "6 Runs", accent: "amber" },
-  { key: "three", label: "3 Runs", accent: "violet" },
 ];
 
 function ScrollingSoundLabel({ text = "", active = false }) {
@@ -76,6 +77,12 @@ function getAccentClasses(accent) {
       button: "border-violet-300/18 bg-transparent text-violet-100 hover:bg-violet-400/10",
     };
   }
+  if (accent === "emerald") {
+    return {
+      badge: "border-emerald-400/20 bg-emerald-400/10 text-emerald-200",
+      button: "border-emerald-300/18 bg-transparent text-emerald-100 hover:bg-emerald-400/10",
+    };
+  }
   return {
     badge: "border-amber-400/20 bg-amber-400/10 text-amber-200",
     button: "border-amber-300/18 bg-transparent text-amber-100 hover:bg-amber-400/10",
@@ -117,7 +124,7 @@ function SoundAssignmentRow({
           <div className="min-w-0 flex-1">
             <ScrollingSoundLabel
               text={selectedLabel || ""}
-              active={hasAssignedSound}
+              active={isPreviewing}
             />
           </div>
           <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-white/88">
@@ -292,6 +299,7 @@ export default function AnnouncementControls({
   onPreviewSoundEffect,
   onTestSequence,
   previewingSoundEffectId = "",
+  previewingSoundEffectStatus = "idle",
   announceIsActive = false,
   testSequenceIsActive = false,
 }) {
@@ -360,9 +368,27 @@ export default function AnnouncementControls({
 
   if (showModernCompactPanel) {
     return (
-      <section className="relative mx-auto max-w-[32rem] overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.1),transparent_24%),linear-gradient(180deg,rgba(16,16,20,0.98),rgba(7,7,11,0.99))] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.48)] backdrop-blur-md sm:p-5">
-        <div className="pr-1 sm:pr-2" style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}>
-        <div className="relative">
+      <section className="relative mx-auto flex max-h-[78vh] max-w-[32rem] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.1),transparent_24%),linear-gradient(180deg,rgba(16,16,20,0.98),rgba(7,7,11,0.99))] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.48)] backdrop-blur-md sm:max-h-[82vh] sm:p-5">
+        <button
+          type="button"
+          onClick={() => {
+            setEditingEventKey("");
+            onClose?.();
+          }}
+          className="absolute right-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-[rgba(20,20,24,0.92)] text-zinc-400 transition hover:bg-white/[0.08] hover:text-white sm:right-5 sm:top-5"
+          aria-label="Close live commentary"
+        >
+          <FaTimes />
+        </button>
+        <div
+          className="min-h-0 flex-1 overflow-y-auto pr-1 sm:pr-2"
+          style={{
+            touchAction: "pan-y",
+            WebkitOverflowScrolling: "touch",
+            overscrollBehavior: "contain",
+          }}
+        >
+        <div className="pr-12">
           <div className="flex items-start gap-3">
             <div
               className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-lg ${
@@ -379,20 +405,9 @@ export default function AnnouncementControls({
               </h3>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setEditingEventKey("");
-              onClose?.();
-            }}
-            className="absolute right-0 top-0 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-400 transition hover:bg-white/[0.08] hover:text-white"
-            aria-label="Close live commentary"
-          >
-            <FaTimes />
-          </button>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3">
           <div className="rounded-[22px] border border-white/8 bg-white/[0.04] p-3.5">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -416,65 +431,59 @@ export default function AnnouncementControls({
               />
             </div>
           </div>
-
-          <div className="rounded-[22px] border border-white/8 bg-white/[0.04] p-3.5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
-                  Effects
-                </p>
-                <p className="mt-1 text-sm font-semibold text-white">
-                  {settings.playScoreSoundEffects !== false ? "On" : "Off"}
-                </p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  Sound effects after runs and outs.
-                </p>
-              </div>
-              <IosSwitch
-                checked={settings.playScoreSoundEffects !== false}
-                label={
-                  settings.playScoreSoundEffects !== false
-                    ? "Turn score sound effects off"
-                    : "Turn score sound effects on"
-                }
-                onChange={(checked) => updateSetting("playScoreSoundEffects", checked)}
-              />
-            </div>
-          </div>
         </div>
 
-        {showScoreEffectAssignments ? (
+        {showScoreSoundEffectsToggle || showScoreEffectAssignments ? (
           <div className="relative mt-4 rounded-[24px] border border-white/8 bg-white/[0.03] p-3 sm:p-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                  Event Sounds
+                  Score Sounds
+                </p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Choose what sound to play on score.
                 </p>
               </div>
-              <span className="rounded-full border border-white/8 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-300">
-                {activeSoundAssignments.filter((item) => item.selectedId).length}/4 set
-              </span>
-            </div>
-
-            <div className="space-y-2.5">
-              {activeSoundAssignments.map((item) => (
-                <SoundAssignmentRow
-                  key={item.key}
-                  event={item}
-                  selectedId={item.selectedId}
-                  selectedLabel={item.selectedLabel}
-                  isPreviewing={Boolean(item.selectedId && previewingSoundEffectId === item.selectedId)}
-                  onTogglePreview={() => {
-                    if (!item.selectedEffect) {
-                      return;
+              <div className="shrink-0 pt-0.5">
+                {showScoreSoundEffectsToggle ? (
+                  <IosSwitch
+                    checked={settings.playScoreSoundEffects !== false}
+                    label={
+                      settings.playScoreSoundEffects !== false
+                        ? "Turn score sound effects off"
+                        : "Turn score sound effects on"
                     }
-                    void onPreviewSoundEffect?.(item.selectedEffect);
-                  }}
-                  onEdit={() => setEditingEventKey(item.key)}
-                />
-              ))}
+                    onChange={(checked) => updateSetting("playScoreSoundEffects", checked)}
+                  />
+                ) : null}
+              </div>
             </div>
 
+            {showScoreEffectAssignments ? (
+              <div className="mt-3 space-y-2.5">
+                {activeSoundAssignments.map((item) => (
+                  <SoundAssignmentRow
+                    key={item.key}
+                    event={item}
+                    selectedId={item.selectedId}
+                    selectedLabel={item.selectedLabel}
+                    isPreviewing={Boolean(
+                      item.selectedEffect?.id &&
+                        previewingSoundEffectId === item.selectedEffect.id &&
+                        (previewingSoundEffectStatus === "loading" ||
+                          previewingSoundEffectStatus === "playing")
+                    )}
+                    onTogglePreview={() => {
+                      if (!item.selectedEffect) {
+                        return;
+                      }
+                      void onPreviewSoundEffect?.(item.selectedEffect);
+                    }}
+                    onEdit={() => setEditingEventKey(item.key)}
+                  />
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -507,7 +516,7 @@ export default function AnnouncementControls({
           <button
             type="button"
             onClick={() => {
-              void onTestSequence?.(editingEventKey || "six");
+              void onTestSequence?.(editingEventKey || SCORE_EFFECT_EVENTS[0].key);
             }}
             disabled={!onTestSequence}
             className={`inline-flex items-center gap-3 rounded-[22px] border px-4 py-3.5 text-left text-sm font-semibold transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-45 ${
@@ -522,6 +531,7 @@ export default function AnnouncementControls({
             <span>{testSequenceIsActive ? "Pause Test" : "Test Sequence"}</span>
           </button>
         </div>
+        <div className="h-2 shrink-0" />
         </div>
         <SoundPickerSheet
           isOpen={Boolean(editingEvent)}
