@@ -164,6 +164,7 @@ export default function MatchPageClient({
       ? initialMatch.lastLiveEvent.id || ""
       : "",
   );
+  const soundEffectPlaybackCutoffRef = useRef(Date.now());
   const localSoundEffectRequestIdRef = useRef("");
   const skipNextBoundaryLeadRef = useRef(false);
   const activeBoundarySequenceRef = useRef(false);
@@ -1108,8 +1109,7 @@ export default function MatchPageClient({
     activeCommentaryAction === "read-score" &&
     (status === "speaking" || isAnySoundEffectActive);
   const isTestSequenceActionActive =
-    (activeCommentaryAction === "test-sequence" ||
-      activeCommentaryAction === "event-preview") &&
+    activeCommentaryAction === "test-sequence" &&
     (status === "speaking" || isAnySoundEffectActive);
 
   const handleReorderSoundEffects = useCallback((activeId, targetId) => {
@@ -1149,6 +1149,13 @@ export default function MatchPageClient({
     }
 
     lastHandledSoundEffectEventRef.current = liveEvent.id;
+    const createdAtMs = Date.parse(String(liveEvent.createdAt || ""));
+    if (
+      Number.isFinite(createdAtMs) &&
+      createdAtMs < soundEffectPlaybackCutoffRef.current
+    ) {
+      return;
+    }
     if (
       liveEvent.clientRequestId &&
       liveEvent.clientRequestId === localSoundEffectRequestIdRef.current

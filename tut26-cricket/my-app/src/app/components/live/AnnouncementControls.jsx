@@ -32,28 +32,24 @@ function getAccentClasses(accent) {
   if (accent === "rose") {
     return {
       badge: "border-rose-400/20 bg-rose-400/10 text-rose-200",
-      button: "border-rose-300/18 bg-rose-400/10 text-rose-100 hover:bg-rose-400/16",
-      glow: "from-rose-400/18 via-transparent to-transparent",
+      button: "border-rose-300/18 bg-transparent text-rose-100 hover:bg-rose-400/10",
     };
   }
   if (accent === "sky") {
     return {
       badge: "border-sky-400/20 bg-sky-400/10 text-sky-200",
-      button: "border-sky-300/18 bg-sky-400/10 text-sky-100 hover:bg-sky-400/16",
-      glow: "from-sky-400/18 via-transparent to-transparent",
+      button: "border-sky-300/18 bg-transparent text-sky-100 hover:bg-sky-400/10",
     };
   }
   if (accent === "violet") {
     return {
       badge: "border-violet-400/20 bg-violet-400/10 text-violet-200",
-      button: "border-violet-300/18 bg-violet-400/10 text-violet-100 hover:bg-violet-400/16",
-      glow: "from-violet-400/18 via-transparent to-transparent",
+      button: "border-violet-300/18 bg-transparent text-violet-100 hover:bg-violet-400/10",
     };
   }
   return {
     badge: "border-amber-400/20 bg-amber-400/10 text-amber-200",
-    button: "border-amber-300/18 bg-amber-400/10 text-amber-100 hover:bg-amber-400/16",
-    glow: "from-amber-400/18 via-transparent to-transparent",
+    button: "border-amber-300/18 bg-transparent text-amber-100 hover:bg-amber-400/10",
   };
 }
 
@@ -69,14 +65,13 @@ function SoundAssignmentRow({
   const hasAssignedSound = Boolean(selectedId);
 
   return (
-    <div className="relative overflow-hidden rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-3">
-      <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accent.glow}`} />
+    <div className="rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-2.5">
       <div className="relative flex items-center gap-2.5">
         <button
           type="button"
           onClick={onTogglePreview}
           disabled={!hasAssignedSound}
-          className={`flex min-w-0 flex-1 items-center gap-3 rounded-[18px] border px-3 py-2.5 text-left transition ${
+          className={`flex min-w-0 flex-1 items-center gap-3 rounded-[18px] border px-3 py-2.5 text-left transition active:scale-[0.985] ${
             hasAssignedSound
               ? `border-white/10 bg-white/[0.04] hover:bg-white/[0.06] ${isPreviewing ? "ring-2 ring-emerald-400/30" : ""}`
               : "cursor-not-allowed border-white/8 bg-white/[0.03] opacity-80"
@@ -97,9 +92,9 @@ function SoundAssignmentRow({
             <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-zinc-500">
               {hasAssignedSound
                 ? isPreviewing
-                  ? "Tap to pause"
-                  : "Tap to play"
-                : "Tap edit to choose"}
+                  ? "Playing"
+                  : "Assigned"
+                : "Silent"}
             </p>
           </div>
           <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-white">
@@ -109,7 +104,7 @@ function SoundAssignmentRow({
         <button
           type="button"
           onClick={onEdit}
-          className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition ${accent.button}`}
+          className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition active:scale-[0.97] ${accent.button}`}
           aria-label={`Edit ${event.label} sound`}
         >
           <FaEdit className="text-[11px]" />
@@ -140,37 +135,29 @@ function SoundPickerSheet({
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-300/78">
-                Select Sound
-              </p>
-              <h4 className="mt-1 text-lg font-black text-white">{eventLabel}</h4>
+              <h4 className="text-lg font-black text-white">{eventLabel}</h4>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-300 transition active:scale-[0.97] hover:bg-white/[0.08] hover:text-white"
               aria-label="Close sound picker"
             >
               <FaTimes />
             </button>
           </div>
 
-          <div className="mt-4 max-h-[340px] space-y-2 overflow-y-auto pr-1">
+          <div className="mt-4 max-h-[62vh] space-y-2 overflow-y-auto pr-1">
             <button
               type="button"
               onClick={() => onSelect("")}
-              className={`flex w-full items-center justify-between rounded-[20px] border px-4 py-3 text-left transition ${
+              className={`flex w-full items-center justify-between rounded-[20px] border px-4 py-3 text-left transition active:scale-[0.985] ${
                 !selectedId
                   ? "border-emerald-300/28 bg-emerald-400/12 text-white"
                   : "border-white/8 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.05]"
               }`}
             >
-              <div>
-                <p className="text-sm font-semibold">None</p>
-                <p className="mt-1 text-xs uppercase tracking-[0.18em] text-zinc-500">
-                  No effect after the call
-                </p>
-              </div>
+              <p className="text-sm font-semibold">None</p>
               {!selectedId ? <FaCheck className="text-emerald-300" /> : null}
             </button>
 
@@ -190,7 +177,7 @@ function SoundPickerSheet({
                   <button
                     type="button"
                     onClick={() => onPreview(option)}
-                    className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-white transition hover:bg-white/[0.08] ${
+                    className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-white transition active:scale-[0.97] hover:bg-white/[0.08] ${
                       isPreviewing ? "ring-2 ring-emerald-400/35" : ""
                     }`}
                     aria-label={`${isPreviewing ? "Pause" : "Preview"} ${option.label}`}
@@ -200,7 +187,7 @@ function SoundPickerSheet({
                   <button
                     type="button"
                     onClick={() => onSelect(option.id)}
-                    className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left"
+                    className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left active:scale-[0.995]"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-white">
@@ -240,7 +227,7 @@ function IosSwitch({ checked, onChange, disabled = false, label }) {
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange?.(!checked)}
-      className={`relative inline-flex h-8 w-[54px] items-center rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
+      className={`relative inline-flex h-8 w-[54px] items-center rounded-full border transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
         checked
           ? "border-emerald-300/35 bg-emerald-500 shadow-[0_10px_24px_rgba(16,185,129,0.22)]"
           : "border-white/10 bg-white/[0.08]"
@@ -345,7 +332,8 @@ export default function AnnouncementControls({
 
   if (showModernCompactPanel) {
     return (
-      <section className="mx-auto max-w-[32rem] overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.1),transparent_24%),linear-gradient(180deg,rgba(16,16,20,0.98),rgba(7,7,11,0.99))] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.48)] backdrop-blur-md sm:p-5">
+      <section className="relative mx-auto max-h-[88vh] max-w-[32rem] overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.1),transparent_24%),linear-gradient(180deg,rgba(16,16,20,0.98),rgba(7,7,11,0.99))] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.48)] backdrop-blur-md sm:p-5">
+        <div className="max-h-[calc(88vh-2rem)] overflow-y-auto pr-1 sm:pr-2">
         <div className="relative">
           <div className="flex items-start gap-3">
             <div
@@ -358,15 +346,9 @@ export default function AnnouncementControls({
               <FaCompactDisc />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-300/82">
-                Umpire
-              </p>
-              <h3 className="mt-1 text-[1.65rem] font-black tracking-[-0.03em] text-white">
+              <h3 className="text-[1.65rem] font-black tracking-[-0.03em] text-white">
                 {title}
               </h3>
-              <p className="mt-1 text-sm text-zinc-400">
-                Simple score calls and effect picks.
-              </p>
             </div>
           </div>
           <button
@@ -440,9 +422,6 @@ export default function AnnouncementControls({
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
                   Event Sounds
                 </p>
-                <p className="mt-1 text-sm text-zinc-400">
-                  Tap a row to play or pause. Tap edit to change.
-                </p>
               </div>
               <span className="rounded-full border border-white/8 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-300">
                 {activeSoundAssignments.filter((item) => item.selectedId).length}/4 set
@@ -470,24 +449,6 @@ export default function AnnouncementControls({
               ))}
             </div>
 
-            <SoundPickerSheet
-              isOpen={Boolean(editingEvent)}
-              eventLabel={editingEvent?.label || "Sound"}
-              options={soundEffectOptions}
-              selectedId={String(scoreEffectMap?.[editingEvent?.key] || "")}
-              previewingId={previewingSoundEffectId}
-              onClose={() => setEditingEventKey("")}
-              onPreview={(option) => {
-                void onPreviewSoundEffect?.(option);
-              }}
-              onSelect={(nextId) => {
-                updateSetting("scoreSoundEffectMap", {
-                  ...scoreEffectMap,
-                  [editingEvent?.key || ""]: nextId,
-                });
-                setEditingEventKey("");
-              }}
-            />
           </div>
         ) : null}
 
@@ -503,7 +464,7 @@ export default function AnnouncementControls({
               type="button"
               onClick={onAnnounceNow}
               disabled={announceDisabled}
-              className={`inline-flex flex-col items-start justify-center gap-1 rounded-[22px] px-4 py-3.5 text-left text-sm font-semibold transition ${
+              className={`inline-flex flex-col items-start justify-center gap-1 rounded-[22px] px-4 py-3.5 text-left text-sm font-semibold transition active:scale-[0.985] ${
                 announceDisabled
                   ? "cursor-not-allowed bg-zinc-900 text-zinc-500"
                   : announceIsActive
@@ -515,9 +476,6 @@ export default function AnnouncementControls({
                 {announceIsActive ? <FaPause /> : <FaVolumeUp />}
                 {announceIsActive ? "Pause Score" : announceLabel}
               </span>
-              <span className="text-xs font-medium text-zinc-400">
-                Say the current score now.
-              </span>
             </button>
           ) : null}
           <button
@@ -526,7 +484,7 @@ export default function AnnouncementControls({
               void onTestSequence?.(editingEventKey || "six");
             }}
             disabled={!onTestSequence}
-            className={`inline-flex flex-col items-start justify-center gap-1 rounded-[22px] border px-4 py-3.5 text-left text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+            className={`inline-flex flex-col items-start justify-center gap-1 rounded-[22px] border px-4 py-3.5 text-left text-sm font-semibold transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-45 ${
               testSequenceIsActive
                 ? "border-emerald-300/24 bg-emerald-400/16 text-emerald-100 ring-2 ring-emerald-400/20"
                 : "border-emerald-300/16 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/16"
@@ -536,11 +494,27 @@ export default function AnnouncementControls({
               {testSequenceIsActive ? <FaPause className="text-xs" /> : <FaPlay className="text-xs" />}
               {testSequenceIsActive ? "Pause Test" : "Test Sequence"}
             </span>
-            <span className="text-xs font-medium text-emerald-100/70">
-              Preview call, gap, effect, and score.
-            </span>
           </button>
         </div>
+        </div>
+        <SoundPickerSheet
+          isOpen={Boolean(editingEvent)}
+          eventLabel={editingEvent?.label || "Sound"}
+          options={soundEffectOptions}
+          selectedId={String(scoreEffectMap?.[editingEvent?.key] || "")}
+          previewingId={previewingSoundEffectId}
+          onClose={() => setEditingEventKey("")}
+          onPreview={(option) => {
+            void onPreviewSoundEffect?.(option);
+          }}
+          onSelect={(nextId) => {
+            updateSetting("scoreSoundEffectMap", {
+              ...scoreEffectMap,
+              [editingEvent?.key || ""]: nextId,
+            });
+            setEditingEventKey("");
+          }}
+        />
       </section>
     );
   }

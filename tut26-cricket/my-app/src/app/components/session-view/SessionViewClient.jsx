@@ -253,6 +253,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       ? initialData.match.lastLiveEvent.id || ""
       : "",
   );
+  const soundEffectPlaybackCutoffRef = useRef(Date.now());
   const router = useRouter();
   const sessionData = data?.session;
   const match = data?.match;
@@ -863,6 +864,13 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
 
     lastHandledSoundEffectEventRef.current = liveEvent.id;
+    const createdAtMs = Date.parse(String(liveEvent.createdAt || ""));
+    if (
+      Number.isFinite(createdAtMs) &&
+      createdAtMs < soundEffectPlaybackCutoffRef.current
+    ) {
+      return;
+    }
     if (
       liveEvent.trigger === "score_boundary" &&
       settings.playScoreSoundEffects === false

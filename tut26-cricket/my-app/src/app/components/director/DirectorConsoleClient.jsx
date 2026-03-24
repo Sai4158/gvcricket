@@ -725,6 +725,7 @@ export default function DirectorConsoleClient({
   const ambientAudioSessionTypeRef = useRef("");
   const lastDirectorAnnouncedLiveEventRef = useRef("");
   const lastHandledSharedSoundEffectEventRef = useRef("");
+  const soundEffectPlaybackCutoffRef = useRef(Date.now());
   const directorSessionsRefreshPromiseRef = useRef(null);
   const lastDirectorSessionsRefreshAtRef = useRef(0);
   const pendingDirectorAnnouncementRef = useRef(null);
@@ -1931,7 +1932,12 @@ export default function DirectorConsoleClient({
     );
     const liveEvent = targetMatch?.lastLiveEvent || null;
 
-    if (!authorized || !liveEvent?.id || liveEvent.type !== "sound_effect") {
+    if (
+      !authorized ||
+      !liveEvent?.id ||
+      liveEvent.type !== "sound_effect" ||
+      liveEvent.trigger === "score_boundary"
+    ) {
       return;
     }
 
@@ -1940,6 +1946,13 @@ export default function DirectorConsoleClient({
     }
 
     lastHandledSharedSoundEffectEventRef.current = liveEvent.id;
+    const createdAtMs = Date.parse(String(liveEvent.createdAt || ""));
+    if (
+      Number.isFinite(createdAtMs) &&
+      createdAtMs < soundEffectPlaybackCutoffRef.current
+    ) {
+      return;
+    }
     void playEffectRef.current?.(
       {
         id: liveEvent.effectId || liveEvent.effectFileName || liveEvent.id,
