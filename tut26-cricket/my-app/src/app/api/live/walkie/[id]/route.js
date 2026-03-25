@@ -21,6 +21,7 @@ import {
   heartbeatPersistentWalkieParticipant,
   takePersistentWalkieMessages,
 } from "../../../../lib/walkie-store";
+import { sanitizePlainText } from "../../../../lib/validators";
 import Match from "../../../../../models/Match";
 
 export const runtime = "nodejs";
@@ -52,7 +53,7 @@ export async function GET(request, { params }) {
   const { id } = await params;
   const role = request.nextUrl.searchParams.get("role") || "spectator";
   const participantId = request.nextUrl.searchParams.get("participantId") || "";
-  const name = request.nextUrl.searchParams.get("name") || "";
+  const name = sanitizePlainText(request.nextUrl.searchParams.get("name") || "").slice(0, 48);
   const participantToken = createWalkieParticipantToken(id, participantId, role);
 
   if (!/^[a-zA-Z0-9._:-]{8,80}$/.test(participantId)) {

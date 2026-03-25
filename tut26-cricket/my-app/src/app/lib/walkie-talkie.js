@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { sanitizePlainText } from "./validators";
 
 const SPEAKER_MAX_MS = 30_000;
 const CLEANUP_GRACE_MS = 3_000;
@@ -240,11 +241,12 @@ export function subscribeToWalkieParticipant(matchId, participantId, callback) {
 
 export function registerWalkieParticipant(matchId, participant) {
   const matchState = getMatchState(matchId);
+  const safeName = sanitizePlainText(participant.name || "").slice(0, 48);
   const nextParticipant = {
     id: String(participant.id),
     role: participant.role,
     name:
-      participant.name ||
+      safeName ||
       (participant.role === "umpire"
         ? "Umpire"
         : participant.role === "director"

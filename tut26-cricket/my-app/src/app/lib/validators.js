@@ -3,38 +3,69 @@ import { z } from "zod";
 import { isSafeMatchImageUrl } from "./match-image";
 import { formatZodError } from "./request-security";
 
-function sanitizePlainText(value) {
-  return sanitizeHtml(String(value || ""), {
+const UNSAFE_TEXT_CHAR_REGEX =
+  /[\u0000-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g;
+const REPEATED_CHAR_SPAM_REGEX = /([^\s])\1{7,}/u;
+const REPEATED_PUNCTUATION_SPAM_REGEX = /[!?.,=_-]{6,}/;
+const MEANINGFUL_TEXT_REGEX = /[\p{L}\p{N}]/u;
+
+export function sanitizePlainText(value) {
+  let normalized = String(value ?? "");
+  try {
+    normalized = normalized.normalize("NFKC");
+  } catch {
+    // Ignore normalization failures for malformed unicode input.
+  }
+
+  return sanitizeHtml(normalized, {
     allowedTags: [],
     allowedAttributes: {},
   })
-    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(UNSAFE_TEXT_CHAR_REGEX, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function looksLikeSpamText(value) {
+  return (
+    REPEATED_CHAR_SPAM_REGEX.test(value) ||
+    REPEATED_PUNCTUATION_SPAM_REGEX.test(value)
+  );
+}
+
+function hasMeaningfulText(value) {
+  return MEANINGFUL_TEXT_REGEX.test(value);
 }
 
 function buildStringSchema({ min = 0, max = 120, allowEmpty = false } = {}) {
   const schema = z
     .string()
-    .max(max)
-    .transform((value) => sanitizePlainText(value));
+    .transform((value) => sanitizePlainText(value))
+    .refine((value) => value.length <= max, {
+      message: "Value is too long.",
+    })
+    .refine((value) => !value || !looksLikeSpamText(value), {
+      message: "Value looks like spam.",
+    });
 
   if (allowEmpty) {
-    return schema.refine((value) => value.length <= max, {
-      message: "Value is too long.",
-    });
+    return schema;
   }
 
-  return schema.refine((value) => value.length >= min, {
-    message: "Value is required.",
-  });
+  return schema
+    .refine((value) => value.length >= min, {
+      message: "Value is required.",
+    })
+    .refine((value) => hasMeaningfulText(value), {
+      message: "Value is invalid.",
+    });
 }
 
-const optionalStringSchema = buildStringSchema({ max: 240, allowEmpty: true });
-const requiredNameSchema = buildStringSchema({ min: 1, max: 80 });
-const playerNameSchema = buildStringSchema({ min: 1, max: 48 });
-const playerArraySchema = z.array(playerNameSchema).min(1).max(15);
-const oversSchema = z.number().int().min(1).max(50);
+export const optionalStringSchema = buildStringSchema({ max: 240, allowEmpty: true });
+export const requiredNameSchema = buildStringSchema({ min: 1, max: 80 });
+export const playerNameSchema = buildStringSchema({ min: 1, max: 48 });
+export const playerArraySchema = z.array(playerNameSchema).min(1).max(15);
+export const oversSchema = z.number().int().min(1).max(50);
 const draftTokenSchema = z
   .string()
   .trim()
@@ -85,6 +116,17 @@ export const setupMatchSchema = z
     teamBPlayers: playerArraySchema,
     overs: z.coerce.number().int().min(1).max(50),
     draftToken: draftTokenSchema.optional(),
+  })
+  .strict();
+
+export const createMatchSchema = z
+  .object({
+    sessionId: z.string().regex(/^[a-f0-9]{24}$/i, "sessionId is invalid."),
+    teamAName: requiredNameSchema,
+    teamBName: requiredNameSchema,
+    teamA: playerArraySchema,
+    teamB: playerArraySchema,
+    overs: oversSchema,
   })
   .strict();
 
@@ -339,4 +381,4 @@ export function validateWalkieSignalPayload(body) {
   return validateWithSchema(walkieSignalSchema, body);
 }
 
-export { draftTokenSchema, inningsSchema, oversSchema, pinSchema, secretPinSchema };
+export { draftTokenSchema, inningsSchema, pinSchema, secretPinSchema };

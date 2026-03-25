@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  createMatchSchema,
   matchActionSchema,
   sessionCreateSchema,
 } from "../src/app/lib/validators.js";
@@ -99,6 +100,31 @@ test("validators reject unknown fields and malformed scoring payloads", () => {
   assert.equal(sanitizedSession.success, true);
   assert.equal(sanitizedSession.data.name.includes("<"), false);
   assert.equal(sanitizedSession.data.date.includes("<"), false);
+
+  const normalizedSession = sessionCreateSchema.safeParse({
+    name: "Fal\u200Bcons\u202E XI",
+    date: "  June\u00A01  ",
+  });
+  assert.equal(normalizedSession.success, true);
+  assert.equal(normalizedSession.data.name, "Fal cons XI");
+  assert.equal(normalizedSession.data.date, "June 1");
+
+  const spammySession = sessionCreateSchema.safeParse({
+    name: "!!!!!!!!!!",
+  });
+  assert.equal(spammySession.success, false);
+
+  const sanitizedMatch = createMatchSchema.safeParse({
+    sessionId: "507f1f77bcf86cd799439011",
+    teamAName: "<b>Team A</b>",
+    teamBName: "Team B",
+    teamA: ["Ali\u200Bce", "Bea"],
+    teamB: ["Cara", "Dina"],
+    overs: 6,
+  });
+  assert.equal(sanitizedMatch.success, true);
+  assert.equal(sanitizedMatch.data.teamAName, "Team A");
+  assert.equal(sanitizedMatch.data.teamA[0], "Ali ce");
 
   const invalidAction = matchActionSchema.safeParse({
     actionId: "score:test-action",

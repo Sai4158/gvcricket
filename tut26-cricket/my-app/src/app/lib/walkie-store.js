@@ -4,6 +4,7 @@ import {
   publishWalkieMessage,
   publishWalkieStateUpdate,
 } from "./walkie-live-updates";
+import { sanitizePlainText } from "./validators";
 
 const SPEAKER_MAX_MS = 30_000;
 const REQUEST_COOLDOWN_MS = 30_000;
@@ -37,7 +38,8 @@ function touchIdleExpiry(doc) {
 }
 
 function displayNameForRole(role, name = "") {
-  if (name) return name;
+  const safeName = sanitizePlainText(name).slice(0, 48);
+  if (safeName) return safeName;
   if (role === "umpire") return "Umpire";
   if (role === "director") return "Director";
   return "Spectator";

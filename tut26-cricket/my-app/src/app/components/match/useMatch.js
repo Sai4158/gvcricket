@@ -50,7 +50,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     Boolean(matchId && hasAccess && !initialMatch)
   );
   const [isUpdating, setIsUpdating] = useState(false);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState("");
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(initialMatch?.updatedAt || "");
   const lastStreamUpdateRef = useRef(initialMatch?.updatedAt || "");
   const previousMatchIdRef = useRef(matchId);
   const matchRef = useRef(initialMatch);
@@ -78,9 +78,11 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
         return null;
       }
 
+      matchRef.current = body;
+      lastStreamUpdateRef.current = body.updatedAt || lastStreamUpdateRef.current;
       startTransition(() => {
         setMatch(body);
-        setLastUpdatedAt(new Date().toISOString());
+        setLastUpdatedAt(body.updatedAt || new Date().toISOString());
         setError(null);
       });
 
@@ -98,6 +100,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       processingQueueRef.current = false;
       actionQueueRef.current = [];
       lastStreamUpdateRef.current = initialMatch?.updatedAt || "";
+      matchRef.current = initialMatch || null;
       setMatch(initialMatch || null);
       setError(null);
       setLastUpdatedAt(initialMatch?.updatedAt || "");
@@ -105,8 +108,11 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     }
 
     if (!matchId || !hasAccess) {
+      lastStreamUpdateRef.current = initialMatch?.updatedAt || "";
+      matchRef.current = initialMatch || null;
       setMatch(initialMatch);
       setError(null);
+      setLastUpdatedAt(initialMatch?.updatedAt || "");
       setIsLoading(false);
       return;
     }
@@ -126,6 +132,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       }
 
       lastStreamUpdateRef.current = payload.updatedAt || "";
+      matchRef.current = payload.match || null;
       startTransition(() => {
         setMatch(payload.match || null);
         setLastUpdatedAt(payload.updatedAt || "");
@@ -210,9 +217,11 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
         if (body.match) {
           matchRef.current = body.match;
+          lastStreamUpdateRef.current =
+            body.match.updatedAt || lastStreamUpdateRef.current;
           startTransition(() => {
             setMatch(body.match);
-            setLastUpdatedAt(new Date().toISOString());
+            setLastUpdatedAt(body.match.updatedAt || new Date().toISOString());
           });
         }
 
@@ -294,9 +303,11 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
         throw new Error(body.message || "Failed to update match.");
       }
 
+      matchRef.current = body;
+      lastStreamUpdateRef.current = body.updatedAt || lastStreamUpdateRef.current;
       startTransition(() => {
         setMatch(body);
-        setLastUpdatedAt(new Date().toISOString());
+        setLastUpdatedAt(body.updatedAt || new Date().toISOString());
       });
       setError(null);
       return body;
@@ -374,9 +385,12 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     historyStack,
     currentInningsHasHistory,
     replaceMatch: (nextMatch) => {
+      matchRef.current = nextMatch;
+      lastStreamUpdateRef.current =
+        nextMatch?.updatedAt || lastStreamUpdateRef.current;
       startTransition(() => {
         setMatch(nextMatch);
-        setLastUpdatedAt(new Date().toISOString());
+        setLastUpdatedAt(nextMatch?.updatedAt || new Date().toISOString());
       });
     },
     handleScoreEvent,

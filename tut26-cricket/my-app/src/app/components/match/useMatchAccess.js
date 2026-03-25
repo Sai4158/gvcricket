@@ -13,6 +13,42 @@ function getAuthCacheKey(matchId) {
   return `gv-match-access-status-${matchId}`;
 }
 
+function readRememberedGrant(matchId) {
+  if (typeof window === "undefined" || !matchId) {
+    return false;
+  }
+
+  try {
+    return window.localStorage.getItem(getRememberKey(matchId)) === "granted";
+  } catch {
+    return false;
+  }
+}
+
+function writeRememberedGrant(matchId) {
+  if (typeof window === "undefined" || !matchId) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(getRememberKey(matchId), "granted");
+  } catch {
+    // Ignore local storage failures and rely on other caches.
+  }
+}
+
+function clearRememberedGrant(matchId) {
+  if (typeof window === "undefined" || !matchId) {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(getRememberKey(matchId));
+  } catch {
+    // Ignore local storage failures and rely on other caches.
+  }
+}
+
 function readCachedAuthStatus(matchId) {
   if (!matchId) return null;
 
@@ -98,13 +134,13 @@ export default function useMatchAccess(matchId, initialAuthStatus = "checking") 
     }
 
     if (authStatus === "granted") {
-      window.localStorage.setItem(getRememberKey(matchId), "granted");
+      writeRememberedGrant(matchId);
       writeCachedAuthStatus(matchId, "granted");
       return;
     }
 
     if (authStatus === "locked") {
-      window.localStorage.removeItem(getRememberKey(matchId));
+      clearRememberedGrant(matchId);
       clearCachedAuthStatus(matchId);
     }
   }, [authStatus, matchId]);
@@ -124,9 +160,7 @@ export default function useMatchAccess(matchId, initialAuthStatus = "checking") 
       return;
     }
 
-    const remembered =
-      typeof window !== "undefined" &&
-      window.localStorage.getItem(getRememberKey(matchId)) === "granted";
+    const remembered = readRememberedGrant(matchId);
     const cachedStatus = remembered ? readCachedAuthStatus(matchId) : null;
 
     if (cachedStatus === "granted") {
@@ -151,13 +185,13 @@ export default function useMatchAccess(matchId, initialAuthStatus = "checking") 
         }
 
         if (data.authorized) {
-          window.localStorage.setItem(getRememberKey(matchId), "granted");
+          writeRememberedGrant(matchId);
           writeCachedAuthStatus(matchId, "granted");
           setAuthStatus("granted");
           return;
         }
 
-        window.localStorage.removeItem(getRememberKey(matchId));
+        clearRememberedGrant(matchId);
         clearCachedAuthStatus(matchId);
         setAuthStatus("locked");
       })
@@ -190,16 +224,16 @@ export default function useMatchAccess(matchId, initialAuthStatus = "checking") 
       }
 
       if (typeof window !== "undefined" && matchId) {
-        window.localStorage.setItem(getRememberKey(matchId), "granted");
+        writeRememberedGrant(matchId);
       }
       writeCachedAuthStatus(matchId, "granted");
       setAuthStatus("granted");
     } catch (caughtError) {
       if (typeof window !== "undefined" && matchId) {
-        window.localStorage.removeItem(getRememberKey(matchId));
+        clearRememberedGrant(matchId);
       }
       clearCachedAuthStatus(matchId);
-      setAuthError(caughtError.message);
+      setAuthError(caughtError?.message || "Incorrect PIN.");
     } finally {
       setAuthSubmitting(false);
     }

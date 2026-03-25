@@ -44,6 +44,17 @@ export default function useLiveSoundEffectsPlayer({
     setStatus("idle");
   }, [clearPlaybackTimer]);
 
+  const finishPlayback = useCallback(
+    ({ notifyAfterEnd = false } = {}) => {
+      bufferedPlaybackRef.current = null;
+      resetPlaybackState();
+      if (notifyAfterEnd) {
+        onAfterEnd?.();
+      }
+    },
+    [onAfterEnd, resetPlaybackState],
+  );
+
   const startBufferedPlaybackTimer = useCallback(() => {
     clearPlaybackTimer();
     playbackTimerRef.current = window.setInterval(() => {
@@ -72,9 +83,7 @@ export default function useLiveSoundEffectsPlayer({
     }
 
     const handleEnded = () => {
-      bufferedPlaybackRef.current = null;
-      resetPlaybackState();
-      onAfterEnd?.();
+      finishPlayback({ notifyAfterEnd: true });
     };
 
     const handlePlaying = () => {
@@ -82,8 +91,7 @@ export default function useLiveSoundEffectsPlayer({
     };
 
     const handleError = () => {
-      bufferedPlaybackRef.current = null;
-      resetPlaybackState();
+      finishPlayback({ notifyAfterEnd: true });
     };
 
     const handlePause = () => {
@@ -122,7 +130,7 @@ export default function useLiveSoundEffectsPlayer({
       audio.removeEventListener("canplay", handleLoadedMetadata);
       audio.removeEventListener("timeupdate", handleTimeUpdate);
     };
-  }, [onAfterEnd, onDuration, resetPlaybackState]);
+  }, [finishPlayback, onDuration]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -213,9 +221,7 @@ export default function useLiveSoundEffectsPlayer({
             if (requestId !== playRequestRef.current) {
               return;
             }
-            bufferedPlaybackRef.current = null;
-            resetPlaybackState();
-            onAfterEnd?.();
+            finishPlayback({ notifyAfterEnd: true });
           },
         });
 
@@ -289,8 +295,8 @@ export default function useLiveSoundEffectsPlayer({
       }
     },
     [
+      finishPlayback,
       isIosSafari,
-      onAfterEnd,
       onBeforePlay,
       onDuration,
       prime,
