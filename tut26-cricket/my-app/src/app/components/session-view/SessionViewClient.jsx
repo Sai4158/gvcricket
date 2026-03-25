@@ -417,11 +417,28 @@ export default function SessionViewClient({ sessionId, initialData }) {
     soundEffectPlayingRef.current = false;
     activeBoundarySoundEffectRef.current = false;
     const pendingManualScore = pendingManualScoreAnnouncementRef.current;
+    const deferredAnnouncement = deferredAnnouncementRef.current;
     pendingManualScoreAnnouncementRef.current = null;
     if (!shouldResumeAfterSoundEffectRef.current) {
       shouldResumeAfterSoundEffectRef.current = false;
       interruptedAnnouncementQueueRef.current = [];
       deferredAnnouncementRef.current = null;
+      if (
+        deferredAnnouncement?.items?.length &&
+        settings.enabled &&
+        settings.mode !== "silent"
+      ) {
+        speakSequenceWithDuck(
+          deferredAnnouncement.items,
+          {
+            key: `spectator-post-effect-${Date.now()}`,
+            priority: Number(deferredAnnouncement.options?.priority || 2),
+            interrupt: true,
+            minGapMs: 0,
+          },
+          Math.max(2400, Number(deferredAnnouncement.restoreAfterMs || 0)),
+        );
+      }
       if (
         pendingManualScore &&
         settings.enabled &&
@@ -487,6 +504,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
   const {
     audioRef: soundEffectsAudioRef,
+    prime: primeSoundEffects,
     playEffect: playLiveSoundEffect,
     stop: stopLiveSoundEffect,
   } = useLiveSoundEffectsPlayer({
@@ -501,6 +519,31 @@ export default function SessionViewClient({ sessionId, initialData }) {
     },
     onAfterEnd: resumeSpectatorAnnouncementsAfterSoundEffect,
   });
+
+  useEffect(() => {
+    if (!match?._id || !isLiveMatch || settings.playScoreSoundEffects === false) {
+      return undefined;
+    }
+
+    const unlockSoundEffects = () => {
+      void primeSoundEffects({ userGesture: true });
+    };
+
+    window.addEventListener("click", unlockSoundEffects, { once: true });
+    window.addEventListener("touchend", unlockSoundEffects, { once: true });
+    window.addEventListener("keydown", unlockSoundEffects, { once: true });
+
+    return () => {
+      window.removeEventListener("click", unlockSoundEffects);
+      window.removeEventListener("touchend", unlockSoundEffects);
+      window.removeEventListener("keydown", unlockSoundEffects);
+    };
+  }, [
+    isLiveMatch,
+    match?._id,
+    primeSoundEffects,
+    settings.playScoreSoundEffects,
+  ]);
 
   const cancelBoundarySoundEffectSequence = useCallback(() => {
     activeBoundarySoundEffectRef.current = false;
@@ -2096,6 +2139,12 @@ export default function SessionViewClient({ sessionId, initialData }) {
             inningsData={inningsCard.inningsData}
             statusLabel={inningsCard.statusLabel}
             targetSummary={inningsCard.targetSummary}
+            teamSide={
+              inningsCard.title === teamB.name ||
+              inningsCard.inningsData?.team === teamB.name
+                ? "red"
+                : "blue"
+            }
           />
         ))}
       </div>

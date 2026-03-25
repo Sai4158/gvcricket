@@ -28,6 +28,14 @@ const SCORE_EFFECT_EVENTS = [
   { key: "four", label: "4 Runs", accent: "sky" },
   { key: "six", label: "6 Runs", accent: "amber" },
 ];
+const RANDOM_SCORE_EFFECT_ID = "__random__";
+
+function formatEffectDuration(durationSeconds) {
+  const totalSeconds = Math.max(0, Math.round(Number(durationSeconds) || 0));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
 
 function ScrollingSoundLabel({ text = "", active = false }) {
   const label = String(text || "").trim();
@@ -93,12 +101,13 @@ function SoundAssignmentRow({
   event,
   selectedLabel,
   selectedId,
+  canPreview = true,
   isPreviewing = false,
   onTogglePreview,
   onEdit,
 }) {
   const accent = getAccentClasses(event.accent);
-  const hasAssignedSound = Boolean(selectedId);
+  const hasAssignedSound = Boolean(selectedId) && canPreview;
 
   return (
     <div className="rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-2.5">
@@ -161,83 +170,109 @@ function SoundPickerSheet({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="absolute inset-0 z-20 rounded-[28px] bg-[linear-gradient(180deg,rgba(10,10,14,0.96),rgba(4,4,8,0.98))] p-4 backdrop-blur-md"
+          className="absolute inset-0 z-20 rounded-[28px] bg-[linear-gradient(180deg,rgba(10,10,14,0.96),rgba(4,4,8,0.98))] px-4 pb-4 pt-14 backdrop-blur-md"
           style={{ touchAction: "pan-y" }}
         >
-          <div className="flex items-start justify-between gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-4 top-3 z-30 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/18 bg-[rgba(14,14,18,0.92)] text-white shadow-[0_10px_30px_rgba(0,0,0,0.32)] transition active:scale-[0.97] hover:bg-white/[0.12]"
+            aria-label="Back to umpire commentary"
+          >
+            <FaTimes />
+          </button>
+
+          <div className="flex h-full min-h-0 flex-col rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,15,20,0.98),rgba(6,6,10,1))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div>
               <h4 className="text-lg font-black text-white">{eventLabel}</h4>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-300 transition active:scale-[0.97] hover:bg-white/[0.08] hover:text-white"
-              aria-label="Close sound picker"
+
+            <div
+              className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1"
+              style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
             >
-              <FaTimes />
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => onSelect("")}
+                className={`flex w-full items-center justify-between rounded-[20px] border px-4 py-3 text-left transition active:scale-[0.985] ${
+                  !selectedId
+                    ? "border-emerald-300/28 bg-emerald-400/12 text-white"
+                    : "border-white/8 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.05]"
+                }`}
+              >
+                <p className="text-sm font-semibold">None</p>
+                {!selectedId ? <FaCheck className="text-emerald-300" /> : null}
+              </button>
 
-          <div
-            className="mt-4 max-h-[62vh] space-y-2 overflow-y-auto pr-1"
-            style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
-          >
-            <button
-              type="button"
-              onClick={() => onSelect("")}
-              className={`flex w-full items-center justify-between rounded-[20px] border px-4 py-3 text-left transition active:scale-[0.985] ${
-                !selectedId
-                  ? "border-emerald-300/28 bg-emerald-400/12 text-white"
-                  : "border-white/8 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.05]"
-              }`}
-            >
-              <p className="text-sm font-semibold">None</p>
-              {!selectedId ? <FaCheck className="text-emerald-300" /> : null}
-            </button>
-
-            {options.map((option) => {
-              const isSelected = selectedId === option.id;
-              const isPreviewing = previewingId === option.id;
-
-              return (
-                <div
-                  key={option.id}
-                  className={`flex items-center gap-3 rounded-[20px] border px-4 py-3 transition ${
-                    isSelected
-                      ? "border-emerald-300/28 bg-emerald-400/12"
-                      : "border-white/8 bg-white/[0.03]"
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => onPreview(option)}
-                    className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-white transition active:scale-[0.97] hover:bg-white/[0.08] ${
-                      isPreviewing ? "ring-2 ring-emerald-400/35" : ""
-                    }`}
-                    aria-label={`${isPreviewing ? "Pause" : "Preview"} ${option.label}`}
-                  >
-                    {isPreviewing ? <FaPause className="text-xs" /> : <FaPlay className="text-xs" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onSelect(option.id)}
-                    className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left active:scale-[0.995]"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-white">
-                        {option.label}
-                      </p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.18em] text-zinc-500">
-                        {option.fileName || option.id}
-                      </p>
-                    </div>
-                    <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">
-                      {isSelected ? <FaCheck className="text-emerald-300" /> : <FaChevronRight />}
-                    </div>
-                  </button>
+              <button
+                type="button"
+                onClick={() => onSelect(RANDOM_SCORE_EFFECT_ID)}
+                className={`flex w-full items-center justify-between rounded-[20px] border px-4 py-3 text-left transition active:scale-[0.985] ${
+                  selectedId === RANDOM_SCORE_EFFECT_ID
+                    ? "border-fuchsia-300/32 bg-[linear-gradient(90deg,rgba(217,70,239,0.18),rgba(56,189,248,0.16))] text-white"
+                    : "border-fuchsia-300/14 bg-[linear-gradient(90deg,rgba(217,70,239,0.12),rgba(56,189,248,0.08))] text-zinc-100 hover:bg-[linear-gradient(90deg,rgba(217,70,239,0.16),rgba(56,189,248,0.12))]"
+                }`}
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">Random</p>
+                  <p className="mt-1 text-xs uppercase tracking-[0.18em] text-white/60">
+                    Play a random effect each time
+                  </p>
                 </div>
-              );
-            })}
+                {selectedId === RANDOM_SCORE_EFFECT_ID ? (
+                  <FaCheck className="text-fuchsia-100" />
+                ) : null}
+              </button>
+
+              {options.map((option) => {
+                const isSelected = selectedId === option.id;
+                const isPreviewing = previewingId === option.id;
+
+                return (
+                  <div
+                    key={option.id}
+                    className={`flex items-center gap-3 rounded-[20px] border px-4 py-3 transition ${
+                      isSelected
+                        ? "border-emerald-300/28 bg-emerald-400/12"
+                        : "border-white/8 bg-white/[0.03]"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onPreview(option)}
+                      className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-white transition active:scale-[0.97] hover:bg-white/[0.08] ${
+                        isPreviewing ? "ring-2 ring-emerald-400/35" : ""
+                      }`}
+                      aria-label={`${isPreviewing ? "Pause" : "Preview"} ${option.label}`}
+                    >
+                      {isPreviewing ? <FaPause className="text-xs" /> : <FaPlay className="text-xs" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onSelect(option.id)}
+                      className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left active:scale-[0.995]"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">
+                          {option.label}
+                        </p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.18em] text-zinc-500">
+                          {option.fileName || option.id}
+                        </p>
+                      </div>
+                      <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">
+                        {Number(option.durationSeconds) > 0 ? (
+                          <span className="text-[11px] tracking-[0.14em] text-zinc-500">
+                            {formatEffectDuration(option.durationSeconds)}
+                          </span>
+                        ) : null}
+                        {isSelected ? <FaCheck className="text-emerald-300" /> : <FaChevronRight />}
+                      </div>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </motion.div>
       ) : null}
@@ -294,6 +329,7 @@ export default function AnnouncementControls({
   talkError = "",
   simpleMode = false,
   showScoreSoundEffectsToggle = false,
+  showSpectatorBroadcastToggle = false,
   showScoreEffectAssignments = false,
   soundEffectOptions = [],
   onPreviewSoundEffect,
@@ -334,6 +370,15 @@ export default function AnnouncementControls({
     () =>
       SCORE_EFFECT_EVENTS.map((event) => {
         const selectedId = String(scoreEffectMap?.[event.key] || "").trim();
+        if (selectedId === RANDOM_SCORE_EFFECT_ID) {
+          return {
+            ...event,
+            selectedId,
+            selectedEffect: null,
+            selectedLabel: "Random",
+            isRandom: true,
+          };
+        }
         const selectedEffect =
           soundEffectOptions.find((option) => option.id === selectedId) || null;
         return {
@@ -341,6 +386,7 @@ export default function AnnouncementControls({
           selectedId,
           selectedEffect,
           selectedLabel: selectedEffect?.label || "",
+          isRandom: false,
         };
       }),
     [scoreEffectMap, soundEffectOptions]
@@ -369,17 +415,19 @@ export default function AnnouncementControls({
   if (showModernCompactPanel) {
     return (
       <section className="relative mx-auto flex max-h-[78vh] max-w-[32rem] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.1),transparent_24%),linear-gradient(180deg,rgba(16,16,20,0.98),rgba(7,7,11,0.99))] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.48)] backdrop-blur-md sm:max-h-[82vh] sm:p-5">
-        <button
-          type="button"
-          onClick={() => {
-            setEditingEventKey("");
-            onClose?.();
-          }}
-          className="absolute right-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-[rgba(20,20,24,0.92)] text-zinc-400 transition hover:bg-white/[0.08] hover:text-white sm:right-5 sm:top-5"
-          aria-label="Close live commentary"
-        >
-          <FaTimes />
-        </button>
+        {!editingEvent ? (
+          <button
+            type="button"
+            onClick={() => {
+              setEditingEventKey("");
+              onClose?.();
+            }}
+            className="absolute right-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-[rgba(20,20,24,0.92)] text-zinc-400 transition hover:bg-white/[0.08] hover:text-white sm:right-5 sm:top-5"
+            aria-label="Close live commentary"
+          >
+            <FaTimes />
+          </button>
+        ) : null}
         <div
           className="min-h-0 flex-1 overflow-y-auto pr-1 sm:pr-2"
           style={{
@@ -459,6 +507,30 @@ export default function AnnouncementControls({
               </div>
             </div>
 
+            {showSpectatorBroadcastToggle ? (
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] border border-white/8 bg-white/[0.03] px-3.5 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-white">
+                    Play for Spectators
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Send score sounds live to spectator view.
+                  </p>
+                </div>
+                <IosSwitch
+                  checked={settings.broadcastScoreSoundEffects !== false}
+                  label={
+                    settings.broadcastScoreSoundEffects !== false
+                      ? "Turn spectator score sounds off"
+                      : "Turn spectator score sounds on"
+                  }
+                  onChange={(checked) =>
+                    updateSetting("broadcastScoreSoundEffects", checked)
+                  }
+                />
+              </div>
+            ) : null}
+
             {showScoreEffectAssignments ? (
               <div className="mt-3 space-y-2.5">
                 {activeSoundAssignments.map((item) => (
@@ -467,6 +539,7 @@ export default function AnnouncementControls({
                     event={item}
                     selectedId={item.selectedId}
                     selectedLabel={item.selectedLabel}
+                    canPreview={!item.isRandom}
                     isPreviewing={Boolean(
                       item.selectedEffect?.id &&
                         previewingSoundEffectId === item.selectedEffect.id &&

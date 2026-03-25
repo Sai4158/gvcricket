@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 
-const SETTINGS_VERSION = 8;
+const SETTINGS_VERSION = 9;
 
 const DEFAULTS = {
   spectator: {
@@ -13,6 +13,7 @@ const DEFAULTS = {
     mode: "full",
     accessibilityMode: false,
     playScoreSoundEffects: true,
+    broadcastScoreSoundEffects: true,
     scoreSoundEffectMap: {
       out: "",
       two: "",
@@ -29,6 +30,7 @@ const DEFAULTS = {
     mode: "simple",
     accessibilityMode: false,
     playScoreSoundEffects: true,
+    broadcastScoreSoundEffects: true,
     scoreSoundEffectMap: {
       out: "",
       two: "",
@@ -172,6 +174,7 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
           ? {
               enabled: true,
               playScoreSoundEffects: true,
+              broadcastScoreSoundEffects: true,
             }
           : {}),
         version: SETTINGS_VERSION,
