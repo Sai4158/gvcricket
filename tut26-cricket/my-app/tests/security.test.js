@@ -1072,7 +1072,7 @@ test("spectator commentary handles last-ball warnings and over summaries", () =>
   assert.equal(fullLine, "Umpire has given 1 run.");
 
   const scoreLine = buildSpectatorScoreAnnouncement(event, after);
-  assert.equal(scoreLine, "Score is 5 for 2. This is the last ball of the over.");
+  assert.equal(scoreLine, "Score is 5 for 2. One ball to finish the over.");
 
   const overLine = buildSpectatorOverCompleteAnnouncement({
     ...after,
@@ -1237,7 +1237,7 @@ test("spectator commentary gives progress reminders and clean undo lines", () =>
   );
   assert.equal(
     buildSpectatorAnnouncement(undoEvent, match, "full"),
-    "Umpire has undone the last ball. The score for that ball has been removed. Umpire will redo this ball."
+    "Umpire has removed the score for that ball. Umpire will redo this ball."
   );
   assert.equal(buildSpectatorScoreAnnouncement(undoEvent, match), "Score is 4 for 0.");
 });
@@ -1312,7 +1312,7 @@ test("umpire commentary speaks score buttons and undo with clean wording", () =>
   assert.equal(buildUmpireAnnouncement(scoreEvent, "simple"), "Umpire gives 2 runs.");
   assert.equal(
     buildUmpireAnnouncement(undoEvent, "simple"),
-    "Umpire has undone the last ball. The score for that ball has been removed. Umpire will redo this ball."
+    "Umpire has removed the score for that ball. Umpire will redo this ball."
   );
 });
 

@@ -154,7 +154,7 @@ function buildBallEventLine(ball) {
 }
 
 function buildUndoAnnouncementLine() {
-  return "Umpire has undone the last ball. The score for that ball has been removed. Umpire will redo this ball.";
+  return "Umpire has removed the score for that ball. Umpire will redo this ball.";
 }
 
 function buildProgressReminder(event, match) {
@@ -165,7 +165,7 @@ function buildProgressReminder(event, match) {
   const ballNumber = getBallNumberInOver(match);
   if (ballNumber === 2) return "This is ball 2.";
   if (ballNumber === 4) return "This is ball 4.";
-  if (ballNumber === 5) return "This is the last ball of the over.";
+  if (ballNumber === 5) return "One ball to finish the over.";
   return "";
 }
 

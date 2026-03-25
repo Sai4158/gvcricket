@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   FaArrowLeft,
@@ -36,20 +36,28 @@ const TEAM_SETUP_TOSS_ANNOUNCER_SETTINGS = {
 const getTossPromptHandoffKey = (sessionId) =>
   `session_${sessionId}_tossPromptPrimed_v1`;
 
-export default function TeamSelectionPageClient() {
-  const { id: sessionId } = useParams();
+async function readJsonSafely(response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+export default function TeamSelectionPageClient({ sessionId }) {
+  const resolvedSessionId = String(sessionId || "").trim();
   const router = useRouter();
-  const draftTokenKey = `session_${sessionId}_draftToken`;
+  const draftTokenKey = `session_${resolvedSessionId}_draftToken`;
   const [teamA, setTeamA] = useSessionStorageState(
-    `session_${sessionId}_teamA_v2`,
+    `session_${resolvedSessionId}_teamA_v2`,
     createDefaultRoster("Team Blue")
   );
   const [teamB, setTeamB] = useSessionStorageState(
-    `session_${sessionId}_teamB_v2`,
+    `session_${resolvedSessionId}_teamB_v2`,
     createDefaultRoster("Team Red")
   );
   const [overs, setOvers] = useSessionStorageState(
-    `session_${sessionId}_overs_v2`,
+    `session_${resolvedSessionId}_overs_v2`,
     6
   );
   const [isLoading, setIsLoading] = useState(false);
@@ -75,6 +83,11 @@ export default function TeamSelectionPageClient() {
       return imageUploadPromiseRef.current;
     }
 
+    if (!resolvedSessionId) {
+      setImageUploadState("failed");
+      return false;
+    }
+
     const draftToken = window.sessionStorage.getItem(draftTokenKey) || "";
     const pendingImage = getPendingSessionImage();
 
@@ -86,7 +99,7 @@ export default function TeamSelectionPageClient() {
     setImageUploadState("uploading");
 
     const uploadPromise = uploadPendingSessionImageToDraftSession({
-      sessionId,
+      sessionId: resolvedSessionId,
       draftToken,
       pendingImage,
     })
@@ -110,7 +123,7 @@ export default function TeamSelectionPageClient() {
 
     imageUploadPromiseRef.current = uploadPromise;
     return uploadPromise;
-  }, [draftTokenKey, sessionId]);
+  }, [draftTokenKey, resolvedSessionId]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -133,7 +146,7 @@ export default function TeamSelectionPageClient() {
     return () => {
       isMounted = false;
     };
-  }, [draftTokenKey, sessionId, uploadDraftImageIfNeeded]);
+  }, [draftTokenKey, resolvedSessionId, uploadDraftImageIfNeeded]);
 
   useEffect(() => {
     if (tossStatus !== "counting" || tossCountdown <= 0) {
@@ -212,12 +225,12 @@ export default function TeamSelectionPageClient() {
   };
 
   const deleteDraftSession = async () => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !resolvedSessionId) return;
     const draftToken = window.sessionStorage.getItem(draftTokenKey);
     if (!draftToken) return;
 
     try {
-      await fetch(`/api/sessions/${sessionId}`, {
+      await fetch(`/api/sessions/${resolvedSessionId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ draftToken }),
@@ -227,9 +240,9 @@ export default function TeamSelectionPageClient() {
       // Ignore cleanup errors; the session is hidden as a draft anyway.
     } finally {
       window.sessionStorage.removeItem(draftTokenKey);
-      window.sessionStorage.removeItem(`session_${sessionId}_teamA_v2`);
-      window.sessionStorage.removeItem(`session_${sessionId}_teamB_v2`);
-      window.sessionStorage.removeItem(`session_${sessionId}_overs_v2`);
+      window.sessionStorage.removeItem(`session_${resolvedSessionId}_teamA_v2`);
+      window.sessionStorage.removeItem(`session_${resolvedSessionId}_teamB_v2`);
+      window.sessionStorage.removeItem(`session_${resolvedSessionId}_overs_v2`);
     }
   };
 
@@ -241,6 +254,11 @@ export default function TeamSelectionPageClient() {
 
   const handleSubmit = async () => {
     stop();
+    if (!resolvedSessionId) {
+      setError("Session is still loading. Please try again.");
+      return;
+    }
+
     const finalTeamAName = teamA.name.trim();
     const finalTeamBName = teamB.name.trim();
     const finalTeamAPlayers = teamA.players.map((player) => player.trim()).filter(Boolean);
@@ -266,7 +284,7 @@ export default function TeamSelectionPageClient() {
         throw new Error("Cover image is still uploading. Please try again in a moment.");
       }
 
-      const response = await fetch(`/api/sessions/${sessionId}/setup-match`, {
+      const response = await fetch(`/api/sessions/${resolvedSessionId}/setup-match`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -281,14 +299,14 @@ export default function TeamSelectionPageClient() {
               : "",
         }),
       });
+      const payload = await readJsonSafely(response);
 
       if (!response.ok) {
         throw new Error(
-          (await response.json()).message || "Failed to set up the match."
+          payload?.message || "Failed to set up the match."
         );
       }
 
-      await response.json().catch(() => ({}));
       prime({ userGesture: true });
       let handoffPromptSpoken = false;
       if (typeof window !== "undefined") {
@@ -299,13 +317,13 @@ export default function TeamSelectionPageClient() {
           })
         );
         if (handoffPromptSpoken) {
-          window.sessionStorage.setItem(getTossPromptHandoffKey(sessionId), "1");
+          window.sessionStorage.setItem(getTossPromptHandoffKey(resolvedSessionId), "1");
         }
       }
       if (handoffPromptSpoken) {
         await new Promise((resolve) => window.setTimeout(resolve, 1050));
       }
-      router.push(`/toss/${sessionId}`);
+      router.push(`/toss/${resolvedSessionId}`);
     } catch (caughtError) {
       setError(caughtError.message);
       setIsLoading(false);

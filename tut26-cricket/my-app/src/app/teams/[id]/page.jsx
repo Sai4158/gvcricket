@@ -29,5 +29,5 @@ export default async function TeamSelectionPage({ params }) {
     redirect(`/toss/${session.match}`);
   }
 
-  return <TeamSelectionPageClient />;
+  return <TeamSelectionPageClient sessionId={id} />;
 }
