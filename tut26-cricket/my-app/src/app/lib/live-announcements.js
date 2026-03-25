@@ -464,18 +464,25 @@ export function createMatchEndLiveEvent(match, resultText) {
 }
 
 export function createSoundEffectLiveEvent(match, effect, options = {}) {
+  const action = options.action === "stop" ? "stop" : "play";
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     type: "sound_effect",
-    summaryText: effect?.label
-      ? `${effect.label} sound effect.`
-      : "Sound effect.",
+    summaryText:
+      action === "stop"
+        ? effect?.label
+          ? `${effect.label} sound effect stopped.`
+          : "Sound effect stopped."
+        : effect?.label
+          ? `${effect.label} sound effect.`
+          : "Sound effect.",
     score: match?.score ?? 0,
     outs: match?.outs ?? 0,
     effectId: effect?.id || "",
     effectFileName: effect?.fileName || effect?.id || "",
     effectLabel: effect?.label || "",
     effectSrc: effect?.src || "",
+    action,
     clientRequestId: options.clientRequestId || "",
     resumeAnnouncements: Boolean(options.resumeAnnouncements),
     trigger: options.trigger === "score_boundary" ? "score_boundary" : "manual",

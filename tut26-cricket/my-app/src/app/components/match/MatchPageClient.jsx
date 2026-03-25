@@ -721,21 +721,76 @@ export default function MatchPageClient({
       cancelBoundarySequence({ stopEffect: true });
     }
 
+    const shouldPlayLocalScoreEffect =
+      umpireSettings.playScoreSoundEffects !== false;
+    const shouldBroadcastScoreEffect =
+      umpireSettings.broadcastScoreSoundEffects !== false;
     const configuredScoreEffect =
-      umpireSettings.playScoreSoundEffects !== false
+      shouldPlayLocalScoreEffect || shouldBroadcastScoreEffect
         ? await resolveConfiguredScoreSoundEffect(runs, isOut, extraType)
         : null;
     const scorePreview = buildUmpireScorePreview(runs, isOut, extraType);
 
     if (configuredScoreEffect) {
+      if (!shouldPlayLocalScoreEffect && shouldBroadcastScoreEffect) {
+        try {
+          await fetch(`/api/matches/${matchId}/sound-effects`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            keepalive: true,
+            body: JSON.stringify({
+              effectId: configuredScoreEffect.id,
+              clientRequestId: createSoundEffectRequestId(),
+              resumeAnnouncements: false,
+              trigger: "score_boundary",
+              preAnnouncementText: String(scorePreview.leadItem?.text || "").trim(),
+              preAnnouncementDelayMs: String(scorePreview.leadItem?.text || "").trim()
+                ? estimateBoundaryLeadDelayMs(
+                    String(scorePreview.leadItem?.text || "").trim(),
+                    Number(scorePreview.leadItem?.rate || SIX_PRE_EFFECT_RATE),
+                  )
+                : 0,
+            }),
+          });
+        } catch {
+          // Spectator relay is best-effort and should not block scoring.
+        }
+        announceUmpireAction(runs, isOut, extraType);
+        handleScoreEvent(runs, isOut, extraType);
+        return;
+      }
+
       const boundarySequenceVersion = boundarySequenceVersionRef.current + 1;
       const leadText = String(scorePreview.leadItem?.text || "").trim();
       const leadRate = Number(scorePreview.leadItem?.rate || SIX_PRE_EFFECT_RATE);
       const leadDelayMs = leadText
         ? estimateBoundaryLeadDelayMs(leadText, leadRate)
         : 0;
+      const clientRequestId = createSoundEffectRequestId();
       boundarySequenceVersionRef.current = boundarySequenceVersion;
       activeBoundarySequenceRef.current = true;
+
+      if (shouldBroadcastScoreEffect) {
+        localSoundEffectRequestIdRef.current = clientRequestId;
+        try {
+          await fetch(`/api/matches/${matchId}/sound-effects`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            keepalive: true,
+            body: JSON.stringify({
+              effectId: configuredScoreEffect.id,
+              clientRequestId,
+              resumeAnnouncements: false,
+              trigger: "score_boundary",
+              preAnnouncementText: leadText,
+              preAnnouncementDelayMs: leadDelayMs,
+            }),
+          });
+        } catch {
+          // Spectator relay is best-effort and should not block scoring.
+        }
+      }
+
       handleScoreEvent(runs, isOut, extraType);
 
       if (leadText && umpireSettings.enabled && umpireSettings.mode !== "silent") {
@@ -758,13 +813,17 @@ export default function MatchPageClient({
         }
       }
 
-      await triggerSharedSoundEffect(configuredScoreEffect, {
-        userGesture: true,
-        resumeAnnouncements: false,
-        trigger: "score_boundary",
-        preAnnouncementText: leadText,
-        preAnnouncementDelayMs: leadDelayMs,
-      });
+      if (shouldPlayLocalScoreEffect) {
+        setSoundEffectError("");
+        shouldResumeAfterSoundEffectRef.current = false;
+        const playedLocally = await playLocalSoundEffect(configuredScoreEffect, {
+          userGesture: true,
+        });
+        if (!playedLocally) {
+          resumeUmpireAnnouncementsAfterSoundEffect();
+          return;
+        }
+      }
 
       if (boundarySequenceVersion !== boundarySequenceVersionRef.current) {
         return;
@@ -952,7 +1011,24 @@ export default function MatchPageClient({
         (activeSoundEffectStatus === "loading" ||
           activeSoundEffectStatus === "playing")
       ) {
+        const stopRequestId =
+          localSoundEffectRequestIdRef.current || createSoundEffectRequestId();
         stopActiveSoundEffect();
+        localSoundEffectRequestIdRef.current = "";
+        try {
+          await fetch(`/api/matches/${matchId}/sound-effects`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            keepalive: true,
+            body: JSON.stringify({
+              effectId: file.id,
+              clientRequestId: stopRequestId,
+              action: "stop",
+            }),
+          });
+        } catch {
+          // Local stop already succeeded. Relay sync is best-effort.
+        }
         return;
       }
 
@@ -1012,43 +1088,33 @@ export default function MatchPageClient({
     ],
   );
 
-  const relaySoundEffectToMatch = useCallback(
-    async (
-      file,
-      {
-        clientRequestId = createSoundEffectRequestId(),
-        resumeAnnouncements = false,
-        trigger = "manual",
-        preAnnouncementText = "",
-        preAnnouncementDelayMs = 0,
-      } = {}
-    ) => {
-      if (!match?._id || !isLiveMatch || !file?.id) {
-        return false;
-      }
+  const handleStopLiveSoundEffect = useCallback(async () => {
+    const effectId = String(activeSoundEffectId || "").trim();
+    if (!effectId) {
+      stopActiveSoundEffect();
+      return;
+    }
 
-      try {
-        const response = await fetch(`/api/matches/${matchId}/sound-effects`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          keepalive: true,
-          body: JSON.stringify({
-            effectId: file.id,
-            clientRequestId,
-            resumeAnnouncements,
-            trigger,
-            preAnnouncementText,
-            preAnnouncementDelayMs,
-          }),
-        });
+    const stopRequestId =
+      localSoundEffectRequestIdRef.current || createSoundEffectRequestId();
+    stopActiveSoundEffect();
+    localSoundEffectRequestIdRef.current = "";
 
-        return response.ok;
-      } catch {
-        return false;
-      }
-    },
-    [isLiveMatch, match?._id, matchId]
-  );
+    try {
+      await fetch(`/api/matches/${matchId}/sound-effects`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        keepalive: true,
+        body: JSON.stringify({
+          effectId,
+          clientRequestId: stopRequestId,
+          action: "stop",
+        }),
+      });
+    } catch {
+      // Local stop already succeeded. Relay sync is best-effort.
+    }
+  }, [activeSoundEffectId, matchId, stopActiveSoundEffect]);
 
   const triggerSharedSoundEffect = useCallback(
     async (
@@ -1088,13 +1154,23 @@ export default function MatchPageClient({
       }
 
       if (broadcast) {
-        await relaySoundEffectToMatch(file, {
-          clientRequestId,
-          resumeAnnouncements,
-          trigger,
-          preAnnouncementText,
-          preAnnouncementDelayMs,
-        });
+        try {
+          await fetch(`/api/matches/${matchId}/sound-effects`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            keepalive: true,
+            body: JSON.stringify({
+              effectId: file.id,
+              clientRequestId,
+              resumeAnnouncements,
+              trigger,
+              preAnnouncementText,
+              preAnnouncementDelayMs,
+            }),
+          });
+        } catch {
+          // Local playback already succeeded. Relay sync is best-effort.
+        }
       }
 
       return playLocally ? playedLocally : true;
@@ -1102,8 +1178,8 @@ export default function MatchPageClient({
     [
       isLiveMatch,
       match?._id,
+      matchId,
       playLocalSoundEffect,
-      relaySoundEffectToMatch,
       resumeUmpireAnnouncementsAfterSoundEffect,
     ]
   );
@@ -1338,10 +1414,20 @@ export default function MatchPageClient({
       liveEvent.clientRequestId &&
       liveEvent.clientRequestId === localSoundEffectRequestIdRef.current
     ) {
+      if (liveEvent.action === "stop") {
+        localSoundEffectRequestIdRef.current = "";
+        return;
+      }
       shouldResumeAfterSoundEffectRef.current = Boolean(
         liveEvent.resumeAnnouncements
       );
       localSoundEffectRequestIdRef.current = "";
+      return;
+    }
+
+    if (liveEvent.action === "stop") {
+      stopActiveSoundEffect();
+      shouldResumeAfterSoundEffectRef.current = false;
       return;
     }
 
@@ -1366,6 +1452,7 @@ export default function MatchPageClient({
     match?.lastLiveEvent,
     playLocalSoundEffect,
     resumeUmpireAnnouncementsAfterSoundEffect,
+    stopActiveSoundEffect,
     stop,
   ]);
 
@@ -1644,7 +1731,7 @@ export default function MatchPageClient({
               onToggle={toggleSoundEffectsPanel}
               onMinimize={() => setSoundEffectsOpen(false)}
               onPlayEffect={handlePlaySoundEffect}
-              onStopEffect={() => stopActiveSoundEffect()}
+              onStopEffect={handleStopLiveSoundEffect}
               onReorder={handleReorderSoundEffects}
             />
           ) : null}
@@ -1765,6 +1852,7 @@ export default function MatchPageClient({
                   announceLabel: "Read Score",
                   announceDisabled: false,
                   showScoreSoundEffectsToggle: true,
+                  showSpectatorBroadcastToggle: true,
                   showScoreEffectAssignments: true,
                   soundEffectOptions: commentarySoundEffectOptions,
                   previewingSoundEffectId:

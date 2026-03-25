@@ -310,6 +310,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
   });
 
   const currentLiveEventId = match?.lastLiveEvent?.id || "";
+  const currentAnnouncementEventId =
+    match?.lastLiveEvent?.type === "sound_effect" ? "" : currentLiveEventId;
   const isLiveMatch = Boolean(match?.isOngoing && !match?.result);
   const spectatorWalkieSignalActive = Boolean(
     isLiveMatch && (spectatorWalkieEnabled || quickWalkieTalking),
@@ -392,7 +394,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
           },
         ],
         {
-          key: `spectator-current-score-${match._id}-${currentLiveEventId || "snapshot"}`,
+          key: `spectator-current-score-${match._id}-${currentAnnouncementEventId || "snapshot"}`,
           priority: 3,
           interrupt: Boolean(options.interrupt),
           minGapMs: 0,
@@ -402,7 +404,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         2400,
       );
     },
-    [currentLiveEventId, match, speakSequenceWithDuck],
+    [currentAnnouncementEventId, match, speakSequenceWithDuck],
   );
 
   const clearAnnouncementTimers = useCallback(() => {
@@ -723,7 +725,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       return;
     }
 
-    const initialSummaryKey = `${match._id}:${currentLiveEventId || "snapshot"}`;
+    const initialSummaryKey = `${match._id}:${currentAnnouncementEventId || "snapshot"}`;
     if (announcerInitialSummaryRef.current === initialSummaryKey) {
       return;
     }
@@ -738,7 +740,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     announcerInitialSummaryRef.current = initialSummaryKey;
   }, [
     announceCurrentScore,
-    currentLiveEventId,
+    currentAnnouncementEventId,
     isLiveMatch,
     match,
     announcerStatus,
@@ -752,7 +754,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       match && isLiveMatch && settings.enabled && settings.mode !== "silent",
     );
     const initialSummaryKey = match?._id
-      ? `${match._id}:${currentLiveEventId || "snapshot"}`
+      ? `${match._id}:${currentAnnouncementEventId || "snapshot"}`
       : "";
 
     if (
@@ -787,7 +789,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     };
   }, [
     announceCurrentScore,
-    currentLiveEventId,
+    currentAnnouncementEventId,
     isLiveMatch,
     match,
     settings.enabled,
@@ -799,7 +801,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       match && isLiveMatch && settings.enabled && settings.mode !== "silent",
     );
     const initialSummaryKey = match?._id
-      ? `${match._id}:${currentLiveEventId || "snapshot"}`
+      ? `${match._id}:${currentAnnouncementEventId || "snapshot"}`
       : "";
 
     if (
@@ -841,7 +843,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     };
   }, [
     announceCurrentScore,
-    currentLiveEventId,
+    currentAnnouncementEventId,
     isLiveMatch,
     match,
     prime,
@@ -949,6 +951,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
     ) {
       return;
     }
+
+    if (liveEvent.action === "stop") {
+      stopLiveSoundEffect();
+      shouldResumeAfterSoundEffectRef.current = false;
+      activeBoundarySoundEffectRef.current = false;
+      return;
+    }
+
     shouldResumeAfterSoundEffectRef.current = Boolean(
       liveEvent.resumeAnnouncements,
     );

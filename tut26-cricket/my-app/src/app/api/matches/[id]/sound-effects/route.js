@@ -44,6 +44,7 @@ const soundEffectRequestSchema = z
       .max(120)
       .regex(/^[a-zA-Z0-9._:-]+$/, "clientRequestId is invalid.")
       .optional(),
+    action: z.enum(["play", "stop"]).optional(),
     resumeAnnouncements: z.boolean().optional(),
     trigger: z.enum(["manual", "score_boundary"]).optional(),
     preAnnouncementText: z.string().trim().max(180).optional(),
@@ -131,12 +132,21 @@ export async function POST(req, { params }) {
       return jsonError("Sound effects only work during a live match.", 409);
     }
 
-    const effect = await resolveSoundEffect(parsedRequest.value.effectId);
+    const effect =
+      parsedRequest.value.action === "stop"
+        ? {
+            id: parsedRequest.value.effectId,
+            fileName: parsedRequest.value.effectId,
+            label: prettifyName(parsedRequest.value.effectId),
+            src: "",
+          }
+        : await resolveSoundEffect(parsedRequest.value.effectId);
     if (!effect) {
       return jsonError("Sound effect not found.", 404);
     }
 
     const liveEvent = createSoundEffectLiveEvent(match, effect, {
+      action: parsedRequest.value.action === "stop" ? "stop" : "play",
       clientRequestId: parsedRequest.value.clientRequestId || "",
       resumeAnnouncements: Boolean(parsedRequest.value.resumeAnnouncements),
       trigger:
@@ -173,7 +183,10 @@ export async function POST(req, { params }) {
       status: "success",
       ip: meta.ip,
       userAgent: meta.userAgent,
-      metadata: { effectId: effect.id },
+      metadata: {
+        effectId: effect.id,
+        action: parsedRequest.value.action === "stop" ? "stop" : "play",
+      },
     });
 
     return Response.json(
