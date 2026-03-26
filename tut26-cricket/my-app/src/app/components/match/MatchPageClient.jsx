@@ -13,6 +13,7 @@ import { countLegalBalls } from "../../lib/match-scoring";
 import {
   buildCurrentScoreAnnouncement,
   buildLiveScoreAnnouncementSequence,
+  buildUmpireAnnouncement,
   buildSpectatorScoreAnnouncement,
   createScoreLiveEvent,
   createUndoLiveEvent,
@@ -590,11 +591,30 @@ export default function MatchPageClient({
       isOut,
       extraType,
     });
-    const sequence = buildLiveScoreAnnouncementSequence(
+    const baseSequence = buildLiveScoreAnnouncementSequence(
       event,
       nextMatch || match,
       umpireSettings.mode
     );
+    const umpireLeadText =
+      buildUmpireAnnouncement(event, umpireSettings.mode) ||
+      baseSequence.items?.[0]?.text ||
+      "";
+    const sequence = {
+      ...baseSequence,
+      items: umpireLeadText
+        ? [
+            {
+              ...(baseSequence.items?.[0] || {
+                pauseAfterMs: 0,
+                rate: 0.78,
+              }),
+              text: umpireLeadText,
+            },
+            ...(baseSequence.items?.slice(1) || []),
+          ]
+        : baseSequence.items || [],
+    };
     const leadItem = sequence.items?.[0] || null;
     const followUpItems = sequence.items?.slice(1) || [];
 

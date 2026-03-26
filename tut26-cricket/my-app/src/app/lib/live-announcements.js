@@ -718,7 +718,7 @@ export function buildUmpireAnnouncement(event, mode = "simple") {
   }
 
   if (ball.runs === 0) {
-    return "Umpire says dot ball.";
+    return "Umpire has given dot ball.";
   }
 
   if (safeNumber(ball.runs) === 4) {

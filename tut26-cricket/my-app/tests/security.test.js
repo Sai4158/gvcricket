@@ -1408,9 +1408,18 @@ test("umpire commentary speaks score buttons and undo with clean wording", () =>
     isOut: false,
     extraType: null,
   });
+  const dotBallEvent = createScoreLiveEvent(matchBefore, matchBefore, {
+    runs: 0,
+    isOut: false,
+    extraType: null,
+  });
   const undoEvent = createUndoLiveEvent(matchAfter);
 
   assert.equal(buildUmpireAnnouncement(scoreEvent, "simple"), "Umpire gives 2 runs.");
+  assert.equal(
+    buildUmpireAnnouncement(dotBallEvent, "simple"),
+    "Umpire has given dot ball."
+  );
   assert.equal(
     buildUmpireAnnouncement(undoEvent, "simple"),
     "Umpire has removed the score for that ball. Umpire will redo this ball."
