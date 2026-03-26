@@ -290,12 +290,30 @@ function SessionCard({
                 ) : null}
               </div>
             ) : null}
-            <div className={`min-w-0 ${hasScoreCard ? "pr-24 sm:pr-28" : "pr-0 sm:pr-2"}`}>
-              <h2 className="text-[1.25rem] leading-[1.08] font-medium tracking-[-0.035em] text-white [overflow-wrap:break-word] sm:text-[1.45rem] md:text-[1.58rem]">
+            <div
+              className={`min-w-0 min-h-[8.9rem] ${hasScoreCard ? "pr-24 sm:pr-28" : "pr-0 sm:pr-2"}`}
+            >
+              <h2
+                className="text-[1.25rem] leading-[1.08] font-medium tracking-[-0.035em] text-white [overflow-wrap:anywhere] sm:text-[1.45rem] md:text-[1.58rem]"
+                style={{
+                  display: "-webkit-box",
+                  WebkitBoxOrient: "vertical",
+                  WebkitLineClamp: 3,
+                  overflow: "hidden",
+                }}
+              >
                 {session.name || "Untitled Session"}
               </h2>
               {teamLine ? (
-                <p className="mt-4 text-[0.98rem] leading-snug font-semibold uppercase tracking-[0.02em] text-zinc-100 [overflow-wrap:break-word] sm:text-[1.02rem]">
+                <p
+                  className="mt-4 text-[0.98rem] leading-snug font-semibold uppercase tracking-[0.02em] text-zinc-100 [overflow-wrap:anywhere] sm:text-[1.02rem]"
+                  style={{
+                    display: "-webkit-box",
+                    WebkitBoxOrient: "vertical",
+                    WebkitLineClamp: 2,
+                    overflow: "hidden",
+                  }}
+                >
                   {teamLine}
                 </p>
               ) : null}
@@ -340,16 +358,26 @@ function SessionCard({
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(7,7,10,0.08),rgba(7,7,10,0.18))]" />
           </div>
         ) : (
-          <div className="mt-6 rounded-[20px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.03),transparent_28%),linear-gradient(180deg,rgba(0,0,0,0.18),rgba(0,0,0,0.32))] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-zinc-500">
-              Match Status
-            </p>
-            <p className="mt-2 text-[15px] font-semibold leading-6 text-zinc-100">
-              {statusMeta.title}
-            </p>
-            <p className="mt-1 text-[14px] leading-6 text-zinc-300">
-              {statusMeta.summary}
-            </p>
+          <div className="mt-6 overflow-hidden rounded-[20px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.03),transparent_28%),linear-gradient(180deg,rgba(0,0,0,0.18),rgba(0,0,0,0.32))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <div className="flex aspect-[16/7.8] flex-col justify-center px-4 py-3.5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                Status
+              </p>
+              <p className="mt-1.5 text-[14px] font-semibold leading-5 text-zinc-100">
+                {statusMeta.title}
+              </p>
+              <p
+                className="mt-1 text-[13px] leading-5 text-zinc-300"
+                style={{
+                  display: "-webkit-box",
+                  WebkitBoxOrient: "vertical",
+                  WebkitLineClamp: 2,
+                  overflow: "hidden",
+                }}
+              >
+                {statusMeta.summary}
+              </p>
+            </div>
           </div>
         )}
 

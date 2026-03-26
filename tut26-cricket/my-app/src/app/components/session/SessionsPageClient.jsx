@@ -314,6 +314,15 @@ export default function SessionsPageClient({ initialSessions }) {
   const showingTo = filteredSessions.length
     ? Math.min(filteredSessions.length, pageStart + pageSize)
     : 0;
+  const totalSessionCount = sessions.length;
+  const filteredSessionCount = filteredSessions.length;
+  const totalSessionsLabel = `${totalSessionCount} ${
+    totalSessionCount === 1 ? "session" : "sessions"
+  }`;
+  const filteredSessionsLabel = `${filteredSessionCount} ${
+    filteredSessionCount === 1 ? "session" : "sessions"
+  }`;
+  const isFilteredView = filterBy !== "all" || Boolean(searchQuery);
   const imageReplaceSession = imageReplaceContext
     ? sessions.find((session) => session._id === imageReplaceContext.sessionId) || null
     : null;
@@ -810,7 +819,7 @@ export default function SessionsPageClient({ initialSessions }) {
         selectionMode ? "pt-28 sm:pt-32" : "pt-6"
       }`}
     >
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto max-w-[1680px]">
         <div className="mb-6 flex items-center justify-between gap-3">
           <LoadingButton
             type="button"
@@ -858,7 +867,9 @@ export default function SessionsPageClient({ initialSessions }) {
                 </button>
               </div>
               <p className="mt-3 text-sm text-zinc-400">
-                {filteredSessions.length} visible of {sessions.length} total sessions
+                {isFilteredView
+                  ? `${filteredSessionsLabel} visible of ${totalSessionsLabel}`
+                  : `${totalSessionsLabel} total`}
               </p>
             </div>
           </div>
@@ -933,7 +944,7 @@ export default function SessionsPageClient({ initialSessions }) {
             />
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-4">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] gap-5 2xl:gap-6">
                 {paginatedSessions.map((session) => (
                   <div
                     key={session._id}
@@ -964,8 +975,14 @@ export default function SessionsPageClient({ initialSessions }) {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <p className="text-sm font-medium text-zinc-200">
-                      Showing {showingFrom}-{showingTo} of {filteredSessions.length} sessions
+                      Showing {showingFrom}-{showingTo} of{" "}
+                      {isFilteredView ? filteredSessionsLabel : totalSessionsLabel}
                     </p>
+                    {isFilteredView ? (
+                      <p className="mt-1 text-sm text-zinc-500">
+                        {totalSessionsLabel} in database
+                      </p>
+                    ) : null}
                     <p className="mt-1 text-sm text-zinc-500">
                       Page {currentPage} of {totalPages}
                     </p>
