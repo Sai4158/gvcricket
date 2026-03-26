@@ -22,6 +22,10 @@ function getConfiguredManagePinValue() {
   );
 }
 
+function getConfiguredManagePinHashValue() {
+  return process.env.SESSION_MANAGE_PIN_HASH || "";
+}
+
 function getConfiguredPinHashValue() {
   return (
     process.env.UMPIRE_ADMIN_PIN_HASH ||
@@ -86,6 +90,15 @@ export function isValidUmpirePin(pin) {
 }
 
 export function isValidManagePin(pin) {
+  const configuredHash = getConfiguredManagePinHashValue();
+
+  if (configuredHash) {
+    const incomingHash = hashManagePin(pin);
+    const expectedBuffer = Buffer.from(configuredHash, "hex");
+    if (incomingHash.length !== expectedBuffer.length) return false;
+    return crypto.timingSafeEqual(incomingHash, expectedBuffer);
+  }
+
   const configuredPin = getConfiguredManagePin();
   if (!configuredPin) return false;
 

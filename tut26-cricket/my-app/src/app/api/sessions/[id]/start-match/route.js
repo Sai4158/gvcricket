@@ -16,6 +16,7 @@ import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../../lib/request-security";
 import { hasValidDraftToken } from "../../../../lib/session-draft";
+import { invalidateSessionsDataCache } from "../../../../lib/server-data";
 import { setupMatchSchema } from "../../../../lib/validators";
 import { z } from "zod";
 
@@ -195,6 +196,7 @@ export async function POST(req, { params }) {
       Number(finalMatch.adminAccessVersion || 1)
     );
     response.cookies.set(matchCookie.name, matchCookie.value, matchCookie.options);
+    invalidateSessionsDataCache();
     publishMatchUpdate(finalMatch._id);
     publishSessionUpdate(sessionId);
 

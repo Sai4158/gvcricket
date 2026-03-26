@@ -17,6 +17,8 @@ import {
   FaPlus,
   FaSearch,
   FaSlidersH,
+  FaTrash,
+  FaTimes,
 } from "react-icons/fa";
 import DarkSelect from "../shared/DarkSelect";
 import InfoModal from "./InfoModal";
@@ -50,6 +52,7 @@ const FILTER_OPTIONS = [
   { value: "live", label: "Live" },
   { value: "completed", label: "Completed" },
 ];
+const SESSION_SELECTION_HOLD_MS = 3000;
 
 function normalizeSearchValue(value) {
   return String(value || "").trim().toLowerCase();
@@ -145,6 +148,10 @@ export default function SessionsPageClient({ initialSessions }) {
   const [imageDeleteContext, setImageDeleteContext] = useState(null);
   const [imageReplaceContext, setImageReplaceContext] = useState(null);
   const [imageActionError, setImageActionError] = useState("");
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedSessionIds, setSelectedSessionIds] = useState([]);
+  const [selectionError, setSelectionError] = useState("");
+  const [bulkDeletePromptOpen, setBulkDeletePromptOpen] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("live-newest");
@@ -159,6 +166,14 @@ export default function SessionsPageClient({ initialSessions }) {
 
   useEffect(() => {
     setSessions(initialSessions ?? []);
+  }, [initialSessions]);
+
+  useEffect(() => {
+    setSelectedSessionIds((current) =>
+      current.filter((sessionId) =>
+        (initialSessions ?? []).some((session) => session._id === sessionId)
+      )
+    );
   }, [initialSessions]);
 
   useEffect(() => {
@@ -226,10 +241,27 @@ export default function SessionsPageClient({ initialSessions }) {
   const imageReplaceSession = imageReplaceContext
     ? sessions.find((session) => session._id === imageReplaceContext.sessionId) || null
     : null;
+  const selectedSessions = useMemo(
+    () => sessions.filter((session) => selectedSessionIds.includes(session._id)),
+    [selectedSessionIds, sessions]
+  );
+  const selectedSessionForManage =
+    selectedSessions.length === 1 ? selectedSessions[0] : null;
 
   useEffect(() => {
     setPage((current) => Math.min(current, totalPages));
   }, [totalPages]);
+
+  useEffect(() => {
+    if (!selectionMode) {
+      return;
+    }
+
+    if (!selectedSessionIds.length) {
+      setSelectionMode(false);
+      setSelectionError("");
+    }
+  }, [selectedSessionIds.length, selectionMode]);
 
   const handleOpenUmpirePin = useCallback((nextSession) => {
     setPinError("");
@@ -285,6 +317,49 @@ export default function SessionsPageClient({ initialSessions }) {
     }
   }, []);
 
+  const clearSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedSessionIds([]);
+    setSelectionError("");
+    setBulkDeletePromptOpen(false);
+  }, []);
+
+  const toggleSessionSelection = useCallback((sessionId) => {
+    setSelectionError("");
+    setSelectedSessionIds((current) => {
+      if (current.includes(sessionId)) {
+        return current.filter((value) => value !== sessionId);
+      }
+
+      if (current.length >= 15) {
+        setSelectionError("You can select up to 15 sessions at once.");
+        return current;
+      }
+
+      return [...current, sessionId];
+    });
+  }, []);
+
+  const startSelectionMode = useCallback((session) => {
+    if (!session?._id) {
+      return;
+    }
+
+    suppressCardOpenUntilRef.current = Date.now() + 1200;
+    setSelectionMode(true);
+    setSelectionError("");
+    setSelectedSessionIds((current) => {
+      if (current.includes(session._id)) {
+        return current;
+      }
+      if (current.length >= 15) {
+        setSelectionError("You can select up to 15 sessions at once.");
+        return current;
+      }
+      return [...current, session._id];
+    });
+  }, []);
+
   const handleSecretManageHoldStart = useCallback(
     (session, event) => {
       if (
@@ -296,9 +371,11 @@ export default function SessionsPageClient({ initialSessions }) {
 
       clearSecretHoldTimer();
       secretHoldTimerRef.current = window.setTimeout(() => {
-        suppressCardOpenUntilRef.current = Date.now() + 1200;
-        setManagePinPrompt(session);
-      }, 4000);
+        setManagePinPrompt({
+          mode: "select",
+          session,
+        });
+      }, SESSION_SELECTION_HOLD_MS);
     },
     [clearSecretHoldTimer]
   );
@@ -308,8 +385,8 @@ export default function SessionsPageClient({ initialSessions }) {
   }, [clearSecretHoldTimer]);
 
   const shouldBlockCardOpen = useCallback(
-    () => Date.now() < suppressCardOpenUntilRef.current,
-    []
+    () => selectionMode || Date.now() < suppressCardOpenUntilRef.current,
+    [selectionMode]
   );
 
   const handleGoHome = useCallback(() => {
@@ -329,7 +406,7 @@ export default function SessionsPageClient({ initialSessions }) {
 
   const handleManagePinSubmit = useCallback(
     async (pin) => {
-      if (!managePinPrompt?._id) {
+      if (!managePinPrompt?.session?._id) {
         return;
       }
 
@@ -346,11 +423,15 @@ export default function SessionsPageClient({ initialSessions }) {
         throw new Error(payload.message || "Incorrect PIN.");
       }
 
-      const session = managePinPrompt;
+      const session = managePinPrompt.session;
       setManagePinPrompt(null);
+      if (managePinPrompt.mode === "select") {
+        startSelectionMode(session);
+        return;
+      }
       openSessionManager(session, pin);
     },
-    [managePinPrompt, openSessionManager]
+    [managePinPrompt, openSessionManager, startSelectionMode]
   );
 
   const closeSessionManager = useCallback(() => {
@@ -452,6 +533,43 @@ export default function SessionsPageClient({ initialSessions }) {
     }
   }, [closeSessionManager, manageSessionContext, manageSubmitting]);
 
+  const handleBulkDeleteSessions = useCallback(
+    async (pin) => {
+      if (!selectedSessionIds.length) {
+        throw new Error("Select at least 1 session.");
+      }
+
+      const response = await fetch("/api/sessions/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionIds: selectedSessionIds,
+          pin,
+        }),
+      });
+      const payload = await response
+        .json()
+        .catch(() => ({ message: "Could not delete the selected sessions." }));
+
+      if (!response.ok) {
+        throw new Error(payload.message || "Could not delete the selected sessions.");
+      }
+
+      const deletedIds = Array.isArray(payload.deletedSessionIds)
+        ? payload.deletedSessionIds.map((value) => String(value))
+        : [];
+      const removedIds = deletedIds.length ? deletedIds : selectedSessionIds;
+
+      setSessions((current) =>
+        current.filter((session) => !removedIds.includes(String(session._id)))
+      );
+      clearSelectionMode();
+      setBulkDeletePromptOpen(false);
+      router.refresh();
+    },
+    [clearSelectionMode, router, selectedSessionIds]
+  );
+
   const handleDeleteSessionImage = useCallback(
     async (pin) => {
       if (!imageDeleteContext?.matchId) {
@@ -551,7 +669,11 @@ export default function SessionsPageClient({ initialSessions }) {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_20%),radial-gradient(circle_at_86%_10%,rgba(14,165,233,0.1),transparent_20%),radial-gradient(circle_at_16%_88%,rgba(16,185,129,0.08),transparent_20%),linear-gradient(180deg,#1b1d23_0%,#09090d_100%)] px-4 pb-10 pt-6 text-zinc-100 sm:px-6 lg:px-8">
+    <main
+      className={`min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_20%),radial-gradient(circle_at_86%_10%,rgba(14,165,233,0.1),transparent_20%),radial-gradient(circle_at_16%_88%,rgba(16,185,129,0.08),transparent_20%),linear-gradient(180deg,#1b1d23_0%,#09090d_100%)] px-4 pb-10 text-zinc-100 sm:px-6 lg:px-8 ${
+        selectionMode ? "pt-28 sm:pt-32" : "pt-6"
+      }`}
+    >
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex items-center justify-between gap-3">
           <LoadingButton
@@ -656,6 +778,7 @@ export default function SessionsPageClient({ initialSessions }) {
               ))}
             </div>
           </div>
+
         </section>
 
         <div className="mt-8">
@@ -693,6 +816,9 @@ export default function SessionsPageClient({ initialSessions }) {
                       onDirectorClick={handleOpenDirectorPin}
                       shouldBlockCardOpen={shouldBlockCardOpen}
                       onImageHold={handleOpenImageActions}
+                      selectionMode={selectionMode}
+                      selected={selectedSessionIds.includes(session._id)}
+                      onSelectToggle={toggleSessionSelection}
                     />
                   </div>
                 ))}
@@ -747,6 +873,66 @@ export default function SessionsPageClient({ initialSessions }) {
         </div>
       </div>
 
+      {selectionMode ? (
+        <div className="pointer-events-none fixed inset-x-0 top-3 z-40 flex justify-center px-4 sm:top-4 sm:px-6">
+          <div className="pointer-events-auto w-full max-w-5xl overflow-hidden rounded-[26px] border border-cyan-300/12 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.08),transparent_22%),linear-gradient(180deg,rgba(14,14,18,0.96),rgba(8,8,12,0.98))] shadow-[0_22px_70px_rgba(0,0,0,0.42)] backdrop-blur-2xl">
+            <div className="flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex rounded-full border border-cyan-200/16 bg-cyan-300/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-100">
+                    Selection
+                  </span>
+                  <span className="inline-flex rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs font-semibold text-white">
+                    {selectedSessionIds.length} selected
+                  </span>
+                  {selectionError ? (
+                    <span className="text-xs font-medium text-rose-300">
+                      {selectionError}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-zinc-400">Up to 15</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 sm:justify-end">
+                {selectedSessionForManage ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setManagePinPrompt({
+                        mode: "manage",
+                        session: selectedSessionForManage,
+                      })
+                    }
+                    className="press-feedback rounded-2xl border border-cyan-300/18 bg-[linear-gradient(180deg,rgba(12,24,34,0.96),rgba(8,47,73,0.82))] px-4 py-2.5 text-sm font-semibold text-cyan-50"
+                  >
+                    Manage
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setBulkDeletePromptOpen(true)}
+                  disabled={!selectedSessionIds.length}
+                  className="press-feedback inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-300/18 bg-[linear-gradient(180deg,rgba(82,15,28,0.98),rgba(127,29,29,0.9))] px-4 py-2.5 text-sm font-semibold text-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <FaTrash />
+                  Delete
+                </button>
+                <button
+                  type="button"
+                  onClick={clearSelectionMode}
+                  className="press-feedback inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-zinc-200 transition hover:bg-white/[0.08]"
+                  aria-label="Close selection mode"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <AnimatePresence>
         {pinPrompt ? (
           <PinModal
@@ -775,17 +961,39 @@ export default function SessionsPageClient({ initialSessions }) {
         {managePinPrompt ? (
           <ImagePinModal
             isOpen={Boolean(managePinPrompt)}
-            title=""
-            subtitle=""
-            confirmLabel="Continue"
+            title={
+              managePinPrompt.mode === "select"
+                ? "Select Sessions"
+                : "Manage Session"
+            }
+            subtitle={
+              managePinPrompt.mode === "select"
+                ? "Enter the 6-digit manage PIN to unlock session selection."
+                : "Enter the 6-digit manage PIN to edit or delete this session."
+            }
+            confirmLabel={
+              managePinPrompt.mode === "select" ? "Unlock Selection" : "Continue"
+            }
             digitCount={6}
-            pinLabel="Secret manage PIN"
+            pinLabel="Manage PIN"
             placeholder="- - - - - -"
-            hideHeaderCopy
             onConfirm={handleManagePinSubmit}
             onClose={() => {
               setManagePinPrompt(null);
             }}
+          />
+        ) : null}
+        {bulkDeletePromptOpen ? (
+          <ImagePinModal
+            isOpen={bulkDeletePromptOpen}
+            title="Delete Sessions"
+            subtitle={`Enter the 6-digit manage PIN to delete ${selectedSessionIds.length} selected session${selectedSessionIds.length === 1 ? "" : "s"}.`}
+            confirmLabel="Delete Sessions"
+            digitCount={6}
+            pinLabel="Manage PIN"
+            placeholder="- - - - - -"
+            onConfirm={handleBulkDeleteSessions}
+            onClose={() => setBulkDeletePromptOpen(false)}
           />
         ) : null}
         {manageSessionContext ? (

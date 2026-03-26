@@ -8,6 +8,7 @@ import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../../lib/request-security";
 import { hasValidDraftToken } from "../../../../lib/session-draft";
+import { invalidateSessionsDataCache } from "../../../../lib/server-data";
 import { buildTeamUpdate } from "../../../../lib/team-utils";
 import { setupMatchSchema } from "../../../../lib/validators";
 import Session from "../../../../../models/Session";
@@ -72,6 +73,7 @@ export async function POST(req, { params }) {
     existingSession.teamBName = normalizedTeamB.name;
     existingSession.overs = overs;
     await existingSession.save();
+    invalidateSessionsDataCache();
 
     const response = NextResponse.json(serializePublicSession(existingSession), {
       status: 201,

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import test from "node:test";
 import {
   createMatchSchema,
@@ -8,6 +9,7 @@ import {
 import {
   createMatchAccessToken,
   hasValidMatchAccess,
+  isValidManagePin,
   isValidUmpirePin,
 } from "../src/app/lib/match-access.js";
 import {
@@ -164,6 +166,40 @@ test("match access tokens validate by version and PIN checks use constant-time f
 
     if (previousPinHash === undefined) delete process.env.UMPIRE_ADMIN_PIN_HASH;
     else process.env.UMPIRE_ADMIN_PIN_HASH = previousPinHash;
+  }
+});
+
+test("manage PIN validation supports hashed env configuration", () => {
+  const previousSecret = process.env.MATCH_ACCESS_SECRET;
+  const previousManageSecret = process.env.SESSION_MANAGE_ACCESS_SECRET;
+  const previousManagePin = process.env.SESSION_MANAGE_PIN;
+  const previousManagePinHash = process.env.SESSION_MANAGE_PIN_HASH;
+
+  process.env.MATCH_ACCESS_SECRET = "manage-hash-fallback-secret";
+  process.env.SESSION_MANAGE_ACCESS_SECRET = "manage-hash-secret";
+  process.env.SESSION_MANAGE_PIN = "636363";
+  process.env.SESSION_MANAGE_PIN_HASH = crypto
+    .scryptSync("636363", "manage-hash-secret", 64)
+    .toString("hex");
+
+  try {
+    assert.equal(isValidManagePin("636363"), true);
+    assert.equal(isValidManagePin("000000"), false);
+  } finally {
+    if (previousSecret === undefined) delete process.env.MATCH_ACCESS_SECRET;
+    else process.env.MATCH_ACCESS_SECRET = previousSecret;
+
+    if (previousManageSecret === undefined) {
+      delete process.env.SESSION_MANAGE_ACCESS_SECRET;
+    } else {
+      process.env.SESSION_MANAGE_ACCESS_SECRET = previousManageSecret;
+    }
+
+    if (previousManagePin === undefined) delete process.env.SESSION_MANAGE_PIN;
+    else process.env.SESSION_MANAGE_PIN = previousManagePin;
+
+    if (previousManagePinHash === undefined) delete process.env.SESSION_MANAGE_PIN_HASH;
+    else process.env.SESSION_MANAGE_PIN_HASH = previousManagePinHash;
   }
 });
 

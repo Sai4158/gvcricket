@@ -40,6 +40,15 @@ if (!globalThis.__gvServerDataCache) {
   globalThis.__gvServerDataCache = globalServerDataCache;
 }
 
+export function invalidateSessionsDataCache() {
+  globalServerDataCache.sessionsIndex.value = null;
+  globalServerDataCache.sessionsIndex.expiresAt = 0;
+  globalServerDataCache.sessionsIndex.pending = null;
+  globalServerDataCache.directorSessions.value = null;
+  globalServerDataCache.directorSessions.expiresAt = 0;
+  globalServerDataCache.directorSessions.pending = null;
+}
+
 async function resolveSessionMatches(sessions) {
   const resolvedBySessionId = new Map();
   const unresolvedSessionIds = sessions

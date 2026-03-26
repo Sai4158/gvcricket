@@ -4,6 +4,7 @@ import { memo, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   FaArrowUpRightFromSquare,
+  FaCheck,
   FaEye,
   FaLock,
   FaRadio,
@@ -74,6 +75,9 @@ function SessionCard({
   onDirectorClick,
   shouldBlockCardOpen,
   onImageHold,
+  selectionMode = false,
+  selected = false,
+  onSelectToggle,
 }) {
   const router = useRouter();
   const cardRef = useRef(null);
@@ -143,25 +147,39 @@ function SessionCard({
   return (
     <div
       ref={cardRef}
-      role={canOpenCard ? "link" : undefined}
-      tabIndex={canOpenCard ? 0 : undefined}
-      aria-label={canOpenCard ? `Open ${session.name || "session"}` : undefined}
+      role={selectionMode ? "button" : canOpenCard ? "link" : undefined}
+      tabIndex={selectionMode || canOpenCard ? 0 : undefined}
+      aria-label={
+        selectionMode
+          ? `${selected ? "Deselect" : "Select"} ${session.name || "session"}`
+          : canOpenCard
+          ? `Open ${session.name || "session"}`
+          : undefined
+      }
       onClick={(event) => {
         if (
-          !canOpenCard ||
+          (!canOpenCard && !selectionMode) ||
           (event.target instanceof Element &&
             event.target.closest("button,a,input,textarea,select,label"))
         ) {
           return;
         }
+        if (selectionMode) {
+          onSelectToggle?.(session._id);
+          return;
+        }
         handleCardOpen();
       }}
       onKeyDown={(event) => {
-        if (!canOpenCard) {
+        if (!selectionMode && !canOpenCard) {
           return;
         }
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
+          if (selectionMode) {
+            onSelectToggle?.(session._id);
+            return;
+          }
           handleCardOpen();
         }
       }}
@@ -169,7 +187,13 @@ function SessionCard({
         isLive
           ? "border-rose-300/18 bg-[radial-gradient(circle_at_top_left,rgba(244,63,94,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(190,24,93,0.08),transparent_34%),linear-gradient(180deg,rgba(24,12,16,0.98),rgba(7,10,12,0.98))]"
           : "border-emerald-300/14 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.1),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(34,197,94,0.08),transparent_28%),linear-gradient(180deg,rgba(12,20,16,0.98),rgba(10,10,14,0.98))]"
-      } ${canOpenCard ? "cursor-pointer press-feedback" : ""}`}
+      } ${
+        selectionMode
+          ? `cursor-pointer press-feedback ${selected ? "ring-2 ring-cyan-300/45 shadow-[0_0_0_1px_rgba(103,232,249,0.28),0_24px_70px_rgba(0,0,0,0.34)]" : ""}`
+          : canOpenCard
+          ? "cursor-pointer press-feedback"
+          : ""
+      }`}
       style={{
         contentVisibility: "auto",
         containIntrinsicSize: "320px",
@@ -193,6 +217,19 @@ function SessionCard({
           isLive ? "bg-rose-500/8" : "bg-emerald-500/8"
         }`}
       />
+      {selectionMode ? (
+        <div className="pointer-events-none absolute left-4 top-4 z-10">
+          <span
+            className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border text-sm shadow-[0_12px_24px_rgba(0,0,0,0.18)] ${
+              selected
+                ? "border-cyan-200/28 bg-cyan-300/18 text-cyan-50"
+                : "border-white/10 bg-black/35 text-zinc-300"
+            }`}
+          >
+            <FaCheck />
+          </span>
+        </div>
+      ) : null}
 
       <div className="relative flex h-full flex-col">
         <div className="flex flex-col gap-3">
@@ -273,8 +310,17 @@ function SessionCard({
           </div>
         )}
 
-        <div className="mt-6 flex flex-wrap gap-3">
-          {isLive && session.match ? (
+        <div
+          className={`mt-6 flex flex-wrap gap-3 ${
+            selectionMode ? "pointer-events-none opacity-45" : ""
+          }`}
+        >
+          {selectionMode ? (
+            <div className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3 text-sm font-medium text-zinc-300">
+              <FaCheck />
+              <span>{selected ? "Selected" : "Tap to select"}</span>
+            </div>
+          ) : isLive && session.match ? (
             <>
               <PendingLink
                 href={scoreHref}

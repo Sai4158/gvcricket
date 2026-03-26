@@ -1,10 +1,10 @@
 import { jsonError, jsonRateLimit } from "../../../lib/api-response";
 import { writeAuditLog } from "../../../lib/audit-log";
-import { isValidUmpirePin } from "../../../lib/match-access";
+import { isValidManagePin } from "../../../lib/match-access";
 import { getRequestMeta } from "../../../lib/request-meta";
 import { enforceRateLimit } from "../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../lib/request-security";
-import { pinPayloadSchema } from "../../../lib/validators";
+import { secretPinPayloadSchema } from "../../../lib/validators";
 
 export async function POST(req) {
   const meta = getRequestMeta(req);
@@ -32,14 +32,14 @@ export async function POST(req) {
     );
   }
 
-  const parsedRequest = await parseJsonRequest(req, pinPayloadSchema, {
+  const parsedRequest = await parseJsonRequest(req, secretPinPayloadSchema, {
     maxBytes: 2048,
   });
   if (!parsedRequest.ok) {
     return jsonError(parsedRequest.message, parsedRequest.status);
   }
 
-  if (!isValidUmpirePin(parsedRequest.value.pin)) {
+  if (!isValidManagePin(parsedRequest.value.pin)) {
     await writeAuditLog({
       action: "media_pin_failed",
       targetType: "media",

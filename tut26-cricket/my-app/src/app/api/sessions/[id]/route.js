@@ -16,6 +16,7 @@ import { getRequestMeta } from "../../../lib/request-meta";
 import { enforceRateLimit } from "../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../lib/request-security";
 import { hasValidDraftToken } from "../../../lib/session-draft";
+import { invalidateSessionsDataCache } from "../../../lib/server-data";
 import {
   pinSchema,
   sessionPatchObjectSchema,
@@ -152,6 +153,17 @@ export async function PATCH(req, { params }) {
       });
     }
 
+    invalidateSessionsDataCache();
+    {
+      const { publishMatchUpdate, publishSessionUpdate } = await import(
+        "../../../lib/live-updates"
+      );
+      if (session.match) {
+        publishMatchUpdate(String(session.match));
+      }
+      publishSessionUpdate(id);
+    }
+
     await writeAuditLog({
       action: "session_patch",
       targetType: "session",
@@ -214,6 +226,9 @@ export async function DELETE(req, { params }) {
       }
 
       await Session.deleteOne({ _id: id });
+      invalidateSessionsDataCache();
+      const { publishSessionUpdate } = await import("../../../lib/live-updates");
+      publishSessionUpdate(id);
 
       await writeAuditLog({
         action: "session_draft_delete",
@@ -248,6 +263,7 @@ export async function DELETE(req, { params }) {
       await Match.deleteOne({ _id: matchId });
     }
     await Session.deleteOne({ _id: id });
+    invalidateSessionsDataCache();
 
     await writeAuditLog({
       action: "session_delete",
@@ -258,11 +274,13 @@ export async function DELETE(req, { params }) {
       userAgent: meta.userAgent,
     });
 
-    if (matchId) {
+    {
       const { publishMatchUpdate, publishSessionUpdate } = await import(
         "../../../lib/live-updates"
       );
-      publishMatchUpdate(matchId);
+      if (matchId) {
+        publishMatchUpdate(matchId);
+      }
       publishSessionUpdate(id);
     }
 
