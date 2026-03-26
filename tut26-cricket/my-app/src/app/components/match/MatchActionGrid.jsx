@@ -67,24 +67,30 @@ function AnnounceIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" aria-hidden="true">
       <path
-        d="M4.5 14H7l4.5 3V7L7 10H4.5A1.5 1.5 0 0 0 3 11.5v1A1.5 1.5 0 0 0 4.5 14Z"
+        d="M9.5 6.25a2.25 2.25 0 1 1 0 4.5a2.25 2.25 0 0 1 0-4.5Z"
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
-        d="M15.5 9.5a4 4 0 0 1 0 5m2.5-7.5a7 7 0 0 1 0 10"
+        d="M5.75 18.25a3.75 3.75 0 0 1 7.5 0"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M15 9.5a3.5 3.5 0 0 1 0 5"
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
       />
       <path
-        d="m17 4.75 2 2-2 2"
+        d="M17.75 7.5a6.5 6.5 0 0 1 0 9"
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
-        strokeLinejoin="round"
       />
     </svg>
   );

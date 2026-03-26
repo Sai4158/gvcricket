@@ -304,6 +304,9 @@ export default function ResultPageClient({ matchId, initialMatch }) {
                   setMatch(updatedMatch);
                 });
               }}
+              onComplete={() => {
+                setIsImageManagerOpen(false);
+              }}
               title="Match Images"
               description="Add, rank, and clean up the result gallery."
               primaryLabel="Save Images"

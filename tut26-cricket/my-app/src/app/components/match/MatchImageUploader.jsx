@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FaArrowLeft,
@@ -255,6 +256,7 @@ export default function MatchImageUploader({
   targetImageId = "",
   appendOnUpload = false,
   onUploaded,
+  onComplete,
   onSkip,
   title = "Add Match Image",
   description = "",
@@ -286,6 +288,7 @@ export default function MatchImageUploader({
   const [pendingProtectedAction, setPendingProtectedAction] = useState(null);
   const [error, setError] = useState("");
   const [showPinPrompt, setShowPinPrompt] = useState(false);
+  const [uploadStatusText, setUploadStatusText] = useState("");
   const inputRef = useRef(null);
   const pinInputRef = useRef(null);
   const browseModeRef = useRef("replace");
@@ -408,6 +411,7 @@ export default function MatchImageUploader({
     replaceSelectedItems([]);
     setPin("");
     setError("");
+    setUploadStatusText("");
     setShowPinPrompt(false);
     setPendingProtectedAction(null);
     setSubmitMode("");
@@ -442,12 +446,13 @@ export default function MatchImageUploader({
           ? [...current, ...preparedItems]
           : preparedItems;
       });
-      setUploadPlan((currentPlan) => {
-        if (browseModeRef.current === "replace") {
-          return galleryItems.length > 0 ? "replace" : "append";
-        }
-        return currentPlan === "replace" ? "replace" : "append";
-      });
+      setUploadPlan(
+        browseModeRef.current === "replace"
+          ? galleryItems.length > 0
+            ? "replace"
+            : "append"
+          : "append",
+      );
       setError("");
     } catch (caughtError) {
       setError(caughtError.message || "Could not prepare these images.");
@@ -488,10 +493,24 @@ export default function MatchImageUploader({
   );
 
   const requestProtectedAction = useCallback((action) => {
+    setPin("");
+    setError("");
     setPendingProtectedAction(action);
     setShowPinPrompt(true);
     lastAutoActionKeyRef.current = "";
   }, []);
+
+  const closeProtectedActionPrompt = useCallback(() => {
+    if (isSubmitting) {
+      return;
+    }
+
+    setShowPinPrompt(false);
+    setPendingProtectedAction(null);
+    setPin("");
+    setError("");
+    lastAutoActionKeyRef.current = "";
+  }, [isSubmitting]);
 
   const executeUpload = useCallback(
     async (pinOverride = "") => {
@@ -501,8 +520,6 @@ export default function MatchImageUploader({
 
       const submittedPin = String(pinOverride || pin || "").trim();
       if (uploadNeedsPin && submittedPin.length !== 4) {
-        setSubmitMode("upload");
-        setError("");
         requestProtectedAction({ type: "upload" });
         return;
       }
@@ -514,11 +531,21 @@ export default function MatchImageUploader({
       setError("");
       try {
         let latestPayload = null;
-        const compressedFiles = await Promise.all(
-          selectedFiles.map((selectedFile) => compressMatchImage(selectedFile)),
-        );
+        const totalUploads = selectedFiles.length;
 
-        for (const [index, compressedFile] of compressedFiles.entries()) {
+        for (const [index, selectedFile] of selectedFiles.entries()) {
+          setUploadStatusText(
+            totalUploads > 1
+              ? `Preparing ${index + 1}/${totalUploads}...`
+              : "Preparing...",
+          );
+          const compressedFile = await compressMatchImage(selectedFile);
+
+          setUploadStatusText(
+            totalUploads > 1
+              ? `Uploading ${index + 1}/${totalUploads}...`
+              : "Uploading...",
+          );
           const formData = new FormData();
           formData.append("image", compressedFile);
           formData.append("plannedTotalCount", String(plannedGalleryCount));
@@ -557,9 +584,11 @@ export default function MatchImageUploader({
         syncGalleryFromPayload(latestPayload, {
           preferredImageId: replaceTargetId || activeExistingItem?.id || "",
         });
+        onComplete?.("upload", latestPayload);
       } catch (caughtError) {
         setError(caughtError.message || "Image upload failed.");
       } finally {
+        setUploadStatusText("");
         setSubmitMode("");
       }
     },
@@ -574,6 +603,7 @@ export default function MatchImageUploader({
       resetSelectedFiles,
       selectedFiles,
       syncGalleryFromPayload,
+      onComplete,
       uploadNeedsPin,
     ],
   );
@@ -761,16 +791,16 @@ export default function MatchImageUploader({
   );
 
   const helperText =
-    description || "Add one image fast, or build and rank a gallery here.";
+    description || "Add, sort, or remove images.";
   const showGallerySection = galleryItems.length > 0;
   const showSelectedSection = selectedItems.length > 0;
   const showReplaceButton = showGallerySection || showSelectedSection;
   const pinPromptCopy =
     pendingProtectedAction?.type === "remove"
-      ? "Enter it once to remove this image."
+      ? "Enter PIN to remove."
       : pendingProtectedAction?.type === "reorder"
-      ? "Enter it once to save this gallery order."
-      : "Enter it once for this upload.";
+      ? "Enter PIN to save order."
+      : "Enter PIN to upload.";
 
   return (
     <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.08),transparent_28%),linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,8,12,0.99))] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.34)] ring-1 ring-white/5 sm:p-5">
@@ -787,12 +817,12 @@ export default function MatchImageUploader({
         <div className="flex flex-wrap justify-end gap-2">
           {showGallerySection ? (
             <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-300">
-              {galleryItems.length} live
+              {galleryItems.length} image{galleryItems.length === 1 ? "" : "s"}
             </span>
           ) : null}
           {showSelectedSection ? (
             <span className="rounded-full border border-emerald-300/18 bg-emerald-500/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100">
-              {selectedItems.length} ready
+              {selectedItems.length} selected
             </span>
           ) : null}
         </div>
@@ -810,11 +840,11 @@ export default function MatchImageUploader({
             <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.92))] px-4 pb-4 pt-10">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full border border-white/12 bg-black/40 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/80">
-                  {activeItem ? "New Preview" : "Current Cover"}
+                  {activeItem ? "Selected" : "Cover"}
                 </span>
                 {plannedGalleryCount > 1 ? (
                   <span className="rounded-full border border-white/12 bg-black/40 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/72">
-                    Gallery {plannedGalleryCount}
+                    {plannedGalleryCount} total
                   </span>
                 ) : null}
               </div>
@@ -825,9 +855,9 @@ export default function MatchImageUploader({
             <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-white/[0.05] text-zinc-300">
               <FaImage className="text-lg" />
             </div>
-            <h4 className="mt-4 text-lg font-semibold text-white">Build the gallery</h4>
+            <h4 className="mt-4 text-lg font-semibold text-white">No images yet</h4>
             <p className="mt-2 max-w-xs text-sm leading-6 text-zinc-400">
-              Add, rank, and clean up your match images here.
+              Choose one to start.
             </p>
           </div>
         )}
@@ -837,9 +867,8 @@ export default function MatchImageUploader({
         <div className="mt-4">
           <div className="mb-2 flex items-center justify-between gap-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-              Current images
+              Gallery
             </p>
-            <span className="text-xs text-zinc-400">First image becomes the cover</span>
           </div>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
             {galleryItems.map((item, index) => (
@@ -863,7 +892,7 @@ export default function MatchImageUploader({
         <div className="mt-4">
           <div className="mb-2 flex items-center justify-between gap-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-              New uploads
+              Selected
             </p>
             <button
               type="button"
@@ -895,7 +924,7 @@ export default function MatchImageUploader({
           className="press-feedback inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-white/[0.12]"
         >
           <FaImage className="text-xs" />
-          <span>{showReplaceButton ? "Replace selected" : "Choose images"}</span>
+          <span>{showReplaceButton ? "Replace" : "Choose images"}</span>
         </button>
         <button
           type="button"
@@ -917,45 +946,7 @@ export default function MatchImageUploader({
         className="hidden"
       />
 
-      {showPinPrompt ? (
-        <div className="mt-4 rounded-[24px] border border-amber-300/16 bg-[linear-gradient(180deg,rgba(250,204,21,0.08),rgba(255,255,255,0.03))] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.18)]">
-          <div className="flex items-start gap-3">
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-400/14 text-amber-300">
-              <FaShieldAlt className="text-sm" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-300/82">
-                Umpire PIN
-              </p>
-              <p className="mt-1 text-sm text-zinc-300">{pinPromptCopy}</p>
-            </div>
-          </div>
-          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <input
-              ref={pinInputRef}
-              id={`match-image-pin-${matchId}`}
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={4}
-              value={pin}
-              onChange={(event) => {
-                setPin(event.target.value.replace(/\D/g, "").slice(0, 4));
-                if (error) {
-                  setError("");
-                }
-              }}
-              placeholder="0000"
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-base font-semibold tracking-[0.32em] text-white outline-none transition placeholder:tracking-[0.32em] placeholder:text-zinc-500 focus:border-amber-400/28 focus:bg-white/[0.08] sm:max-w-[220px]"
-            />
-            <p className="text-xs leading-5 text-zinc-400">
-              Same PIN as umpire mode.
-            </p>
-          </div>
-        </div>
-      ) : null}
-
-      {error ? (
+      {error && !showPinPrompt ? (
         <p className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
           {error}
         </p>
@@ -964,16 +955,12 @@ export default function MatchImageUploader({
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
         <LoadingButton
           onClick={handleUpload}
-          disabled={!selectedItems.length || (showPinPrompt && pin.length !== 4)}
+          disabled={!selectedItems.length}
           loading={submitMode === "upload"}
-          pendingLabel="Uploading..."
+          pendingLabel={uploadStatusText || "Uploading..."}
           className="inline-flex w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#10b981_0%,#059669_100%)] px-5 py-3.5 font-semibold text-black shadow-[0_16px_36px_rgba(16,185,129,0.22)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1"
         >
-          {uploadNeedsPin && !showPinPrompt
-            ? "Continue"
-            : showPinPrompt && pendingProtectedAction?.type === "upload"
-            ? "Waiting for PIN"
-            : selectedItems.length > 1
+          {selectedItems.length > 1
             ? `${primaryLabel} (${selectedItems.length})`
             : primaryLabel}
         </LoadingButton>
@@ -987,6 +974,85 @@ export default function MatchImageUploader({
           </button>
         ) : null}
       </div>
+
+      <AnimatePresence>
+        {showPinPrompt ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/82 px-4 py-6 backdrop-blur-sm"
+            onClick={closeProtectedActionPrompt}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ type: "spring", stiffness: 360, damping: 28 }}
+              className="relative w-full max-w-sm overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.98),rgba(8,8,12,0.98))] p-6 shadow-[0_28px_90px_rgba(0,0,0,0.52)]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.10),transparent_28%)]" />
+              <button
+                type="button"
+                onClick={closeProtectedActionPrompt}
+                className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white"
+                aria-label="Close PIN dialog"
+              >
+                <FaTimes />
+              </button>
+
+              <div className="relative">
+                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-400/12 text-xl text-amber-300 shadow-[0_12px_24px_rgba(245,158,11,0.12)]">
+                  <FaShieldAlt />
+                </div>
+                <h3 className="text-2xl font-black tracking-tight text-white">
+                  Umpire PIN
+                </h3>
+                <p className="mt-2 max-w-xs text-sm leading-6 text-zinc-400">
+                  {pinPromptCopy}
+                </p>
+
+                <div className="mt-6">
+                  <label
+                    htmlFor={`match-image-pin-${matchId}`}
+                    className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500"
+                  >
+                    4-digit PIN
+                  </label>
+                  <input
+                    ref={pinInputRef}
+                    id={`match-image-pin-${matchId}`}
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={4}
+                    value={pin}
+                    onChange={(event) => {
+                      setPin(event.target.value.replace(/\D/g, "").slice(0, 4));
+                      if (error) {
+                        setError("");
+                      }
+                    }}
+                    placeholder="0000"
+                    className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-amber-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(251,191,36,0.08)]"
+                  />
+                </div>
+
+                {error ? (
+                  <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                    {error}
+                  </div>
+                ) : null}
+
+                <p className="mt-4 text-xs text-zinc-500">
+                  Upload starts as soon as the PIN is complete.
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </section>
   );
 }

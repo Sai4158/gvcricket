@@ -1,6 +1,8 @@
 "use client";
 
 const MAX_DIMENSION = 1600;
+const FAST_PATH_MAX_BYTES = 2 * 1024 * 1024;
+const FAST_PATH_PNG_MAX_BYTES = 900 * 1024;
 
 export function getAcceptedMatchImageTypes() {
   return "image/jpeg,image/png,image/webp";
@@ -8,6 +10,21 @@ export function getAcceptedMatchImageTypes() {
 
 export async function compressMatchImage(file) {
   const bitmap = await createImageBitmap(file);
+  const fitsMaxDimension =
+    bitmap.width <= MAX_DIMENSION && bitmap.height <= MAX_DIMENSION;
+  const canUseOriginalFile =
+    (fitsMaxDimension &&
+      (("image/jpeg" === file.type || "image/webp" === file.type) &&
+        file.size <= FAST_PATH_MAX_BYTES)) ||
+    (fitsMaxDimension &&
+      file.type === "image/png" &&
+      file.size <= FAST_PATH_PNG_MAX_BYTES);
+
+  if (canUseOriginalFile) {
+    bitmap.close();
+    return file;
+  }
+
   const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
   const width = Math.max(1, Math.round(bitmap.width * scale));
   const height = Math.max(1, Math.round(bitmap.height * scale));

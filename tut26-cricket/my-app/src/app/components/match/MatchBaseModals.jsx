@@ -350,6 +350,9 @@ export function MatchImageModal({ match, onUploaded, onClose }) {
         onUploaded={(updatedMatch) => {
           onUploaded(updatedMatch);
         }}
+        onComplete={() => {
+          onClose?.();
+        }}
         title={match?.matchImageUrl ? "Replace Match Image" : "Add Match Image"}
         description="Add, rank, or remove match images here."
         primaryLabel={match?.matchImageUrl ? "Save Images" : "Upload Images"}

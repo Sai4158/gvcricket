@@ -1352,6 +1352,9 @@ export default function SessionsPageClient({
                   updatedMatch
                 );
               }}
+              onComplete={() => {
+                closeImageActionFlows();
+              }}
               title="Match Gallery"
               description="Add, rank, or remove images for this session."
               primaryLabel="Save Images"

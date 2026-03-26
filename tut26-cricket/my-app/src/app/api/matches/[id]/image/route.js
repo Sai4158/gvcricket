@@ -290,11 +290,13 @@ export async function POST(req, { params }) {
       summaryText: "Match image updated.",
       createdAt: new Date().toISOString(),
     };
-    await match.save();
-
-    await Session.findByIdAndUpdate(match.sessionId, {
-      $set: buildSessionMirrorUpdate(match),
-    });
+    const sessionMirrorUpdate = buildSessionMirrorUpdate(match);
+    await Promise.all([
+      match.save(),
+      Session.findByIdAndUpdate(match.sessionId, {
+        $set: sessionMirrorUpdate,
+      }),
+    ]);
     invalidateSessionsDataCache();
     publishMatchUpdate(match._id);
     publishSessionUpdate(match.sessionId);

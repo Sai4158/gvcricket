@@ -170,21 +170,25 @@ function SoundPickerSheet({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="absolute inset-0 z-20 rounded-[28px] bg-[linear-gradient(180deg,rgba(10,10,14,0.96),rgba(4,4,8,0.98))] px-4 pb-4 pt-14 backdrop-blur-md"
+          className="absolute inset-0 z-20 rounded-[28px] bg-[linear-gradient(180deg,rgba(10,10,14,0.96),rgba(4,4,8,0.98))] p-4 backdrop-blur-md"
           style={{ touchAction: "pan-y" }}
         >
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute right-4 top-3 z-30 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/18 bg-[rgba(14,14,18,0.92)] text-white shadow-[0_10px_30px_rgba(0,0,0,0.32)] transition active:scale-[0.97] hover:bg-white/[0.12]"
-            aria-label="Back to umpire commentary"
-          >
-            <FaTimes />
-          </button>
-
           <div className="flex h-full min-h-0 flex-col rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,15,20,0.98),rgba(6,6,10,1))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-            <div>
-              <h4 className="text-lg font-black text-white">{eventLabel}</h4>
+            <div className="flex items-start justify-between gap-3 border-b border-white/8 pb-3">
+              <div className="min-w-0">
+                <h4 className="text-lg font-black text-white">{eventLabel}</h4>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Choose a sound effect
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/14 bg-[rgba(14,14,18,0.92)] text-white shadow-[0_10px_30px_rgba(0,0,0,0.32)] transition active:scale-[0.97] hover:bg-white/[0.12]"
+                aria-label="Back to umpire commentary"
+              >
+                <FaTimes />
+              </button>
             </div>
 
             <div
@@ -416,17 +420,38 @@ export default function AnnouncementControls({
     return (
       <section className="relative mx-auto flex max-h-[78vh] max-w-[32rem] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.1),transparent_24%),linear-gradient(180deg,rgba(16,16,20,0.98),rgba(7,7,11,0.99))] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.48)] backdrop-blur-md sm:max-h-[82vh] sm:p-5">
         {!editingEvent ? (
-          <button
-            type="button"
-            onClick={() => {
-              setEditingEventKey("");
-              onClose?.();
-            }}
-            className="absolute right-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-[rgba(20,20,24,0.92)] text-zinc-400 transition hover:bg-white/[0.08] hover:text-white sm:right-5 sm:top-5"
-            aria-label="Close live commentary"
-          >
-            <FaTimes />
-          </button>
+          <div className="mb-4 flex items-start justify-between gap-3 border-b border-white/8 pb-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <div
+                className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-lg ${
+                  isLiveSpeaking
+                    ? "border-emerald-300/28 bg-emerald-400/15 text-emerald-200 shadow-[0_0_30px_rgba(16,185,129,0.18)]"
+                    : "border-white/10 bg-white/[0.05] text-zinc-100"
+                }`}
+              >
+                <FaCompactDisc />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-[1.65rem] font-black tracking-[-0.03em] text-white">
+                  {title}
+                </h3>
+                <p className="mt-1 text-sm text-zinc-400">
+                  Clean score commentary and sound controls.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingEventKey("");
+                onClose?.();
+              }}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/14 bg-[rgba(20,20,24,0.92)] text-white transition hover:bg-white/[0.08] sm:mt-0.5"
+              aria-label="Close live commentary"
+            >
+              <FaTimes />
+            </button>
+          </div>
         ) : null}
         <div
           className="min-h-0 flex-1 overflow-y-auto pr-1 sm:pr-2"
@@ -436,30 +461,11 @@ export default function AnnouncementControls({
             overscrollBehavior: "contain",
           }}
         >
-        <div className="pr-12">
-          <div className="flex items-start gap-3">
-            <div
-              className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-lg ${
-                isLiveSpeaking
-                  ? "border-emerald-300/28 bg-emerald-400/15 text-emerald-200 shadow-[0_0_30px_rgba(16,185,129,0.18)]"
-                  : "border-white/10 bg-white/[0.05] text-zinc-100"
-              }`}
-            >
-              <FaCompactDisc />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-[1.65rem] font-black tracking-[-0.03em] text-white">
-                {title}
-              </h3>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-3">
+        <div className="grid gap-3">
           <div className="rounded-[22px] border border-white/8 bg-white/[0.04] p-3.5">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">
                   Commentary
                 </p>
                 <p className="mt-1 text-sm font-semibold text-white">
@@ -485,7 +491,7 @@ export default function AnnouncementControls({
           <div className="relative mt-4 rounded-[24px] border border-white/8 bg-white/[0.03] p-3 sm:p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-400">
                   Score Sounds
                 </p>
                 <p className="mt-1 text-xs text-zinc-500">
