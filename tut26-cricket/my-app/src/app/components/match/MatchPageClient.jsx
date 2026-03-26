@@ -679,6 +679,21 @@ export default function MatchPageClient({
     );
   }, [speakImmediateUmpireSequence, umpireSettings.enabled, umpireSettings.mode]);
 
+  const queueConfiguredScoreFollowUp = useCallback((followUpItems = []) => {
+    if (!umpireSettings.enabled || umpireSettings.mode === "silent" || !followUpItems.length) {
+      deferredUmpireAnnouncementRef.current = null;
+      return;
+    }
+
+    deferredUmpireAnnouncementRef.current = {
+      items: followUpItems,
+      options: {
+        key: "umpire-boundary-score",
+        priority: 2,
+      },
+    };
+  }, [umpireSettings.enabled, umpireSettings.mode]);
+
   const announceUmpireAction = (runs, isOut = false, extraType = null) => {
     if (!umpireSettings.enabled || umpireSettings.mode === "silent" || !isLiveMatch) {
       return;
@@ -816,6 +831,7 @@ export default function MatchPageClient({
       if (shouldPlayLocalScoreEffect) {
         setSoundEffectError("");
         shouldResumeAfterSoundEffectRef.current = false;
+        queueConfiguredScoreFollowUp(scorePreview.followUpItems);
         const playedLocally = await playLocalSoundEffect(configuredScoreEffect, {
           userGesture: true,
         });
@@ -830,7 +846,9 @@ export default function MatchPageClient({
       }
 
       activeBoundarySequenceRef.current = false;
-      announceConfiguredScoreFollowUp(scorePreview.followUpItems);
+      if (!shouldPlayLocalScoreEffect) {
+        announceConfiguredScoreFollowUp(scorePreview.followUpItems);
+      }
       return;
     }
 
