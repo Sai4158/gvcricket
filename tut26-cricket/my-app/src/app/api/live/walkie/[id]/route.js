@@ -32,8 +32,8 @@ export const preferredRegion = ["iad1"];
 const WALKIE_HEARTBEAT_INTERVAL_MS = 8000;
 const WALKIE_HEARTBEAT_START_DELAY_MS = 4000;
 const WALKIE_FALLBACK_POLL_INTERVAL_MS = 2000;
-const WALKIE_BOOT_PAD = "0".repeat(256);
-const WALKIE_PING_PAD = "0".repeat(64);
+const WALKIE_BOOT_PAD = "0".repeat(2048);
+const WALKIE_PING_PAD = "0".repeat(256);
 
 function sseHeaders() {
   return {
@@ -98,18 +98,6 @@ export async function GET(request, { params }) {
   const encoder = new TextEncoder();
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
-
-  let heartbeat = null;
-  let pollTimer = null;
-  let closed = false;
-  let lastVersion = -1;
-  let lastNotificationId = "";
-  let cleanupState = () => {};
-  let cleanupMessages = () => {};
-  let hasChangeStreamUpdates = false;
-  let didCleanup = false;
-  let pendingStateReplays = 0;
-  let startupReplayTimers = [];
   const bootstrapSnapshot = {
     enabled: false,
     spectatorCount: 0,
@@ -126,221 +114,234 @@ export async function GET(request, { params }) {
     updatedAt: new Date().toISOString(),
     version: 0,
   };
+  let stopStream = async () => {};
+  const stream = readable;
+  void (async () => {
+    let heartbeat = null;
+    let pollTimer = null;
+    let closed = false;
+    let lastVersion = -1;
+    let lastNotificationId = "";
+    let cleanupState = () => {};
+    let cleanupMessages = () => {};
+    let hasChangeStreamUpdates = false;
+    let didCleanup = false;
+    let pendingStateReplays = 0;
+    let startupReplayTimers = [];
 
-  const buildStatePayload = (snapshot, notification, extra = {}) => ({
-    snapshot,
-    ...(notification ? { notification } : {}),
-    ...extra,
-  });
+    const buildStatePayload = (snapshot, notification, extra = {}) => ({
+      snapshot,
+      ...(notification ? { notification } : {}),
+      ...extra,
+    });
 
-  const finalize = () => {
-    if (didCleanup) {
-      return;
-    }
-    didCleanup = true;
-    cleanupState();
-    cleanupMessages();
-    cleanupState = () => {};
-    cleanupMessages = () => {};
-    void clearPersistentWalkieMessages(id, participantId).catch(() => {});
-    if (heartbeat) {
-      clearTimeout(heartbeat);
-      heartbeat = null;
-    }
-    if (pollTimer) {
-      clearTimeout(pollTimer);
-      pollTimer = null;
-    }
-    if (startupReplayTimers.length) {
-      for (const timerId of startupReplayTimers) {
-        clearTimeout(timerId);
+    const finalize = () => {
+      if (didCleanup) {
+        return;
       }
-      startupReplayTimers = [];
-    }
-  };
+      didCleanup = true;
+      cleanupState();
+      cleanupMessages();
+      cleanupState = () => {};
+      cleanupMessages = () => {};
+      void clearPersistentWalkieMessages(id, participantId).catch(() => {});
+      if (heartbeat) {
+        clearTimeout(heartbeat);
+        heartbeat = null;
+      }
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+        pollTimer = null;
+      }
+      if (startupReplayTimers.length) {
+        for (const timerId of startupReplayTimers) {
+          clearTimeout(timerId);
+        }
+        startupReplayTimers = [];
+      }
+    };
 
-  const send = async (event, data) => {
-    if (closed) {
-      return false;
-    }
+    const send = async (event, data) => {
+      if (closed) {
+        return false;
+      }
 
-    try {
-      await writer.write(encoder.encode(encodeEvent(event, data)));
-      return true;
-    } catch (error) {
+      try {
+        await writer.write(encoder.encode(encodeEvent(event, data)));
+        return true;
+      } catch (error) {
+        closed = true;
+        finalize();
+        if (error?.code !== "ERR_INVALID_STATE") {
+          console.error("Walkie SSE enqueue failed:", error);
+        }
+        return false;
+      }
+    };
+
+    stopStream = async () => {
+      if (closed) {
+        return;
+      }
       closed = true;
       finalize();
-      if (error?.code !== "ERR_INVALID_STATE") {
-        console.error("Walkie SSE enqueue failed:", error);
+      try {
+        await writer.close();
+      } catch {
+        // Ignore close races.
       }
-      return false;
-    }
-  };
+    };
 
-  const stopStream = async () => {
-    if (closed) {
-      return;
-    }
-    closed = true;
-    finalize();
-    try {
-      await writer.close();
-    } catch {
-      // Ignore close races.
-    }
-  };
-
-  const scheduleHeartbeat = (delay) => {
-    if (closed) {
-      return;
-    }
-    if (heartbeat) {
-      clearTimeout(heartbeat);
-    }
-    heartbeat = setTimeout(() => {
-      void heartbeatLoop();
-    }, delay);
-  };
-
-  const schedulePoll = (delay = WALKIE_FALLBACK_POLL_INTERVAL_MS) => {
-    if (closed || hasChangeStreamUpdates) {
-      return;
-    }
-    if (pollTimer) {
-      clearTimeout(pollTimer);
-    }
-    pollTimer = setTimeout(() => {
-      void pollLoop();
-    }, delay);
-  };
-
-  const pushState = async (force = false) => {
-    if (closed) {
-      return;
-    }
-
-    const current = await getPersistentWalkieSnapshot(id);
-    if (closed) {
-      return;
-    }
-    const version = Number(current.snapshot?.version || 0);
-    const notificationId = current.notification?.id || "";
-    if (force || version !== lastVersion || notificationId !== lastNotificationId) {
-      const sent = await send(
-        "state",
-        buildStatePayload(current.snapshot, current.notification, {
-          token: participantToken,
-        })
-      );
-      if (!sent) {
-        return;
-      }
-      lastVersion = version;
-      lastNotificationId = notificationId;
-    }
-  };
-
-  const drainMessages = async () => {
-    if (closed) {
-      return;
-    }
-
-    const messages = await takePersistentWalkieMessages(id, participantId);
-    if (closed) {
-      return;
-    }
-    for (const message of messages) {
-      const sent = await send(
-        message.eventType === "signal" ? "signal" : "participant",
-        message.payload
-      );
-      if (!sent) {
-        return;
-      }
-    }
-  };
-
-  const heartbeatLoop = async () => {
-    if (closed) {
-      return;
-    }
-
-    try {
-      const current = await heartbeatPersistentWalkieParticipant(id, participantId, role, name);
+    const scheduleHeartbeat = (delay) => {
       if (closed) {
         return;
       }
-      await drainMessages();
-      const heartbeatStatePayload = buildStatePayload(
-        current.snapshot,
-        current.notification,
-        {
-          token: participantToken,
-          ...(pendingStateReplays > 0 ? { bootPad: WALKIE_BOOT_PAD } : {}),
-        }
-      );
-      if (!(await send("state", heartbeatStatePayload))) {
+      if (heartbeat) {
+        clearTimeout(heartbeat);
+      }
+      heartbeat = setTimeout(() => {
+        void heartbeatLoop();
+      }, delay);
+    };
+
+    const schedulePoll = (delay = WALKIE_FALLBACK_POLL_INTERVAL_MS) => {
+      if (closed || hasChangeStreamUpdates) {
         return;
       }
-      lastVersion = Number(current.snapshot?.version || 0);
-      lastNotificationId = current.notification?.id || "";
-      if (pendingStateReplays > 0) {
-        const sentState = await send("state", heartbeatStatePayload);
-        if (!sentState) {
-          return;
-        }
-        pendingStateReplays -= 1;
+      if (pollTimer) {
+        clearTimeout(pollTimer);
       }
-      if (!(await send("ping", { ok: true, ts: Date.now() }))) {
-        return;
-      }
-    } catch (error) {
-      console.error("Walkie SSE heartbeat failed:", error);
-      await stopStream();
-      return;
-    }
+      pollTimer = setTimeout(() => {
+        void pollLoop();
+      }, delay);
+    };
 
-    heartbeat = setTimeout(() => {
-      void heartbeatLoop();
-    }, WALKIE_HEARTBEAT_INTERVAL_MS);
-  };
-
-  const pollLoop = async () => {
-    if (closed || hasChangeStreamUpdates) {
-      return;
-    }
-
-    try {
-      await drainMessages();
-      await pushState();
-    } catch (error) {
-      console.error("Walkie SSE fallback poll failed:", error);
-    }
-
-    schedulePoll();
-  };
-
-  const scheduleStartupReplay = (delay, payload) => {
-    const timerId = setTimeout(() => {
+    const pushState = async (force = false) => {
       if (closed) {
         return;
       }
-      void (async () => {
-        if (!(await send("state", payload))) {
+
+      const current = await getPersistentWalkieSnapshot(id);
+      if (closed) {
+        return;
+      }
+      const version = Number(current.snapshot?.version || 0);
+      const notificationId = current.notification?.id || "";
+      if (force || version !== lastVersion || notificationId !== lastNotificationId) {
+        const sent = await send(
+          "state",
+          buildStatePayload(current.snapshot, current.notification, {
+            token: participantToken,
+          })
+        );
+        if (!sent) {
           return;
         }
-        await send("ping", {
-          ok: true,
-          ts: Date.now(),
-          replay: true,
-          pad: WALKIE_PING_PAD,
-        });
-      })();
-    }, delay);
-    startupReplayTimers.push(timerId);
-  };
+        lastVersion = version;
+        lastNotificationId = notificationId;
+      }
+    };
 
-  void (async () => {
+    const drainMessages = async () => {
+      if (closed) {
+        return;
+      }
+
+      const messages = await takePersistentWalkieMessages(id, participantId);
+      if (closed) {
+        return;
+      }
+      for (const message of messages) {
+        const sent = await send(
+          message.eventType === "signal" ? "signal" : "participant",
+          message.payload
+        );
+        if (!sent) {
+          return;
+        }
+      }
+    };
+
+    const heartbeatLoop = async () => {
+      if (closed) {
+        return;
+      }
+
+      try {
+        const current = await heartbeatPersistentWalkieParticipant(id, participantId, role, name);
+        if (closed) {
+          return;
+        }
+        await drainMessages();
+        const heartbeatStatePayload = buildStatePayload(
+          current.snapshot,
+          current.notification,
+          {
+            token: participantToken,
+            ...(pendingStateReplays > 0 ? { bootPad: WALKIE_BOOT_PAD } : {}),
+          }
+        );
+        if (!(await send("state", heartbeatStatePayload))) {
+          return;
+        }
+        lastVersion = Number(current.snapshot?.version || 0);
+        lastNotificationId = current.notification?.id || "";
+        if (pendingStateReplays > 0) {
+          const sentState = await send("state", heartbeatStatePayload);
+          if (!sentState) {
+            return;
+          }
+          pendingStateReplays -= 1;
+        }
+        if (!(await send("ping", { ok: true, ts: Date.now() }))) {
+          return;
+        }
+      } catch (error) {
+        console.error("Walkie SSE heartbeat failed:", error);
+        await stopStream();
+        return;
+      }
+
+      heartbeat = setTimeout(() => {
+        void heartbeatLoop();
+      }, WALKIE_HEARTBEAT_INTERVAL_MS);
+    };
+
+    const pollLoop = async () => {
+      if (closed || hasChangeStreamUpdates) {
+        return;
+      }
+
+      try {
+        await drainMessages();
+        await pushState();
+      } catch (error) {
+        console.error("Walkie SSE fallback poll failed:", error);
+      }
+
+      schedulePoll();
+    };
+
+    const scheduleStartupReplay = (delay, payload) => {
+      const timerId = setTimeout(() => {
+        if (closed) {
+          return;
+        }
+        void (async () => {
+          if (!(await send("state", payload))) {
+            return;
+          }
+          await send("ping", {
+            ok: true,
+            ts: Date.now(),
+            replay: true,
+            pad: WALKIE_PING_PAD,
+          });
+        })();
+      }, delay);
+      startupReplayTimers.push(timerId);
+    };
+
     try {
       const bootstrapStatePayload = buildStatePayload(bootstrapSnapshot, null, {
         token: participantToken,
@@ -429,9 +430,12 @@ export async function GET(request, { params }) {
     }
   })();
 
-  request.signal.addEventListener("abort", () => {
-    void stopStream();
-  });
-
-  return new Response(readable, { headers: sseHeaders() });
+  request.signal.addEventListener(
+    "abort",
+    () => {
+      void stopStream();
+    },
+    { once: true }
+  );
+  return new Response(stream, { headers: sseHeaders() });
 }

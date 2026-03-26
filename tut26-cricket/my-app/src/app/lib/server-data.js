@@ -49,6 +49,35 @@ export function invalidateSessionsDataCache() {
   globalServerDataCache.directorSessions.pending = null;
 }
 
+function getPublicId(value) {
+  return String(value?._id || value || "");
+}
+
+function getIsoTimestamp(...values) {
+  return new Date(values.find(Boolean) || Date.now()).toISOString();
+}
+
+function buildLockedTossPageData() {
+  return {
+    found: false,
+    authStatus: "locked",
+    match: null,
+    sessionId: "",
+    hasCreatedMatch: false,
+    actualMatchId: "",
+  };
+}
+
+async function loadFallbackSession(sessionId, fields = FALLBACK_SESSION_FIELDS) {
+  const normalizedSessionId = getPublicId(sessionId);
+
+  if (!isValidObjectId(normalizedSessionId)) {
+    return null;
+  }
+
+  return Session.findById(normalizedSessionId).select(fields).lean();
+}
+
 async function resolveSessionMatches(sessions) {
   const resolvedBySessionId = new Map();
   const unresolvedSessionIds = sessions
@@ -101,7 +130,7 @@ async function resolveSessionMatches(sessions) {
   ]);
 
   fallbackMatches.forEach((match) => {
-    const sessionId = String(match.sessionId || "");
+    const sessionId = getPublicId(match.sessionId);
     if (sessionId && !resolvedBySessionId.has(sessionId)) {
       resolvedBySessionId.set(sessionId, match);
     }
@@ -184,6 +213,11 @@ async function readSessionsIndexData() {
           : publicSession.matchImages || [],
       updatedAt: resolvedMatch?.updatedAt || session.updatedAt,
       isLive: resolvedMatch ? Boolean(resolvedMatch.isOngoing) : Boolean(session.isLive),
+      score: Number(publicMatch?.score || 0),
+      outs: Number(publicMatch?.outs || 0),
+      innings: publicMatch?.innings || "",
+      innings1: publicMatch?.innings1 || null,
+      innings2: publicMatch?.innings2 || null,
       result: resolvedMatch?.result || session.result || "",
       tossReady:
         publicMatch?.tossReady ||
@@ -222,7 +256,7 @@ export async function loadSessionViewData(sessionId) {
     found: true,
     session: serializePublicSession(session),
     match: serializePublicMatch(match, session),
-    updatedAt: new Date(match?.updatedAt || session.updatedAt || Date.now()).toISOString(),
+    updatedAt: getIsoTimestamp(match?.updatedAt, session.updatedAt),
   };
 }
 
@@ -238,25 +272,13 @@ export async function loadPublicMatchData(matchId) {
   if (!match) {
     return null;
   }
-  const fallbackSession =
-    match.sessionId
-      ? await Session.findById(match.sessionId)
-          .select(FALLBACK_SESSION_FIELDS)
-          .lean()
-      : null;
+  const fallbackSession = await loadFallbackSession(match.sessionId);
   return serializePublicMatch(match, fallbackSession);
 }
 
 export async function loadTossPageData(matchId) {
   if (!isValidObjectId(matchId)) {
-    return {
-      found: false,
-      authStatus: "locked",
-      match: null,
-      sessionId: "",
-      hasCreatedMatch: false,
-      actualMatchId: "",
-    };
+    return buildLockedTossPageData();
   }
 
   await connectDB();
@@ -265,6 +287,7 @@ export async function loadTossPageData(matchId) {
     .lean();
 
   if (match) {
+    const fallbackSession = await loadFallbackSession(match.sessionId);
     const cookieStore = await cookies();
     const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
     const authorized = hasValidMatchAccess(
@@ -273,15 +296,15 @@ export async function loadTossPageData(matchId) {
       Number(match.adminAccessVersion || 1)
     );
 
-      return {
-        found: true,
-        authStatus: authorized ? "granted" : "locked",
-        match: serializePublicMatch(match, null, {
-          includeActionHistory: true,
-        }),
-        sessionId: String(match.sessionId || ""),
-        hasCreatedMatch: true,
-        actualMatchId: String(match._id),
+    return {
+      found: true,
+      authStatus: authorized ? "granted" : "locked",
+      match: serializePublicMatch(match, fallbackSession, {
+        includeActionHistory: true,
+      }),
+      sessionId: getPublicId(match.sessionId),
+      hasCreatedMatch: true,
+      actualMatchId: getPublicId(match._id),
     };
   }
 
@@ -290,14 +313,7 @@ export async function loadTossPageData(matchId) {
     .lean();
 
   if (!session) {
-    return {
-      found: false,
-      authStatus: "locked",
-      match: null,
-      sessionId: "",
-      hasCreatedMatch: false,
-      actualMatchId: "",
-    };
+    return buildLockedTossPageData();
   }
 
   if (session.match) {
@@ -320,9 +336,9 @@ export async function loadTossPageData(matchId) {
         match: serializePublicMatch(linkedMatch, session, {
           includeActionHistory: true,
         }),
-        sessionId: String(session._id),
+        sessionId: getPublicId(session._id),
         hasCreatedMatch: true,
-        actualMatchId: String(linkedMatch._id),
+        actualMatchId: getPublicId(linkedMatch._id),
       };
     }
   }
@@ -331,8 +347,8 @@ export async function loadTossPageData(matchId) {
     found: true,
     authStatus: "granted",
     match: {
-      _id: String(session._id),
-      sessionId: String(session._id),
+      _id: getPublicId(session._id),
+      sessionId: getPublicId(session._id),
       teamA: Array.isArray(session.teamA) ? session.teamA : [],
       teamB: Array.isArray(session.teamB) ? session.teamB : [],
       teamAName: session.teamAName || "Team A",
@@ -352,7 +368,7 @@ export async function loadTossPageData(matchId) {
       createdAt: session.createdAt || null,
       updatedAt: session.updatedAt || null,
     },
-    sessionId: String(session._id),
+    sessionId: getPublicId(session._id),
     hasCreatedMatch: false,
     actualMatchId: "",
   };
@@ -364,9 +380,9 @@ export async function loadMatchAccessData(matchId) {
   }
 
   await connectDB();
-  const match = await Match.findById(matchId)
-    .select(`adminAccessVersion ${PUBLIC_MATCH_FIELDS}`)
-    ;
+  const match = await Match.findById(matchId).select(
+    `adminAccessVersion ${PUBLIC_MATCH_FIELDS}`
+  );
 
   if (!match) {
     return { found: false, authStatus: "locked", match: null };
@@ -380,10 +396,7 @@ export async function loadMatchAccessData(matchId) {
     Number(match.adminAccessVersion || 1)
   );
 
-  const fallbackSession =
-    match && match.sessionId
-      ? await Session.findById(match.sessionId).select(FALLBACK_SESSION_FIELDS)
-      : null;
+  const fallbackSession = await loadFallbackSession(match.sessionId);
 
   if (authorized && hydrateLegacyTossState(match, fallbackSession)) {
     await match.save();
@@ -416,10 +429,10 @@ export async function loadHomeLiveBannerData() {
   }
 
   const session = match.sessionId
-    ? await Session.findById(match.sessionId).select(PUBLIC_SESSION_FIELDS).lean()
+    ? await loadFallbackSession(match.sessionId, PUBLIC_SESSION_FIELDS)
     : await Session.findOne({ match: match._id }).select(PUBLIC_SESSION_FIELDS).lean();
 
-  if (!session || !match) {
+  if (!session) {
     return null;
   }
 
@@ -440,14 +453,14 @@ export async function loadHomeLiveBannerData() {
   const publicSession = serializePublicSession(session);
 
   return {
-    sessionId: String(session._id),
-    matchId: String(match._id),
+    sessionId: getPublicId(session._id),
+    matchId: getPublicId(match._id),
     teamAName,
     teamBName,
     score: Number(match.score || 0),
     outs: Number(match.outs || 0),
     matchImageUrl: publicMatch?.matchImageUrl || publicSession?.matchImageUrl || "",
-    updatedAt: new Date(match.updatedAt || session.updatedAt || session.createdAt).toISOString(),
+    updatedAt: getIsoTimestamp(match.updatedAt, session.updatedAt, session.createdAt),
   };
 }
 
@@ -479,12 +492,11 @@ async function readDirectorSessionsList() {
       return {
         session: publicSession,
         match: publicMatch,
-        updatedAt: new Date(
-          resolvedMatch?.updatedAt ||
-            session.updatedAt ||
-            session.createdAt ||
-            Date.now()
-        ).toISOString(),
+        updatedAt: getIsoTimestamp(
+          resolvedMatch?.updatedAt,
+          session.updatedAt,
+          session.createdAt
+        ),
         isLive: Boolean(resolvedMatch?.isOngoing && !resolvedMatch?.result),
       };
     })
@@ -509,8 +521,6 @@ export async function loadDirectorSessionsList() {
 }
 
 export async function loadDirectorConsoleData() {
-  await connectDB();
-
   const cookieStore = await cookies();
   const directorToken = cookieStore.get(getDirectorAccessCookieName())?.value;
   const authorized = hasValidDirectorAccess(directorToken);
