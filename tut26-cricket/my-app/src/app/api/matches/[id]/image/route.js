@@ -28,6 +28,7 @@ import {
   parseJsonRequest,
   parseMultipartRequest,
 } from "../../../../lib/request-security";
+import { invalidateSessionsDataCache } from "../../../../lib/server-data";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 import { z } from "zod";
@@ -38,6 +39,13 @@ const deleteImagePayloadSchema = z.object({
   pin: z.string().trim().optional().default(""),
   imageId: z.string().trim().max(80).optional().default(""),
 });
+
+const reorderImagePayloadSchema = z
+  .object({
+    pin: z.string().trim().optional().default(""),
+    imageIds: z.array(z.string().trim().min(1).max(80)).min(1).max(20),
+  })
+  .strict();
 
 function getMatchImageModerationMode() {
   return String(process.env.MATCH_IMAGE_MODERATION_MODE || "best-effort").trim().toLowerCase();
@@ -287,6 +295,7 @@ export async function POST(req, { params }) {
     await Session.findByIdAndUpdate(match.sessionId, {
       $set: buildSessionMirrorUpdate(match),
     });
+    invalidateSessionsDataCache();
     publishMatchUpdate(match._id);
     publishSessionUpdate(match.sessionId);
 
@@ -422,6 +431,7 @@ export async function DELETE(req, { params }) {
         $set: buildSessionMirrorUpdate(match),
       }),
     ]);
+    invalidateSessionsDataCache();
     publishMatchUpdate(match._id);
     publishSessionUpdate(match.sessionId);
 
@@ -451,5 +461,117 @@ export async function DELETE(req, { params }) {
     });
 
     return jsonError("Failed to remove the match image.", 500);
+  }
+}
+
+export async function PATCH(req, { params }) {
+  const { id } = await params;
+  const meta = getRequestMeta(req);
+  const reorderLimit = enforceRateLimit({
+    key: `match-image-reorder:${id}:${meta.ip}`,
+    limit: 20,
+    windowMs: 60 * 1000,
+    blockMs: 60 * 1000,
+  });
+
+  if (!reorderLimit.allowed) {
+    return jsonRateLimit(
+      "Too many image update attempts. Try again shortly.",
+      reorderLimit.retryAfterMs,
+    );
+  }
+
+  try {
+    const parsedRequest = await parseJsonRequest(req, reorderImagePayloadSchema, {
+      maxBytes: 8192,
+    });
+    if (!parsedRequest.ok) {
+      return jsonError(parsedRequest.message, parsedRequest.status);
+    }
+
+    await connectDB();
+    const match = await Match.findById(id);
+    if (!match) {
+      return jsonError("Match not found.", 404);
+    }
+
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get(getMatchAccessCookieName(id))?.value;
+    const hasCookieAccess = hasValidMatchAccess(
+      id,
+      accessToken,
+      Number(match.adminAccessVersion || 1),
+    );
+    const hasPinAccess =
+      Boolean(parsedRequest.value.pin) && isValidUmpirePin(parsedRequest.value.pin);
+
+    if (!hasCookieAccess && !hasPinAccess) {
+      return jsonError("Incorrect PIN.", 401);
+    }
+
+    const currentImages = getStoredMatchImages(match, { matchId: id });
+    const currentIds = currentImages.map((entry) => entry.id);
+    const nextIds = parsedRequest.value.imageIds.map((value) => String(value).trim());
+
+    if (
+      currentIds.length !== nextIds.length ||
+      new Set(nextIds).size !== nextIds.length ||
+      currentIds.some((imageId) => !nextIds.includes(imageId))
+    ) {
+      return jsonError("Image order is invalid.", 400);
+    }
+
+    const byId = new Map(currentImages.map((entry) => [entry.id, entry]));
+    const nextImages = nextIds.map((imageId) => byId.get(imageId)).filter(Boolean);
+
+    applyStoredMatchImages(match, nextImages, { matchId: id });
+    match.mediaUpdatedAt = new Date();
+    match.lastEventType = "image_update";
+    match.lastEventText = "Match image order updated.";
+    match.lastLiveEvent = {
+      id: `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`,
+      type: "image_update",
+      summaryText: "Match image order updated.",
+      createdAt: new Date().toISOString(),
+    };
+
+    await Promise.all([
+      match.save(),
+      Session.findByIdAndUpdate(match.sessionId, {
+        $set: buildSessionMirrorUpdate(match),
+      }),
+    ]);
+
+    invalidateSessionsDataCache();
+    publishMatchUpdate(match._id);
+    publishSessionUpdate(match.sessionId);
+
+    await writeAuditLog({
+      action: "match_media_reorder",
+      targetType: "match",
+      targetId: id,
+      status: "success",
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      metadata: { imageIds: nextIds },
+    });
+
+    return Response.json(serializePublicMatch(match), {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (error) {
+    await writeAuditLog({
+      action: "match_media_reorder",
+      targetType: "match",
+      targetId: id,
+      status: "failure",
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      metadata: { message: error?.message || "Unknown error" },
+    });
+
+    return jsonError("Failed to reorder match images.", 500);
   }
 }

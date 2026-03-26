@@ -1279,6 +1279,7 @@ export default function SessionsPageClient({ initialSessions }) {
           >
             <MatchImageUploader
               matchId={String(imageReplaceContext.matchId)}
+              existingImages={Array.isArray(imageReplaceSession?.matchImages) ? imageReplaceSession.matchImages : []}
               existingImageUrl={
                 imageReplaceContext.mode === "replace"
                   ? imageReplaceContext.image?.url || ""
@@ -1296,23 +1297,10 @@ export default function SessionsPageClient({ initialSessions }) {
                   imageReplaceContext.sessionId,
                   updatedMatch
                 );
-                closeImageActionFlows();
               }}
-              title={
-                imageReplaceContext.mode === "replace"
-                  ? "Replace Match Image"
-                  : "Add Match Image"
-              }
-              description={
-                imageReplaceContext.mode === "replace"
-                  ? "Replace the selected gallery image."
-                  : "Build the gallery, then upload once."
-              }
-              primaryLabel={
-                imageReplaceContext.mode === "replace"
-                  ? "Save Changes"
-                  : "Upload Images"
-              }
+              title="Match Gallery"
+              description="Add, rank, or remove images for this session."
+              primaryLabel="Save Images"
             />
           </ModalBase>
         ) : null}
