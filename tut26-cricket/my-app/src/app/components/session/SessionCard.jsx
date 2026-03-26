@@ -12,6 +12,7 @@ import {
 } from "react-icons/fa6";
 import { formatRelativeTime } from "./formatRelativeTime";
 import PendingLink from "../shared/PendingLink";
+import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
 import {
   GV_MATCH_FALLBACK_IMAGE,
   resolveSafeMatchImage,
@@ -28,7 +29,8 @@ function buildStatusMeta(session) {
     return {
       badge: "Live now",
       tone: "live",
-      summary: "Live score is ready.",
+      title: "Live scoring is on.",
+      summary: "Open live score, umpire mode, or director mode.",
     };
   }
 
@@ -40,7 +42,10 @@ function buildStatusMeta(session) {
   return {
     badge,
     tone: "ended",
-    summary: hasSavedScore ? "Final score available" : "No score to view",
+    title: hasSavedScore ? "Match complete." : "No score yet.",
+    summary: hasSavedScore
+      ? session.result || "Final score is ready to open."
+      : "Open this session when scoring starts.",
   };
 }
 
@@ -80,6 +85,7 @@ function SessionCard({
   onSelectToggle,
 }) {
   const router = useRouter();
+  const { startNavigation } = useRouteFeedback();
   const cardRef = useRef(null);
   const [shouldLoadGallery, setShouldLoadGallery] = useState(false);
   const isLive = session.isLive;
@@ -100,6 +106,26 @@ function SessionCard({
       : "";
   const dateLabel = formatSessionDateLabel(session);
   const canOpenCard = Boolean(scoreHref);
+  const hasScoreCard = Boolean(
+    session.match &&
+      (isLive ||
+        Number(session.score || 0) > 0 ||
+        Number(session.outs || 0) > 0 ||
+        session.result)
+  );
+  const displayScore = Number.isFinite(Number(session.score))
+    ? Number(session.score)
+    : 0;
+  const displayOuts = Number.isFinite(Number(session.outs))
+    ? Number(session.outs)
+    : 0;
+  const scoreMetaLabel = isLive ? "Runs" : "Final";
+  const scoreDetailLabel =
+    displayOuts > 0
+      ? `${displayOuts} ${displayOuts === 1 ? "WKT" : "WKTS"}`
+      : !isLive && session.result
+      ? "RESULT"
+      : "";
 
   useEffect(() => {
     if (!hasUploadedCardImage || shouldLoadGallery) {
@@ -141,6 +167,7 @@ function SessionCard({
     }
 
     void primeUiAudio().catch(() => {});
+    startNavigation(isLive ? "Opening live score..." : "Opening final score...");
     router.push(scoreHref);
   };
 
@@ -248,18 +275,33 @@ function SessionCard({
               />
               {statusMeta.badge}
             </span>
-            <div className="min-w-0 pr-0 sm:pr-2">
+            {hasScoreCard ? (
+              <div className="pointer-events-none absolute right-0 top-[3.1rem] text-right">
+                <p className="text-[2.05rem] font-black leading-none tracking-tight text-amber-300 sm:text-[2.3rem]">
+                  {displayScore.toLocaleString()}
+                </p>
+                <p className="mt-1 text-[0.92rem] font-black uppercase leading-none tracking-tight text-amber-300">
+                  {scoreMetaLabel}
+                </p>
+                {scoreDetailLabel ? (
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-400">
+                    {scoreDetailLabel}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            <div className={`min-w-0 ${hasScoreCard ? "pr-24 sm:pr-28" : "pr-0 sm:pr-2"}`}>
               <h2 className="text-[1.25rem] leading-[1.08] font-medium tracking-[-0.035em] text-white [overflow-wrap:break-word] sm:text-[1.45rem] md:text-[1.58rem]">
                 {session.name || "Untitled Session"}
               </h2>
-              <p className="mt-4 text-[13px] font-medium tracking-[0.01em] text-zinc-400">
-                {dateLabel}
-              </p>
               {teamLine ? (
-                <p className="mt-2 text-[0.98rem] leading-snug font-medium tracking-[-0.015em] text-zinc-100 [overflow-wrap:break-word] sm:text-[1.02rem]">
+                <p className="mt-4 text-[0.98rem] leading-snug font-semibold uppercase tracking-[0.02em] text-zinc-100 [overflow-wrap:break-word] sm:text-[1.02rem]">
                   {teamLine}
                 </p>
               ) : null}
+              <p className="mt-2 text-[13px] font-medium tracking-[0.01em] text-zinc-400">
+                {dateLabel}
+              </p>
             </div>
           </div>
         </div>
@@ -300,12 +342,13 @@ function SessionCard({
         ) : (
           <div className="mt-6 rounded-[20px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.03),transparent_28%),linear-gradient(180deg,rgba(0,0,0,0.18),rgba(0,0,0,0.32))] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-zinc-500">
-              Session state
+              Match Status
             </p>
-            <p className="mt-2 text-[14px] leading-6 text-zinc-200">
-              {isLive && session.match
-                ? "Open live score or enter umpire mode."
-                : statusMeta.summary}
+            <p className="mt-2 text-[15px] font-semibold leading-6 text-zinc-100">
+              {statusMeta.title}
+            </p>
+            <p className="mt-1 text-[14px] leading-6 text-zinc-300">
+              {statusMeta.summary}
             </p>
           </div>
         )}

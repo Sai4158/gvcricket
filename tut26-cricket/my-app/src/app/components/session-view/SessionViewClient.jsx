@@ -52,7 +52,9 @@ import { getTeamBundle } from "../../lib/team-utils";
 import { duckPageMedia, restorePageMedia } from "../../lib/page-audio";
 import { buildShareUrl } from "../../lib/site-metadata";
 import { ModalBase } from "../match/MatchBaseModals";
+import LoadingButton from "../shared/LoadingButton";
 import OptionalFeatureBoundary from "../shared/OptionalFeatureBoundary";
+import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
 
 function DualWalkieIcon() {
   return (
@@ -215,6 +217,7 @@ function isSixBoundaryScoreEvent(event) {
 
 export default function SessionViewClient({ sessionId, initialData }) {
   const [copied, setCopied] = useState(false);
+  const [isLeavingToSessions, setIsLeavingToSessions] = useState(false);
   const [data, setData] = useState(initialData || null);
   const [activePanel, setActivePanel] = useState(null);
   const [localWalkieNotice, setLocalWalkieNotice] = useState("");
@@ -260,6 +263,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   );
   const soundEffectPlaybackCutoffRef = useRef(0);
   const router = useRouter();
+  const { startNavigation } = useRouteFeedback();
   const sessionData = data?.session;
   const match = data?.match;
   const { settings, updateSetting } = useAnnouncementSettings(
@@ -277,6 +281,12 @@ export default function SessionViewClient({ sessionId, initialData }) {
     audioUnlocked,
     status: announcerStatus,
   } = useSpeechAnnouncer(settings);
+
+  const handleBackToSessions = useCallback(() => {
+    setIsLeavingToSessions(true);
+    startNavigation("Opening sessions...");
+    router.push("/session");
+  }, [router, startNavigation]);
 
   useEventSource({
     url: sessionId ? `/api/live/sessions/${sessionId}` : null,
@@ -1768,14 +1778,16 @@ export default function SessionViewClient({ sessionId, initialData }) {
   return (
     <main className="min-h-screen bg-zinc-950 text-white font-sans p-4 pb-10 flex flex-col items-center">
       <div className="w-full max-w-4xl mt-4 mb-2 grid grid-cols-[auto_1fr_auto] items-center gap-3 px-1">
-        <button
-          onClick={() => router.push("/session")}
+        <LoadingButton
+          onClick={handleBackToSessions}
+          loading={isLeavingToSessions}
+          pendingLabel="Opening..."
           className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
           aria-label="Back to Sessions"
         >
           <FaArrowLeft size={15} />
-          <span>Back</span>
-        </button>
+          Back
+        </LoadingButton>
         <div className="flex min-w-0 items-center justify-center justify-self-center text-center">
           <span className="inline-flex items-center gap-2 text-sm font-semibold text-white">
             <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse"></span>

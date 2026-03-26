@@ -31,6 +31,7 @@ import LiquidSportText from "../home/LiquidSportText";
 import ImagePinModal from "../shared/ImagePinModal";
 import { ModalBase } from "../match/MatchBaseModals";
 import MatchImageUploader from "../match/MatchImageUploader";
+import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
 
 const SORT_OPTIONS = [
   { value: "live-newest", label: "Live first" },
@@ -234,6 +235,7 @@ export default function SessionsPageClient({ initialSessions }) {
   const [page, setPage] = useState(1);
   const [isGoingHome, setIsGoingHome] = useState(false);
   const router = useRouter();
+  const { startNavigation } = useRouteFeedback();
   const deferredSearchQuery = useDeferredValue(normalizeSearchValue(searchInput));
   const secretHoldTimerRef = useRef(null);
   const suppressCardOpenUntilRef = useRef(0);
@@ -465,8 +467,9 @@ export default function SessionsPageClient({ initialSessions }) {
 
   const handleGoHome = useCallback(() => {
     setIsGoingHome(true);
+    startNavigation("Opening home...");
     router.replace("/");
-  }, [router]);
+  }, [router, startNavigation]);
 
   const openSessionManager = useCallback((session, pin) => {
     setManageSessionContext({ sessionId: session._id, pin });
@@ -754,6 +757,7 @@ export default function SessionsPageClient({ initialSessions }) {
         }
 
         const directorSessionId = pinPrompt.session._id;
+        startNavigation("Opening director mode...");
         router.push(`/director?session=${directorSessionId}&manage=1`);
         setPinPrompt(null);
         return;
@@ -773,6 +777,7 @@ export default function SessionsPageClient({ initialSessions }) {
       }
 
       const needsToss = !pinPrompt.session.tossReady;
+      startNavigation(needsToss ? "Opening toss..." : "Opening umpire mode...");
       router.push(
         needsToss ? `/toss/${pinPrompt.session.match}` : `/match/${pinPrompt.session.match}`
       );

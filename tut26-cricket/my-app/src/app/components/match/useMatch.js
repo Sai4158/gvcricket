@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { applyMatchAction, MatchEngineError } from "../../lib/match-engine";
 import useEventSource from "../live/useEventSource";
+import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
 
 const ACTION_QUEUE_RETRY_DELAY_MS = 2500;
 
@@ -130,6 +131,7 @@ function isRetryableActionFailure(status) {
 
 export default function useMatch(matchId, hasAccess, initialMatch = null) {
   const router = useRouter();
+  const { startNavigation } = useRouteFeedback();
   const [match, setMatch] = useState(initialMatch);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(
@@ -410,6 +412,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
             }
 
             setError(null);
+            startNavigation("Opening toss...");
             router.replace(`/toss/${matchId}`);
             break;
           }
@@ -462,6 +465,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     refreshMatchFromServer,
     router,
     scheduleQueuedActionRetry,
+    startNavigation,
     updateQueuedActions,
   ]);
 
@@ -599,6 +603,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     if (!match || match.result || !hasAccess) return;
     if (tossPending) {
       setError(null);
+      startNavigation("Opening toss...");
       router.replace(`/toss/${matchId}`);
       return;
     }
@@ -611,12 +616,13 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       isOut,
       extraType,
     });
-  }, [hasAccess, match, matchId, router, sendAction, tossPending]);
+  }, [hasAccess, match, matchId, router, sendAction, startNavigation, tossPending]);
 
   const handleUndo = useCallback(async () => {
     triggerHapticFeedback();
     if (tossPending) {
       setError(null);
+      startNavigation("Opening toss...");
       router.replace(`/toss/${matchId}`);
       return;
     }
@@ -626,17 +632,19 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       actionId: createActionId("undo"),
       type: "undo_last",
     });
-  }, [currentInningsHasHistory, match?.undoCount, matchId, router, sendAction, tossPending]);
+  }, [currentInningsHasHistory, match?.undoCount, matchId, router, sendAction, startNavigation, tossPending]);
 
   const handleNextInningsOrEnd = useCallback(async () => {
     if (!match || !hasAccess) return;
     if (tossPending) {
       setError(null);
+      startNavigation("Opening toss...");
       router.replace(`/toss/${matchId}`);
       return;
     }
 
     if (match.result && !match.isOngoing) {
+      startNavigation("Opening result...");
       router.push(`/result/${matchId}`);
       return;
     }
@@ -647,9 +655,10 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     });
 
     if (updatedMatch?.result && !updatedMatch?.isOngoing) {
+      startNavigation("Opening result...");
       router.push(`/result/${matchId}`);
     }
-  }, [hasAccess, match, matchId, router, sendAction, tossPending]);
+  }, [hasAccess, match, matchId, router, sendAction, startNavigation, tossPending]);
 
   return {
     match,

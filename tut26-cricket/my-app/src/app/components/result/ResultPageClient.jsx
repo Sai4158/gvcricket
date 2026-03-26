@@ -12,6 +12,8 @@ import MatchImageUploader from "../match/MatchImageUploader";
 import { ModalBase } from "../match/MatchBaseModals";
 import SafeMatchImage from "../shared/SafeMatchImage";
 import MatchImageCarousel from "../shared/MatchImageCarousel";
+import LoadingButton from "../shared/LoadingButton";
+import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
 import { calculateInningsSummary } from "../../lib/match-stats";
 import CongratulationsCard from "./CongratulationsCard";
 import EnhancedScorecard from "./EnhancedScorecard";
@@ -28,9 +30,11 @@ const ScoringBreakdownCharts = dynamic(() => import("./ScoringBreakdownCharts"),
 
 export default function ResultPageClient({ matchId, initialMatch }) {
   const router = useRouter();
+  const { startNavigation } = useRouteFeedback();
   const [match, setMatch] = useState(initialMatch);
   const [streamError, setStreamError] = useState("");
   const [isImageManagerOpen, setIsImageManagerOpen] = useState(false);
+  const [isLeavingToSessions, setIsLeavingToSessions] = useState(false);
   const [showConfetti, setShowConfetti] = useState(true);
   const [activeGalleryImageId, setActiveGalleryImageId] = useState("");
   const [zoomedImage, setZoomedImage] = useState(null);
@@ -102,17 +106,25 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   const innings1Summary = calculateInningsSummary(match.innings1);
   const innings2Summary = calculateInningsSummary(match.innings2);
 
+  const handleOpenSessions = () => {
+    setIsLeavingToSessions(true);
+    startNavigation("Opening sessions...");
+    router.push("/session");
+  };
+
   return (
     <main className="min-h-screen bg-zinc-950 p-4 sm:p-8 text-zinc-300 font-sans">
       <div className="max-w-5xl mx-auto space-y-12 py-10">
         <div className="flex justify-start">
-          <button
-            onClick={() => router.push("/session")}
+          <LoadingButton
+            onClick={handleOpenSessions}
+            loading={isLeavingToSessions}
+            pendingLabel="Opening..."
             className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-zinc-100 backdrop-blur-sm transition-colors hover:bg-black/45"
           >
             <FaArrowLeft />
-            <span>Back to Sessions</span>
-          </button>
+            Back to Sessions
+          </LoadingButton>
         </div>
 
         <MatchHeroBackdrop match={match} className="mb-2">
@@ -262,12 +274,14 @@ export default function ResultPageClient({ matchId, initialMatch }) {
         </section>
 
         <footer className="text-center pt-8 border-t border-white/10">
-          <button
-            onClick={() => router.push("/session")}
+          <LoadingButton
+            onClick={handleOpenSessions}
+            loading={isLeavingToSessions}
+            pendingLabel="Opening..."
             className="bg-blue-600 text-white px-8 py-3 rounded-lg shadow-lg hover:bg-blue-500 transition-colors font-semibold"
           >
             View All Match History
-          </button>
+          </LoadingButton>
         </footer>
       </div>
       <AnimatePresence>
