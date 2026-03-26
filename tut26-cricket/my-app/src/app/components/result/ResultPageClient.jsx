@@ -10,7 +10,6 @@ import LiquidSportText from "../home/LiquidSportText";
 import MatchHeroBackdrop from "../match/MatchHeroBackdrop";
 import MatchImageUploader from "../match/MatchImageUploader";
 import { ModalBase } from "../match/MatchBaseModals";
-import ImagePinModal from "../shared/ImagePinModal";
 import SafeMatchImage from "../shared/SafeMatchImage";
 import MatchImageCarousel from "../shared/MatchImageCarousel";
 import { calculateInningsSummary } from "../../lib/match-stats";
@@ -31,10 +30,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   const router = useRouter();
   const [match, setMatch] = useState(initialMatch);
   const [streamError, setStreamError] = useState("");
-  const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
-  const [isImageActionsOpen, setIsImageActionsOpen] = useState(false);
-  const [imageUploadMode, setImageUploadMode] = useState("");
-  const [removeError, setRemoveError] = useState("");
+  const [isImageManagerOpen, setIsImageManagerOpen] = useState(false);
   const [showConfetti, setShowConfetti] = useState(true);
   const [activeGalleryImageId, setActiveGalleryImageId] = useState("");
   const [zoomedImage, setZoomedImage] = useState(null);
@@ -105,24 +101,6 @@ export default function ResultPageClient({ matchId, initialMatch }) {
 
   const innings1Summary = calculateInningsSummary(match.innings1);
   const innings2Summary = calculateInningsSummary(match.innings2);
-
-  const handleRemoveImage = async (pin) => {
-    const response = await fetch(`/api/matches/${matchId}/image`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pin, imageId: activeGalleryImage?.id || "" }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || "Failed to remove the image.");
-    }
-
-    startTransition(() => {
-      setMatch(payload);
-      setRemoveError("");
-      setIsRemoveModalOpen(false);
-    });
-  };
 
   return (
     <main className="min-h-screen bg-zinc-950 p-4 sm:p-8 text-zinc-300 font-sans">
@@ -231,16 +209,24 @@ export default function ResultPageClient({ matchId, initialMatch }) {
                 event.preventDefault();
                 event.stopPropagation();
                 setActiveGalleryImageId(image?.url ? image.id || "" : "");
-                setRemoveError("");
-                setIsImageActionsOpen(true);
+                setIsImageManagerOpen(true);
               }}
             />
           </div>
-          {removeError ? (
-            <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-              {removeError}
-            </div>
-          ) : null}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
+              {matchImages.length
+                ? `${matchImages.length} image${matchImages.length === 1 ? "" : "s"} in gallery`
+                : "No gallery yet"}
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsImageManagerOpen(true)}
+              className="rounded-full border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(10,16,26,0.96),rgba(8,47,73,0.78))] px-4 py-2 text-sm font-semibold text-cyan-50 transition hover:brightness-110"
+            >
+              Manage Images
+            </button>
+          </div>
         </section>
 
         <section className="space-y-8">
@@ -284,99 +270,29 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           </button>
         </footer>
       </div>
-      <ImagePinModal
-        isOpen={isRemoveModalOpen}
-        title="Remove picture"
-        subtitle="Enter the 6-digit PIN to remove this session image."
-        confirmLabel="Remove picture"
-        onConfirm={handleRemoveImage}
-        onClose={() => setIsRemoveModalOpen(false)}
-      />
       <AnimatePresence>
-        {isImageActionsOpen ? (
+        {isImageManagerOpen ? (
           <ModalBase
-            title="Match Image"
-            onExit={() => setIsImageActionsOpen(false)}
-            panelClassName="max-w-sm"
-          >
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsImageActionsOpen(false);
-                  setImageUploadMode("add");
-                }}
-                className="w-full rounded-2xl border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(10,16,26,0.96),rgba(8,47,73,0.78))] px-4 py-3 text-sm font-semibold text-cyan-50 transition hover:brightness-110"
-              >
-                Add Image
-              </button>
-              {activeGalleryImage?.id ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsImageActionsOpen(false);
-                      setImageUploadMode("replace");
-                    }}
-                    className="w-full rounded-2xl border border-emerald-300/16 bg-[linear-gradient(180deg,rgba(10,18,18,0.98),rgba(9,32,28,0.96)_56%,rgba(6,95,70,0.74))] px-4 py-3 text-sm font-semibold text-emerald-50 transition hover:brightness-110"
-                  >
-                    Replace This Image
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsImageActionsOpen(false);
-                      setRemoveError("");
-                      setIsRemoveModalOpen(true);
-                    }}
-                    className="w-full rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/15"
-                  >
-                    Delete This Image
-                  </button>
-                </>
-              ) : null}
-            </div>
-          </ModalBase>
-        ) : null}
-      </AnimatePresence>
-      <AnimatePresence>
-        {Boolean(imageUploadMode) ? (
-          <ModalBase
-            title={imageUploadMode === "replace" ? "Replace Match Image" : "Add Match Image"}
-            onExit={() => setImageUploadMode("")}
+            title="Match Images"
+            onExit={() => setIsImageManagerOpen(false)}
             panelClassName="max-w-md"
             bodyClassName="max-h-[calc(100vh-7rem)]"
           >
             <MatchImageUploader
               matchId={String(match._id)}
-              existingImageUrl={
-                imageUploadMode === "replace" ? activeGalleryImage?.url || "" : ""
-              }
+              existingImages={matchImages}
+              existingImageUrl={activeGalleryImage?.url || match?.matchImageUrl || ""}
               existingImageCount={matchImages.length}
-              targetImageId={
-                imageUploadMode === "replace" ? activeGalleryImage?.id || "" : ""
-              }
-              appendOnUpload={imageUploadMode !== "replace"}
+              targetImageId={activeGalleryImage?.id || ""}
+              appendOnUpload={matchImages.length > 0}
               onUploaded={(updatedMatch) => {
                 startTransition(() => {
                   setMatch(updatedMatch);
-                  setRemoveError("");
-                  setImageUploadMode("");
                 });
               }}
-              title={
-                imageUploadMode === "replace"
-                  ? "Replace Match Image"
-                  : "Add Match Image"
-              }
-              description={
-                imageUploadMode === "replace"
-                  ? "Replace the selected gallery image."
-                  : "Build the gallery, then upload once."
-              }
-              primaryLabel={
-                imageUploadMode === "replace" ? "Save Changes" : "Upload Images"
-              }
+              title="Match Images"
+              description="Add, rank, and clean up the result gallery."
+              primaryLabel="Save Images"
             />
           </ModalBase>
         ) : null}
