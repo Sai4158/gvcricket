@@ -15,6 +15,8 @@ export default function ImagePinModal({
   pinLabel = "6-digit PIN",
   placeholder = "- - - - - -",
   hideHeaderCopy = false,
+  summaryTitle = "",
+  summaryItems = [],
   onConfirm,
   onContinueWithout,
   onClose,
@@ -100,6 +102,26 @@ export default function ImagePinModal({
                     </p>
                   ) : null}
                 </>
+              ) : null}
+
+              {summaryItems.length ? (
+                <div className={`${hideHeaderCopy ? "mt-4" : "mt-5"} rounded-[22px] border border-white/8 bg-white/[0.04] p-3`}>
+                  {summaryTitle ? (
+                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                      {summaryTitle}
+                    </p>
+                  ) : null}
+                  <div className="max-h-36 space-y-2 overflow-y-auto pr-1">
+                    {summaryItems.map((item) => (
+                      <div
+                        key={item}
+                        className="rounded-2xl border border-white/8 bg-black/20 px-3 py-2 text-sm text-zinc-100"
+                      >
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               ) : null}
 
               <div className={hideHeaderCopy ? "mt-2" : "mt-6"}>

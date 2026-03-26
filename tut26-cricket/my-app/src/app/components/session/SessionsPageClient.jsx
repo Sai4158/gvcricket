@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import {
   FaArrowLeft,
+  FaCheck,
   FaInfoCircle,
   FaPlus,
   FaSearch,
@@ -129,6 +130,78 @@ function EmptyState({ title, text, href, label }) {
   );
 }
 
+function ActionSummaryModal({ summary, onClose }) {
+  if (!summary) {
+    return null;
+  }
+
+  const toneClasses =
+    summary.tone === "danger"
+      ? "border-rose-300/16 bg-[radial-gradient(circle_at_top_left,rgba(244,63,94,0.12),transparent_28%),linear-gradient(180deg,rgba(26,10,14,0.98),rgba(10,8,12,0.98))]"
+      : "border-emerald-300/16 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.14),transparent_28%),linear-gradient(180deg,rgba(10,24,18,0.98),rgba(8,10,12,0.98))]";
+  const badgeClasses =
+    summary.tone === "danger"
+      ? "border-rose-300/20 bg-rose-400/12 text-rose-100"
+      : "border-emerald-300/20 bg-emerald-400/12 text-emerald-100";
+
+  return (
+    <ModalBase title={summary.title} onExit={onClose} panelClassName="max-w-md">
+      <div
+        className={`rounded-[24px] border px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${toneClasses}`}
+      >
+        <div className="flex items-start gap-3">
+          <span
+            className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border text-sm shadow-[0_14px_30px_rgba(0,0,0,0.18)] ${badgeClasses}`}
+          >
+            <FaCheck />
+          </span>
+          <div className="min-w-0">
+            <p className="text-base font-semibold text-white">{summary.heading}</p>
+            {summary.description ? (
+              <p className="mt-1 text-sm leading-6 text-zinc-300">
+                {summary.description}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        {summary.items?.length ? (
+          <div className="mt-4 space-y-2">
+            {summary.items.map((item) => (
+              <div
+                key={item}
+                className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2.5 text-sm text-zinc-100"
+              >
+                {item}
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      <button
+        type="button"
+        onClick={onClose}
+        className="mt-5 w-full rounded-2xl border border-white/10 bg-white/[0.05] px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
+      >
+        Close
+      </button>
+    </ModalBase>
+  );
+}
+
+function describeSessionFieldChange(label, previousValue, nextValue) {
+  if (previousValue === nextValue) {
+    return "";
+  }
+
+  if (!previousValue) {
+    return `${label}: ${nextValue}`;
+  }
+
+  return `${label}: ${previousValue} -> ${nextValue}`;
+}
+
 export default function SessionsPageClient({ initialSessions }) {
   const [sessions, setSessions] = useState(initialSessions ?? []);
   const [pinPrompt, setPinPrompt] = useState(null);
@@ -152,6 +225,7 @@ export default function SessionsPageClient({ initialSessions }) {
   const [selectedSessionIds, setSelectedSessionIds] = useState([]);
   const [selectionError, setSelectionError] = useState("");
   const [bulkDeletePromptOpen, setBulkDeletePromptOpen] = useState(false);
+  const [actionSummary, setActionSummary] = useState(null);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("live-newest");
@@ -456,6 +530,8 @@ export default function SessionsPageClient({ initialSessions }) {
     setManageError("");
 
     try {
+      const previousSession =
+        sessions.find((session) => session._id === manageSessionContext.sessionId) || null;
       const response = await fetch(
         `/api/sessions/${manageSessionContext.sessionId}`,
         {
@@ -482,13 +558,40 @@ export default function SessionsPageClient({ initialSessions }) {
           session._id === payload._id ? { ...session, ...payload } : session
         )
       );
+      const changedItems = [
+        describeSessionFieldChange(
+          "Game name",
+          previousSession?.name || "",
+          payload.name || manageForm.name.trim()
+        ),
+        describeSessionFieldChange(
+          "Team A",
+          previousSession?.teamAName || "",
+          payload.teamAName || manageForm.teamAName.trim()
+        ),
+        describeSessionFieldChange(
+          "Team B",
+          previousSession?.teamBName || "",
+          payload.teamBName || manageForm.teamBName.trim()
+        ),
+      ].filter(Boolean);
+
       closeSessionManager();
+      setActionSummary({
+        title: "Session Updated",
+        heading: payload.name || previousSession?.name || "Session updated",
+        description: changedItems.length
+          ? "These changes were saved."
+          : "The session details were saved.",
+        items: changedItems,
+        tone: "success",
+      });
     } catch (error) {
       setManageError(error.message || "Could not update session.");
     } finally {
       setManageSubmitting(false);
     }
-  }, [closeSessionManager, manageForm.name, manageForm.teamAName, manageForm.teamBName, manageSessionContext, manageSubmitting]);
+  }, [closeSessionManager, manageForm.name, manageForm.teamAName, manageForm.teamBName, manageSessionContext, manageSubmitting, sessions]);
 
   const handleManageSessionDelete = useCallback(async () => {
     if (!manageSessionContext?.sessionId || manageSubmitting) {
@@ -506,6 +609,8 @@ export default function SessionsPageClient({ initialSessions }) {
     setManageError("");
 
     try {
+      const deletedSession =
+        sessions.find((session) => session._id === manageSessionContext.sessionId) || null;
       const response = await fetch(
         `/api/sessions/${manageSessionContext.sessionId}`,
         {
@@ -526,18 +631,34 @@ export default function SessionsPageClient({ initialSessions }) {
         current.filter((session) => session._id !== manageSessionContext.sessionId)
       );
       closeSessionManager();
+      setActionSummary({
+        title: "Session Deleted",
+        heading: deletedSession?.name || "Session removed",
+        description: "The session and any linked match were deleted.",
+        items: deletedSession
+          ? [
+              deletedSession.teamAName && deletedSession.teamBName
+                ? `${deletedSession.teamAName} vs ${deletedSession.teamBName}`
+                : "",
+            ].filter(Boolean)
+          : [],
+        tone: "danger",
+      });
     } catch (error) {
       setManageError(error.message || "Could not delete session.");
     } finally {
       setManageSubmitting(false);
     }
-  }, [closeSessionManager, manageSessionContext, manageSubmitting]);
+  }, [closeSessionManager, manageSessionContext, manageSubmitting, sessions]);
 
   const handleBulkDeleteSessions = useCallback(
     async (pin) => {
       if (!selectedSessionIds.length) {
         throw new Error("Select at least 1 session.");
       }
+      const selectedSessionSnapshot = sessions.filter((session) =>
+        selectedSessionIds.includes(session._id)
+      );
 
       const response = await fetch("/api/sessions/bulk-delete", {
         method: "POST",
@@ -565,9 +686,19 @@ export default function SessionsPageClient({ initialSessions }) {
       );
       clearSelectionMode();
       setBulkDeletePromptOpen(false);
+      setActionSummary({
+        title: "Sessions Deleted",
+        heading: `${removedIds.length} session${removedIds.length === 1 ? "" : "s"} removed`,
+        description: "The selected sessions were deleted.",
+        items: selectedSessionSnapshot
+          .map((session) => session.name || "")
+          .filter(Boolean)
+          .slice(0, 6),
+        tone: "danger",
+      });
       router.refresh();
     },
-    [clearSelectionMode, router, selectedSessionIds]
+    [clearSelectionMode, router, selectedSessionIds, sessions]
   );
 
   const handleDeleteSessionImage = useCallback(
@@ -988,6 +1119,16 @@ export default function SessionsPageClient({ initialSessions }) {
             isOpen={bulkDeletePromptOpen}
             title="Delete Sessions"
             subtitle={`Enter the 6-digit manage PIN to delete ${selectedSessionIds.length} selected session${selectedSessionIds.length === 1 ? "" : "s"}.`}
+            summaryTitle="Selected Sessions"
+            summaryItems={selectedSessions
+              .map((session) => {
+                const teams =
+                  session.teamAName && session.teamBName
+                    ? `${session.teamAName} vs ${session.teamBName}`
+                    : "";
+                return [session.name, teams].filter(Boolean).join(" · ");
+              })
+              .filter(Boolean)}
             confirmLabel="Delete Sessions"
             digitCount={6}
             pinLabel="Manage PIN"
@@ -1187,6 +1328,12 @@ export default function SessionsPageClient({ initialSessions }) {
         ) : null}
         {isInfoModalOpen ? (
           <InfoModal onExit={() => setIsInfoModalOpen(false)} />
+        ) : null}
+        {actionSummary ? (
+          <ActionSummaryModal
+            summary={actionSummary}
+            onClose={() => setActionSummary(null)}
+          />
         ) : null}
       </AnimatePresence>
     </main>
