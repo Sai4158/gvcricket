@@ -33,8 +33,6 @@ const TEAM_SETUP_TOSS_ANNOUNCER_SETTINGS = {
   volume: 1,
   mode: "full",
 };
-const getTossPromptHandoffKey = (sessionId) =>
-  `session_${sessionId}_tossPromptPrimed_v1`;
 
 async function readJsonSafely(response) {
   try {
@@ -307,22 +305,6 @@ export default function TeamSelectionPageClient({ sessionId }) {
         );
       }
 
-      prime({ userGesture: true });
-      let handoffPromptSpoken = false;
-      if (typeof window !== "undefined") {
-        handoffPromptSpoken = Boolean(
-          speak("What do you want to choose, heads or tails?", {
-            userGesture: true,
-            interrupt: true,
-          })
-        );
-        if (handoffPromptSpoken) {
-          window.sessionStorage.setItem(getTossPromptHandoffKey(resolvedSessionId), "1");
-        }
-      }
-      if (handoffPromptSpoken) {
-        await new Promise((resolve) => window.setTimeout(resolve, 1050));
-      }
       router.push(`/toss/${resolvedSessionId}`);
     } catch (caughtError) {
       setError(caughtError.message);

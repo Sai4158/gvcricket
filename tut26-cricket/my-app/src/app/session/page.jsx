@@ -1,6 +1,6 @@
 import SessionsPageClient from "../components/session/SessionsPageClient";
 import { absoluteUrl, siteConfig } from "../lib/site-metadata";
-import { loadSessionsIndexData } from "../lib/server-data";
+import { loadSessionsIndexPageData } from "../lib/server-data";
 
 export const revalidate = 15;
 
@@ -34,6 +34,11 @@ export const metadata = {
 };
 
 export default async function SessionsPage() {
-  const initialSessions = await loadSessionsIndexData();
-  return <SessionsPageClient initialSessions={initialSessions} />;
+  const { sessions, totalCount } = await loadSessionsIndexPageData();
+  return (
+    <SessionsPageClient
+      initialSessions={sessions}
+      initialTotalCount={totalCount}
+    />
+  );
 }

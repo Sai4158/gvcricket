@@ -203,8 +203,12 @@ function describeSessionFieldChange(label, previousValue, nextValue) {
   return `${label}: ${previousValue} -> ${nextValue}`;
 }
 
-export default function SessionsPageClient({ initialSessions }) {
+export default function SessionsPageClient({
+  initialSessions,
+  initialTotalCount = 0,
+}) {
   const [sessions, setSessions] = useState(initialSessions ?? []);
+  const [totalCount, setTotalCount] = useState(Number(initialTotalCount || 0));
   const [pinPrompt, setPinPrompt] = useState(null);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [pinError, setPinError] = useState("");
@@ -243,6 +247,10 @@ export default function SessionsPageClient({ initialSessions }) {
   useEffect(() => {
     setSessions(initialSessions ?? []);
   }, [initialSessions]);
+
+  useEffect(() => {
+    setTotalCount(Number(initialTotalCount || 0));
+  }, [initialTotalCount]);
 
   useEffect(() => {
     setSelectedSessionIds((current) =>
@@ -314,7 +322,8 @@ export default function SessionsPageClient({ initialSessions }) {
   const showingTo = filteredSessions.length
     ? Math.min(filteredSessions.length, pageStart + pageSize)
     : 0;
-  const totalSessionCount = sessions.length;
+  const totalSessionCount =
+    Number.isFinite(totalCount) && totalCount > 0 ? totalCount : sessions.length;
   const filteredSessionCount = filteredSessions.length;
   const totalSessionsLabel = `${totalSessionCount} ${
     totalSessionCount === 1 ? "session" : "sessions"
@@ -480,6 +489,35 @@ export default function SessionsPageClient({ initialSessions }) {
     router.replace("/");
   }, [router, startNavigation]);
 
+  const reloadSessionsFromServer = useCallback(async () => {
+    const response = await fetch("/api/sessions", {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("Could not refresh sessions.");
+    }
+
+    const payload = await response
+      .json()
+      .catch(() => []);
+
+    if (!Array.isArray(payload)) {
+      throw new Error("Could not refresh sessions.");
+    }
+
+    const nextTotalCount = Number(
+      response.headers.get("X-Total-Count") || payload.length || 0
+    );
+
+    setSessions(payload);
+    setTotalCount(Number.isFinite(nextTotalCount) ? nextTotalCount : payload.length);
+    return payload;
+  }, []);
+
   const openSessionManager = useCallback((session, pin) => {
     setManageSessionContext({ sessionId: session._id, pin });
     setManageForm({
@@ -565,11 +603,6 @@ export default function SessionsPageClient({ initialSessions }) {
         throw new Error(payload.message || "Could not update session.");
       }
 
-      setSessions((current) =>
-        current.map((session) =>
-          session._id === payload._id ? { ...session, ...payload } : session
-        )
-      );
       const changedItems = [
         describeSessionFieldChange(
           "Game name",
@@ -588,6 +621,8 @@ export default function SessionsPageClient({ initialSessions }) {
         ),
       ].filter(Boolean);
 
+      await reloadSessionsFromServer();
+
       closeSessionManager();
       setActionSummary({
         title: "Session Updated",
@@ -603,7 +638,7 @@ export default function SessionsPageClient({ initialSessions }) {
     } finally {
       setManageSubmitting(false);
     }
-  }, [closeSessionManager, manageForm.name, manageForm.teamAName, manageForm.teamBName, manageSessionContext, manageSubmitting, sessions]);
+  }, [closeSessionManager, manageForm.name, manageForm.teamAName, manageForm.teamBName, manageSessionContext, manageSubmitting, reloadSessionsFromServer, sessions]);
 
   const handleManageSessionDelete = useCallback(async () => {
     if (!manageSessionContext?.sessionId || manageSubmitting) {
@@ -639,9 +674,8 @@ export default function SessionsPageClient({ initialSessions }) {
         throw new Error(payload.message || "Could not delete session.");
       }
 
-      setSessions((current) =>
-        current.filter((session) => session._id !== manageSessionContext.sessionId)
-      );
+      await reloadSessionsFromServer();
+      setPage(1);
       closeSessionManager();
       setActionSummary({
         title: "Session Deleted",
@@ -661,7 +695,7 @@ export default function SessionsPageClient({ initialSessions }) {
     } finally {
       setManageSubmitting(false);
     }
-  }, [closeSessionManager, manageSessionContext, manageSubmitting, sessions]);
+  }, [closeSessionManager, manageSessionContext, manageSubmitting, reloadSessionsFromServer, sessions]);
 
   const handleBulkDeleteSessions = useCallback(
     async (pin) => {
@@ -693,9 +727,8 @@ export default function SessionsPageClient({ initialSessions }) {
         : [];
       const removedIds = deletedIds.length ? deletedIds : selectedSessionIds;
 
-      setSessions((current) =>
-        current.filter((session) => !removedIds.includes(String(session._id)))
-      );
+      await reloadSessionsFromServer();
+      setPage(1);
       clearSelectionMode();
       setBulkDeletePromptOpen(false);
       setActionSummary({
@@ -708,9 +741,8 @@ export default function SessionsPageClient({ initialSessions }) {
           .slice(0, 6),
         tone: "danger",
       });
-      router.refresh();
     },
-    [clearSelectionMode, router, selectedSessionIds, sessions]
+    [clearSelectionMode, reloadSessionsFromServer, selectedSessionIds, sessions]
   );
 
   const handleDeleteSessionImage = useCallback(

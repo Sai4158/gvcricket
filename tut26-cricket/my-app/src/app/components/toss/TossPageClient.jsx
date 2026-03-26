@@ -19,8 +19,6 @@ import StepFlow from "../shared/StepFlow";
 import LiquidSportText from "../home/LiquidSportText";
 
 const getDraftTokenKey = (sessionId) => `session_${sessionId}_draftToken`;
-const getTossPromptHandoffKey = (sessionId) =>
-  `session_${sessionId}_tossPromptPrimed_v1`;
 const TOSS_ANNOUNCER_SETTINGS = {
   enabled: true,
   muted: false,
@@ -144,28 +142,21 @@ export default function TossPageClient({
 
   useEffect(() => {
     if (status !== "choosing" || choicePromptedRef.current || !matchDetails) {
-      return;
-    }
-
-    if (typeof window !== "undefined") {
-      const handoffPrompt = window.sessionStorage.getItem(
-        getTossPromptHandoffKey(sessionId)
-      );
-      if (handoffPrompt) {
-        window.sessionStorage.removeItem(getTossPromptHandoffKey(sessionId));
-        choicePromptedRef.current = true;
-        return;
-      }
+      return undefined;
     }
 
     const teamName = getTeamBundle(matchDetails, "teamA").name;
     const nextChoicePrompt = buildTossChoicePrompt(teamName);
-    prime();
-    choicePromptedRef.current = true;
-    speak(nextChoicePrompt, {
-      priority: 2,
-      interrupt: true,
-    });
+    const promptTimer = window.setTimeout(() => {
+      prime();
+      choicePromptedRef.current = true;
+      speak(nextChoicePrompt, {
+        priority: 2,
+        interrupt: true,
+      });
+    }, 420);
+
+    return () => window.clearTimeout(promptTimer);
   }, [matchDetails, prime, sessionId, speak, status]);
 
   useEffect(() => {
