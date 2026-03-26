@@ -1470,6 +1470,61 @@ test("umpire tap announcer keeps score-button speech short and direct", () => {
   assert.equal(buildUmpireTapAnnouncement(undoEvent, "simple"), "Undo.");
 });
 
+test("wide and no-ball extras use given wording in announcer text", () => {
+  const matchBefore = applyMatchAction(buildBaseMatch(), {
+    actionId: "toss:extras-given-wording",
+    type: "set_toss",
+    tossWinner: "Falcons",
+    tossDecision: "bat",
+  });
+  const wideAfter = applyMatchAction(matchBefore, {
+    actionId: "score:wide-given-wording",
+    type: "score_ball",
+    runs: 1,
+    isOut: false,
+    extraType: "wide",
+  });
+  const noBallAfter = applyMatchAction(matchBefore, {
+    actionId: "score:noball-given-wording",
+    type: "score_ball",
+    runs: 1,
+    isOut: false,
+    extraType: "noball",
+  });
+  const wideEvent = createScoreLiveEvent(matchBefore, wideAfter, {
+    runs: 1,
+    isOut: false,
+    extraType: "wide",
+  });
+  const noBallEvent = createScoreLiveEvent(matchBefore, noBallAfter, {
+    runs: 1,
+    isOut: false,
+    extraType: "noball",
+  });
+
+  assert.equal(
+    buildSpectatorAnnouncement(wideEvent, wideAfter, "simple"),
+    "Umpire has given a wide. 1 run given."
+  );
+  assert.equal(
+    buildSpectatorAnnouncement(noBallEvent, noBallAfter, "simple"),
+    "Umpire has given a no ball. 1 run given."
+  );
+  assert.equal(
+    buildUmpireAnnouncement(wideEvent, "simple"),
+    "Umpire says wide ball. 1 run given."
+  );
+  assert.equal(
+    buildUmpireAnnouncement(noBallEvent, "simple"),
+    "Umpire says no ball. 1 run given."
+  );
+  assert.equal(buildUmpireTapAnnouncement(wideEvent, "simple"), "Wide, 1 run given.");
+  assert.equal(
+    buildUmpireTapAnnouncement(noBallEvent, "simple"),
+    "No ball, 1 run given."
+  );
+});
+
 test("walkie snapshot tracks director presence and spectator requests stay live-only", () => {
   const matchId = `walkie-test-${Date.now()}`;
   hydrateWalkieEnabled(matchId, false);

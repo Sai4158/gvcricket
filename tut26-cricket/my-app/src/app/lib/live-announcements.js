@@ -131,7 +131,7 @@ function buildBallEventLine(ball) {
   if (ball.extraType === "wide") {
     const wideRuns = Math.max(safeNumber(ball.runs), 0);
     if (wideRuns > 0) {
-      return `Umpire has given a wide. ${pluralizeRuns(wideRuns)} taken.`;
+      return `Umpire has given a wide. ${pluralizeRuns(wideRuns)} given.`;
     }
     return "Umpire has given a wide.";
   }
@@ -139,7 +139,7 @@ function buildBallEventLine(ball) {
   if (ball.extraType === "noball") {
     const noBallRuns = Math.max(safeNumber(ball.runs), 0);
     if (noBallRuns > 0) {
-      return `Umpire has given a no ball. ${pluralizeRuns(noBallRuns)} taken.`;
+      return `Umpire has given a no ball. ${pluralizeRuns(noBallRuns)} given.`;
     }
     return "Umpire has given a no ball.";
   }
@@ -694,14 +694,14 @@ export function buildUmpireAnnouncement(event, mode = "simple") {
   if (ball.extraType === "wide") {
     const wideRuns = Math.max(safeNumber(ball.runs), 0);
     return wideRuns > 0
-      ? `Umpire says wide ball. ${pluralizeRuns(wideRuns)} more taken.`
+      ? `Umpire says wide ball. ${pluralizeRuns(wideRuns)} given.`
       : "Umpire says wide ball.";
   }
 
   if (ball.extraType === "noball") {
     const noBallRuns = Math.max(safeNumber(ball.runs), 0);
     return noBallRuns > 0
-      ? `Umpire says no ball. ${pluralizeRuns(noBallRuns)} more taken.`
+      ? `Umpire says no ball. ${pluralizeRuns(noBallRuns)} given.`
       : "Umpire says no ball.";
   }
 
@@ -758,13 +758,13 @@ export function buildUmpireTapAnnouncement(event, mode = "simple") {
 
   if (ball.extraType === "wide") {
     const wideRuns = Math.max(safeNumber(ball.runs), 0);
-    return wideRuns > 0 ? `Wide, ${pluralizeRuns(wideRuns)} taken.` : "Wide.";
+    return wideRuns > 0 ? `Wide, ${pluralizeRuns(wideRuns)} given.` : "Wide.";
   }
 
   if (ball.extraType === "noball") {
     const noBallRuns = Math.max(safeNumber(ball.runs), 0);
     return noBallRuns > 0
-      ? `No ball, ${pluralizeRuns(noBallRuns)} taken.`
+      ? `No ball, ${pluralizeRuns(noBallRuns)} given.`
       : "No ball.";
   }
 
