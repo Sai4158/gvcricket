@@ -125,7 +125,7 @@ function buildBallEventLine(ball) {
     if (safeNumber(ball.runs) > 0) {
       return `Umpire has given ${pluralizeRuns(safeNumber(ball.runs))}. Batter is out.`;
     }
-    return "Umpire has given 1 out.";
+    return "Umpire has given the batter out.";
   }
 
   if (ball.extraType === "wide") {
@@ -677,7 +677,7 @@ export function buildUmpireAnnouncement(event, mode = "simple") {
   }
 
   if (event.type === "match_end") {
-    return "Umpire says match over.";
+    return "Umpire has called match over.";
   }
 
   const ball = event.ball;
@@ -687,34 +687,34 @@ export function buildUmpireAnnouncement(event, mode = "simple") {
 
   if (ball.isOut) {
     return safeNumber(ball.runs) > 0
-      ? `Umpire gives ${pluralizeRuns(safeNumber(ball.runs))}, and batter is out.`
-      : "Umpire has decided, out.";
+      ? `Umpire has given ${pluralizeRuns(safeNumber(ball.runs))}. Batter is out.`
+      : "Umpire has given the batter out.";
   }
 
   if (ball.extraType === "wide") {
     const wideRuns = Math.max(safeNumber(ball.runs), 0);
     return wideRuns > 0
-      ? `Umpire says wide ball. ${pluralizeRuns(wideRuns)} given.`
-      : "Umpire says wide ball.";
+      ? `Umpire has given a wide. ${pluralizeRuns(wideRuns)} given.`
+      : "Umpire has given a wide.";
   }
 
   if (ball.extraType === "noball") {
     const noBallRuns = Math.max(safeNumber(ball.runs), 0);
     return noBallRuns > 0
-      ? `Umpire says no ball. ${pluralizeRuns(noBallRuns)} given.`
-      : "Umpire says no ball.";
+      ? `Umpire has given a no ball. ${pluralizeRuns(noBallRuns)} given.`
+      : "Umpire has given a no ball.";
   }
 
   if (ball.extraType === "bye") {
     return safeNumber(ball.runs) > 0
-      ? `Umpire gives bye. ${pluralizeRuns(safeNumber(ball.runs))}.`
-      : "Umpire gives bye.";
+      ? `Umpire has given bye. ${pluralizeRuns(safeNumber(ball.runs))}.`
+      : "Umpire has given bye.";
   }
 
   if (ball.extraType === "legbye") {
     return safeNumber(ball.runs) > 0
-      ? `Umpire gives leg bye. ${pluralizeRuns(safeNumber(ball.runs))}.`
-      : "Umpire gives leg bye.";
+      ? `Umpire has given leg bye. ${pluralizeRuns(safeNumber(ball.runs))}.`
+      : "Umpire has given leg bye.";
   }
 
   if (ball.runs === 0) {
@@ -722,14 +722,14 @@ export function buildUmpireAnnouncement(event, mode = "simple") {
   }
 
   if (safeNumber(ball.runs) === 4) {
-    return "Umpire gives four runs.";
+    return "Umpire has given four runs.";
   }
 
   if (safeNumber(ball.runs) === 6) {
-    return "Umpire gives six runs.";
+    return "Umpire has given six runs.";
   }
 
-  return `Umpire gives ${pluralizeRuns(safeNumber(ball.runs))}.`;
+  return `Umpire has given ${pluralizeRuns(safeNumber(ball.runs))}.`;
 }
 
 export function buildUmpireTapAnnouncement(event, mode = "simple") {

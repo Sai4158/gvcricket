@@ -1415,7 +1415,10 @@ test("umpire commentary speaks score buttons and undo with clean wording", () =>
   });
   const undoEvent = createUndoLiveEvent(matchAfter);
 
-  assert.equal(buildUmpireAnnouncement(scoreEvent, "simple"), "Umpire gives 2 runs.");
+  assert.equal(
+    buildUmpireAnnouncement(scoreEvent, "simple"),
+    "Umpire has given 2 runs."
+  );
   assert.equal(
     buildUmpireAnnouncement(dotBallEvent, "simple"),
     "Umpire has given dot ball."
@@ -1512,11 +1515,11 @@ test("wide and no-ball extras use given wording in announcer text", () => {
   );
   assert.equal(
     buildUmpireAnnouncement(wideEvent, "simple"),
-    "Umpire says wide ball. 1 run given."
+    "Umpire has given a wide. 1 run given."
   );
   assert.equal(
     buildUmpireAnnouncement(noBallEvent, "simple"),
-    "Umpire says no ball. 1 run given."
+    "Umpire has given a no ball. 1 run given."
   );
   assert.equal(buildUmpireTapAnnouncement(wideEvent, "simple"), "Wide, 1 run given.");
   assert.equal(
