@@ -893,6 +893,23 @@ export default function MatchPageClient({
     }
   };
 
+  const broadcastManualScoreAnnouncement = useCallback(async () => {
+    if (!match?._id || !isLiveMatch) {
+      return;
+    }
+
+    try {
+      await fetch(`/api/matches/${matchId}/announce`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        keepalive: true,
+        body: JSON.stringify({}),
+      });
+    } catch {
+      // Local umpire announcement already played. Spectator sync is best-effort.
+    }
+  }, [isLiveMatch, match?._id, matchId]);
+
   const handleScoreFeedbackHoldStart = () => {
     if (!match) {
       return;
@@ -901,6 +918,7 @@ export default function MatchPageClient({
     ensureUmpireScoreFeedbackEnabled();
     prime({ userGesture: true });
     handleManualScoreAnnouncement();
+    void broadcastManualScoreAnnouncement();
   };
 
   const loadSoundEffectsLibrary = useCallback(async () => {

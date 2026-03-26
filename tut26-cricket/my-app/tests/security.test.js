@@ -35,8 +35,10 @@ import { applySecurityHeaders } from "../security-headers.mjs";
 import { countLegalBalls, buildWinByWicketsText } from "../src/app/lib/match-scoring.js";
 import {
   buildCurrentScoreAnnouncement,
+  buildLiveScoreAnnouncementSequence,
   buildUmpireAnnouncement,
   buildUmpireTapAnnouncement,
+  createManualScoreAnnouncementLiveEvent,
   buildSpectatorAnnouncement,
   buildSpectatorOverCompleteAnnouncement,
   buildSpectatorScoreAnnouncement,
@@ -1266,6 +1268,43 @@ test("spectator commentary gives progress reminders and clean undo lines", () =>
     "Umpire has removed the score for that ball. Umpire will redo this ball."
   );
   assert.equal(buildSpectatorScoreAnnouncement(undoEvent, match), "Score is 4 for 0.");
+});
+
+test("manual score announcement event reads the current score without a duplicate lead line", () => {
+  const match = {
+    ...buildBaseMatch(),
+    tossWinner: "Falcons",
+    tossDecision: "bat",
+    innings: "first",
+    score: 42,
+    outs: 2,
+    innings1: {
+      team: "Falcons",
+      score: 42,
+      outs: 2,
+      history: [
+        {
+          overNumber: 1,
+          balls: [
+            { runs: 1 },
+            { runs: 2 },
+            { runs: 0 },
+            { runs: 4 },
+            { runs: 1 },
+            { runs: 0 },
+          ],
+        },
+      ],
+    },
+    innings2: { team: "Titans", score: 0, history: [] },
+  };
+
+  const event = createManualScoreAnnouncementLiveEvent(match);
+  const sequence = buildLiveScoreAnnouncementSequence(event, match, "full");
+
+  assert.equal(buildSpectatorAnnouncement(event, match, "full"), "");
+  assert.equal(sequence.items.length, 1);
+  assert.match(sequence.items[0].text, /Score is 42 for 2\./);
 });
 
 test("score correction announcements stay smart for umpire and spectator", () => {

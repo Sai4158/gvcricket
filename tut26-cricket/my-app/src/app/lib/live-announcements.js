@@ -323,6 +323,10 @@ export function buildSpectatorScoreAnnouncement(event, match) {
       .join(" ");
   }
 
+  if (event.type === "manual_score_announcement") {
+    return buildCurrentScoreAnnouncement(match);
+  }
+
   if (event.overCompleted) {
     return "";
   }
@@ -495,6 +499,23 @@ export function createSoundEffectLiveEvent(match, effect, options = {}) {
   };
 }
 
+export function createManualScoreAnnouncementLiveEvent(match) {
+  const history = getActiveHistory(match);
+  const legalBalls = countLegalBalls(history);
+
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    type: "manual_score_announcement",
+    summaryText: "Umpire requested the current score announcement.",
+    score: match?.score ?? 0,
+    outs: match?.outs ?? 0,
+    battingTeam: getBattingTeamBundle(match).name,
+    overs: `${Math.floor(legalBalls / 6)}.${legalBalls % 6}`,
+    result: match?.result || "",
+    createdAt: new Date().toISOString(),
+  };
+}
+
 export function buildSpectatorAnnouncement(event, match, mode = "full") {
   if (!event || mode === "silent") {
     return "";
@@ -542,6 +563,10 @@ export function buildSpectatorAnnouncement(event, match, mode = "full") {
     return "";
   }
 
+  if (event.type === "manual_score_announcement") {
+    return "";
+  }
+
   return buildSpectatorBallAnnouncement(event);
 }
 
@@ -555,6 +580,23 @@ export function buildLiveScoreAnnouncementSequence(
       items: [],
       priority: 0,
       restoreAfterMs: 0,
+    };
+  }
+
+  if (event.type === "manual_score_announcement") {
+    const scoreLine = buildSpectatorScoreAnnouncement(event, match);
+    return {
+      items: scoreLine
+        ? [
+            {
+              text: scoreLine,
+              pauseAfterMs: 0,
+              rate: 0.8,
+            },
+          ]
+        : [],
+      priority: 3,
+      restoreAfterMs: 2400,
     };
   }
 

@@ -1,9 +1,18 @@
 "use client";
 
-import { startTransition, useEffect, useMemo, useRef, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import { applyMatchAction, MatchEngineError } from "../../lib/match-engine";
 import useEventSource from "../live/useEventSource";
+
+const ACTION_QUEUE_RETRY_DELAY_MS = 2500;
 
 function triggerHapticFeedback() {
   if (
@@ -42,6 +51,83 @@ function normalizeOptimisticMatch(nextMatch) {
   };
 }
 
+function getActionQueueStorageKey(matchId) {
+  return `gv-match-pending-actions-${matchId}`;
+}
+
+function normalizeQueuedActionEntry(entry) {
+  if (
+    !entry ||
+    typeof entry !== "object" ||
+    typeof entry.action !== "object" ||
+    typeof entry.action?.type !== "string" ||
+    typeof entry.action?.actionId !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    action: entry.action,
+    allowOneRetry: entry.allowOneRetry !== false,
+  };
+}
+
+function readStoredActionQueue(matchId) {
+  if (typeof window === "undefined" || !matchId) {
+    return [];
+  }
+
+  try {
+    const rawValue = window.sessionStorage.getItem(
+      getActionQueueStorageKey(matchId)
+    );
+    if (!rawValue) {
+      return [];
+    }
+
+    const parsed = JSON.parse(rawValue);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .map(normalizeQueuedActionEntry)
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredActionQueue(matchId, entries) {
+  if (typeof window === "undefined" || !matchId) {
+    return;
+  }
+
+  try {
+    if (!entries.length) {
+      window.sessionStorage.removeItem(getActionQueueStorageKey(matchId));
+      return;
+    }
+
+    window.sessionStorage.setItem(
+      getActionQueueStorageKey(matchId),
+      JSON.stringify(entries),
+    );
+  } catch {
+    // Ignore storage failures and continue with in-memory queueing.
+  }
+}
+
+export function replayQueuedMatchActions(baseMatch, queuedEntries = []) {
+  return (queuedEntries || []).reduce((nextMatch, entry) => {
+    return applyMatchAction(nextMatch, entry.action);
+  }, baseMatch);
+}
+
+function isRetryableActionFailure(status) {
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
 export default function useMatch(matchId, hasAccess, initialMatch = null) {
   const router = useRouter();
   const [match, setMatch] = useState(initialMatch);
@@ -56,12 +142,88 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
   const matchRef = useRef(initialMatch);
   const actionQueueRef = useRef([]);
   const processingQueueRef = useRef(false);
+  const retryTimerRef = useRef(null);
+  const processQueuedActionsRef = useRef(async () => {});
+
+  const clearRetryTimer = useCallback(() => {
+    if (retryTimerRef.current) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+  }, []);
+
+  const updateQueuedActions = useCallback((nextQueue) => {
+    actionQueueRef.current = nextQueue;
+    writeStoredActionQueue(matchId, nextQueue);
+  }, [matchId]);
+
+  const applyQueuedFallbackState = useCallback((baseMatch) => {
+    if (!baseMatch) {
+      return null;
+    }
+
+    if (!actionQueueRef.current.length) {
+      return baseMatch;
+    }
+
+    try {
+      return normalizeOptimisticMatch(
+        replayQueuedMatchActions(baseMatch, actionQueueRef.current),
+      );
+    } catch {
+      updateQueuedActions([]);
+      setError(
+        new Error(
+          "Saved local scoring was cleared because the live match changed.",
+        ),
+      );
+      return baseMatch;
+    }
+  }, [updateQueuedActions]);
+
+  const scheduleQueuedActionRetry = useCallback(
+    (delayMs = ACTION_QUEUE_RETRY_DELAY_MS) => {
+      if (
+        typeof window === "undefined" ||
+        retryTimerRef.current ||
+        !matchId ||
+        !hasAccess ||
+        !actionQueueRef.current.length
+      ) {
+        return;
+      }
+
+      retryTimerRef.current = window.setTimeout(() => {
+        retryTimerRef.current = null;
+
+        if (
+          typeof document !== "undefined" &&
+          document.visibilityState === "hidden"
+        ) {
+          scheduleQueuedActionRetry(
+            Math.max(delayMs, ACTION_QUEUE_RETRY_DELAY_MS),
+          );
+          return;
+        }
+
+        if (typeof navigator !== "undefined" && navigator.onLine === false) {
+          scheduleQueuedActionRetry(
+            Math.max(delayMs, ACTION_QUEUE_RETRY_DELAY_MS * 2),
+          );
+          return;
+        }
+
+        void processQueuedActionsRef.current();
+      }, delayMs);
+    },
+    [hasAccess, matchId],
+  );
 
   useEffect(() => {
     matchRef.current = match;
   }, [match]);
 
-  const refreshMatch = async () => {
+  const refreshMatch = useCallback(async () => {
     if (!matchId || !hasAccess) {
       return null;
     }
@@ -78,11 +240,14 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
         return null;
       }
 
-      matchRef.current = body;
+      const nextMatch = applyQueuedFallbackState(body);
+      matchRef.current = nextMatch;
       lastStreamUpdateRef.current = body.updatedAt || lastStreamUpdateRef.current;
       startTransition(() => {
-        setMatch(body);
-        setLastUpdatedAt(body.updatedAt || new Date().toISOString());
+        setMatch(nextMatch);
+        setLastUpdatedAt(
+          nextMatch?.updatedAt || body.updatedAt || new Date().toISOString(),
+        );
         setError(null);
       });
 
@@ -90,15 +255,16 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     } catch {
       return null;
     }
-  };
+  }, [applyQueuedFallbackState, hasAccess, matchId]);
 
   useEffect(() => {
     const matchChanged = previousMatchIdRef.current !== matchId;
     previousMatchIdRef.current = matchId;
 
     if (matchChanged) {
+      clearRetryTimer();
       processingQueueRef.current = false;
-      actionQueueRef.current = [];
+      updateQueuedActions([]);
       lastStreamUpdateRef.current = initialMatch?.updatedAt || "";
       matchRef.current = initialMatch || null;
       setMatch(initialMatch || null);
@@ -108,6 +274,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     }
 
     if (!matchId || !hasAccess) {
+      clearRetryTimer();
       lastStreamUpdateRef.current = initialMatch?.updatedAt || "";
       matchRef.current = initialMatch || null;
       setMatch(initialMatch);
@@ -120,7 +287,40 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     if (!initialMatch) {
       setIsLoading(true);
     }
-  }, [hasAccess, initialMatch, matchId]);
+  }, [clearRetryTimer, hasAccess, initialMatch, matchId, updateQueuedActions]);
+
+  useEffect(() => {
+    if (!matchId) {
+      clearRetryTimer();
+      actionQueueRef.current = [];
+      return;
+    }
+
+    clearRetryTimer();
+    const storedQueue = readStoredActionQueue(matchId);
+    updateQueuedActions(storedQueue);
+
+    if (!storedQueue.length || !initialMatch) {
+      return;
+    }
+
+    const replayedMatch = applyQueuedFallbackState(initialMatch);
+    matchRef.current = replayedMatch;
+    setMatch(replayedMatch);
+    setLastUpdatedAt(replayedMatch?.updatedAt || initialMatch.updatedAt || "");
+
+    if (hasAccess) {
+      scheduleQueuedActionRetry(250);
+    }
+  }, [
+    applyQueuedFallbackState,
+    clearRetryTimer,
+    hasAccess,
+    initialMatch,
+    matchId,
+    scheduleQueuedActionRetry,
+    updateQueuedActions,
+  ]);
 
   useEventSource({
     url: matchId && hasAccess ? `/api/live/matches/${matchId}` : null,
@@ -132,10 +332,11 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       }
 
       lastStreamUpdateRef.current = payload.updatedAt || "";
-      matchRef.current = payload.match || null;
+      const nextMatch = applyQueuedFallbackState(payload.match || null);
+      matchRef.current = nextMatch;
       startTransition(() => {
-        setMatch(payload.match || null);
-        setLastUpdatedAt(payload.updatedAt || "");
+        setMatch(nextMatch);
+        setLastUpdatedAt(nextMatch?.updatedAt || payload.updatedAt || "");
         setError(null);
         setIsLoading(false);
       });
@@ -158,19 +359,20 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     match?.[activeInningsKey]?.history?.some((over) => Array.isArray(over?.balls) && over.balls.length > 0)
   );
 
-  const refreshMatchFromServer = async () => {
+  const refreshMatchFromServer = useCallback(async () => {
     const refreshedMatch = await refreshMatch();
     if (refreshedMatch) {
       matchRef.current = refreshedMatch;
     }
     return refreshedMatch;
-  };
+  }, [refreshMatch]);
 
-  const processQueuedActions = async () => {
+  const processQueuedActions = useCallback(async () => {
     if (processingQueueRef.current) {
       return;
     }
 
+    clearRetryTimer();
     processingQueueRef.current = true;
 
     while (actionQueueRef.current.length > 0) {
@@ -189,6 +391,16 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
           .catch(() => ({ message: "Failed to update match." }));
 
         if (!response.ok) {
+          if (isRetryableActionFailure(response.status)) {
+            setError(
+              new Error(
+                `${body.message || "Could not update match."} Saved locally and retrying.`,
+              ),
+            );
+            scheduleQueuedActionRetry();
+            break;
+          }
+
           if (body.message === "Set the toss before scoring starts.") {
             const refreshedMatch = await refreshMatchFromServer();
 
@@ -216,30 +428,46 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
         }
 
         if (body.match) {
-          matchRef.current = body.match;
+          const remainingQueue = actionQueueRef.current.slice(1);
+          updateQueuedActions(remainingQueue);
+          const nextMatch = applyQueuedFallbackState(body.match);
+          matchRef.current = nextMatch;
           lastStreamUpdateRef.current =
             body.match.updatedAt || lastStreamUpdateRef.current;
           startTransition(() => {
-            setMatch(body.match);
-            setLastUpdatedAt(body.match.updatedAt || new Date().toISOString());
+            setMatch(nextMatch);
+            setLastUpdatedAt(
+              nextMatch?.updatedAt || body.match.updatedAt || new Date().toISOString(),
+            );
           });
+        } else {
+          updateQueuedActions(actionQueueRef.current.slice(1));
         }
 
         setError(null);
-        actionQueueRef.current.shift();
       } catch (caughtError) {
         console.error("Failed to update match:", caughtError);
-        await refreshMatchFromServer();
         setError(caughtError);
-        actionQueueRef.current.shift();
+        scheduleQueuedActionRetry();
+        break;
       }
     }
 
     processingQueueRef.current = false;
     setIsUpdating(false);
-  };
+  }, [
+    applyQueuedFallbackState,
+    clearRetryTimer,
+    matchId,
+    refreshMatchFromServer,
+    router,
+    scheduleQueuedActionRetry,
+    updateQueuedActions,
+  ]);
 
-  const sendAction = async (action, allowOneRetry = true) => {
+  processQueuedActionsRef.current = processQueuedActions;
+
+  const sendAction = useCallback(async (action, allowOneRetry = true) => {
     if (!matchId || !hasAccess) return null;
 
     const baseMatch = matchRef.current;
@@ -266,16 +494,19 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       return null;
     }
 
-    actionQueueRef.current.push({
-      action,
-      allowOneRetry,
-    });
+    updateQueuedActions([
+      ...actionQueueRef.current,
+      {
+        action,
+        allowOneRetry,
+      },
+    ]);
     void processQueuedActions();
 
     return matchRef.current;
-  };
+  }, [hasAccess, matchId, processQueuedActions, updateQueuedActions]);
 
-  const patchAndUpdate = async (payload) => {
+  const patchAndUpdate = useCallback(async (payload) => {
     if (!matchId || !hasAccess || processingQueueRef.current) return null;
 
     setIsUpdating(true);
@@ -318,9 +549,53 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     } finally {
       setIsUpdating(false);
     }
-  };
+  }, [hasAccess, matchId, refreshMatchFromServer]);
 
-  const handleScoreEvent = (runs, isOut = false, extraType = null) => {
+  useEffect(() => {
+    if (!matchId || !hasAccess || typeof window === "undefined") {
+      return undefined;
+    }
+
+    const retryPendingActions = () => {
+      if (!actionQueueRef.current.length) {
+        return;
+      }
+
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "hidden"
+      ) {
+        return;
+      }
+
+      clearRetryTimer();
+      void processQueuedActionsRef.current();
+    };
+
+    const handleVisibility = () => {
+      if (typeof document === "undefined" || document.visibilityState !== "hidden") {
+        retryPendingActions();
+      }
+    };
+
+    window.addEventListener("online", retryPendingActions);
+    window.addEventListener("focus", retryPendingActions);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.removeEventListener("online", retryPendingActions);
+      window.removeEventListener("focus", retryPendingActions);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [clearRetryTimer, hasAccess, matchId]);
+
+  useEffect(() => {
+    return () => {
+      clearRetryTimer();
+    };
+  }, [clearRetryTimer]);
+
+  const handleScoreEvent = useCallback((runs, isOut = false, extraType = null) => {
     if (!match || match.result || !hasAccess) return;
     if (tossPending) {
       setError(null);
@@ -336,9 +611,9 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       isOut,
       extraType,
     });
-  };
+  }, [hasAccess, match, matchId, router, sendAction, tossPending]);
 
-  const handleUndo = async () => {
+  const handleUndo = useCallback(async () => {
     triggerHapticFeedback();
     if (tossPending) {
       setError(null);
@@ -351,9 +626,9 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       actionId: createActionId("undo"),
       type: "undo_last",
     });
-  };
+  }, [currentInningsHasHistory, match?.undoCount, matchId, router, sendAction, tossPending]);
 
-  const handleNextInningsOrEnd = async () => {
+  const handleNextInningsOrEnd = useCallback(async () => {
     if (!match || !hasAccess) return;
     if (tossPending) {
       setError(null);
@@ -374,7 +649,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     if (updatedMatch?.result && !updatedMatch?.isOngoing) {
       router.push(`/result/${matchId}`);
     }
-  };
+  }, [hasAccess, match, matchId, router, sendAction, tossPending]);
 
   return {
     match,
