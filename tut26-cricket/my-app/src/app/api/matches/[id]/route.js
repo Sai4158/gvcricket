@@ -166,6 +166,10 @@ export async function PATCH(req, { params }) {
     match.lastEventText = nextState.lastEventText;
     match.announcerEnabled = nextState.announcerEnabled;
     match.announcerMode = nextState.announcerMode;
+    match.announcerScoreSoundEffectsEnabled =
+      nextState.announcerScoreSoundEffectsEnabled;
+    match.announcerBroadcastScoreSoundEffectsEnabled =
+      nextState.announcerBroadcastScoreSoundEffectsEnabled;
     await match.save();
 
     await Session.findByIdAndUpdate(match.sessionId, {

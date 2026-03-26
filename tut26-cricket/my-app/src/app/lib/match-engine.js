@@ -549,6 +549,14 @@ export function applySafeMatchPatch(matchDocument, patch) {
   if (patch.announcerMode !== undefined) {
     nextMatch.announcerMode = patch.announcerMode;
   }
+  if (patch.announcerScoreSoundEffectsEnabled !== undefined) {
+    nextMatch.announcerScoreSoundEffectsEnabled =
+      patch.announcerScoreSoundEffectsEnabled;
+  }
+  if (patch.announcerBroadcastScoreSoundEffectsEnabled !== undefined) {
+    nextMatch.announcerBroadcastScoreSoundEffectsEnabled =
+      patch.announcerBroadcastScoreSoundEffectsEnabled;
+  }
 
   if (
     previousNames.teamAName !== nextNames.teamAName ||
@@ -590,6 +598,10 @@ export function buildSessionMirrorUpdate(matchDocument) {
     matchImageUploadedBy: match?.matchImageUploadedBy || "",
     announcerEnabled: Boolean(match?.announcerEnabled),
     announcerMode: match?.announcerMode || "",
+    announcerScoreSoundEffectsEnabled:
+      match?.announcerScoreSoundEffectsEnabled !== false,
+    announcerBroadcastScoreSoundEffectsEnabled:
+      match?.announcerBroadcastScoreSoundEffectsEnabled !== false,
     lastEventType: match?.lastEventType || "",
     lastEventText: match?.lastEventText || "",
     adminAccessVersion: Number(match?.adminAccessVersion || 1),

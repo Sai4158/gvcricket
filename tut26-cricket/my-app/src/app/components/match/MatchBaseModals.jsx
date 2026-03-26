@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { FaTimes } from "react-icons/fa";
 import LiquidSportText from "../home/LiquidSportText";
 import LoadingButton from "../shared/LoadingButton";
-import { Ball } from "./MatchBallHistory";
+import { Ball, buildBallSlotLabels } from "./MatchBallHistory";
 import MatchImageUploader from "./MatchImageUploader";
 import { countLegalBalls } from "../../lib/match-scoring";
 
@@ -147,19 +147,27 @@ function HistorySection({ title, history }) {
         </span>
       </div>
       <div className="space-y-4">
-        {[...history].reverse().map((over) => (
-          <div
-            key={`${title}-${over.overNumber}`}
-            className="rounded-2xl border border-white/8 bg-white/[0.03] p-4"
-          >
-            <p className="font-semibold text-zinc-100">Over {over.overNumber}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {over.balls.map((ball, index) => (
-                <Ball key={index} ball={ball} ballNumber={index + 1} />
-              ))}
+        {[...history].reverse().map((over) => {
+          const ballSlotLabels = buildBallSlotLabels(over.balls || []);
+
+          return (
+            <div
+              key={`${title}-${over.overNumber}`}
+              className="rounded-2xl border border-white/8 bg-white/[0.03] p-4"
+            >
+              <p className="font-semibold text-zinc-100">Over {over.overNumber}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(over.balls || []).map((ball, index) => (
+                  <Ball
+                    key={index}
+                    ball={ball}
+                    ballNumber={ballSlotLabels[index] || "•"}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -337,8 +345,8 @@ export function InningsEndModal({ match, onNext }) {
 export function MatchImageModal({ match, onUploaded, onClose }) {
   return (
     <ModalBase
-      title={match?.matchImageUrl ? "Replace Match Image" : "Add Match Image"}
-      onExit={onClose}
+      onExit={undefined}
+      hideHeader
       panelClassName="max-w-md"
       bodyClassName="max-h-[calc(100vh-7rem)]"
     >
@@ -353,8 +361,9 @@ export function MatchImageModal({ match, onUploaded, onClose }) {
         onComplete={() => {
           onClose?.();
         }}
+        onRequestClose={onClose}
         title={match?.matchImageUrl ? "Replace Match Image" : "Add Match Image"}
-        description="Add, rank, or remove match images here."
+        description="Manage match images."
         primaryLabel={match?.matchImageUrl ? "Save Images" : "Upload Images"}
       />
     </ModalBase>

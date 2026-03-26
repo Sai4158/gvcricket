@@ -202,7 +202,6 @@ const HOLD_BUTTON_INTERACTION_PROPS = {
   },
 };
 
-const ANNOUNCER_AUTO_RESET_DELAY_MS = 1500;
 const ANNOUNCER_GESTURE_READ_DELAY_MS = 2000;
 const SIX_PRE_EFFECT_DELAY_MS = 1000;
 
@@ -228,7 +227,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const lastAnnouncedEventRef = useRef("");
   const announcementDuckRef = useRef([]);
   const announcementRestoreTimerRef = useRef(null);
-  const announcerResetTimerRef = useRef(null);
   const walkieNoticeTimerRef = useRef(null);
   const walkieHoldTimerRef = useRef(null);
   const walkieHeldRef = useRef(false);
@@ -585,10 +583,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
       window.clearTimeout(announcerAutoReadTimerRef.current);
       announcerAutoReadTimerRef.current = null;
     }
-    if (announcerResetTimerRef.current) {
-      window.clearTimeout(announcerResetTimerRef.current);
-      announcerResetTimerRef.current = null;
-    }
     if (pendingSoundEffectTimerRef.current) {
       window.clearTimeout(pendingSoundEffectTimerRef.current);
       pendingSoundEffectTimerRef.current = null;
@@ -668,29 +662,13 @@ export default function SessionViewClient({ sessionId, initialData }) {
     previousEnabledRef.current = false;
     clearAnnouncementTimers();
     stop();
-    if (announcerResetTimerRef.current) {
-      window.clearTimeout(announcerResetTimerRef.current);
-      announcerResetTimerRef.current = null;
-    }
-    if (settings.enabled) {
-      updateSetting("enabled", false);
-      announcerResetTimerRef.current = window.setTimeout(() => {
-        announcerResetTimerRef.current = null;
-        updateSetting("enabled", true);
-      }, ANNOUNCER_AUTO_RESET_DELAY_MS);
-      return;
-    }
-
-    if (!settings.enabled) {
-      updateSetting("enabled", true);
-    }
+    stopLiveSoundEffect();
   }, [
     clearAnnouncementTimers,
     isLiveMatch,
     match?._id,
-    settings.enabled,
     stop,
-    updateSetting,
+    stopLiveSoundEffect,
   ]);
 
   useEffect(() => {
@@ -1073,10 +1051,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
         window.clearTimeout(announcerAutoReadTimerRef.current);
         announcerAutoReadTimerRef.current = null;
       }
-      if (announcerResetTimerRef.current) {
-        window.clearTimeout(announcerResetTimerRef.current);
-        announcerResetTimerRef.current = null;
-      }
       if (pendingSoundEffectTimerRef.current) {
         window.clearTimeout(pendingSoundEffectTimerRef.current);
         pendingSoundEffectTimerRef.current = null;
@@ -1250,12 +1224,12 @@ export default function SessionViewClient({ sessionId, initialData }) {
   };
 
   const ensureSpectatorAnnouncerReady = useCallback(
-    ({ userGesture = false, openPanel = false } = {}) => {
-      if (!settings.enabled) {
+    ({ userGesture = false, openPanel = false, forceEnable = false } = {}) => {
+      if (forceEnable && !settings.enabled) {
         updateSetting("enabled", true);
       }
 
-      if (settings.mode === "silent") {
+      if (forceEnable && settings.mode === "silent") {
         updateSetting("mode", "full");
       }
 
@@ -1263,7 +1237,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
         setActivePanel("announce");
       }
 
-      prime({ userGesture });
+      if (userGesture) {
+        prime({ userGesture: true });
+      }
     },
     [prime, settings.enabled, settings.mode, updateSetting],
   );
@@ -1291,7 +1267,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       return;
     }
 
-    ensureSpectatorAnnouncerReady({ userGesture: true });
+    ensureSpectatorAnnouncerReady({ userGesture: true, forceEnable: true });
     announceCurrentScore({ userGesture: true, interrupt: true });
   }, [announceCurrentScore, ensureSpectatorAnnouncerReady, match]);
 
@@ -1631,6 +1607,17 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const speakerCardTalking = quickSpeakerTalking || micMonitor.isActive;
   const speakerSwitchOn = Boolean(speakerMicOn || activePanel === "mic");
   const announceSwitchOn = Boolean(settings.enabled);
+  const umpireBroadcastScoreSoundsEnabled =
+    match?.announcerBroadcastScoreSoundEffectsEnabled !== false;
+  const spectatorScoreSoundsDescription =
+    settings.playScoreSoundEffects === false
+      ? "Turn it on to hear score sounds on this device."
+      : umpireBroadcastScoreSoundsEnabled
+        ? "Play score sounds on this device."
+        : "Local sound is on, but umpire relay is off.";
+  const spectatorBroadcastStatusText = umpireBroadcastScoreSoundsEnabled
+    ? "Umpire is sending score sounds to spectators."
+    : "Umpire has score sounds off for spectators.";
   const walkieCardDescription = walkieLoading
     ? walkie.recoveringAudio || walkie.recoveringSignaling
       ? "Reconnecting walkie..."
@@ -2224,6 +2211,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
               updateSetting={updateSetting}
               simpleMode
               showScoreSoundEffectsToggle
+              showBroadcastStatus
+              scoreSoundsDescription={spectatorScoreSoundsDescription}
+              broadcastStatusLabel="Umpire Relay"
+              broadcastStatusText={spectatorBroadcastStatusText}
+              broadcastStatusEnabled={umpireBroadcastScoreSoundsEnabled}
               variant="modal"
               onClose={() => setActivePanel(null)}
               onToggleEnabled={(nextEnabled) => {

@@ -161,6 +161,8 @@ export const sessionPatchObjectSchema = z
     tossWinner: optionalStringSchema.optional(),
     announcerEnabled: z.boolean().optional(),
     announcerMode: z.enum(["simple", "full", ""]).optional(),
+    announcerScoreSoundEffectsEnabled: z.boolean().optional(),
+    announcerBroadcastScoreSoundEffectsEnabled: z.boolean().optional(),
     matchImageUrl: optionalStringSchema
       .refine((value) => !value || isSafeMatchImageUrl(value), {
         message: "matchImageUrl is invalid.",
@@ -191,6 +193,8 @@ export const matchPatchObjectSchema = z
     innings1Score: z.number().int().min(0).max(999).optional(),
     announcerEnabled: z.boolean().optional(),
     announcerMode: z.enum(["simple", "full", ""]).optional(),
+    announcerScoreSoundEffectsEnabled: z.boolean().optional(),
+    announcerBroadcastScoreSoundEffectsEnabled: z.boolean().optional(),
   })
   .strict();
 

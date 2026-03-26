@@ -334,7 +334,12 @@ export default function AnnouncementControls({
   simpleMode = false,
   showScoreSoundEffectsToggle = false,
   showSpectatorBroadcastToggle = false,
+  showBroadcastStatus = false,
   showScoreEffectAssignments = false,
+  scoreSoundsDescription = "Choose what sound to play on score.",
+  broadcastStatusLabel = "Umpire Relay",
+  broadcastStatusText = "",
+  broadcastStatusEnabled = true,
   soundEffectOptions = [],
   onPreviewSoundEffect,
   onTestSequence,
@@ -495,7 +500,7 @@ export default function AnnouncementControls({
                   Score Sounds
                 </p>
                 <p className="mt-1 text-xs text-zinc-500">
-                  Choose what sound to play on score.
+                  {scoreSoundsDescription}
                 </p>
               </div>
               <div className="shrink-0 pt-0.5">
@@ -534,6 +539,28 @@ export default function AnnouncementControls({
                     updateSetting("broadcastScoreSoundEffects", checked)
                   }
                 />
+              </div>
+            ) : null}
+
+            {showBroadcastStatus ? (
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] border border-white/8 bg-white/[0.03] px-3.5 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-white">
+                    {broadcastStatusLabel}
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    {broadcastStatusText}
+                  </p>
+                </div>
+                <span
+                  className={`inline-flex shrink-0 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${
+                    broadcastStatusEnabled
+                      ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-200"
+                      : "border-rose-300/20 bg-rose-400/10 text-rose-200"
+                  }`}
+                >
+                  {broadcastStatusEnabled ? "On" : "Off"}
+                </span>
               </div>
             ) : null}
 

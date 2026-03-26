@@ -86,6 +86,11 @@ const MatchSchema = new mongoose.Schema(
       enum: ["simple", "full", ""],
       default: "",
     },
+    announcerScoreSoundEffectsEnabled: { type: Boolean, default: true },
+    announcerBroadcastScoreSoundEffectsEnabled: {
+      type: Boolean,
+      default: true,
+    },
     walkieTalkieEnabled: { type: Boolean, default: false },
     walkieTalkieUpdatedAt: { type: Date, default: null },
     lastEventType: { type: String, default: "", trim: true },

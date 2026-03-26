@@ -248,6 +248,63 @@ function GalleryImageTile({
   );
 }
 
+function DiscardChangesPrompt({
+  isOpen,
+  title = "Discard changes?",
+  description = "Your image changes are not saved yet.",
+  onKeepEditing,
+  onDiscard,
+}) {
+  return (
+    <AnimatePresence>
+      {isOpen ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/78 px-4 py-6 backdrop-blur-sm"
+          onClick={onKeepEditing}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 10 }}
+            transition={{ type: "spring", stiffness: 360, damping: 28 }}
+            className="w-full max-w-sm overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.98),rgba(8,8,12,0.98))] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.52)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500/12 text-lg text-rose-200">
+              <FaTrash />
+            </div>
+            <h3 className="text-xl font-black tracking-tight text-white">
+              {title}
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-zinc-400">
+              {description}
+            </p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={onKeepEditing}
+                className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
+              >
+                Keep editing
+              </button>
+              <button
+                type="button"
+                onClick={onDiscard}
+                className="rounded-2xl bg-[linear-gradient(90deg,#fb7185_0%,#f43f5e_100%)] px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(244,63,94,0.24)] transition hover:brightness-105"
+              >
+                Discard
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
 export default function MatchImageUploader({
   matchId,
   existingImages = [],
@@ -258,6 +315,7 @@ export default function MatchImageUploader({
   onUploaded,
   onComplete,
   onSkip,
+  onRequestClose,
   title = "Add Match Image",
   description = "",
   primaryLabel = "Upload Image",
@@ -288,12 +346,12 @@ export default function MatchImageUploader({
   const [pendingProtectedAction, setPendingProtectedAction] = useState(null);
   const [error, setError] = useState("");
   const [showPinPrompt, setShowPinPrompt] = useState(false);
+  const [showDiscardPrompt, setShowDiscardPrompt] = useState(false);
   const [uploadStatusText, setUploadStatusText] = useState("");
   const inputRef = useRef(null);
   const pinInputRef = useRef(null);
   const browseModeRef = useRef("replace");
   const selectedItemsRef = useRef([]);
-  const lastAutoActionKeyRef = useRef("");
 
   const selectedFiles = useMemo(
     () => selectedItems.map((item) => item.file),
@@ -363,12 +421,6 @@ export default function MatchImageUploader({
   }, [selectedItems]);
 
   useEffect(() => {
-    if (!showPinPrompt) {
-      lastAutoActionKeyRef.current = "";
-    }
-  }, [showPinPrompt]);
-
-  useEffect(() => {
     return () => {
       revokePreviewItems(selectedItemsRef.current);
     };
@@ -415,7 +467,6 @@ export default function MatchImageUploader({
     setShowPinPrompt(false);
     setPendingProtectedAction(null);
     setSubmitMode("");
-    lastAutoActionKeyRef.current = "";
     if (inputRef.current) {
       inputRef.current.value = "";
     }
@@ -497,7 +548,6 @@ export default function MatchImageUploader({
     setError("");
     setPendingProtectedAction(action);
     setShowPinPrompt(true);
-    lastAutoActionKeyRef.current = "";
   }, []);
 
   const closeProtectedActionPrompt = useCallback(() => {
@@ -509,8 +559,76 @@ export default function MatchImageUploader({
     setPendingProtectedAction(null);
     setPin("");
     setError("");
-    lastAutoActionKeyRef.current = "";
   }, [isSubmitting]);
+
+  const hasPendingChanges =
+    selectedItems.length > 0 ||
+    Boolean(String(pin || "").trim()) ||
+    Boolean(pendingProtectedAction) ||
+    showPinPrompt;
+
+  const handleDiscardAndClose = useCallback(() => {
+    resetSelectedFiles();
+    setShowDiscardPrompt(false);
+    onRequestClose?.();
+  }, [onRequestClose, resetSelectedFiles]);
+
+  const handleRequestClose = useCallback(() => {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (hasPendingChanges) {
+      setShowDiscardPrompt(true);
+      return;
+    }
+
+    onRequestClose?.();
+  }, [hasPendingChanges, isSubmitting, onRequestClose]);
+
+  const handleProtectedSubmit = useCallback(() => {
+    if (isSubmitting || pin.length !== 4 || !pendingProtectedAction) {
+      return;
+    }
+
+    if (pendingProtectedAction.type === "upload") {
+      void executeUpload(pin);
+      return;
+    }
+
+    if (pendingProtectedAction.type === "remove") {
+      void executeRemoveImage(pendingProtectedAction.imageId, pin);
+      return;
+    }
+
+    if (pendingProtectedAction.type === "reorder") {
+      void executeReorderImages(
+        pendingProtectedAction.imageIds,
+        pendingProtectedAction.focusImageId,
+        pin,
+      );
+    }
+  }, [
+    executeRemoveImage,
+    executeReorderImages,
+    executeUpload,
+    isSubmitting,
+    pendingProtectedAction,
+    pin,
+  ]);
+
+  const handlePinPromptClose = useCallback(() => {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (String(pin || "").trim()) {
+      setShowDiscardPrompt(true);
+      return;
+    }
+
+    closeProtectedActionPrompt();
+  }, [closeProtectedActionPrompt, isSubmitting, pin]);
 
   const executeUpload = useCallback(
     async (pinOverride = "") => {
@@ -693,7 +811,6 @@ export default function MatchImageUploader({
         setPendingProtectedAction(null);
         setShowPinPrompt(false);
         setPin("");
-        lastAutoActionKeyRef.current = "";
         syncGalleryFromPayload(payload, { preferredImageId: focusImageId });
       } catch (caughtError) {
         setError(caughtError.message || "Could not update the gallery order.");
@@ -703,56 +820,6 @@ export default function MatchImageUploader({
     },
     [isSubmitting, matchId, pin, requestProtectedAction, syncGalleryFromPayload],
   );
-
-  useEffect(() => {
-    if (!showPinPrompt || isSubmitting || pin.length !== 4 || !pendingProtectedAction) {
-      return;
-    }
-
-    const autoKey = JSON.stringify({
-      pin,
-      type: pendingProtectedAction.type,
-      imageId: pendingProtectedAction.imageId || "",
-      imageIds: pendingProtectedAction.imageIds || [],
-    });
-
-    if (lastAutoActionKeyRef.current === autoKey) {
-      return;
-    }
-
-    lastAutoActionKeyRef.current = autoKey;
-    const timer = window.setTimeout(() => {
-      if (pendingProtectedAction.type === "upload") {
-        void executeUpload(pin);
-        return;
-      }
-
-      if (pendingProtectedAction.type === "remove") {
-        void executeRemoveImage(pendingProtectedAction.imageId, pin);
-        return;
-      }
-
-      if (pendingProtectedAction.type === "reorder") {
-        void executeReorderImages(
-          pendingProtectedAction.imageIds,
-          pendingProtectedAction.focusImageId,
-          pin,
-        );
-      }
-    }, 120);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [
-    executeRemoveImage,
-    executeReorderImages,
-    executeUpload,
-    isSubmitting,
-    pendingProtectedAction,
-    pin,
-    showPinPrompt,
-  ]);
 
   const handleUpload = useCallback(() => {
     void executeUpload();
@@ -790,8 +857,7 @@ export default function MatchImageUploader({
     [executeReorderImages, galleryItems],
   );
 
-  const helperText =
-    description || "Add, sort, or remove images.";
+  const helperText = description || "Add or manage images.";
   const showGallerySection = galleryItems.length > 0;
   const showSelectedSection = selectedItems.length > 0;
   const showReplaceButton = showGallerySection || showSelectedSection;
@@ -801,6 +867,14 @@ export default function MatchImageUploader({
       : pendingProtectedAction?.type === "reorder"
       ? "Enter PIN to save order."
       : "Enter PIN to upload.";
+  const pinPromptActionLabel =
+    pendingProtectedAction?.type === "remove"
+      ? "Remove image"
+      : pendingProtectedAction?.type === "reorder"
+      ? "Save order"
+      : selectedItems.length > 1
+      ? "Upload images"
+      : "Upload image";
 
   return (
     <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.08),transparent_28%),linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,8,12,0.99))] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.34)] ring-1 ring-white/5 sm:p-5">
@@ -824,6 +898,16 @@ export default function MatchImageUploader({
             <span className="rounded-full border border-emerald-300/18 bg-emerald-500/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100">
               {selectedItems.length} selected
             </span>
+          ) : null}
+          {onRequestClose ? (
+            <button
+              type="button"
+              onClick={handleRequestClose}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white transition hover:bg-white/[0.1]"
+              aria-label="Close image manager"
+            >
+              <FaTimes />
+            </button>
           ) : null}
         </div>
       </div>
@@ -982,7 +1066,7 @@ export default function MatchImageUploader({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[90] flex items-center justify-center bg-black/82 px-4 py-6 backdrop-blur-sm"
-            onClick={closeProtectedActionPrompt}
+            onClick={handlePinPromptClose}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.96, y: 12 }}
@@ -995,7 +1079,7 @@ export default function MatchImageUploader({
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.10),transparent_28%)]" />
               <button
                 type="button"
-                onClick={closeProtectedActionPrompt}
+                onClick={handlePinPromptClose}
                 className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white"
                 aria-label="Close PIN dialog"
               >
@@ -1028,16 +1112,22 @@ export default function MatchImageUploader({
                     autoComplete="one-time-code"
                     maxLength={4}
                     value={pin}
-                    onChange={(event) => {
-                      setPin(event.target.value.replace(/\D/g, "").slice(0, 4));
-                      if (error) {
-                        setError("");
-                      }
-                    }}
-                    placeholder="0000"
-                    className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-amber-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(251,191,36,0.08)]"
-                  />
-                </div>
+                  onChange={(event) => {
+                    setPin(event.target.value.replace(/\D/g, "").slice(0, 4));
+                    if (error) {
+                      setError("");
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleProtectedSubmit();
+                    }
+                  }}
+                  placeholder="0000"
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-amber-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(251,191,36,0.08)]"
+                />
+              </div>
 
                 {error ? (
                   <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
@@ -1045,14 +1135,36 @@ export default function MatchImageUploader({
                   </div>
                 ) : null}
 
-                <p className="mt-4 text-xs text-zinc-500">
-                  Upload starts as soon as the PIN is complete.
-                </p>
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={handlePinPromptClose}
+                    className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
+                  >
+                    Back
+                  </button>
+                  <LoadingButton
+                    type="button"
+                    onClick={handleProtectedSubmit}
+                    disabled={pin.length !== 4}
+                    loading={isSubmitting}
+                    pendingLabel="Checking..."
+                    className="rounded-2xl bg-[linear-gradient(90deg,#facc15_0%,#f59e0b_52%,#fb7185_100%)] px-4 py-3 text-sm font-bold text-black shadow-[0_16px_36px_rgba(245,158,11,0.2)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {pinPromptActionLabel}
+                  </LoadingButton>
+                </div>
               </div>
             </motion.div>
           </motion.div>
         ) : null}
       </AnimatePresence>
+      <DiscardChangesPrompt
+        isOpen={showDiscardPrompt}
+        description="You have unsaved image changes. Discard them and close?"
+        onKeepEditing={() => setShowDiscardPrompt(false)}
+        onDiscard={handleDiscardAndClose}
+      />
     </section>
   );
 }

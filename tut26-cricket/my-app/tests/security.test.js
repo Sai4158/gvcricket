@@ -1006,9 +1006,18 @@ test("spectator commentary uses simple ball-first wording and separate score lin
     isOut: false,
     extraType: null,
   });
+  const dotEvent = createScoreLiveEvent(before, before, {
+    runs: 0,
+    isOut: false,
+    extraType: null,
+  });
 
   const fullLine = buildSpectatorAnnouncement(event, after, "full");
   assert.equal(fullLine, "Umpire has given 1 run.");
+  assert.equal(
+    buildSpectatorAnnouncement(dotEvent, before, "full"),
+    "Umpire has given dot ball.",
+  );
 
   const scoreLine = buildSpectatorScoreAnnouncement(event, after);
   assert.equal(scoreLine, "Score is 8 for 1.");

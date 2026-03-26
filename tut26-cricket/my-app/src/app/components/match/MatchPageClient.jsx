@@ -177,6 +177,7 @@ export default function MatchPageClient({
   const activeBoundarySequenceRef = useRef(false);
   const boundarySequenceVersionRef = useRef(0);
   const boundarySequenceTimerRef = useRef(null);
+  const lastPersistedAnnouncerSettingsRef = useRef("");
 
   useEffect(() => {
     const restoreTimer = window.setTimeout(() => {
@@ -372,6 +373,21 @@ export default function MatchPageClient({
     handleNextInningsOrEnd,
     patchAndUpdate,
   } = useMatch(matchId, authStatus === "granted", initialMatch);
+  const announcerSettingsSignature = useMemo(
+    () =>
+      [
+        umpireSettings.enabled ? "1" : "0",
+        umpireSettings.mode || "",
+        umpireSettings.playScoreSoundEffects !== false ? "1" : "0",
+        umpireSettings.broadcastScoreSoundEffects !== false ? "1" : "0",
+      ].join(":"),
+    [
+      umpireSettings.broadcastScoreSoundEffects,
+      umpireSettings.enabled,
+      umpireSettings.mode,
+      umpireSettings.playScoreSoundEffects,
+    ]
+  );
   const liveUpdatedLabel = useLiveRelativeTime(lastUpdatedAt);
   const isLiveMatch = Boolean(match?.isOngoing && !match?.result);
   const tossPending = Boolean(match && !match.tossReady);
@@ -1626,6 +1642,66 @@ export default function MatchPageClient({
       await walkie.startTalking();
     }
   };
+
+  useEffect(() => {
+    if (authStatus !== "granted" || !match?._id) {
+      return;
+    }
+
+    const remoteSignature = [
+      match.announcerEnabled ? "1" : "0",
+      match.announcerMode || "",
+      match.announcerScoreSoundEffectsEnabled !== false ? "1" : "0",
+      match.announcerBroadcastScoreSoundEffectsEnabled !== false ? "1" : "0",
+    ].join(":");
+
+    if (remoteSignature === announcerSettingsSignature) {
+      lastPersistedAnnouncerSettingsRef.current = announcerSettingsSignature;
+      return;
+    }
+
+    if (lastPersistedAnnouncerSettingsRef.current === announcerSettingsSignature) {
+      return;
+    }
+
+    let cancelled = false;
+    lastPersistedAnnouncerSettingsRef.current = announcerSettingsSignature;
+
+    void (async () => {
+      const updatedMatch = await patchAndUpdate({
+        announcerEnabled: umpireSettings.enabled,
+        announcerMode:
+          umpireSettings.enabled && umpireSettings.mode !== "silent"
+            ? umpireSettings.mode || "simple"
+            : "",
+        announcerScoreSoundEffectsEnabled:
+          umpireSettings.playScoreSoundEffects !== false,
+        announcerBroadcastScoreSoundEffectsEnabled:
+          umpireSettings.broadcastScoreSoundEffects !== false,
+      });
+
+      if (!updatedMatch && !cancelled) {
+        lastPersistedAnnouncerSettingsRef.current = "";
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    announcerSettingsSignature,
+    authStatus,
+    match?._id,
+    match?.announcerBroadcastScoreSoundEffectsEnabled,
+    match?.announcerEnabled,
+    match?.announcerMode,
+    match?.announcerScoreSoundEffectsEnabled,
+    patchAndUpdate,
+    umpireSettings.broadcastScoreSoundEffects,
+    umpireSettings.enabled,
+    umpireSettings.mode,
+    umpireSettings.playScoreSoundEffects,
+  ]);
 
   if (authStatus !== "granted") {
     if (authStatus === "checking") return <Splash>Checking umpire access...</Splash>;

@@ -144,10 +144,18 @@ function buildBallEventLine(ball) {
     return "Umpire has given a no ball.";
   }
 
-  if (ball.extraType === "bye") return "Bye.";
-  if (ball.extraType === "legbye") return "Leg bye.";
+  if (ball.extraType === "bye") {
+    return safeNumber(ball.runs) > 0
+      ? `Umpire has given bye. ${pluralizeRuns(safeNumber(ball.runs))}.`
+      : "Umpire has given bye.";
+  }
+  if (ball.extraType === "legbye") {
+    return safeNumber(ball.runs) > 0
+      ? `Umpire has given leg bye. ${pluralizeRuns(safeNumber(ball.runs))}.`
+      : "Umpire has given leg bye.";
+  }
 
-  if (safeNumber(ball.runs) === 0) return "Dot ball.";
+  if (safeNumber(ball.runs) === 0) return "Umpire has given dot ball.";
   if (isBoundary(ball))
     return `Umpire has given ${pluralizeRuns(safeNumber(ball.runs))}.`;
   return buildRunsCall(safeNumber(ball.runs));

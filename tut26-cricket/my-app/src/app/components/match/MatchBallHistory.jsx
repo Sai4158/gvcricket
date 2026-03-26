@@ -2,16 +2,25 @@
 
 import { memo, useLayoutEffect, useMemo, useRef } from "react";
 
-function getBallKey(ball, ballNumber, overNumber) {
-  return [
-    "over",
-    overNumber,
-    "ball",
-    ballNumber,
-    Number(ball?.runs || 0),
-    ball?.isOut ? "out" : "in",
-    ball?.extraType || "legal",
-  ].join(":");
+function getBallKey(ballNumber, overNumber) {
+  return ["over", overNumber, "slot", ballNumber].join(":");
+}
+
+function isCountableBall(ball) {
+  return ball?.extraType !== "wide" && ball?.extraType !== "noball";
+}
+
+export function buildBallSlotLabels(balls = []) {
+  let legalBallCount = 0;
+
+  return (Array.isArray(balls) ? balls : []).map((ball) => {
+    if (!isCountableBall(ball)) {
+      return "•";
+    }
+
+    legalBallCount += 1;
+    return String(legalBallCount);
+  });
 }
 
 export const Ball = memo(function Ball({ ball, ballNumber }) {
@@ -46,7 +55,7 @@ export const Ball = memo(function Ball({ ball, ballNumber }) {
       >
         {label}
       </div>
-      <span className="text-xs font-semibold text-zinc-400 tabular-nums">
+      <span className="text-xs font-semibold text-white/92 tabular-nums">
         {ballNumber}
       </span>
     </div>
@@ -55,15 +64,32 @@ export const Ball = memo(function Ball({ ball, ballNumber }) {
 
 export function BallTracker({ history }) {
   const trackerRef = useRef(null);
-  const previousTrackerStateRef = useRef({
-    overNumber: 1,
-    ballCount: 0,
-  });
   const currentOver = useMemo(
     () => history.at(-1) ?? { overNumber: 1, balls: [] },
     [history]
   );
-  const currentBalls = Array.isArray(currentOver.balls) ? currentOver.balls : [];
+  const currentBalls = useMemo(
+    () => (Array.isArray(currentOver.balls) ? currentOver.balls : []),
+    [currentOver],
+  );
+  const currentBallSlotLabels = useMemo(
+    () => buildBallSlotLabels(currentBalls),
+    [currentBalls],
+  );
+  const currentBallSignature = useMemo(
+    () =>
+      currentBalls
+        .map((ball, index) =>
+          [
+            index,
+            Number(ball?.runs || 0),
+            ball?.isOut ? "out" : "in",
+            ball?.extraType || "legal",
+          ].join(":"),
+        )
+        .join("|"),
+    [currentBalls],
+  );
 
   useLayoutEffect(() => {
     const tracker = trackerRef.current;
@@ -71,19 +97,20 @@ export function BallTracker({ history }) {
       return;
     }
 
-    const previous = previousTrackerStateRef.current;
-    const hasNewBall = currentBalls.length > previous.ballCount;
-    const changedOver = currentOver.overNumber !== previous.overNumber;
-
-    if (hasNewBall || changedOver) {
-      tracker.scrollLeft = tracker.scrollWidth;
-    }
-
-    previousTrackerStateRef.current = {
-      overNumber: currentOver.overNumber,
-      ballCount: currentBalls.length,
+    const scrollToLatest = () => {
+      tracker.scrollTo({
+        left: tracker.scrollWidth,
+        behavior: "auto",
+      });
     };
-  }, [currentBalls.length, currentOver.overNumber]);
+
+    scrollToLatest();
+    const frameId = window.requestAnimationFrame(scrollToLatest);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [currentBallSignature, currentOver.overNumber]);
 
   return (
     <div className="bg-zinc-900/50 p-4 rounded-2xl ring-1 ring-white/10 mb-6">
@@ -92,13 +119,18 @@ export function BallTracker({ history }) {
       </h3>
       <div
         ref={trackerRef}
-        className="flex min-h-[4.5rem] items-start gap-4 overflow-x-auto overflow-y-hidden pb-2 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="overflow-x-auto overflow-y-hidden pb-3 pr-1 [scrollbar-color:rgba(255,255,255,0.35)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/30 [&::-webkit-scrollbar-track]:bg-transparent"
       >
-        {currentBalls.map((ball, index) => (
-          <div key={getBallKey(ball, index + 1, currentOver.overNumber)}>
-            <Ball ball={ball} ballNumber={index + 1} />
-          </div>
-        ))}
+        <div className="ml-auto flex min-h-[4.5rem] min-w-max items-start gap-4">
+          {currentBalls.map((ball, index) => (
+            <div key={getBallKey(index + 1, currentOver.overNumber)}>
+              <Ball
+                ball={ball}
+                ballNumber={currentBallSlotLabels[index] || "•"}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

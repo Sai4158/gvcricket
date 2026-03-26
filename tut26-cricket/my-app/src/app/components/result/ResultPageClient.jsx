@@ -287,8 +287,8 @@ export default function ResultPageClient({ matchId, initialMatch }) {
       <AnimatePresence>
         {isImageManagerOpen ? (
           <ModalBase
-            title="Match Images"
-            onExit={() => setIsImageManagerOpen(false)}
+            onExit={undefined}
+            hideHeader
             panelClassName="max-w-md"
             bodyClassName="max-h-[calc(100vh-7rem)]"
           >
@@ -307,8 +307,9 @@ export default function ResultPageClient({ matchId, initialMatch }) {
               onComplete={() => {
                 setIsImageManagerOpen(false);
               }}
+              onRequestClose={() => setIsImageManagerOpen(false)}
               title="Match Images"
-              description="Add, rank, and clean up the result gallery."
+              description="Manage the result gallery."
               primaryLabel="Save Images"
             />
           </ModalBase>

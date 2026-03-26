@@ -46,6 +46,10 @@ export function serializePublicMatch(
     matchImages: publicImages,
     announcerEnabled: Boolean(match.announcerEnabled),
     announcerMode: match.announcerMode || "",
+    announcerScoreSoundEffectsEnabled:
+      match.announcerScoreSoundEffectsEnabled !== false,
+    announcerBroadcastScoreSoundEffectsEnabled:
+      match.announcerBroadcastScoreSoundEffectsEnabled !== false,
     lastLiveEvent: match.lastLiveEvent || null,
     lastEventType: match.lastEventType || "",
     lastEventText: match.lastEventText || "",
@@ -108,6 +112,10 @@ export function serializePublicSession(sessionDocument) {
     matchImages: publicImages,
     announcerEnabled: Boolean(session.announcerEnabled),
     announcerMode: session.announcerMode || "",
+    announcerScoreSoundEffectsEnabled:
+      session.announcerScoreSoundEffectsEnabled !== false,
+    announcerBroadcastScoreSoundEffectsEnabled:
+      session.announcerBroadcastScoreSoundEffectsEnabled !== false,
     lastEventType: session.lastEventType || "",
     lastEventText: session.lastEventText || "",
     createdAt: session.createdAt || null,

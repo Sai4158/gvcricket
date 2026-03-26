@@ -1326,8 +1326,8 @@ export default function SessionsPageClient({
         ) : null}
         {imageReplaceContext ? (
           <ModalBase
-            title={imageReplaceContext.mode === "replace" ? "Replace Match Image" : "Add Match Image"}
-            onExit={closeImageActionFlows}
+            onExit={undefined}
+            hideHeader
             panelClassName="max-w-md"
             bodyClassName="max-h-[calc(100vh-7rem)]"
           >
@@ -1355,8 +1355,9 @@ export default function SessionsPageClient({
               onComplete={() => {
                 closeImageActionFlows();
               }}
+              onRequestClose={closeImageActionFlows}
               title="Match Gallery"
-              description="Add, rank, or remove images for this session."
+              description="Manage session images."
               primaryLabel="Save Images"
             />
           </ModalBase>
