@@ -117,6 +117,37 @@ function getPlannedGalleryCount({
   return existingCount + nextSelectedCount;
 }
 
+function getProtectedPinConfig({
+  actionType = "",
+  plannedGalleryCount = 0,
+  galleryCount = 0,
+}) {
+  const usesManagePin =
+    actionType === "upload"
+      ? Number(plannedGalleryCount || 0) > 1
+      : Number(galleryCount || 0) > 1;
+
+  return {
+    usesManagePin,
+    digitCount: usesManagePin ? 6 : 4,
+    title: usesManagePin ? "Manage PIN" : "Umpire PIN",
+    label: usesManagePin ? "Manage PIN" : "4-digit PIN",
+    placeholder: usesManagePin ? "- - - - - -" : "0000",
+    description:
+      actionType === "remove"
+        ? usesManagePin
+          ? "Enter PIN to remove from this gallery."
+          : "Enter PIN to remove."
+        : actionType === "reorder"
+        ? usesManagePin
+          ? "Enter PIN to save this gallery order."
+          : "Enter PIN to save order."
+        : usesManagePin
+        ? "Enter PIN to upload to this gallery."
+        : "Enter PIN to upload.",
+  };
+}
+
 function SelectedImageTile({
   item,
   index,
@@ -197,10 +228,26 @@ function GalleryImageTile({
       <div className="pointer-events-none absolute left-2 top-2 rounded-full border border-white/12 bg-black/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/82">
         #{index + 1}
       </div>
+      <button
+        type="button"
+        onPointerDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onRemove(item.id);
+        }}
+        disabled={disabled}
+        className="absolute right-2 top-2 z-20 inline-flex h-8 w-8 touch-manipulation items-center justify-center rounded-full border border-white/12 bg-black/70 text-white transition hover:bg-black/85 disabled:cursor-not-allowed disabled:opacity-50"
+        aria-label={`Remove image ${index + 1}`}
+      >
+        <FaTimes className="text-xs" />
+      </button>
 
       <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.94))] px-2 pb-2 pt-10">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex gap-1.5">
+        <div className="flex items-center justify-center gap-1.5">
             <button
               type="button"
               onClick={(event) => {
@@ -227,21 +274,6 @@ function GalleryImageTile({
             >
               <FaArrowRight className="text-[11px]" />
             </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              onRemove(item.id);
-            }}
-            disabled={disabled}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-300/16 bg-rose-500/14 text-rose-100 transition hover:bg-rose-500/22 disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label={`Remove image ${index + 1}`}
-          >
-            <FaTrash className="text-[11px]" />
-          </button>
         </div>
       </div>
     </div>
@@ -305,6 +337,78 @@ function DiscardChangesPrompt({
   );
 }
 
+function DeleteImagePrompt({
+  isOpen,
+  imageIndex = 0,
+  imageUrl = "",
+  loading = false,
+  onCancel,
+  onConfirm,
+}) {
+  return (
+    <AnimatePresence>
+      {isOpen ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 px-4 py-6 backdrop-blur-sm"
+          onClick={loading ? undefined : onCancel}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 10 }}
+            transition={{ type: "spring", stiffness: 360, damping: 28 }}
+            className="w-full max-w-sm overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.98),rgba(8,8,12,0.98))] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.52)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500/12 text-lg text-rose-200">
+              <FaTrash />
+            </div>
+            <h3 className="text-xl font-black tracking-tight text-white">
+              Delete this image?
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-zinc-400">
+              Image {imageIndex > 0 ? `#${imageIndex}` : ""} will be removed from
+              the gallery.
+            </p>
+            {imageUrl ? (
+              <div className="mt-4 overflow-hidden rounded-[22px] border border-white/10 bg-black/25">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageUrl}
+                  alt={imageIndex > 0 ? `Image ${imageIndex}` : "Selected image"}
+                  className="h-40 w-full object-cover"
+                />
+              </div>
+            ) : null}
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={loading}
+                className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <LoadingButton
+                type="button"
+                onClick={onConfirm}
+                loading={loading}
+                pendingLabel="Deleting..."
+                className="rounded-2xl bg-[linear-gradient(90deg,#fb7185_0%,#f43f5e_100%)] px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(244,63,94,0.24)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Delete image
+              </LoadingButton>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
 export default function MatchImageUploader({
   matchId,
   existingImages = [],
@@ -316,8 +420,8 @@ export default function MatchImageUploader({
   onComplete,
   onSkip,
   onRequestClose,
+  promptForUploadPin = false,
   title = "Add Match Image",
-  description = "",
   primaryLabel = "Upload Image",
   secondaryLabel = "Skip for Now",
 }) {
@@ -347,6 +451,7 @@ export default function MatchImageUploader({
   const [error, setError] = useState("");
   const [showPinPrompt, setShowPinPrompt] = useState(false);
   const [showDiscardPrompt, setShowDiscardPrompt] = useState(false);
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState(null);
   const [uploadStatusText, setUploadStatusText] = useState("");
   const inputRef = useRef(null);
   const pinInputRef = useRef(null);
@@ -586,36 +691,13 @@ export default function MatchImageUploader({
     onRequestClose?.();
   }, [hasPendingChanges, isSubmitting, onRequestClose]);
 
-  const handleProtectedSubmit = useCallback(() => {
-    if (isSubmitting || pin.length !== 4 || !pendingProtectedAction) {
+  const closeDeleteConfirmPrompt = useCallback(() => {
+    if (isSubmitting) {
       return;
     }
 
-    if (pendingProtectedAction.type === "upload") {
-      void executeUpload(pin);
-      return;
-    }
-
-    if (pendingProtectedAction.type === "remove") {
-      void executeRemoveImage(pendingProtectedAction.imageId, pin);
-      return;
-    }
-
-    if (pendingProtectedAction.type === "reorder") {
-      void executeReorderImages(
-        pendingProtectedAction.imageIds,
-        pendingProtectedAction.focusImageId,
-        pin,
-      );
-    }
-  }, [
-    executeRemoveImage,
-    executeReorderImages,
-    executeUpload,
-    isSubmitting,
-    pendingProtectedAction,
-    pin,
-  ]);
+    setDeleteConfirmTarget(null);
+  }, [isSubmitting]);
 
   const handlePinPromptClose = useCallback(() => {
     if (isSubmitting) {
@@ -690,7 +772,7 @@ export default function MatchImageUploader({
             if (response.status === 401) {
               setPin("");
               requestProtectedAction({ type: "upload" });
-              throw new Error("Enter the 4-digit umpire PIN to save this gallery.");
+              throw new Error(payload.message || "PIN required to upload images.");
             }
             throw new Error(payload.message || "Image upload failed.");
           }
@@ -749,7 +831,7 @@ export default function MatchImageUploader({
           if (response.status === 401) {
             setPin("");
             requestProtectedAction({ type: "remove", imageId });
-            throw new Error("Enter the 4-digit umpire PIN to remove this image.");
+            throw new Error(payload.message || "PIN required to remove this image.");
           }
           throw new Error(payload.message || "Could not remove this image.");
         }
@@ -803,7 +885,7 @@ export default function MatchImageUploader({
               imageIds: nextImageIds,
               focusImageId,
             });
-            throw new Error("Enter the 4-digit umpire PIN to reorder this gallery.");
+            throw new Error(payload.message || "PIN required to save this gallery order.");
           }
           throw new Error(payload.message || "Could not update the gallery order.");
         }
@@ -821,16 +903,92 @@ export default function MatchImageUploader({
     [isSubmitting, matchId, pin, requestProtectedAction, syncGalleryFromPayload],
   );
 
+  const protectedPinConfig = getProtectedPinConfig({
+    actionType: pendingProtectedAction?.type || "upload",
+    plannedGalleryCount,
+    galleryCount: galleryItems.length || existingImageCount,
+  });
+
+  const handleProtectedSubmit = useCallback(() => {
+    if (
+      isSubmitting ||
+      pin.length !== protectedPinConfig.digitCount ||
+      !pendingProtectedAction
+    ) {
+      return;
+    }
+
+    if (pendingProtectedAction.type === "upload") {
+      void executeUpload(pin);
+      return;
+    }
+
+    if (pendingProtectedAction.type === "remove") {
+      void executeRemoveImage(pendingProtectedAction.imageId, pin);
+      return;
+    }
+
+    if (pendingProtectedAction.type === "reorder") {
+      void executeReorderImages(
+        pendingProtectedAction.imageIds,
+        pendingProtectedAction.focusImageId,
+        pin,
+      );
+    }
+  }, [
+    executeRemoveImage,
+    executeReorderImages,
+    executeUpload,
+    isSubmitting,
+    pendingProtectedAction,
+    pin,
+    protectedPinConfig.digitCount,
+  ]);
+
   const handleUpload = useCallback(() => {
+    if (!selectedItems.length || isSubmitting) {
+      return;
+    }
+
+    if (promptForUploadPin) {
+      requestProtectedAction({ type: "upload" });
+      return;
+    }
+
     void executeUpload();
-  }, [executeUpload]);
+  }, [
+    executeUpload,
+    isSubmitting,
+    promptForUploadPin,
+    requestProtectedAction,
+    selectedItems.length,
+  ]);
 
   const handleRemoveExistingImage = useCallback(
     (imageId) => {
-      void executeRemoveImage(imageId);
+      const targetIndex = galleryItems.findIndex((image) => image.id === imageId);
+      if (targetIndex < 0) {
+        return;
+      }
+
+      setDeleteConfirmTarget({
+        id: imageId,
+        index: targetIndex + 1,
+        url: galleryItems[targetIndex]?.url || "",
+      });
     },
-    [executeRemoveImage],
+    [galleryItems],
   );
+
+  const handleConfirmRemoveExistingImage = useCallback(() => {
+    if (!deleteConfirmTarget?.id || isSubmitting) {
+      return;
+    }
+
+    const nextImageId = deleteConfirmTarget.id;
+    setDeleteConfirmTarget(null);
+    void executeRemoveImage(nextImageId);
+  }, [deleteConfirmTarget, executeRemoveImage, isSubmitting]);
 
   const handleMoveExistingImage = useCallback(
     (imageId, direction) => {
@@ -857,16 +1015,9 @@ export default function MatchImageUploader({
     [executeReorderImages, galleryItems],
   );
 
-  const helperText = description || "Add or manage images.";
   const showGallerySection = galleryItems.length > 0;
   const showSelectedSection = selectedItems.length > 0;
   const showReplaceButton = showGallerySection || showSelectedSection;
-  const pinPromptCopy =
-    pendingProtectedAction?.type === "remove"
-      ? "Enter PIN to remove."
-      : pendingProtectedAction?.type === "reorder"
-      ? "Enter PIN to save order."
-      : "Enter PIN to upload.";
   const pinPromptActionLabel =
     pendingProtectedAction?.type === "remove"
       ? "Remove image"
@@ -885,7 +1036,6 @@ export default function MatchImageUploader({
           </div>
           <div className="min-w-0">
             <h3 className="text-lg font-semibold text-white">{title}</h3>
-            <p className="mt-1 text-xs leading-5 text-zinc-400">{helperText}</p>
           </div>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
@@ -1091,10 +1241,10 @@ export default function MatchImageUploader({
                   <FaShieldAlt />
                 </div>
                 <h3 className="text-2xl font-black tracking-tight text-white">
-                  Umpire PIN
+                  {protectedPinConfig.title}
                 </h3>
                 <p className="mt-2 max-w-xs text-sm leading-6 text-zinc-400">
-                  {pinPromptCopy}
+                  {protectedPinConfig.description}
                 </p>
 
                 <div className="mt-6">
@@ -1102,7 +1252,7 @@ export default function MatchImageUploader({
                     htmlFor={`match-image-pin-${matchId}`}
                     className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500"
                   >
-                    4-digit PIN
+                    {protectedPinConfig.label}
                   </label>
                   <input
                     ref={pinInputRef}
@@ -1110,21 +1260,25 @@ export default function MatchImageUploader({
                     type="text"
                     inputMode="numeric"
                     autoComplete="one-time-code"
-                    maxLength={4}
+                    maxLength={protectedPinConfig.digitCount}
                     value={pin}
-                  onChange={(event) => {
-                    setPin(event.target.value.replace(/\D/g, "").slice(0, 4));
-                    if (error) {
-                      setError("");
-                    }
-                  }}
+                    onChange={(event) => {
+                      setPin(
+                        event.target.value
+                          .replace(/\D/g, "")
+                          .slice(0, protectedPinConfig.digitCount),
+                      );
+                      if (error) {
+                        setError("");
+                      }
+                    }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       event.preventDefault();
                       handleProtectedSubmit();
                     }
                   }}
-                  placeholder="0000"
+                  placeholder={protectedPinConfig.placeholder}
                   className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-amber-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(251,191,36,0.08)]"
                 />
               </div>
@@ -1146,7 +1300,7 @@ export default function MatchImageUploader({
                   <LoadingButton
                     type="button"
                     onClick={handleProtectedSubmit}
-                    disabled={pin.length !== 4}
+                    disabled={pin.length !== protectedPinConfig.digitCount}
                     loading={isSubmitting}
                     pendingLabel="Checking..."
                     className="rounded-2xl bg-[linear-gradient(90deg,#facc15_0%,#f59e0b_52%,#fb7185_100%)] px-4 py-3 text-sm font-bold text-black shadow-[0_16px_36px_rgba(245,158,11,0.2)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1159,6 +1313,14 @@ export default function MatchImageUploader({
           </motion.div>
         ) : null}
       </AnimatePresence>
+      <DeleteImagePrompt
+        isOpen={Boolean(deleteConfirmTarget)}
+        imageIndex={deleteConfirmTarget?.index || 0}
+        imageUrl={deleteConfirmTarget?.url || ""}
+        loading={submitMode === "remove"}
+        onCancel={closeDeleteConfirmPrompt}
+        onConfirm={handleConfirmRemoveExistingImage}
+      />
       <DiscardChangesPrompt
         isOpen={showDiscardPrompt}
         description="You have unsaved image changes. Discard them and close?"

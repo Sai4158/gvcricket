@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SafeMatchImage from "./SafeMatchImage";
 
 const HOLD_DELAY_MS = 520;
@@ -15,6 +16,9 @@ export default function MatchImageCarousel({
   fallbackClassName = "",
   showFallback = false,
   autoPlay = true,
+  autoPlayDelayMs = 2000,
+  autoPlayInitialDelayMs = 1000,
+  transitionStyle = "fade",
   onActiveImageChange,
   onImageTap,
   onImageHold,
@@ -28,6 +32,7 @@ export default function MatchImageCarousel({
   );
   const [activeIndex, setActiveIndex] = useState(0);
   const [isInteracting, setIsInteracting] = useState(false);
+  const [transitionDirection, setTransitionDirection] = useState(1);
   const holdTimerRef = useRef(null);
   const interactionTimerRef = useRef(null);
   const pointerStartRef = useRef(null);
@@ -42,6 +47,11 @@ export default function MatchImageCarousel({
       ? normalizedImages[(resolvedActiveIndex + 1) % normalizedImages.length]
       : null;
 
+  const setCarouselIndex = useCallback((nextIndex, direction = 1) => {
+    setTransitionDirection(direction);
+    setActiveIndex(nextIndex);
+  }, []);
+
   useEffect(() => {
     onActiveImageChange?.(activeImage, resolvedActiveIndex);
   }, [activeImage, onActiveImageChange, resolvedActiveIndex]);
@@ -51,12 +61,14 @@ export default function MatchImageCarousel({
       return undefined;
     }
 
-    const delay = resolvedActiveIndex === 0 ? 1000 : 2000;
+    const delay =
+      resolvedActiveIndex === 0 ? autoPlayInitialDelayMs : autoPlayDelayMs;
     const timer = window.setTimeout(() => {
       setActiveIndex((current) => {
         const nextCurrent = normalizedImages.length
           ? Math.min(current, normalizedImages.length - 1)
           : 0;
+        setTransitionDirection(1);
         return (nextCurrent + 1) % normalizedImages.length;
       });
     }, delay);
@@ -64,7 +76,14 @@ export default function MatchImageCarousel({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [autoPlay, isInteracting, normalizedImages.length, resolvedActiveIndex]);
+  }, [
+    autoPlay,
+    autoPlayDelayMs,
+    autoPlayInitialDelayMs,
+    isInteracting,
+    normalizedImages.length,
+    resolvedActiveIndex,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -138,12 +157,12 @@ export default function MatchImageCarousel({
 
     const deltaX = event.clientX - start.x;
     if (Math.abs(deltaX) >= SWIPE_THRESHOLD_PX && normalizedImages.length > 1) {
-      setActiveIndex((current) => {
-        if (deltaX < 0) {
-          return (current + 1) % normalizedImages.length;
-        }
-        return (current - 1 + normalizedImages.length) % normalizedImages.length;
-      });
+      const nextIndex =
+        deltaX < 0
+          ? (resolvedActiveIndex + 1) % normalizedImages.length
+          : (resolvedActiveIndex - 1 + normalizedImages.length) %
+            normalizedImages.length;
+      setCarouselIndex(nextIndex, deltaX < 0 ? 1 : -1);
       releaseInteraction();
       return;
     }
@@ -159,6 +178,31 @@ export default function MatchImageCarousel({
     return null;
   }
 
+  const animatedImageClassName =
+    imageClassName || "object-cover object-center";
+  const animatedFallbackClassName =
+    fallbackClassName ||
+    imageClassName ||
+    "object-contain object-center bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))] p-8";
+
+  const slideVariants = {
+    enter: (direction) => ({
+      x: direction > 0 ? "12%" : "-12%",
+      opacity: 0.55,
+      scale: 0.985,
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+      scale: 1,
+    },
+    exit: (direction) => ({
+      x: direction > 0 ? "-12%" : "12%",
+      opacity: 0.55,
+      scale: 0.985,
+    }),
+  };
+
   return (
     <div className={className}>
       <div
@@ -172,19 +216,33 @@ export default function MatchImageCarousel({
         onPointerLeave={handlePointerEnd}
         onContextMenu={(event) => event.preventDefault()}
       >
-        <div className="absolute inset-0">
-          <SafeMatchImage
-            key={activeImage?.id || "fallback"}
-            src={activeImage?.url || ""}
-            alt={alt}
-            fill
-            sizes={compact ? "(max-width: 768px) 100vw, 33vw" : "(max-width: 768px) 100vw, 1200px"}
-            className={imageClassName || "object-cover object-center"}
-            fallbackClassName={fallbackClassName || imageClassName || "object-contain object-center bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))] p-8"}
-            draggable={false}
-            loading={compact ? "lazy" : "eager"}
-          />
-        </div>
+        <AnimatePresence initial={false} custom={transitionDirection} mode="popLayout">
+          <motion.div
+            key={activeImage?.id || activeImage?.url || "fallback"}
+            className="absolute inset-0"
+            custom={transitionDirection}
+            initial={transitionStyle === "slide" ? "enter" : { opacity: 0 }}
+            animate={transitionStyle === "slide" ? "center" : { opacity: 1 }}
+            exit={transitionStyle === "slide" ? "exit" : { opacity: 0 }}
+            variants={transitionStyle === "slide" ? slideVariants : undefined}
+            transition={
+              transitionStyle === "slide"
+                ? { duration: 0.42, ease: [0.22, 1, 0.36, 1] }
+                : { duration: 0.24, ease: "easeOut" }
+            }
+          >
+            <SafeMatchImage
+              src={activeImage?.url || ""}
+              alt={alt}
+              fill
+              sizes={compact ? "(max-width: 768px) 100vw, 33vw" : "(max-width: 768px) 100vw, 1200px"}
+              className={animatedImageClassName}
+              fallbackClassName={animatedFallbackClassName}
+              draggable={false}
+              loading={compact ? "lazy" : "eager"}
+            />
+          </motion.div>
+        </AnimatePresence>
         {nextImage ? (
           <div className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0">
             <SafeMatchImage

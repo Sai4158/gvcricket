@@ -8,6 +8,7 @@ import { publishMatchUpdate, publishSessionUpdate } from "../../../../lib/live-u
 import {
   getMatchAccessCookieName,
   hasValidMatchAccess,
+  isValidManagePin,
   isValidUmpirePin,
 } from "../../../../lib/match-access";
 import {
@@ -86,6 +87,10 @@ function getProjectedGalleryCount({
   return Math.max(projectedCount, declaredTotal);
 }
 
+function requiresManageGalleryPin(totalImageCount = 0) {
+  return Math.max(0, Number(totalImageCount || 0)) > 1;
+}
+
 export async function POST(req, { params }) {
   const { id } = await params;
   const meta = getRequestMeta(req);
@@ -151,10 +156,17 @@ export async function POST(req, { params }) {
       Number(match.adminAccessVersion || 1)
     );
     const pinValue = String(parsedRequest.value.get("pin") || "").trim();
-    const hasPinAccess = Boolean(pinValue) && isValidUmpirePin(pinValue);
-    const requiresPinForUpload = projectedGalleryCount > 1;
+    const hasUmpirePinAccess = Boolean(pinValue) && isValidUmpirePin(pinValue);
+    const hasManagePinAccess = Boolean(pinValue) && isValidManagePin(pinValue);
+    const requiresManagePinForUpload = requiresManageGalleryPin(projectedGalleryCount);
+    const hasRequiredUploadPinAccess = requiresManagePinForUpload
+      ? hasManagePinAccess
+      : hasUmpirePinAccess || hasManagePinAccess;
 
-    if ((!hasCookieAccess && !hasPinAccess) || (requiresPinForUpload && !hasPinAccess)) {
+    if (
+      (requiresManagePinForUpload && !hasManagePinAccess) ||
+      (!requiresManagePinForUpload && !hasCookieAccess && !hasRequiredUploadPinAccess)
+    ) {
       await writeAuditLog({
         action: "match_media_upload_denied",
         targetType: "match",
@@ -164,8 +176,8 @@ export async function POST(req, { params }) {
         userAgent: meta.userAgent,
       });
       return jsonError(
-        requiresPinForUpload
-          ? "Umpire PIN required when uploading more than one match image."
+        requiresManagePinForUpload
+          ? "Manage PIN required when uploading more than one match image."
           : "Umpire PIN required for image upload.",
         401
       );
@@ -388,10 +400,19 @@ export async function DELETE(req, { params }) {
       accessToken,
       Number(match.adminAccessVersion || 1)
     );
-    const hasPinAccess =
-      Boolean(parsedRequest.value.pin) && isValidUmpirePin(parsedRequest.value.pin);
+    const pinValue = String(parsedRequest.value.pin || "").trim();
+    const hasUmpirePinAccess = Boolean(pinValue) && isValidUmpirePin(pinValue);
+    const hasManagePinAccess = Boolean(pinValue) && isValidManagePin(pinValue);
+    const currentImages = getStoredMatchImages(match, { matchId: id });
+    const requiresManagePinForDelete = requiresManageGalleryPin(currentImages.length);
 
-    if (!hasCookieAccess && !hasPinAccess) {
+    if (
+      (requiresManagePinForDelete && !hasManagePinAccess) ||
+      (!requiresManagePinForDelete &&
+        !hasCookieAccess &&
+        !hasUmpirePinAccess &&
+        !hasManagePinAccess)
+    ) {
       await writeAuditLog({
         action: "match_media_delete_denied",
         targetType: "match",
@@ -401,11 +422,15 @@ export async function DELETE(req, { params }) {
         userAgent: meta.userAgent,
       });
 
-      return jsonError("Incorrect PIN.", 401);
+      return jsonError(
+        requiresManagePinForDelete
+          ? "Manage PIN required for gallery changes."
+          : "Incorrect PIN.",
+        401,
+      );
     }
 
     const targetImageId = String(parsedRequest.value.imageId || "").trim();
-    const currentImages = getStoredMatchImages(match, { matchId: id });
     if (!currentImages.length) {
       return Response.json(serializePublicMatch(match), {
         headers: {
@@ -504,14 +529,27 @@ export async function PATCH(req, { params }) {
       accessToken,
       Number(match.adminAccessVersion || 1),
     );
-    const hasPinAccess =
-      Boolean(parsedRequest.value.pin) && isValidUmpirePin(parsedRequest.value.pin);
+    const currentImages = getStoredMatchImages(match, { matchId: id });
+    const pinValue = String(parsedRequest.value.pin || "").trim();
+    const hasUmpirePinAccess = Boolean(pinValue) && isValidUmpirePin(pinValue);
+    const hasManagePinAccess = Boolean(pinValue) && isValidManagePin(pinValue);
+    const requiresManagePinForReorder = requiresManageGalleryPin(currentImages.length);
 
-    if (!hasCookieAccess && !hasPinAccess) {
-      return jsonError("Incorrect PIN.", 401);
+    if (
+      (requiresManagePinForReorder && !hasManagePinAccess) ||
+      (!requiresManagePinForReorder &&
+        !hasCookieAccess &&
+        !hasUmpirePinAccess &&
+        !hasManagePinAccess)
+    ) {
+      return jsonError(
+        requiresManagePinForReorder
+          ? "Manage PIN required for gallery changes."
+          : "Incorrect PIN.",
+        401,
+      );
     }
 
-    const currentImages = getStoredMatchImages(match, { matchId: id });
     const currentIds = currentImages.map((entry) => entry.id);
     const nextIds = parsedRequest.value.imageIds.map((value) => String(value).trim());
 

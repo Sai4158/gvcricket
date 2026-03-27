@@ -343,6 +343,9 @@ function SessionCard({
                   alt={`${session.name || "Session"} match image`}
                   compact
                   className="relative"
+                  autoPlayDelayMs={1000}
+                  autoPlayInitialDelayMs={1000}
+                  transitionStyle="slide"
                   imageClassName="object-cover object-center"
                   fallbackClassName="object-cover object-center"
                   onImageHold={(image, index, event) => {

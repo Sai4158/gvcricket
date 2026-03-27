@@ -308,6 +308,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
                 setIsImageManagerOpen(false);
               }}
               onRequestClose={() => setIsImageManagerOpen(false)}
+              promptForUploadPin
               title="Match Images"
               description="Manage the result gallery."
               primaryLabel="Save Images"
