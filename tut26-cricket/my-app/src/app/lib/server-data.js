@@ -21,9 +21,22 @@ const SESSION_MATCH_SUMMARY_FIELDS =
   "_id teamA teamB teamAName teamBName tossWinner tossDecision score outs innings innings1 innings2 isOngoing result updatedAt sessionId matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy createdAt";
 const FALLBACK_SESSION_FIELDS =
   "tossWinner tossDecision teamAName teamBName teamA teamB";
-const NON_DRAFT_SESSION_COUNT_FILTER = {
-  $or: [{ isDraft: false }, { isDraft: null }, { isDraft: { $exists: false } }],
+const NON_DRAFT_SESSION_COLLECTION_FILTER = {
+  isDraft: { $ne: true },
 };
+
+function buildProjection(fields) {
+  return String(fields || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .reduce((projection, field) => {
+      projection[field] = 1;
+      return projection;
+    }, {});
+}
+
+const PUBLIC_SESSION_PROJECTION = buildProjection(PUBLIC_SESSION_FIELDS);
+const SESSION_MATCH_SUMMARY_PROJECTION = buildProjection(SESSION_MATCH_SUMMARY_FIELDS);
 
 const globalServerDataCache = globalThis.__gvServerDataCache || {
   sessionsIndex: {
@@ -68,10 +81,6 @@ function buildLockedTossPageData() {
     hasCreatedMatch: false,
     actualMatchId: "",
   };
-}
-
-function isNonDraftSession(session) {
-  return session?.isDraft !== true;
 }
 
 async function loadFallbackSession(sessionId, fields = FALLBACK_SESSION_FIELDS) {
@@ -145,6 +154,55 @@ async function resolveSessionMatches(sessions) {
   return resolvedBySessionId;
 }
 
+async function hydrateLinkedSessionMatches(sessions) {
+  const linkedMatchIds = sessions
+    .map((session) => getPublicId(session.match))
+    .filter((matchId) => isValidObjectId(matchId))
+    .map((matchId) => new Types.ObjectId(matchId));
+
+  if (!linkedMatchIds.length) {
+    return sessions;
+  }
+
+  const linkedMatches = await Match.collection
+    .find(
+      {
+        _id: { $in: linkedMatchIds },
+      },
+      {
+        projection: SESSION_MATCH_SUMMARY_PROJECTION,
+      }
+    )
+    .toArray();
+
+  const linkedMatchesById = new Map(
+    linkedMatches.map((match) => [getPublicId(match._id), match])
+  );
+
+  return sessions.map((session) => {
+    const linkedMatch = linkedMatchesById.get(getPublicId(session.match));
+    if (!linkedMatch) {
+      return session;
+    }
+
+    return {
+      ...session,
+      match: linkedMatch,
+    };
+  });
+}
+
+async function readVisibleSessionsWithMatches(sort = { createdAt: -1, _id: -1 }) {
+  const sessions = await Session.collection
+    .find(NON_DRAFT_SESSION_COLLECTION_FILTER, {
+      projection: PUBLIC_SESSION_PROJECTION,
+    })
+    .sort(sort)
+    .toArray();
+
+  return hydrateLinkedSessionMatches(sessions);
+}
+
 async function getCachedServerData(cacheEntry, loader) {
   const now = Date.now();
 
@@ -186,23 +244,13 @@ async function readSessionsIndexPageData() {
   await connectDB();
 
   const [sessions, totalCount] = await Promise.all([
-    Session.find({})
-      .select(PUBLIC_SESSION_FIELDS)
-      .populate({
-        path: "match",
-        select: SESSION_MATCH_SUMMARY_FIELDS,
-        options: { lean: true },
-      })
-      .sort({ createdAt: -1 })
-      .lean(),
-    Session.collection.countDocuments(NON_DRAFT_SESSION_COUNT_FILTER),
+    readVisibleSessionsWithMatches({ createdAt: -1 }),
+    Session.collection.countDocuments(NON_DRAFT_SESSION_COLLECTION_FILTER),
   ]);
 
-  const visibleSessions = sessions.filter(isNonDraftSession);
+  const fallbackMatchesBySessionId = await resolveSessionMatches(sessions);
 
-  const fallbackMatchesBySessionId = await resolveSessionMatches(visibleSessions);
-
-  const mappedSessions = visibleSessions.map((session) => {
+  const mappedSessions = sessions.map((session) => {
     let resolvedMatch =
       session.match || fallbackMatchesBySessionId.get(String(session._id)) || null;
     if (resolvedMatch && !hasCompleteTossState(resolvedMatch, session)) {
@@ -488,21 +536,14 @@ export async function loadHomeLiveBannerData() {
 async function readDirectorSessionsList() {
   await connectDB();
 
-  const sessions = await Session.find({})
-    .select(PUBLIC_SESSION_FIELDS)
-    .populate({
-      path: "match",
-      select: SESSION_MATCH_SUMMARY_FIELDS,
-      options: { lean: true },
-    })
-    .sort({ createdAt: -1, _id: -1 })
-    .lean();
+  const sessions = await readVisibleSessionsWithMatches({
+    createdAt: -1,
+    _id: -1,
+  });
 
-  const visibleSessions = sessions.filter(isNonDraftSession);
+  const fallbackMatchesBySessionId = await resolveSessionMatches(sessions);
 
-  const fallbackMatchesBySessionId = await resolveSessionMatches(visibleSessions);
-
-  const mappedSessions = visibleSessions
+  const mappedSessions = sessions
     .map((session) => {
       const resolvedMatch =
         session.match || fallbackMatchesBySessionId.get(String(session._id)) || null;

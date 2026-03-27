@@ -15,6 +15,7 @@ import {
   FaBroadcastTower,
   FaBullhorn,
   FaCompactDisc,
+  FaExternalLinkAlt,
   FaForward,
   FaGripVertical,
   FaHeadphones,
@@ -25,8 +26,10 @@ import {
   FaPlay,
   FaPowerOff,
   FaStop,
+  FaTrash,
   FaVolumeUp,
   FaWifi,
+  FaYoutube,
 } from "react-icons/fa";
 import LiquidSportText from "../home/LiquidSportText";
 import SessionCoverHero from "../shared/SessionCoverHero";
@@ -66,10 +69,235 @@ const DIRECTOR_SESSIONS_CACHE_KEY = "gv-director-sessions-v1";
 const DIRECTOR_AUDIO_LIBRARY_CACHE_TTL_MS = 10 * 60 * 1000;
 const DIRECTOR_AUDIO_ORDER_SAVE_DELAY_MS = 20_000;
 const DIRECTOR_SESSIONS_REFRESH_MIN_GAP_MS = 1500;
+const DIRECTOR_YOUTUBE_TRACKS_CACHE_KEY = "gv-director-youtube-tracks-v1";
 let directorAudioLibraryMemoryCache = null;
 let directorAudioLibraryPromise = null;
 let directorSessionsMemoryCache = null;
 let directorAudioMetadataMemoryCache = {};
+let directorYouTubeApiPromise = null;
+
+function buildYouTubeWatchUrl(videoId) {
+  return `https://www.youtube.com/watch?v=${videoId}`;
+}
+
+function buildYouTubeThumbnailUrl(videoId) {
+  return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+}
+
+function extractYouTubeVideoId(input) {
+  const rawValue = String(input || "").trim();
+  if (!rawValue) {
+    return "";
+  }
+
+  const directIdMatch = rawValue.match(/^[a-zA-Z0-9_-]{11}$/);
+  if (directIdMatch) {
+    return directIdMatch[0];
+  }
+
+  try {
+    const parsed = new URL(rawValue);
+    const host = parsed.hostname.replace(/^www\./, "");
+
+    if (host === "youtu.be") {
+      return parsed.pathname.replace(/\//g, "").slice(0, 11);
+    }
+
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      if (parsed.pathname === "/watch") {
+        return String(parsed.searchParams.get("v") || "").slice(0, 11);
+      }
+
+      if (parsed.pathname.startsWith("/embed/")) {
+        return parsed.pathname.split("/")[2]?.slice(0, 11) || "";
+      }
+
+      if (parsed.pathname.startsWith("/shorts/")) {
+        return parsed.pathname.split("/")[2]?.slice(0, 11) || "";
+      }
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function normalizeDirectorYouTubeTrack(track, index = 0) {
+  const videoId = extractYouTubeVideoId(track?.videoId || track?.url || "");
+  if (!videoId) {
+    return null;
+  }
+
+  const safeName = String(track?.name || "").trim() || `Video ${index + 1}`;
+
+  return {
+    id: String(track?.id || `yt-${videoId}`),
+    name: safeName,
+    videoId,
+    url: buildYouTubeWatchUrl(videoId),
+    thumbnailUrl:
+      String(track?.thumbnailUrl || "").trim() || buildYouTubeThumbnailUrl(videoId),
+  };
+}
+
+function readCachedDirectorYouTubeTracks() {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const cachedValue = window.localStorage.getItem(
+      DIRECTOR_YOUTUBE_TRACKS_CACHE_KEY,
+    );
+    if (!cachedValue) {
+      return [];
+    }
+
+    const parsed = JSON.parse(cachedValue);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .map((track, index) => normalizeDirectorYouTubeTrack(track, index))
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function writeCachedDirectorYouTubeTracks(tracks) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      DIRECTOR_YOUTUBE_TRACKS_CACHE_KEY,
+      JSON.stringify(Array.isArray(tracks) ? tracks : []),
+    );
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+async function resolveDirectorYouTubeTrack(input) {
+  const videoId = extractYouTubeVideoId(input);
+  if (!videoId) {
+    throw new Error("Paste a valid YouTube link.");
+  }
+
+  const watchUrl = buildYouTubeWatchUrl(videoId);
+  let name = `YouTube ${videoId}`;
+  let thumbnailUrl = buildYouTubeThumbnailUrl(videoId);
+
+  try {
+    const response = await fetch(
+      `https://www.youtube.com/oembed?url=${encodeURIComponent(
+        watchUrl,
+      )}&format=json`,
+      {
+        cache: "no-store",
+      },
+    );
+
+    if (response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      const resolvedName = String(payload?.title || "").trim();
+      const resolvedThumbnail = String(payload?.thumbnail_url || "").trim();
+      if (resolvedName) {
+        name = resolvedName;
+      }
+      if (resolvedThumbnail) {
+        thumbnailUrl = resolvedThumbnail;
+      }
+    }
+  } catch {
+    // Keep the fallback title and thumbnail.
+  }
+
+  return {
+    id: `yt-${videoId}`,
+    name,
+    videoId,
+    url: watchUrl,
+    thumbnailUrl,
+  };
+}
+
+function loadDirectorYouTubeIframeApi() {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("Window unavailable."));
+  }
+
+  if (window.YT?.Player) {
+    return Promise.resolve(window.YT);
+  }
+
+  if (directorYouTubeApiPromise) {
+    return directorYouTubeApiPromise;
+  }
+
+  directorYouTubeApiPromise = new Promise((resolve, reject) => {
+    let pollTimer = 0;
+    let timeoutTimer = 0;
+
+    const cleanup = () => {
+      if (pollTimer) {
+        window.clearInterval(pollTimer);
+      }
+      if (timeoutTimer) {
+        window.clearTimeout(timeoutTimer);
+      }
+    };
+
+    const resolveIfReady = () => {
+      if (window.YT?.Player) {
+        cleanup();
+        resolve(window.YT);
+        return true;
+      }
+      return false;
+    };
+
+    const previousReady = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      previousReady?.();
+      resolveIfReady();
+    };
+
+    const existingScript = document.querySelector(
+      'script[src="https://www.youtube.com/iframe_api"]',
+    );
+
+    pollTimer = window.setInterval(() => {
+      void resolveIfReady();
+    }, 120);
+    timeoutTimer = window.setTimeout(() => {
+      cleanup();
+      directorYouTubeApiPromise = null;
+      reject(new Error("YouTube player timed out while loading."));
+    }, 12_000);
+
+    if (existingScript) {
+      void resolveIfReady();
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    script.async = true;
+    script.onerror = () => {
+      cleanup();
+      directorYouTubeApiPromise = null;
+      reject(new Error("YouTube player script could not load."));
+    };
+    document.head.appendChild(script);
+  });
+
+  return directorYouTubeApiPromise;
+}
 
 function serializeOrder(order) {
   return JSON.stringify(Array.isArray(order) ? order : []);
@@ -680,6 +908,12 @@ export default function DirectorConsoleClient({
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [musicState, setMusicState] = useState("idle");
   const [musicVolume, setMusicVolume] = useState(0.8);
+  const [musicInput, setMusicInput] = useState("");
+  const [isAddingMusicTrack, setIsAddingMusicTrack] = useState(false);
+  const [hasLoadedMusicTracks, setHasLoadedMusicTracks] = useState(false);
+  const [musicPlayerReady, setMusicPlayerReady] = useState(false);
+  const [musicPlayerError, setMusicPlayerError] = useState("");
+  const [musicPlayerBootNonce, setMusicPlayerBootNonce] = useState(0);
   const [masterVolume, setMasterVolume] = useState(1);
   const [speakerDeviceId, setSpeakerDeviceId] = useState("default");
   const [speakerDevices, setSpeakerDevices] = useState([]);
@@ -706,6 +940,8 @@ export default function DirectorConsoleClient({
   const libraryOrderSaveTimerRef = useRef(null);
   const lastPersistedLibraryOrderRef = useRef(serializeOrder([]));
   const audioRef = useRef(null);
+  const youtubePlayerHostRef = useRef(null);
+  const youtubePlayerRef = useRef(null);
   const effectsAudioRef = useRef(null);
   const bufferedEffectPlaybackRef = useRef(null);
   const bufferedEffectTimerRef = useRef(null);
@@ -719,6 +955,9 @@ export default function DirectorConsoleClient({
   const effectPrimeRequestRef = useRef(null);
   const playEffectRef = useRef(null);
   const musicUrlsRef = useRef([]);
+  const musicTracksRef = useRef([]);
+  const currentTrackIndexRef = useRef(0);
+  const loadedMusicVideoIdRef = useRef("");
   const cachedEffectUrlRef = useRef(new Map());
   const musicEffectDuckFactorRef = useRef(1);
   const musicDuckAnimationFrameRef = useRef(0);
@@ -751,6 +990,41 @@ export default function DirectorConsoleClient({
     );
   }, []);
 
+  useEffect(() => {
+    setMusicTracks(readCachedDirectorYouTubeTracks());
+    setHasLoadedMusicTracks(true);
+  }, []);
+
+  useEffect(() => {
+    musicTracksRef.current = musicTracks;
+    if (hasLoadedMusicTracks) {
+      writeCachedDirectorYouTubeTracks(musicTracks);
+    }
+  }, [hasLoadedMusicTracks, musicTracks]);
+
+  useEffect(() => {
+    currentTrackIndexRef.current = currentTrackIndex;
+  }, [currentTrackIndex]);
+
+  const handlePasteMusicLink = useCallback(async () => {
+    if (typeof navigator === "undefined" || !navigator.clipboard?.readText) {
+      setMusicMessage("Clipboard paste is not supported here.");
+      return;
+    }
+
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+      if (!String(clipboardText || "").trim()) {
+        setMusicMessage("Clipboard is empty.");
+        return;
+      }
+      setMusicInput(String(clipboardText || "").trim());
+      setMusicMessage("Link pasted.");
+    } catch {
+      setMusicMessage("Could not paste from clipboard.");
+    }
+  }, []);
+
   const cancelMusicDuckAnimation = useCallback(() => {
     if (musicDuckAnimationFrameRef.current) {
       window.cancelAnimationFrame(musicDuckAnimationFrameRef.current);
@@ -769,23 +1043,60 @@ export default function DirectorConsoleClient({
     [getBaseMusicVolume],
   );
 
+  const setMusicOutputVolume = useCallback((nextVolume) => {
+    const safeVolume = Math.max(0, Math.min(1, Number(nextVolume) || 0));
+    const audio = audioRef.current;
+    if (audio) {
+      audio.volume = safeVolume;
+    }
+
+    const player = youtubePlayerRef.current;
+    if (player && typeof player.setVolume === "function") {
+      try {
+        player.setVolume(Math.round(safeVolume * 100));
+      } catch {
+        // Ignore YouTube player volume failures.
+      }
+    }
+  }, []);
+
+  const getCurrentMusicOutputVolume = useCallback(() => {
+    const player = youtubePlayerRef.current;
+    if (player && typeof player.getVolume === "function") {
+      try {
+        const playerVolume = Number(player.getVolume());
+        if (Number.isFinite(playerVolume)) {
+          return Math.max(0, Math.min(1, playerVolume / 100));
+        }
+      } catch {
+        // Ignore player volume reads and fall back below.
+      }
+    }
+
+    const audio = audioRef.current;
+    if (audio && Number.isFinite(audio.volume)) {
+      return Math.max(0, Math.min(1, audio.volume));
+    }
+
+    return getMusicTargetVolume();
+  }, [getMusicTargetVolume]);
+
   const applyMusicDuck = useCallback(
     (duckFactor, { durationMs = 220 } = {}) => {
       musicEffectDuckFactorRef.current = duckFactor;
       const audio = audioRef.current;
-      if (!audio) {
+      const player = youtubePlayerRef.current;
+      if (!audio && !player) {
         return;
       }
 
       cancelMusicDuckAnimation();
 
       const targetVolume = getMusicTargetVolume(duckFactor);
-      const startVolume = Number.isFinite(audio.volume)
-        ? audio.volume
-        : targetVolume;
+      const startVolume = getCurrentMusicOutputVolume();
 
       if (durationMs <= 0 || Math.abs(startVolume - targetVolume) < 0.01) {
-        audio.volume = targetVolume;
+        setMusicOutputVolume(targetVolume);
         return;
       }
 
@@ -793,7 +1104,9 @@ export default function DirectorConsoleClient({
       const step = (now) => {
         const progress = Math.min(1, (now - startTime) / durationMs);
         const eased = 0.5 - Math.cos(progress * Math.PI) / 2;
-        audio.volume = startVolume + (targetVolume - startVolume) * eased;
+        setMusicOutputVolume(
+          startVolume + (targetVolume - startVolume) * eased,
+        );
 
         if (progress < 1) {
           musicDuckAnimationFrameRef.current =
@@ -805,8 +1118,26 @@ export default function DirectorConsoleClient({
 
       musicDuckAnimationFrameRef.current = window.requestAnimationFrame(step);
     },
-    [cancelMusicDuckAnimation, getMusicTargetVolume],
+    [
+      cancelMusicDuckAnimation,
+      getCurrentMusicOutputVolume,
+      getMusicTargetVolume,
+      setMusicOutputVolume,
+    ],
   );
+
+  useEffect(() => {
+    if (!musicTracks.length) {
+      setCurrentTrackIndex(0);
+      loadedMusicVideoIdRef.current = "";
+      setMusicState("idle");
+      return;
+    }
+
+    if (currentTrackIndex >= musicTracks.length) {
+      setCurrentTrackIndex(musicTracks.length - 1);
+    }
+  }, [currentTrackIndex, musicTracks.length]);
 
   const speakDirectorScoreAnnouncement = useCallback(
     (targetMatch, eventId, options = {}) => {
@@ -1438,12 +1769,13 @@ export default function DirectorConsoleClient({
 
   useEffect(() => {
     const effectsAudio = effectsAudioRef.current;
+    const musicUrls = musicUrlsRef.current;
 
     return () => {
       clearLibraryOrderSaveTimer();
       void flushPendingLibraryOrder({ useBeacon: true });
       cancelMusicDuckAnimation();
-      musicUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      musicUrls.forEach((url) => URL.revokeObjectURL(url));
       if (effectsAudio) {
         effectsAudio.pause();
         effectsAudio.src = "";
@@ -2569,6 +2901,11 @@ export default function DirectorConsoleClient({
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
     }
+    try {
+      youtubePlayerRef.current?.stopVideo();
+    } catch {
+      // Ignore stop failures.
+    }
     setMusicState("stopped");
     await micMonitor.stop({ resumeMedia: true });
     await walkie.stopTalking();
@@ -2615,101 +2952,404 @@ export default function DirectorConsoleClient({
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
+    try {
+      youtubePlayerRef.current?.stopVideo();
+    } catch {
+      // Ignore stop failures.
+    }
 
     setMusicState("idle");
   }, [clearLibraryDragState, managedSessionId]);
 
-  const handleMusicSelection = (event) => {
-    const files = Array.from(event.target.files || []);
-    if (!files.length) {
-      return;
-    }
+  const syncMusicTrackToPlayer = useCallback(
+    (track, { autoplay = false, restart = false } = {}) => {
+      const player = youtubePlayerRef.current;
+      if (!player || !track?.videoId) {
+        return false;
+      }
 
-    musicUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-    const nextTracks = files.map((file) => ({
-      id: `${file.name}-${file.size}-${file.lastModified}`,
-      name: file.name.replace(/\.[^.]+$/, ""),
-      url: URL.createObjectURL(file),
-      type: file.type || "audio/mpeg",
-    }));
-    musicUrlsRef.current = nextTracks.map((track) => track.url);
-    setMusicTracks(nextTracks);
-    setCurrentTrackIndex(0);
-    setMusicMessage(
-      `${nextTracks.length} track${nextTracks.length === 1 ? "" : "s"} loaded.`,
-    );
-    window.setTimeout(() => setMusicMessage(""), 2200);
-  };
+      setMusicPlayerError("");
+      setMusicOutputVolume(getMusicTargetVolume());
+
+      try {
+        const currentVideoId = String(player.getVideoData?.().video_id || "");
+        const sameVideo =
+          currentVideoId === track.videoId ||
+          loadedMusicVideoIdRef.current === track.videoId;
+
+        loadedMusicVideoIdRef.current = track.videoId;
+
+        if (autoplay) {
+          if (sameVideo && !restart) {
+            player.playVideo();
+          } else {
+            player.loadVideoById(track.videoId);
+          }
+          return true;
+        }
+
+        if (!sameVideo || restart) {
+          player.cueVideoById(track.videoId);
+        }
+        return true;
+      } catch {
+        setMusicPlayerError("Player is still loading.");
+        return false;
+      }
+    },
+    [getMusicTargetVolume, setMusicOutputVolume],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    setMusicPlayerReady(false);
+    setMusicPlayerError("");
+
+    void loadDirectorYouTubeIframeApi()
+      .then(() => {
+        if (
+          cancelled ||
+          !youtubePlayerHostRef.current ||
+          youtubePlayerRef.current
+        ) {
+          return;
+        }
+
+        const player = new window.YT.Player(youtubePlayerHostRef.current, {
+          height: "100%",
+          width: "100%",
+          host: "https://www.youtube-nocookie.com",
+          playerVars: {
+            autoplay: 0,
+            controls: 0,
+            rel: 0,
+            playsinline: 1,
+            modestbranding: 1,
+            fs: 0,
+            disablekb: 1,
+            enablejsapi: 1,
+            origin: window.location.origin,
+            iv_load_policy: 3,
+          },
+          events: {
+            onReady: (event) => {
+              if (cancelled) {
+                return;
+              }
+
+              youtubePlayerRef.current = event.target;
+              setMusicPlayerReady(true);
+              setMusicPlayerError("");
+              setMusicOutputVolume(getMusicTargetVolume());
+
+              const initialTrack =
+                musicTracksRef.current[currentTrackIndexRef.current];
+              if (initialTrack?.videoId) {
+                loadedMusicVideoIdRef.current = initialTrack.videoId;
+                try {
+                  event.target.cueVideoById(initialTrack.videoId);
+                } catch {
+                  // Ignore cue failures until the user interacts.
+                }
+              }
+            },
+            onStateChange: (event) => {
+              if (cancelled) {
+                return;
+              }
+
+              if (event.data === window.YT.PlayerState.PLAYING) {
+                const activeTrack =
+                  musicTracksRef.current[currentTrackIndexRef.current];
+                setMusicPlayerReady(true);
+                setMusicPlayerError("");
+                setMusicState("playing");
+                setMusicMessage(
+                  activeTrack ? `Playing ${activeTrack.name}.` : "Playing video.",
+                );
+                return;
+              }
+
+              if (event.data === window.YT.PlayerState.PAUSED) {
+                setMusicPlayerReady(true);
+                setMusicState("paused");
+                return;
+              }
+
+              if (event.data === window.YT.PlayerState.BUFFERING) {
+                setMusicPlayerReady(true);
+                setMusicMessage("Loading video...");
+                return;
+              }
+
+              if (event.data === window.YT.PlayerState.CUED) {
+                setMusicPlayerReady(true);
+                setMusicState((current) =>
+                  current === "playing" ? current : "paused",
+                );
+                return;
+              }
+
+              if (event.data === window.YT.PlayerState.ENDED) {
+                if (musicTracksRef.current.length > 1) {
+                  const nextIndex =
+                    (currentTrackIndexRef.current + 1) %
+                    musicTracksRef.current.length;
+                  const nextTrack = musicTracksRef.current[nextIndex];
+                  currentTrackIndexRef.current = nextIndex;
+                  setCurrentTrackIndex(nextIndex);
+                  if (nextTrack?.videoId) {
+                    loadedMusicVideoIdRef.current = nextTrack.videoId;
+                    try {
+                      event.target.loadVideoById(nextTrack.videoId);
+                    } catch {
+                      setMusicState("stopped");
+                    }
+                  }
+                } else {
+                  setMusicState("stopped");
+                  setMusicMessage("Playback finished.");
+                }
+              }
+            },
+          },
+        });
+
+        youtubePlayerRef.current = player;
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMusicPlayerReady(false);
+          setMusicPlayerError("YouTube player could not load.");
+          setMusicMessage("YouTube player could not load.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      try {
+        youtubePlayerRef.current?.destroy();
+      } catch {
+        // Ignore destroy failures.
+      }
+      youtubePlayerRef.current = null;
+      loadedMusicVideoIdRef.current = "";
+      setMusicPlayerReady(false);
+    };
+  }, [getMusicTargetVolume, musicPlayerBootNonce, setMusicOutputVolume]);
 
   useEffect(() => {
     const currentTrack = musicTracks[currentTrackIndex];
-    const audio = audioRef.current;
-    if (!audio || !currentTrack) {
+    if (!currentTrack?.videoId || !youtubePlayerRef.current) {
       return;
     }
 
-    if (audio.src !== currentTrack.url) {
-      audio.src = currentTrack.url;
+    if (loadedMusicVideoIdRef.current === currentTrack.videoId) {
+      return;
     }
 
-    void syncSinkId(speakerDeviceId);
-  }, [currentTrackIndex, musicTracks, speakerDeviceId]);
+    const synced = syncMusicTrackToPlayer(currentTrack, { autoplay: false });
+    if (synced) {
+      setMusicMessage(`Ready: ${currentTrack.name}.`);
+      setMusicState("paused");
+    }
+  }, [currentTrackIndex, musicPlayerError, musicTracks, syncMusicTrackToPlayer]);
 
-  const handlePlayMusic = async () => {
-    const audio = audioRef.current;
+  const handleAddMusicTrack = useCallback(async () => {
+    const nextValue = String(musicInput || "").trim();
+    if (!nextValue || isAddingMusicTrack) {
+      return;
+    }
+
+    setIsAddingMusicTrack(true);
+    setMusicMessage("");
+
+    try {
+      const nextTrack = await resolveDirectorYouTubeTrack(nextValue);
+      const existingIndex = musicTracks.findIndex(
+        (track) => track.videoId === nextTrack.videoId,
+      );
+
+      if (existingIndex >= 0) {
+        setCurrentTrackIndex(existingIndex);
+        setMusicInput("");
+        setMusicMessage("This video is already in the deck.");
+        loadedMusicVideoIdRef.current = "";
+        syncMusicTrackToPlayer(musicTracks[existingIndex], {
+          autoplay: false,
+          restart: true,
+        });
+        return;
+      }
+
+      setMusicTracks((current) => [...current, nextTrack]);
+      setCurrentTrackIndex(musicTracks.length);
+      setMusicInput("");
+      loadedMusicVideoIdRef.current = "";
+      window.setTimeout(() => {
+        syncMusicTrackToPlayer(nextTrack, {
+          autoplay: false,
+          restart: true,
+        });
+      }, 0);
+      setMusicMessage("Video added. Tap play.");
+    } catch (caughtError) {
+      setMusicMessage(caughtError.message || "Could not add this YouTube link.");
+    } finally {
+      setIsAddingMusicTrack(false);
+    }
+  }, [isAddingMusicTrack, musicInput, musicTracks, syncMusicTrackToPlayer]);
+
+  const handlePlayMusic = useCallback(async () => {
     const track = musicTracks[currentTrackIndex];
-    if (!audio || !track) {
+    if (!track) {
       return;
     }
 
-    audio.src = track.url;
-    audio.volume = musicVolume * masterVolume;
-    const sinkApplied = await syncSinkId(speakerDeviceId);
-    if (!sinkApplied && speakerDeviceId !== "default") {
-      setSpeakerMessage("Output routing is not supported in this browser.");
+    if (musicPlayerError) {
+      setMusicPlayerError("");
+      setMusicPlayerReady(false);
+      setMusicMessage("Reloading YouTube player...");
+      setMusicPlayerBootNonce((current) => current + 1);
+      return;
+    }
+
+    if (!youtubePlayerRef.current) {
+      setMusicPlayerReady(false);
+      setMusicMessage("Loading YouTube player...");
+      setMusicPlayerBootNonce((current) => current + 1);
+      return;
+    }
+
+    const synced = syncMusicTrackToPlayer(track, {
+      autoplay: true,
+    });
+
+    if (!synced) {
+      setMusicMessage("YouTube player is loading...");
+    }
+  }, [currentTrackIndex, musicPlayerError, musicTracks, syncMusicTrackToPlayer]);
+
+  const handlePauseMusic = useCallback(() => {
+    const player = youtubePlayerRef.current;
+    if (!player) {
+      return;
     }
 
     try {
-      await audio.play();
-      setMusicState("playing");
-      setMusicMessage(`Playing ${track.name}.`);
+      player.pauseVideo();
+      setMusicState("paused");
     } catch {
-      setMusicMessage("Music playback was blocked by the browser.");
+      setMusicMessage("Could not pause this video.");
     }
-  };
+  }, []);
 
-  const handlePauseMusic = () => {
-    audioRef.current?.pause();
-    setMusicState("paused");
-  };
-
-  const handleStopMusic = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+  const handleStopMusic = useCallback(() => {
+    const player = youtubePlayerRef.current;
+    if (!player) {
+      return;
     }
-    setMusicState("stopped");
-  };
 
-  const handleNextMusic = async () => {
+    try {
+      player.stopVideo();
+      setMusicState("stopped");
+    } catch {
+      setMusicMessage("Could not stop this video.");
+    }
+  }, []);
+
+  const handleNextMusic = useCallback(async () => {
     if (!musicTracks.length) {
       return;
     }
 
     const nextIndex = (currentTrackIndex + 1) % musicTracks.length;
+    const nextTrack = musicTracks[nextIndex];
     setCurrentTrackIndex(nextIndex);
-    window.setTimeout(() => {
-      void handlePlayMusic();
-    }, 60);
-  };
 
-  const handleTrackEnd = () => {
-    if (musicTracks.length > 1) {
-      void handleNextMusic();
+    if (!nextTrack) {
       return;
     }
-    setMusicState("stopped");
-  };
+
+    const synced = syncMusicTrackToPlayer(nextTrack, {
+      autoplay: true,
+      restart: true,
+    });
+
+    if (!synced) {
+      setMusicMessage("YouTube player is loading...");
+    }
+  }, [currentTrackIndex, musicTracks, syncMusicTrackToPlayer]);
+
+  const handleToggleMusicPlayback = useCallback(() => {
+    if (!musicTracks[currentTrackIndex]) {
+      return;
+    }
+
+    if (musicState === "playing") {
+      handlePauseMusic();
+      return;
+    }
+
+    void handlePlayMusic();
+  }, [currentTrackIndex, handlePauseMusic, handlePlayMusic, musicState, musicTracks]);
+
+  const handleRemoveMusicTrack = useCallback(
+    (trackId) => {
+      const removeIndex = musicTracks.findIndex((track) => track.id === trackId);
+      if (removeIndex < 0) {
+        return;
+      }
+
+      const nextTracks = musicTracks.filter((track) => track.id !== trackId);
+      setMusicTracks(nextTracks);
+
+      if (!nextTracks.length) {
+        loadedMusicVideoIdRef.current = "";
+        try {
+          youtubePlayerRef.current?.stopVideo();
+        } catch {
+          // Ignore stop failures.
+        }
+        setCurrentTrackIndex(0);
+        setMusicState("idle");
+        setMusicMessage("Deck cleared.");
+        return;
+      }
+
+      const nextIndex =
+        currentTrackIndex > removeIndex
+          ? currentTrackIndex - 1
+          : Math.min(currentTrackIndex, nextTracks.length - 1);
+      const nextTrack = nextTracks[nextIndex];
+      setCurrentTrackIndex(nextIndex);
+      loadedMusicVideoIdRef.current = "";
+      if (nextTrack) {
+        const autoplay = musicState === "playing";
+        window.setTimeout(() => {
+          syncMusicTrackToPlayer(nextTrack, { autoplay });
+        }, 0);
+      }
+      setMusicMessage("Video removed.");
+    },
+    [currentTrackIndex, musicState, musicTracks, syncMusicTrackToPlayer],
+  );
+
+  const handleSelectMusicTrack = useCallback(
+    (index) => {
+      const nextTrack = musicTracks[index];
+      if (!nextTrack) {
+        return;
+      }
+
+      setCurrentTrackIndex(index);
+      loadedMusicVideoIdRef.current = "";
+      syncMusicTrackToPlayer(nextTrack, {
+        autoplay: musicState === "playing",
+      });
+    },
+    [musicState, musicTracks, syncMusicTrackToPlayer],
+  );
 
   const handleDirectorMicStart = useCallback(async () => {
     if (!directorSpeakerOn || directorMicHoldingRef.current) {
@@ -2834,7 +3474,7 @@ export default function DirectorConsoleClient({
 
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentTrack.name,
-      artist: "Local phone audio",
+      artist: "YouTube deck",
       album: "GV Cricket Music Deck",
     });
     navigator.mediaSession.playbackState =
@@ -2842,32 +3482,18 @@ export default function DirectorConsoleClient({
 
     try {
       navigator.mediaSession.setActionHandler("play", () => {
-        const audio = audioRef.current;
-        if (!audio || !currentTrack) {
-          return;
-        }
-        audio
-          .play()
-          .then(() => {
-            setMusicState("playing");
-          })
-          .catch(() => {});
+        void handlePlayMusic();
       });
       navigator.mediaSession.setActionHandler("pause", () => {
-        audioRef.current?.pause();
-        setMusicState("paused");
+        handlePauseMusic();
       });
       navigator.mediaSession.setActionHandler("nexttrack", () => {
         if (musicTracks.length > 1) {
-          setCurrentTrackIndex((index) => (index + 1) % musicTracks.length);
+          void handleNextMusic();
         }
       });
       navigator.mediaSession.setActionHandler("stop", () => {
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current.currentTime = 0;
-        }
-        setMusicState("stopped");
+        handleStopMusic();
       });
     } catch {
       // Some browsers only support a subset of media session actions.
@@ -2883,7 +3509,16 @@ export default function DirectorConsoleClient({
         // Ignore unsupported action cleanup.
       }
     };
-  }, [currentTrack, iOSSafari, musicState, musicTracks.length]);
+  }, [
+    currentTrack,
+    handleNextMusic,
+    handlePauseMusic,
+    handlePlayMusic,
+    handleStopMusic,
+    iOSSafari,
+    musicState,
+    musicTracks.length,
+  ]);
 
   const directorWalkieChannelEnabled = directorWalkieSharedEnabled;
   const directorWalkieUi =
@@ -3667,38 +4302,223 @@ export default function DirectorConsoleClient({
 
           <Card
             title="Music Deck"
-            subtitle="Files on this phone"
+            subtitle="YouTube links"
             icon={<FaMusic />}
             accent="cyan"
             help={{
               title: "Music Deck",
-              body: "Use audio files from Files, Downloads, or this phone. Connect a Bluetooth speaker first for louder playback. External apps like Spotify or Apple Music cannot be controlled here.",
+              body: "Paste YouTube links, build a small playlist, and play videos directly here.",
             }}
             action={
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black shadow-[0_10px_30px_rgba(16,185,129,0.2)]">
-                <FaCompactDisc />
-                Add tracks
-                <input
-                  type="file"
-                  accept="audio/*"
-                  multiple
-                  className="hidden"
-                  onChange={handleMusicSelection}
-                />
-              </label>
+              <span className="inline-flex items-center gap-2 rounded-full border border-red-300/16 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-100 shadow-[0_10px_30px_rgba(239,68,68,0.14)]">
+                <FaYoutube className="text-base text-red-300" />
+                YouTube
+              </span>
             }
           >
-            <audio ref={audioRef} onEnded={handleTrackEnd} hidden />
+            <audio ref={audioRef} hidden />
             <div className="space-y-4">
+              <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(8,25,34,0.34),rgba(10,10,14,0.52))] p-3">
+                <label
+                  htmlFor="director-youtube-input"
+                  className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500"
+                >
+                  Paste YouTube link
+                </label>
+                <p className="mt-2 text-sm text-zinc-400">
+                  Open YouTube, tap Share, copy the link, then paste it here.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a
+                    href="https://www.youtube.com/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full border border-red-300/16 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/16"
+                  >
+                    <FaYoutube className="text-sm text-red-300" />
+                    Open YouTube
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => void handlePasteMusicLink()}
+                    className="inline-flex items-center gap-2 rounded-full border border-cyan-300/16 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-400/16"
+                  >
+                    Paste link
+                  </button>
+                </div>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    id="director-youtube-input"
+                    type="url"
+                    inputMode="url"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    value={musicInput}
+                    onChange={(event) => setMusicInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void handleAddMusicTrack();
+                      }
+                    }}
+                    placeholder="https://youtube.com/watch?v=..."
+                    className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3.5 text-[16px] text-white outline-none transition placeholder:text-zinc-500 focus:border-cyan-300/26 focus:bg-white/[0.07]"
+                  />
+                  <LoadingButton
+                    type="button"
+                    onClick={() => void handleAddMusicTrack()}
+                    loading={isAddingMusicTrack}
+                    pendingLabel="Adding..."
+                    disabled={!String(musicInput || "").trim()}
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(90deg,#22d3ee_0%,#3b82f6_100%)] px-4 py-3 text-sm font-semibold text-black shadow-[0_14px_34px_rgba(34,211,238,0.18)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <FaCompactDisc />
+                    Add video
+                  </LoadingButton>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(8,25,34,0.38),rgba(10,10,14,0.52))]">
+                <div className="relative aspect-video bg-black">
+                  {currentTrack ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={
+                          currentTrack.thumbnailUrl ||
+                          buildYouTubeThumbnailUrl(currentTrack.videoId)
+                        }
+                        alt={currentTrack.name}
+                        className={`absolute inset-0 h-full w-full object-cover transition duration-300 ${
+                          musicState === "playing" && musicPlayerReady
+                            ? "opacity-0"
+                            : "opacity-100"
+                        }`}
+                      />
+                      <div
+                        className={`absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.18),rgba(0,0,0,0.62))] transition ${
+                          musicState === "playing" && musicPlayerReady
+                            ? "opacity-0"
+                            : "opacity-100"
+                        }`}
+                      />
+                    </>
+                  ) : null}
+                  <div
+                    ref={youtubePlayerHostRef}
+                    className={`h-full w-full transition ${
+                      currentTrack ? "opacity-100" : "pointer-events-none opacity-0"
+                    }`}
+                    style={{ pointerEvents: "none" }}
+                  />
+                  {!currentTrack ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-5 text-center">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-[20px] border border-white/10 bg-white/[0.06] text-zinc-300">
+                        <FaMusic className="text-lg" />
+                      </div>
+                      <div>
+                        <p className="text-lg font-semibold text-white">
+                          No video loaded
+                        </p>
+                        <p className="mt-1 text-sm text-zinc-400">
+                          Paste a YouTube link to start.
+                        </p>
+                      </div>
+                    </div>
+                  ) : currentTrack && (!musicPlayerReady || musicPlayerError) ? (
+                    <div className="absolute inset-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={
+                          currentTrack.thumbnailUrl ||
+                          buildYouTubeThumbnailUrl(currentTrack.videoId)
+                        }
+                        alt={currentTrack.name}
+                        className="h-full w-full object-cover opacity-72"
+                      />
+                      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.28),rgba(0,0,0,0.78))]" />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-5 text-center">
+                        <p className="text-lg font-semibold text-white">
+                          {musicPlayerError || "Loading player..."}
+                        </p>
+                        <p className="max-w-xs text-sm text-zinc-300">
+                          If it takes too long, open the video in YouTube and paste
+                          another link.
+                        </p>
+                        <a
+                          href={currentTrack.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/[0.12]"
+                        >
+                          <FaExternalLinkAlt className="text-xs" />
+                          Open on YouTube
+                        </a>
+                      </div>
+                    </div>
+                  ) : null}
+                  {currentTrack ? (
+                    <button
+                      type="button"
+                      onClick={handleToggleMusicPlayback}
+                      className="absolute inset-0 z-10 flex items-center justify-center"
+                      aria-label={
+                        musicState === "playing"
+                          ? "Pause video"
+                          : "Play video"
+                      }
+                    >
+                      <div
+                        className={`inline-flex h-18 w-18 items-center justify-center rounded-full border border-white/18 shadow-[0_16px_36px_rgba(0,0,0,0.32)] transition ${
+                          musicState === "playing" && musicPlayerReady
+                            ? "bg-black/28 text-white/92 opacity-0 hover:opacity-100"
+                            : "bg-white/16 text-white opacity-100 backdrop-blur-sm"
+                        }`}
+                      >
+                        {musicState === "playing" && musicPlayerReady ? (
+                          <FaPause className="text-xl" />
+                        ) : (
+                          <FaPlay className="ml-1 text-xl" />
+                        )}
+                      </div>
+                    </button>
+                  ) : null}
+                  {currentTrack ? (
+                    <div className="pointer-events-none absolute bottom-3 left-3 z-10 inline-flex items-center gap-2 rounded-full border border-white/14 bg-black/45 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/88 backdrop-blur-sm">
+                      <FaYoutube className="text-red-300" />
+                      {musicState === "playing" && musicPlayerReady
+                        ? "Tap video to pause"
+                        : "Tap video to play"}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
               <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(8,25,34,0.38),rgba(10,10,14,0.52))] px-4 py-4">
                 <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(34,211,238,0.82)_18%,rgba(59,130,246,0.76)_56%,rgba(250,204,21,0.34)_82%,rgba(0,0,0,0))]" />
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                  Now playing
-                </p>
-                <p className="mt-2 text-lg font-semibold text-white">
-                  {currentTrack ? currentTrack.name : "No track loaded"}
-                </p>
-                <p className="mt-1 text-sm text-zinc-400">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                      Now playing
+                    </p>
+                    <p className="mt-2 line-clamp-2 text-lg font-semibold text-white">
+                      {currentTrack ? currentTrack.name : "No video loaded"}
+                    </p>
+                  </div>
+                  {currentTrack ? (
+                    <a
+                      href={currentTrack.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-200 transition hover:bg-white/[0.1]"
+                      aria-label="Open on YouTube"
+                    >
+                      <FaExternalLinkAlt className="text-xs" />
+                    </a>
+                  ) : null}
+                </div>
+                <p className="mt-2 text-sm text-zinc-400">
                   {musicMessage ||
                     (musicState === "playing"
                       ? "Playing"
@@ -3709,26 +4529,6 @@ export default function DirectorConsoleClient({
               </div>
 
               <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handlePlayMusic();
-                  }}
-                  disabled={!currentTrack}
-                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-black disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-                  aria-label="Play music"
-                >
-                  <FaPlay />
-                </button>
-                <button
-                  type="button"
-                  onClick={handlePauseMusic}
-                  disabled={!currentTrack}
-                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/6 text-white disabled:cursor-not-allowed disabled:text-zinc-500"
-                  aria-label="Pause music"
-                >
-                  <FaPause />
-                </button>
                 <button
                   type="button"
                   onClick={handleNextMusic}
@@ -3775,28 +4575,50 @@ export default function DirectorConsoleClient({
               {musicTracks.length ? (
                 <div className="space-y-2 rounded-3xl border border-white/10 bg-black/20 p-3">
                   {musicTracks.map((track, index) => (
-                    <button
+                    <div
                       key={track.id}
-                      type="button"
-                      onClick={() => setCurrentTrackIndex(index)}
-                      className={`flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left text-sm ${
+                      className={`flex items-center gap-3 rounded-2xl border px-3 py-2 ${
                         index === currentTrackIndex
-                          ? "bg-emerald-500/12 text-emerald-100"
-                          : "text-zinc-300 hover:bg-white/4"
+                          ? "border-emerald-300/18 bg-emerald-500/10"
+                          : "border-white/8 bg-white/[0.03]"
                       }`}
                     >
-                      <span className="truncate">{track.name}</span>
-                      {index === currentTrackIndex ? (
-                        <span className="text-xs font-semibold uppercase tracking-[0.16em]">
-                          Live
-                        </span>
-                      ) : null}
-                    </button>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={track.thumbnailUrl || buildYouTubeThumbnailUrl(track.videoId)}
+                        alt={track.name}
+                        className="h-12 w-20 shrink-0 rounded-xl object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSelectMusicTrack(index)}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <div className="truncate text-sm font-semibold text-white">
+                          {track.name}
+                        </div>
+                        <div className="mt-1 text-xs text-zinc-400">
+                          {index === currentTrackIndex
+                            ? musicState === "playing"
+                              ? "Live"
+                              : "Ready"
+                            : "Tap to load"}
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMusicTrack(track.id)}
+                        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-300 transition hover:bg-rose-500/18 hover:text-rose-100"
+                        aria-label={`Remove ${track.name}`}
+                      >
+                        <FaTrash className="text-sm" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               ) : (
                 <div className="mt-2 rounded-3xl border border-white/10 bg-black/20 px-4 py-4 text-center text-sm text-zinc-400">
-                  Add audio files from Files, Downloads, or this phone.
+                  Paste a YouTube link above to build the deck.
                 </div>
               )}
             </div>

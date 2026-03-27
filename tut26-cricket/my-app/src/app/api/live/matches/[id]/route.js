@@ -105,7 +105,7 @@ function sseHeaders() {
   return {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache, no-transform",
-    Connection: "close",
+    Connection: "keep-alive",
     "X-Accel-Buffering": "no",
     "Content-Encoding": "none",
   };
@@ -277,17 +277,18 @@ export async function GET(request, { params }) {
           pad: STREAM_BOOTSTRAP_PAD,
         });
 
+        cleanup = subscribeToMatch(id, async () => {
+          try {
+            await pushMatch({ force: true });
+          } catch (error) {
+            console.error("Match SSE push failed:", error);
+          }
+        });
+
         try {
           await ensureLiveUpdates();
           if (!closed) {
             liveUpdatesReady = true;
-            cleanup = subscribeToMatch(id, async () => {
-              try {
-                await pushMatch({ force: true });
-              } catch (error) {
-                console.error("Match SSE push failed:", error);
-              }
-            });
           }
         } catch (error) {
           console.error("Match change streams unavailable.", error);

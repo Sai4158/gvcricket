@@ -425,12 +425,33 @@ export async function requestPersistentWalkieEnable(
   }
   publishWalkieStateUpdate(matchId);
 
+  const snapshot = buildSnapshot(doc);
+  const umpireParticipants = doc.participants.filter(
+    (item) => item.role === "umpire"
+  );
+
+  await Promise.all(
+    umpireParticipants.map((umpireParticipant) =>
+      queueParticipantMessage(matchId, umpireParticipant.id, "participant", {
+        type: "walkie-request",
+        requestId,
+        participantId: participant.id,
+        role: participant.role,
+        name: participant.name,
+        requestedAt: new Date(request.requestedAt).toISOString(),
+        expiresAt: new Date(request.expiresAt).toISOString(),
+        notification: doc.lastNotification,
+        snapshot,
+      })
+    )
+  );
+
   await queueParticipantMessage(matchId, participant.id, "participant", {
     type: "request-sent",
     requestId,
   });
 
-  return { ok: true, snapshot: buildSnapshot(doc) };
+  return { ok: true, snapshot };
 }
 
 export async function respondToPersistentWalkieRequest(

@@ -32,14 +32,15 @@ export const preferredRegion = ["iad1"];
 const WALKIE_HEARTBEAT_INTERVAL_MS = 8000;
 const WALKIE_HEARTBEAT_START_DELAY_MS = 4000;
 const WALKIE_FALLBACK_POLL_INTERVAL_MS = 2000;
-const WALKIE_BOOT_PAD = "0".repeat(2048);
-const WALKIE_PING_PAD = "0".repeat(256);
+const WALKIE_STARTUP_POLL_WINDOW_MS = 10_000;
+const WALKIE_BOOT_PAD = ".".repeat(8192);
+const WALKIE_PING_PAD = ".".repeat(1024);
 
 function sseHeaders() {
   return {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache, no-transform",
-    Connection: "close",
+    Connection: "keep-alive",
     "X-Accel-Buffering": "no",
     "Content-Encoding": "none",
   };
@@ -128,6 +129,8 @@ export async function GET(request, { params }) {
     let didCleanup = false;
     let pendingStateReplays = 0;
     let startupReplayTimers = [];
+    let startupPolling = true;
+    let startupPollWindowTimer = null;
 
     const buildStatePayload = (snapshot, notification, extra = {}) => ({
       snapshot,
@@ -159,6 +162,10 @@ export async function GET(request, { params }) {
         }
         startupReplayTimers = [];
       }
+      if (startupPollWindowTimer) {
+        clearTimeout(startupPollWindowTimer);
+        startupPollWindowTimer = null;
+      }
     };
 
     const send = async (event, data) => {
@@ -167,6 +174,7 @@ export async function GET(request, { params }) {
       }
 
       try {
+        await writer.ready;
         await writer.write(encoder.encode(encodeEvent(event, data)));
         return true;
       } catch (error) {
@@ -205,7 +213,7 @@ export async function GET(request, { params }) {
     };
 
     const schedulePoll = (delay = WALKIE_FALLBACK_POLL_INTERVAL_MS) => {
-      if (closed || hasChangeStreamUpdates) {
+      if (closed || (hasChangeStreamUpdates && !startupPolling)) {
         return;
       }
       if (pollTimer) {
@@ -278,7 +286,6 @@ export async function GET(request, { params }) {
           current.notification,
           {
             token: participantToken,
-            ...(pendingStateReplays > 0 ? { bootPad: WALKIE_BOOT_PAD } : {}),
           }
         );
         if (!(await send("state", heartbeatStatePayload))) {
@@ -308,7 +315,7 @@ export async function GET(request, { params }) {
     };
 
     const pollLoop = async () => {
-      if (closed || hasChangeStreamUpdates) {
+      if (closed || (hasChangeStreamUpdates && !startupPolling)) {
         return;
       }
 
@@ -345,7 +352,6 @@ export async function GET(request, { params }) {
     try {
       const bootstrapStatePayload = buildStatePayload(bootstrapSnapshot, null, {
         token: participantToken,
-        bootPad: WALKIE_BOOT_PAD,
         bootstrap: true,
       });
       if (!(await send("state", bootstrapStatePayload))) {
@@ -355,7 +361,7 @@ export async function GET(request, { params }) {
         ok: true,
         ts: Date.now(),
         bootstrap: true,
-        pad: WALKIE_PING_PAD,
+        pad: WALKIE_BOOT_PAD,
       });
 
       const registration = await registerPersistentWalkieParticipant(id, {
@@ -368,7 +374,6 @@ export async function GET(request, { params }) {
         registration.notification,
         {
           token: participantToken,
-          bootPad: WALKIE_BOOT_PAD,
         }
       );
       if (!(await send("state", initialStatePayload))) {
@@ -385,6 +390,13 @@ export async function GET(request, { params }) {
       pendingStateReplays = 2;
       scheduleStartupReplay(400, initialStatePayload);
       scheduleStartupReplay(1400, initialStatePayload);
+      startupPollWindowTimer = setTimeout(() => {
+        startupPolling = false;
+        if (hasChangeStreamUpdates && pollTimer) {
+          clearTimeout(pollTimer);
+          pollTimer = null;
+        }
+      }, WALKIE_STARTUP_POLL_WINDOW_MS);
 
       void drainMessages().catch((error) => {
         console.error("Walkie initial message drain failed:", error);
@@ -397,7 +409,6 @@ export async function GET(request, { params }) {
           if (closed) {
             return;
           }
-          hasChangeStreamUpdates = true;
           cleanupState = subscribeToWalkieState(id, () => {
             void pushState().catch((error) => {
               console.error("Walkie state push failed:", error);
@@ -410,6 +421,7 @@ export async function GET(request, { params }) {
               void stopStream();
             });
           });
+          hasChangeStreamUpdates = true;
           await drainMessages();
           await pushState();
           if (closed) {
@@ -423,6 +435,7 @@ export async function GET(request, { params }) {
         }
       })();
 
+      schedulePoll(600);
       scheduleHeartbeat(WALKIE_HEARTBEAT_START_DELAY_MS);
     } catch (error) {
       console.error("Walkie SSE setup failed:", error);

@@ -124,7 +124,7 @@ function sseHeaders() {
   return {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache, no-transform",
-    Connection: "close",
+    Connection: "keep-alive",
     "X-Accel-Buffering": "no",
     "Content-Encoding": "none",
   };
@@ -176,6 +176,7 @@ export async function GET(request, { params }) {
     }
 
     try {
+      await writer.ready;
       await writer.write(encoder.encode(encodeEvent(event, data)));
       return true;
     } catch (error) {
@@ -319,17 +320,18 @@ export async function GET(request, { params }) {
         pad: STREAM_BOOTSTRAP_PAD,
       });
 
+      cleanupSession = subscribeToSession(id, async () => {
+        try {
+          await pushSessionPayload({ force: true });
+        } catch (error) {
+          console.error("Session SSE session push failed:", error);
+        }
+      });
+
       try {
         await ensureLiveUpdates();
         if (!closed) {
           liveUpdatesReady = true;
-          cleanupSession = subscribeToSession(id, async () => {
-            try {
-              await pushSessionPayload({ force: true });
-            } catch (error) {
-              console.error("Session SSE session push failed:", error);
-            }
-          });
         }
       } catch (error) {
         console.error("Session change streams unavailable.", error);
