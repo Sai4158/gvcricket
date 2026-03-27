@@ -17,6 +17,7 @@ import {
   FaMusic,
   FaShareAlt,
   FaVolumeUp,
+  FaYoutube,
 } from "react-icons/fa";
 import StepFlow from "../shared/StepFlow";
 import SafeMatchImage from "../shared/SafeMatchImage";
@@ -143,7 +144,7 @@ const featureCards = [
   },
   {
     title: "Director Console",
-    copy: "Run effects, music, walkie, loudspeaker, and score audio from one sharper live control deck.",
+    copy: "Run effects, YouTube music, walkie, loudspeaker, and score audio from one sharper live control deck.",
     accent: "cyan",
     previewType: "director",
   },
@@ -753,7 +754,7 @@ function renderFeaturePreview(card) {
               <div>
                 <p className="text-sm font-semibold text-white">Live control rack</p>
                 <p className="mt-1 text-[11px] text-zinc-400">
-                  Audio, crowd effects, and talkback in one place.
+                  Audio, YouTube music, crowd effects, and talkback in one place.
                 </p>
               </div>
               <span className="rounded-full border border-emerald-300/18 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-100/90">
@@ -764,7 +765,7 @@ function renderFeaturePreview(card) {
               {[
                 ["Walkie", FaBroadcastTower, "Live"],
                 ["PA Mic", FaBullhorn, "Ready"],
-                ["Music", FaMusic, "Deck A"],
+                ["YouTube", FaYoutube, "Deck A"],
                 ["Effects", FaVolumeUp, "6 pads"],
                 ["Announcer", FaMicrophoneAlt, "Queued"],
                 ["Crowd", FaVolumeUp, "Hot"],
@@ -778,7 +779,11 @@ function renderFeaturePreview(card) {
                       : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))]"
                   }`}
                 >
-                  <Icon className="text-sm text-white" />
+                  <Icon
+                    className={`text-sm ${
+                      label === "YouTube" ? "text-red-300" : "text-white"
+                    }`}
+                  />
                   <p className="mt-3 text-sm font-semibold text-white">{label}</p>
                   <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-zinc-500">{meta}</p>
                 </motion.div>

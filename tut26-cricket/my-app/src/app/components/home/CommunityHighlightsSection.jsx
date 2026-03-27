@@ -63,7 +63,7 @@ export default function CommunityHighlightsSection() {
         transition={{ duration: 0.6, delay: 0.04, ease: [0.22, 1, 0.36, 1] }}
         className="text-lg text-white/78 leading-relaxed text-center max-w-3xl mx-auto -mt-8 mb-16"
       >
-        It all started in 2022 with a few friends who loved the game. Today, GV Cricket is actively being used by a friendly league of over 50+ members who meet for fun, competitive cricket.
+        GV Cricket started in 2022 with a few friends who loved the game. Today, it helps power a friendly league of more than 50 members who come together for fun, competitive cricket.
       </motion.p>
       <div className="grid w-full gap-8 sm:grid-cols-2 lg:grid-cols-2 xl:gap-10 2xl:gap-12">
         {demoVideos.map((video, index) => (

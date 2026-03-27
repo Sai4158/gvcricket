@@ -9,6 +9,7 @@ import {
   FaLock,
   FaRadio,
   FaTowerBroadcast,
+  FaYoutube,
 } from "react-icons/fa6";
 import { formatRelativeTime } from "./formatRelativeTime";
 import PendingLink from "../shared/PendingLink";
@@ -429,6 +430,7 @@ function SessionCard({
                   className="inline-flex min-w-0 items-center justify-center gap-2 rounded-2xl border border-emerald-300/16 bg-[linear-gradient(135deg,rgba(8,25,24,0.96),rgba(13,36,32,0.96)_58%,rgba(5,150,105,0.72))] px-4 py-3 text-sm font-semibold text-emerald-50 shadow-[0_16px_38px_rgba(4,120,87,0.18)] transition hover:-translate-y-0.5 hover:border-emerald-200/26 hover:brightness-110"
                 >
                   <FaTowerBroadcast />
+                  <FaYoutube className="text-red-300/95" />
                   <span>Director Mode</span>
                 </button>
               </div>
