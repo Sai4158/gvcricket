@@ -70,7 +70,11 @@ export default function PrimaryActionsSection() {
     threshold: 0.08,
     rootMargin: "0px 0px -6% 0px",
   });
-  const cardsReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
+  const startCardReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
+    threshold: 0.08,
+    rootMargin: "0px 0px -6% 0px",
+  });
+  const sessionsCardReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
     threshold: 0.08,
     rootMargin: "0px 0px -6% 0px",
   });
@@ -149,23 +153,11 @@ export default function PrimaryActionsSection() {
       </motion.div>
 
       <motion.div
-        ref={useDesktopLiteMotion ? cardsReveal.ref : undefined}
         initial={shouldReduceMotion ? false : "hidden"}
         whileInView={shouldReduceMotion ? undefined : "visible"}
         viewport={{ once: true, amount: 0.16, margin: "0px 0px -6% 0px" }}
         variants={sectionVariants}
-        className={`grid w-full max-w-3xl gap-4 sm:grid-cols-2 xl:max-w-6xl xl:gap-5 2xl:max-w-7xl ${
-          useDesktopLiteMotion
-            ? `home-desktop-reveal home-desktop-reveal-panel home-desktop-grid-sequence ${
-                cardsReveal.isVisible ? "is-visible" : ""
-              }`
-            : ""
-        }`}
-        style={
-          useDesktopLiteMotion
-            ? { "--home-reveal-delay": "110ms" }
-            : undefined
-        }
+        className="grid w-full max-w-3xl gap-4 sm:grid-cols-2 xl:max-w-6xl xl:gap-5 2xl:max-w-7xl"
       >
         <PendingLink
           href="/session/new"
@@ -174,11 +166,23 @@ export default function PrimaryActionsSection() {
           className="block"
         >
           <motion.div
+            ref={useDesktopLiteMotion ? startCardReveal.ref : undefined}
             custom={0}
             variants={cardVariants}
             whileHover={shouldReduceMotion ? undefined : { scale: 1.015 }}
             whileTap={{ scale: 0.99 }}
-            className="liquid-glass group rounded-[30px] p-5 text-left transition duration-300 hover:border-white/28"
+            className={`liquid-glass group rounded-[30px] p-5 text-left transition duration-300 hover:border-white/28 ${
+              useDesktopLiteMotion
+                ? `home-desktop-reveal home-desktop-reveal-card ${
+                    startCardReveal.isVisible ? "is-visible" : ""
+                  }`
+                : ""
+            }`}
+            style={
+              useDesktopLiteMotion
+                ? { "--home-reveal-delay": "110ms" }
+                : undefined
+            }
           >
             <motion.div
               animate={
@@ -268,11 +272,23 @@ export default function PrimaryActionsSection() {
           className="block"
         >
           <motion.div
+            ref={useDesktopLiteMotion ? sessionsCardReveal.ref : undefined}
             custom={1}
             variants={cardVariants}
             whileHover={shouldReduceMotion ? undefined : { scale: 1.015 }}
             whileTap={{ scale: 0.99 }}
-            className="liquid-glass group rounded-[30px] p-5 text-left transition duration-300 hover:border-white/28"
+            className={`liquid-glass group rounded-[30px] p-5 text-left transition duration-300 hover:border-white/28 ${
+              useDesktopLiteMotion
+                ? `home-desktop-reveal home-desktop-reveal-card ${
+                    sessionsCardReveal.isVisible ? "is-visible" : ""
+                  }`
+                : ""
+            }`}
+            style={
+              useDesktopLiteMotion
+                ? { "--home-reveal-delay": "165ms" }
+                : undefined
+            }
           >
             <motion.div
               animate={

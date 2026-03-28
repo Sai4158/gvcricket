@@ -30,7 +30,6 @@ export default function useHomeDesktopReveal(
     let frameOne = 0;
     let frameTwo = 0;
     let timeoutId = 0;
-    let fallbackTimeoutId = 0;
 
     const cleanupTimers = () => {
       if (frameOne) {
@@ -41,9 +40,6 @@ export default function useHomeDesktopReveal(
       }
       if (timeoutId) {
         window.clearTimeout(timeoutId);
-      }
-      if (fallbackTimeoutId) {
-        window.clearTimeout(fallbackTimeoutId);
       }
     };
 
@@ -101,11 +97,6 @@ export default function useHomeDesktopReveal(
       reveal(true);
       observer.disconnect();
     }
-
-    fallbackTimeoutId = window.setTimeout(() => {
-      setHasRevealed(true);
-      observer.disconnect();
-    }, Math.max(120, revealDelayMs + 120));
 
     return () => {
       observer.disconnect();
