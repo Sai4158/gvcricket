@@ -405,7 +405,7 @@ export default function PrimaryActionsSection() {
           />
           <motion.div
             initial={shouldReduceMotion ? false : "hidden"}
-            whileInView="visible"
+            whileInView={shouldReduceMotion ? undefined : "visible"}
             viewport={{ once: true, amount: 0.45 }}
             variants={cardContentVariants}
             className="relative z-10 flex min-w-0 flex-1 items-center gap-4 sm:gap-5"

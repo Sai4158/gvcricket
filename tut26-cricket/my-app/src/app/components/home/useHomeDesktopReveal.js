@@ -1,19 +1,19 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function useHomeDesktopReveal(
   active,
   {
     threshold = 0.12,
     rootMargin = "0px 0px -8% 0px",
-    revealDelayMs = 36,
+    revealDelayMs = 24,
   } = {}
 ) {
   const ref = useRef(null);
   const [hasRevealed, setHasRevealed] = useState(false);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!active || hasRevealed) {
       return undefined;
     }
@@ -30,6 +30,7 @@ export default function useHomeDesktopReveal(
     let frameOne = 0;
     let frameTwo = 0;
     let timeoutId = 0;
+    let fallbackTimeoutId = 0;
 
     const cleanupTimers = () => {
       if (frameOne) {
@@ -41,9 +42,16 @@ export default function useHomeDesktopReveal(
       if (timeoutId) {
         window.clearTimeout(timeoutId);
       }
+      if (fallbackTimeoutId) {
+        window.clearTimeout(fallbackTimeoutId);
+      }
     };
 
-    const reveal = () => {
+    const reveal = (instant = false) => {
+      if (hasRevealed) {
+        return;
+      }
+
       cleanupTimers();
       frameOne = window.requestAnimationFrame(() => {
         const finishReveal = () => {
@@ -52,7 +60,7 @@ export default function useHomeDesktopReveal(
           });
         };
 
-        if (revealDelayMs > 0) {
+        if (!instant && revealDelayMs > 0) {
           timeoutId = window.setTimeout(finishReveal, revealDelayMs);
           return;
         }
@@ -90,9 +98,14 @@ export default function useHomeDesktopReveal(
     const isAlreadyInView = rect.top < viewportHeight * 0.94 && rect.bottom > 0;
 
     if (isAlreadyInView) {
-      reveal();
+      reveal(true);
       observer.disconnect();
     }
+
+    fallbackTimeoutId = window.setTimeout(() => {
+      setHasRevealed(true);
+      observer.disconnect();
+    }, Math.max(120, revealDelayMs + 120));
 
     return () => {
       observer.disconnect();
