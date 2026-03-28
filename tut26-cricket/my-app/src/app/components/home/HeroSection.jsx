@@ -89,12 +89,12 @@ function HeroDesktopScene({
           type="button"
           onClick={handleScrollToStart}
           aria-label="Scroll down to the main actions"
-          className="absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-2 text-white outline-none transition hover:text-white focus-visible:text-white md:bottom-10 lg:bottom-12"
+          className="group absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-2 text-white outline-none transition hover:text-white focus-visible:text-white md:bottom-10 lg:bottom-12"
         >
-          <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-white drop-shadow-[0_4px_14px_rgba(0,0,0,0.55)]">
+          <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-white drop-shadow-[0_4px_14px_rgba(0,0,0,0.55)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-0.5 group-hover:text-rose-100 group-hover:drop-shadow-[0_10px_20px_rgba(255,255,255,0.16)]">
             Explore more
           </span>
-          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/24 bg-white/14 shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/24 bg-white/14 shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105 group-hover:border-white/36 group-hover:bg-white/20 group-hover:shadow-[0_14px_30px_rgba(0,0,0,0.32)]">
             <FaAngleDown className="text-lg" />
           </span>
         </button>
@@ -304,15 +304,17 @@ function HeroAnimatedScene({
             duration: 0.34,
             ease: [0.22, 1, 0.36, 1],
           }}
-          className="absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-2 text-white outline-none transition hover:text-white focus-visible:text-white md:bottom-10 lg:bottom-12"
+          whileHover={{ y: -2 }}
+          whileTap={{ scale: 0.985 }}
+          className="group absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-2 text-white outline-none transition hover:text-white focus-visible:text-white md:bottom-10 lg:bottom-12"
         >
-          <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-white drop-shadow-[0_4px_14px_rgba(0,0,0,0.55)]">
+          <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-white drop-shadow-[0_4px_14px_rgba(0,0,0,0.55)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-0.5 group-hover:text-rose-100 group-hover:drop-shadow-[0_10px_20px_rgba(255,255,255,0.16)]">
             Explore more
           </span>
           <motion.span
             animate={{ y: [0, 5, 0], opacity: [0.8, 1, 0.8] }}
             transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/24 bg-white/12 shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-md"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/24 bg-white/12 shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-md transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105 group-hover:border-white/36 group-hover:bg-white/20 group-hover:shadow-[0_14px_30px_rgba(0,0,0,0.32)]"
           >
             <FaAngleDown className="text-lg" />
           </motion.span>

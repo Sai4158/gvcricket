@@ -13,14 +13,14 @@ import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
 import useHomeDesktopReveal from "./useHomeDesktopReveal";
 
 function LearnStepCard({ title, copy, index, useDesktopLiteMotion, shouldReduceMotion }) {
-  const stepReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
+  const stepReveal = useHomeDesktopReveal(!useDesktopLiteMotion && !shouldReduceMotion, {
     threshold: 0.08,
     rootMargin: "0px 0px -6% 0px",
   });
 
   return (
     <motion.div
-      ref={useDesktopLiteMotion ? stepReveal.ref : undefined}
+      ref={!useDesktopLiteMotion && !shouldReduceMotion ? stepReveal.ref : undefined}
       initial={
         shouldReduceMotion
           ? false
@@ -38,13 +38,12 @@ function LearnStepCard({ title, copy, index, useDesktopLiteMotion, shouldReduceM
         ease: [0.22, 1, 0.36, 1],
       }}
       className={`rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-4 lg:min-h-[168px] ${
-        useDesktopLiteMotion ? `home-desktop-reveal home-desktop-reveal-sm home-desktop-lite-subpanel ${stepReveal.isVisible ? "is-visible" : ""}` : ""
-      }`}
-      style={
         useDesktopLiteMotion
-          ? { "--home-reveal-delay": `${Math.min(index, 8) * 84}ms` }
-          : undefined
-      }
+          ? "home-desktop-lite-subpanel"
+          : stepReveal.isVisible
+          ? "home-desktop-reveal home-desktop-reveal-sm is-visible"
+          : "home-desktop-reveal home-desktop-reveal-sm"
+      }`}
     >
       <span className="block text-sm font-semibold text-white">{title}</span>
       <p className="mt-2 text-[12px] leading-5 text-zinc-300/86">{copy}</p>
@@ -53,14 +52,14 @@ function LearnStepCard({ title, copy, index, useDesktopLiteMotion, shouldReduceM
 }
 
 function LearnGuideCard({ index, useDesktopLiteMotion, shouldReduceMotion }) {
-  const guideReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
+  const guideReveal = useHomeDesktopReveal(!useDesktopLiteMotion && !shouldReduceMotion, {
     threshold: 0.08,
     rootMargin: "0px 0px -6% 0px",
   });
 
   return (
     <motion.div
-      ref={useDesktopLiteMotion ? guideReveal.ref : undefined}
+      ref={!useDesktopLiteMotion && !shouldReduceMotion ? guideReveal.ref : undefined}
       initial={
         shouldReduceMotion
           ? false
@@ -79,16 +78,11 @@ function LearnGuideCard({ index, useDesktopLiteMotion, shouldReduceMotion }) {
       }}
       className={`hidden rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-4 lg:flex lg:min-h-[168px] lg:items-center lg:justify-center ${
         useDesktopLiteMotion
-          ? `home-desktop-reveal home-desktop-reveal-sm home-desktop-lite-subpanel ${
-              guideReveal.isVisible ? "is-visible" : ""
-            }`
-          : "home-desktop-lite-subpanel"
+          ? "home-desktop-lite-subpanel"
+          : guideReveal.isVisible
+          ? "home-desktop-reveal home-desktop-reveal-sm is-visible"
+          : "home-desktop-reveal home-desktop-reveal-sm"
       }`}
-      style={
-        useDesktopLiteMotion
-          ? { "--home-reveal-delay": `${Math.min(index, 8) * 84}ms` }
-          : undefined
-      }
     >
       <div className="inline-flex items-center gap-2 text-center text-sm font-semibold text-white">
         <span>Open guide</span>
@@ -230,7 +224,7 @@ export default function LearnCricketCard() {
             }
             viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
             transition={{ duration: 0.64, ease: [0.22, 1, 0.36, 1] }}
-            className="space-y-5 text-left"
+            className={`space-y-5 text-left ${useDesktopLiteMotion ? "home-desktop-card-sequence" : ""}`}
           >
             <span className="liquid-pill inline-flex items-center rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-zinc-100/90">
               Learn Cricket

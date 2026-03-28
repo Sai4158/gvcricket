@@ -1240,6 +1240,60 @@ function getFeatureCardWideOrder(previewType) {
   }
 }
 
+function getAccentHueLayers(accent) {
+  switch (accent) {
+    case "amber":
+      return {
+        primary:
+          "bg-[radial-gradient(circle,rgba(251,146,60,0.22)_0%,rgba(245,158,11,0.12)_42%,transparent_74%)]",
+        secondary:
+          "bg-[radial-gradient(circle,rgba(251,113,133,0.14)_0%,rgba(251,146,60,0.08)_44%,transparent_78%)]",
+      };
+    case "emerald":
+      return {
+        primary:
+          "bg-[radial-gradient(circle,rgba(16,185,129,0.22)_0%,rgba(34,211,238,0.11)_42%,transparent_74%)]",
+        secondary:
+          "bg-[radial-gradient(circle,rgba(45,212,191,0.14)_0%,rgba(14,165,233,0.08)_44%,transparent_78%)]",
+      };
+    case "rose":
+      return {
+        primary:
+          "bg-[radial-gradient(circle,rgba(244,63,94,0.2)_0%,rgba(251,113,133,0.11)_40%,transparent_74%)]",
+        secondary:
+          "bg-[radial-gradient(circle,rgba(251,146,60,0.14)_0%,rgba(244,63,94,0.08)_46%,transparent_78%)]",
+      };
+    case "violet":
+      return {
+        primary:
+          "bg-[radial-gradient(circle,rgba(168,85,247,0.22)_0%,rgba(99,102,241,0.11)_42%,transparent_74%)]",
+        secondary:
+          "bg-[radial-gradient(circle,rgba(217,70,239,0.14)_0%,rgba(129,140,248,0.08)_46%,transparent_78%)]",
+      };
+    case "yellow":
+      return {
+        primary:
+          "bg-[radial-gradient(circle,rgba(250,204,21,0.2)_0%,rgba(251,146,60,0.11)_42%,transparent_74%)]",
+        secondary:
+          "bg-[radial-gradient(circle,rgba(253,224,71,0.14)_0%,rgba(250,204,21,0.08)_46%,transparent_78%)]",
+      };
+    case "orange":
+      return {
+        primary:
+          "bg-[radial-gradient(circle,rgba(249,115,22,0.22)_0%,rgba(56,189,248,0.1)_42%,transparent_74%)]",
+        secondary:
+          "bg-[radial-gradient(circle,rgba(251,191,36,0.14)_0%,rgba(14,165,233,0.08)_46%,transparent_78%)]",
+      };
+    default:
+      return {
+        primary:
+          "bg-[radial-gradient(circle,rgba(56,189,248,0.2)_0%,rgba(96,165,250,0.11)_42%,transparent_74%)]",
+        secondary:
+          "bg-[radial-gradient(circle,rgba(34,211,238,0.14)_0%,rgba(99,102,241,0.08)_46%,transparent_78%)]",
+      };
+  }
+}
+
 function DesktopRevealCard({ children, index = 0, className = "" }) {
   const { ref, isVisible } = useHomeDesktopReveal(true, {
     threshold: 0.06,
@@ -1260,6 +1314,8 @@ function DesktopRevealCard({ children, index = 0, className = "" }) {
 }
 
 function FeatureCardDesktop({ card, index }) {
+  const hueLayers = getAccentHueLayers(card.accent);
+
   return (
     <DesktopRevealCard
       index={index}
@@ -1267,6 +1323,12 @@ function FeatureCardDesktop({ card, index }) {
         card.previewType === "director" ? "md:col-span-2 xl:col-span-2" : ""
       } ${getFeatureCardWideSpan(card.previewType)} ${getFeatureCardWideOrder(card.previewType)}`}
     >
+      <div
+        className={`pointer-events-none absolute -left-14 top-8 h-40 w-40 rounded-full blur-3xl ${hueLayers.primary} opacity-90`}
+      />
+      <div
+        className={`pointer-events-none absolute -right-12 bottom-6 h-36 w-36 rounded-full blur-[72px] ${hueLayers.secondary} opacity-80`}
+      />
       <div
         className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentRail(
           card.accent
@@ -1290,11 +1352,19 @@ function FeatureCardDesktop({ card, index }) {
 }
 
 function JourneyCardDesktop({ card, index }) {
+  const hueLayers = getAccentHueLayers(card.accent);
+
   return (
     <DesktopRevealCard
       index={index}
       className={`liquid-glass-soft group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 home-desktop-lite-card ${getJourneyCardWideSpan()}`}
     >
+      <div
+        className={`pointer-events-none absolute -left-14 top-8 h-40 w-40 rounded-full blur-3xl ${hueLayers.primary} opacity-90`}
+      />
+      <div
+        className={`pointer-events-none absolute -right-12 bottom-6 h-36 w-36 rounded-full blur-[72px] ${hueLayers.secondary} opacity-80`}
+      />
       <div
         className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentRail(
           card.accent

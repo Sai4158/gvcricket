@@ -178,6 +178,13 @@ export default function HomeHeader() {
     },
   ];
 
+  const drawerOverlayTransition = disableDrawerMotion
+    ? { duration: 0 }
+    : { duration: 0.4, ease: [0.22, 1, 0.36, 1] };
+  const drawerPanelTransition = disableDrawerMotion
+    ? { duration: 0 }
+    : { duration: 0.48, ease: [0.16, 1, 0.3, 1] };
+
   const linkStyles =
     "press-feedback flex w-full items-center justify-between gap-4 rounded-2xl px-3 py-3 text-[1.6rem] leading-tight font-light text-zinc-300 transition-all duration-200 hover:bg-white/6 hover:text-white active:bg-white/10 active:text-white sm:text-2xl";
   const featuredLinkStyles =
@@ -226,11 +233,7 @@ export default function HomeHeader() {
             initial={disableDrawerMotion ? false : { opacity: 0 }}
             animate={disableDrawerMotion ? undefined : { opacity: 1 }}
             exit={disableDrawerMotion ? undefined : { opacity: 0 }}
-            transition={
-              disableDrawerMotion
-                ? { duration: 0 }
-                : { duration: 0.3, ease: [0.22, 1, 0.36, 1] }
-            }
+            transition={drawerOverlayTransition}
             className={`pointer-events-auto fixed inset-0 z-80 ${
               disableDrawerMotion
                 ? "bg-black/60"
@@ -239,19 +242,10 @@ export default function HomeHeader() {
             onClick={closeMenu}
           >
             <motion.div
-              initial={disableDrawerMotion ? false : { x: "100%", opacity: 0.96, scale: 0.985 }}
-              animate={disableDrawerMotion ? undefined : { x: 0, opacity: 1, scale: 1 }}
-              exit={disableDrawerMotion ? undefined : { x: "100%", opacity: 0.96, scale: 0.985 }}
-              transition={{
-                ...(disableDrawerMotion
-                  ? { duration: 0 }
-                  : {
-                      type: "spring",
-                      stiffness: 220,
-                      damping: 28,
-                      mass: 1.08,
-                    }),
-              }}
+              initial={disableDrawerMotion ? false : { x: "100%", opacity: 0.98 }}
+              animate={disableDrawerMotion ? undefined : { x: 0, opacity: 1 }}
+              exit={disableDrawerMotion ? undefined : { x: "100%", opacity: 0.98 }}
+              transition={drawerPanelTransition}
               drag="x"
               dragDirectionLock
               dragConstraints={{ left: 0, right: 0 }}
