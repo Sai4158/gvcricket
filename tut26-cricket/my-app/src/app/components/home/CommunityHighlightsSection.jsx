@@ -63,7 +63,7 @@ export default function CommunityHighlightsSection() {
           characterLineDelay={0.12}
           characterDuration={0.34}
           simplifyMotion={shouldReduceMotion}
-          lightweightCharacterReveal
+          lightweightCharacterReveal={useDesktopLiteMotion}
           delay={0.04}
           className="text-center text-5xl font-bold tracking-tight md:text-7xl"
           lineClassName="leading-[0.96]"

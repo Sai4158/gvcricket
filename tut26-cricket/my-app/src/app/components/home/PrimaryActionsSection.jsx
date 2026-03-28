@@ -116,7 +116,7 @@ export default function PrimaryActionsSection() {
           characterLineDelay={0.12}
           characterDuration={0.34}
           simplifyMotion={shouldReduceMotion}
-          lightweightCharacterReveal
+          lightweightCharacterReveal={useDesktopLiteMotion}
           delay={0.03}
           className="text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl"
           lineClassName="leading-[1.02]"

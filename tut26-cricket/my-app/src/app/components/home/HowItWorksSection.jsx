@@ -1526,7 +1526,7 @@ export default function HowItWorksSection() {
                 characterLineDelay={0.12}
                 characterDuration={0.34}
                 simplifyMotion={shouldReduceMotion}
-                lightweightCharacterReveal
+                lightweightCharacterReveal={useDesktopLiteMotion}
                 delay={0.03}
                 className="text-4xl font-semibold tracking-[-0.04em] md:text-5xl"
                 lineClassName="leading-[0.98]"
@@ -1589,7 +1589,7 @@ export default function HowItWorksSection() {
               characterLineDelay={0.12}
               characterDuration={0.34}
               simplifyMotion={shouldReduceMotion}
-              lightweightCharacterReveal
+              lightweightCharacterReveal={useDesktopLiteMotion}
               delay={0.03}
               className="text-4xl font-semibold tracking-[-0.04em] md:text-5xl"
               lineClassName="leading-[0.98]"

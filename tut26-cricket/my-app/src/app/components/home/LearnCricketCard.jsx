@@ -244,7 +244,7 @@ export default function LearnCricketCard() {
                 characterLineDelay={0.12}
                 characterDuration={0.34}
                 simplifyMotion={shouldReduceMotion}
-                lightweightCharacterReveal
+                lightweightCharacterReveal={useDesktopLiteMotion}
                 delay={0.03}
                 className="max-w-xl text-3xl font-semibold tracking-tight md:text-4xl lg:max-w-2xl"
                 lineClassName="leading-[1.02]"

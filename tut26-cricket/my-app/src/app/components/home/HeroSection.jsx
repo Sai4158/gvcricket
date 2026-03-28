@@ -286,7 +286,6 @@ function HeroAnimatedScene({
                 characterLineDelay={0.12}
                 characterDuration={0.36}
                 simplifyMotion={false}
-                lightweightCharacterReveal
                 delay={0.03}
                 className="block text-[3rem] font-semibold tracking-[-0.058em] sm:text-[4.8rem] md:text-[5.9rem] lg:text-[5.6rem] xl:text-[6.2rem] 2xl:text-[6.85rem]"
                 lineClassName="leading-[0.94]"
