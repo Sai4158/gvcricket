@@ -7,7 +7,7 @@ export default function useHomeDesktopReveal(
   {
     threshold = 0.12,
     rootMargin = "0px 0px -8% 0px",
-    revealDelayMs = 96,
+    revealDelayMs = 36,
   } = {}
 ) {
   const ref = useRef(null);

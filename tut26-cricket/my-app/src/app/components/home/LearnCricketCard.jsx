@@ -66,6 +66,11 @@ export default function LearnCricketCard() {
             }`
           : ""
       }`}
+      style={
+        useDesktopLiteMotion
+          ? { "--home-reveal-delay": "80ms" }
+          : undefined
+      }
     >
       <motion.a
         href="https://usacricket.org/what-is-cricket/"
@@ -86,7 +91,9 @@ export default function LearnCricketCard() {
           <FaCircleDot className="absolute right-24 bottom-6 text-[2.8rem] text-rose-100/10 transition-transform duration-500 group-hover:translate-x-1 group-hover:-translate-y-1" />
         </div>
 
-        <div className="relative z-10 grid items-start gap-7 lg:grid-cols-[minmax(320px,0.84fr)_minmax(0,1.16fr)] lg:gap-9 xl:grid-cols-[minmax(360px,0.88fr)_minmax(0,1.12fr)]">
+        <div className={`relative z-10 grid items-start gap-7 lg:grid-cols-[minmax(320px,0.84fr)_minmax(0,1.16fr)] lg:gap-9 xl:grid-cols-[minmax(360px,0.88fr)_minmax(0,1.12fr)] ${
+          useDesktopLiteMotion ? "home-desktop-panel-sequence" : ""
+        }`}>
           <motion.div
             initial={
               shouldReduceMotion
@@ -188,7 +195,9 @@ export default function LearnCricketCard() {
               </div>
             </motion.div>
 
-            <div className="grid gap-3 pt-1 sm:grid-cols-2 lg:grid-cols-3">
+            <div className={`grid gap-3 pt-1 sm:grid-cols-2 lg:grid-cols-3 ${
+              useDesktopLiteMotion ? "home-desktop-grid-sequence" : ""
+            }`}>
               {learnSteps.map(({ title, copy }, index) => (
                 <motion.div
                   key={title}

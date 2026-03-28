@@ -1279,9 +1279,9 @@ function FeatureCardDesktop({ card, index }) {
         )} opacity-72`}
       />
       <div className="pointer-events-none absolute inset-0 rounded-[30px] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_28%)] opacity-65" />
-      <div className="relative z-10 flex h-full flex-col">
+      <div className="relative z-10 flex h-full flex-col home-desktop-card-sequence">
         <div>{renderFeaturePreview(card)}</div>
-        <div className="mt-5 flex-1">
+        <div className="mt-5 flex-1 home-desktop-panel-sequence">
           <h3 className="text-[1.45rem] font-semibold leading-[1.04] tracking-[-0.04em] text-white drop-shadow-[0_10px_22px_rgba(255,255,255,0.08)] sm:text-[1.6rem] xl:text-[1.32rem] 2xl:text-[1.45rem]">
             {card.title}
           </h3>
@@ -1307,9 +1307,9 @@ function JourneyCardDesktop({ card, index }) {
         )} opacity-72`}
       />
       <div className="pointer-events-none absolute inset-0 rounded-[30px] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_28%)] opacity-65" />
-      <div className="relative z-10 flex h-full flex-col">
+      <div className="relative z-10 flex h-full flex-col home-desktop-card-sequence">
         <div>{renderJourneyPreview(card)}</div>
-        <div className="mt-5 flex-1">
+        <div className="mt-5 flex-1 home-desktop-panel-sequence">
           <h3 className="text-[1.45rem] font-semibold leading-[1.04] tracking-[-0.04em] text-white drop-shadow-[0_10px_22px_rgba(255,255,255,0.08)] sm:text-[1.6rem] xl:text-[1.32rem] 2xl:text-[1.45rem]">
             {card.title}
           </h3>
