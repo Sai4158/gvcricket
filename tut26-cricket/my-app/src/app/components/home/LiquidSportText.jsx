@@ -65,6 +65,11 @@ export default function LiquidSportText({
             : isHeroBright
             ? `pointer-events-none absolute inset-0 z-0 block text-transparent ${lineClassName}`
             : `pointer-events-none absolute inset-0 z-0 block translate-x-[3px] translate-y-[3px] text-neutral-950/26 ${lineClassName}`;
+          const lightweightGhostClass = isDarkOutline
+            ? `pointer-events-none absolute inset-0 z-0 block text-[#050505] opacity-[0.18] [text-rendering:geometricPrecision] [paint-order:stroke_fill] [WebkitTextStroke:1.7px_rgba(255,255,255,0.28)] ${lineClassName}`
+            : isHeroBright
+            ? `pointer-events-none absolute inset-0 z-0 block home-gradient-text opacity-20 ${lineClassName}`
+            : `pointer-events-none absolute inset-0 z-0 block text-white/20 [text-rendering:geometricPrecision] ${lineClassName}`;
           const lightweightWordTextClass = isDarkOutline
             ? "inline-block text-[#050505] [text-rendering:geometricPrecision] [paint-order:stroke_fill] [WebkitTextStroke:1.7px_rgba(255,255,255,0.54)] drop-shadow-[0_8px_22px_rgba(0,0,0,0.42)] [text-shadow:0_0_24px_rgba(196,181,253,0.16),0_2px_0_rgba(255,255,255,0.2)]"
             : isHeroBright
@@ -73,6 +78,7 @@ export default function LiquidSportText({
           const lineParts = line.split(/(\s+)/);
           let wordIndex = 0;
           const shouldRenderLightweightOffsetShadow = !isHeroBright;
+          const shouldRenderLightweightGhost = !isHeroBright;
 
           return (
             <span
@@ -81,6 +87,11 @@ export default function LiquidSportText({
             >
               {shouldRenderLightweightOffsetShadow ? (
                 <span aria-hidden="true" className={offsetShadowClass}>
+                  {line}
+                </span>
+              ) : null}
+              {shouldRenderLightweightGhost ? (
+                <span aria-hidden="true" className={lightweightGhostClass}>
                   {line}
                 </span>
               ) : null}

@@ -871,6 +871,33 @@ button:disabled,
     transition-delay: 330ms;
   }
 
+  .home-desktop-reveal.is-visible .home-desktop-grid-sequence > :nth-child(6),
+  .home-desktop-reveal.is-visible .home-desktop-card-sequence > :nth-child(6),
+  .home-desktop-reveal.is-visible .home-desktop-panel-sequence > :nth-child(6),
+  .home-desktop-reveal.home-desktop-grid-sequence.is-visible > :nth-child(6),
+  .home-desktop-reveal.home-desktop-card-sequence.is-visible > :nth-child(6),
+  .home-desktop-reveal.home-desktop-panel-sequence.is-visible > :nth-child(6) {
+    transition-delay: 390ms;
+  }
+
+  .home-desktop-reveal.is-visible .home-desktop-grid-sequence > :nth-child(7),
+  .home-desktop-reveal.is-visible .home-desktop-card-sequence > :nth-child(7),
+  .home-desktop-reveal.is-visible .home-desktop-panel-sequence > :nth-child(7),
+  .home-desktop-reveal.home-desktop-grid-sequence.is-visible > :nth-child(7),
+  .home-desktop-reveal.home-desktop-card-sequence.is-visible > :nth-child(7),
+  .home-desktop-reveal.home-desktop-panel-sequence.is-visible > :nth-child(7) {
+    transition-delay: 450ms;
+  }
+
+  .home-desktop-reveal.is-visible .home-desktop-grid-sequence > :nth-child(8),
+  .home-desktop-reveal.is-visible .home-desktop-card-sequence > :nth-child(8),
+  .home-desktop-reveal.is-visible .home-desktop-panel-sequence > :nth-child(8),
+  .home-desktop-reveal.home-desktop-grid-sequence.is-visible > :nth-child(8),
+  .home-desktop-reveal.home-desktop-card-sequence.is-visible > :nth-child(8),
+  .home-desktop-reveal.home-desktop-panel-sequence.is-visible > :nth-child(8) {
+    transition-delay: 510ms;
+  }
+
   .home-liquid-surface .liquid-glass,
   .home-liquid-surface .liquid-glass-soft,
   .home-liquid-surface .liquid-pill,

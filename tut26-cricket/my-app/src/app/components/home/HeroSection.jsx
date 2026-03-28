@@ -73,12 +73,12 @@ function HeroDesktopScene({
                 cursor={false}
                 typing={false}
                 characterTyping
-                characterStagger={0.026}
-                characterLineDelay={0.14}
-                characterDuration={0.38}
+                characterStagger={0.042}
+                characterLineDelay={0.28}
+                characterDuration={0.52}
                 simplifyMotion
                 lightweightCharacterReveal
-                delay={0.04}
+                delay={0.12}
                 className="block text-[3rem] font-semibold tracking-[-0.058em] sm:text-[4.8rem] md:text-[5.9rem] lg:text-[5.6rem] xl:text-[6.2rem] 2xl:text-[6.85rem]"
                 lineClassName="leading-[0.94]"
               />
