@@ -73,12 +73,12 @@ function HeroDesktopScene({
                 cursor={false}
                 typing={false}
                 characterTyping
-                characterStagger={0.042}
-                characterLineDelay={0.28}
-                characterDuration={0.52}
+                characterStagger={0.056}
+                characterLineDelay={0.36}
+                characterDuration={0.64}
                 simplifyMotion
                 lightweightCharacterReveal
-                delay={0.12}
+                delay={0.16}
                 className="block text-[3rem] font-semibold tracking-[-0.058em] sm:text-[4.8rem] md:text-[5.9rem] lg:text-[5.6rem] xl:text-[6.2rem] 2xl:text-[6.85rem]"
                 lineClassName="leading-[0.94]"
               />
@@ -94,9 +94,13 @@ function HeroDesktopScene({
           <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-white drop-shadow-[0_4px_14px_rgba(0,0,0,0.55)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-0.5 group-hover:text-rose-100 group-hover:drop-shadow-[0_10px_20px_rgba(255,255,255,0.16)]">
             Explore more
           </span>
-          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/24 bg-white/14 shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105 group-hover:border-white/36 group-hover:bg-white/20 group-hover:shadow-[0_14px_30px_rgba(0,0,0,0.32)]">
+          <motion.span
+            animate={{ y: [0, 7, 0], opacity: [0.88, 1, 0.88] }}
+            transition={{ duration: 1.7, repeat: Infinity, ease: "easeInOut" }}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/24 bg-white/14 shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105 group-hover:border-white/36 group-hover:bg-white/20 group-hover:shadow-[0_14px_30px_rgba(0,0,0,0.32)]"
+          >
             <FaAngleDown className="text-lg" />
-          </span>
+          </motion.span>
         </button>
       </div>
     </section>
@@ -312,8 +316,8 @@ function HeroAnimatedScene({
             Explore more
           </span>
           <motion.span
-            animate={{ y: [0, 5, 0], opacity: [0.8, 1, 0.8] }}
-            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+            animate={{ y: [0, 7, 0], opacity: [0.86, 1, 0.86] }}
+            transition={{ duration: 1.7, repeat: Infinity, ease: "easeInOut" }}
             className="flex h-10 w-10 items-center justify-center rounded-full border border-white/24 bg-white/12 shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-md transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105 group-hover:border-white/36 group-hover:bg-white/20 group-hover:shadow-[0_14px_30px_rgba(0,0,0,0.32)]"
           >
             <FaAngleDown className="text-lg" />
