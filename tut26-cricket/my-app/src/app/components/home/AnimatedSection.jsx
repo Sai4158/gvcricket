@@ -1,6 +1,8 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
+import useHomeDesktopReveal from "./useHomeDesktopReveal";
 
 export default function AnimatedSection({
   children,
@@ -13,7 +15,12 @@ export default function AnimatedSection({
   viewportMargin = "0px 0px 12% 0px",
 }) {
   const prefersReducedMotion = useReducedMotion();
-  const shouldReduceMotion = prefersReducedMotion;
+  const useDesktopLiteMotion = useHomeDesktopLiteMotion();
+  const shouldReduceMotion = prefersReducedMotion || useDesktopLiteMotion;
+  const { ref, isVisible } = useHomeDesktopReveal(useDesktopLiteMotion, {
+    threshold: 0.08,
+    rootMargin: "0px 0px -6% 0px",
+  });
   const hiddenMotion = shouldReduceMotion
     ? false
     : {
@@ -40,6 +47,20 @@ export default function AnimatedSection({
         x: 0,
         y: 0,
       };
+
+  if (useDesktopLiteMotion) {
+    return (
+      <section
+        id={id}
+        ref={ref}
+        className={`home-desktop-reveal home-desktop-reveal-section relative ${
+          isVisible ? "is-visible" : ""
+        } ${className}`}
+      >
+        <div className="relative z-10">{children}</div>
+      </section>
+    );
+  }
 
   return (
     <motion.section

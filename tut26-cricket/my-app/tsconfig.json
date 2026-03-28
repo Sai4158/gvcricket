@@ -27,7 +27,6 @@
     "next-env.d.ts",
     ".next/types/routes.d.ts",
     ".next/types/validator.ts",
-    ".next/types/cache-life.d.ts",
     "**/*.ts",
     "**/*.tsx",
     ".next/dev/types/**/*.ts",

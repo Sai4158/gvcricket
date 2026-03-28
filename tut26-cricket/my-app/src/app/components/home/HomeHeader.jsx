@@ -1,18 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { AnimatePresence, motion, useReducedMotion, useScroll } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { FaArrowRight, FaBars, FaTimes } from "react-icons/fa";
 import PendingLink from "../shared/PendingLink";
+import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
 
 export default function HomeHeader() {
-  const prefersReducedMotion = useReducedMotion();
-  const simplifyMotion = prefersReducedMotion;
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const useDesktopLiteMotion = useHomeDesktopLiteMotion();
+  const simplifyMotion = prefersReducedMotion || useDesktopLiteMotion;
+  const disableDrawerMotion = prefersReducedMotion;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
-  const { scrollY } = useScroll();
   const idleTimerRef = useRef(null);
+  const lastScrollTopRef = useRef(0);
+  const isHeaderHidden = simplifyMotion ? false : hidden;
   const closeMenu = () => setIsMenuOpen(false);
   const handleDrawerDragEnd = (_event, info) => {
     if (info.offset.x > 90 || info.velocity.x > 700) {
@@ -21,6 +24,29 @@ export default function HomeHeader() {
   };
 
   useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncReducedMotion = () => setPrefersReducedMotion(mediaQuery.matches);
+
+    syncReducedMotion();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", syncReducedMotion);
+      return () => mediaQuery.removeEventListener("change", syncReducedMotion);
+    }
+
+    mediaQuery.addListener(syncReducedMotion);
+    return () => mediaQuery.removeListener(syncReducedMotion);
+  }, []);
+
+  useEffect(() => {
+    if (simplifyMotion) {
+      return undefined;
+    }
+
     const clearIdleTimer = () => {
       if (idleTimerRef.current) {
         window.clearTimeout(idleTimerRef.current);
@@ -28,8 +54,12 @@ export default function HomeHeader() {
       }
     };
 
-    const unsubscribe = scrollY.on("change", (latest) => {
-      const previous = scrollY.getPrevious() ?? 0;
+    lastScrollTopRef.current = window.scrollY || window.pageYOffset || 0;
+
+    const handleScroll = () => {
+      const latest = window.scrollY || window.pageYOffset || 0;
+      const previous = lastScrollTopRef.current;
+      lastScrollTopRef.current = latest;
 
       if (isMenuOpen) {
         clearIdleTimer();
@@ -66,13 +96,28 @@ export default function HomeHeader() {
       } else if (delta < 0) {
         setHidden(false);
       }
-    });
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => {
       clearIdleTimer();
-      unsubscribe();
+      window.removeEventListener("scroll", handleScroll);
     };
-  }, [isMenuOpen, scrollY]);
+  }, [isMenuOpen, simplifyMotion]);
+
+  useEffect(() => {
+    if (!isMenuOpen || typeof document === "undefined") {
+      return undefined;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMenuOpen]);
 
   const handleDemoClick = (event) => {
     const element = document.getElementById("product-demo");
@@ -157,79 +202,80 @@ export default function HomeHeader() {
   };
 
   return (
-    <motion.header
-      initial={{ opacity: 0, y: -12 }}
-      animate={hidden ? { opacity: 0, y: -28 } : { opacity: 1, y: 0 }}
-      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className="pointer-events-none fixed top-0 left-0 right-0 z-60 flex justify-end px-4 pt-5 pb-4 font-sans md:px-6 md:pt-8 md:pb-6"
-    >
-      <motion.button
-        animate={{
-          y: simplifyMotion ? 0 : hidden ? 0 : [0, -2, 0],
-          scale: simplifyMotion ? 1 : hidden ? 1 : [1, 1.02, 1],
-        }}
-        transition={simplifyMotion ? undefined : { duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
-        whileTap={{ scale: 0.9 }}
-        onClick={() => setIsMenuOpen(true)}
-        className={`relative inline-flex h-22 w-14 items-center justify-center overflow-hidden text-white drop-shadow-[0_8px_20px_rgba(0,0,0,0.45)] transition-opacity duration-200 ${
-          hidden
-            ? "pointer-events-none opacity-0"
-            : "pointer-events-auto opacity-100"
+    <>
+      <header
+        className={`pointer-events-none fixed top-0 left-0 right-0 z-60 flex justify-end px-4 pt-5 pb-4 font-sans transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] md:px-6 md:pt-8 md:pb-6 ${
+          isHeaderHidden ? "translate-y-[-28px] opacity-0" : "translate-y-0 opacity-100"
         }`}
-        aria-label="Open navigation menu"
       >
-        <FaBars className="h-8 w-8" />
-      </motion.button>
-
-      <AnimatePresence>
+        <button
+          onClick={() => setIsMenuOpen(true)}
+          className={`relative inline-flex h-22 w-14 items-center justify-center overflow-hidden text-white drop-shadow-[0_8px_20px_rgba(0,0,0,0.45)] transition-opacity duration-200 ${
+            isHeaderHidden
+              ? "pointer-events-none opacity-0"
+              : "pointer-events-auto opacity-100 active:scale-95"
+          }`}
+          aria-label="Open navigation menu"
+        >
+          <FaBars className="h-8 w-8" />
+        </button>
+      </header>
+      <AnimatePresence mode="wait">
         {isMenuOpen && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ ease: "easeOut", duration: 0.28 }}
-            className={`pointer-events-auto fixed inset-0 z-50 ${
-              simplifyMotion ? "bg-black/60" : "bg-black/40 backdrop-blur-sm"
+            initial={disableDrawerMotion ? false : { opacity: 0 }}
+            animate={disableDrawerMotion ? undefined : { opacity: 1 }}
+            exit={disableDrawerMotion ? undefined : { opacity: 0 }}
+            transition={
+              disableDrawerMotion
+                ? { duration: 0 }
+                : { duration: 0.3, ease: [0.22, 1, 0.36, 1] }
+            }
+            className={`pointer-events-auto fixed inset-0 z-80 ${
+              disableDrawerMotion
+                ? "bg-black/60"
+                : "bg-black/42 backdrop-blur-[3px]"
             }`}
-            onTap={closeMenu}
+            onClick={closeMenu}
           >
             <motion.div
-              initial={{ x: "100%", opacity: 0.9, scale: 0.98 }}
-              animate={{ x: 0, opacity: 1, scale: 1 }}
-              exit={{ x: "100%", opacity: 0.96, scale: 0.985 }}
+              initial={disableDrawerMotion ? false : { x: "100%", opacity: 0.96, scale: 0.985 }}
+              animate={disableDrawerMotion ? undefined : { x: 0, opacity: 1, scale: 1 }}
+              exit={disableDrawerMotion ? undefined : { x: "100%", opacity: 0.96, scale: 0.985 }}
               transition={{
-                type: "spring",
-                stiffness: 360,
-                damping: 34,
-                mass: 0.9,
+                ...(disableDrawerMotion
+                  ? { duration: 0 }
+                  : {
+                      type: "spring",
+                      stiffness: 220,
+                      damping: 28,
+                      mass: 1.08,
+                    }),
               }}
               drag="x"
               dragDirectionLock
               dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={{ left: 0, right: 0.14 }}
+              dragElastic={{ left: 0, right: 0.12 }}
               onDragEnd={handleDrawerDragEnd}
-              className={`pointer-events-auto fixed top-0 right-0 bottom-0 w-[min(84vw,22rem)] px-5 py-6 sm:px-6 flex flex-col shadow-2xl border-l border-zinc-700/80 ${
-                simplifyMotion
+              className={`pointer-events-auto fixed top-0 right-0 bottom-0 w-[min(84vw,22rem)] max-w-full px-5 py-6 sm:px-6 flex flex-col shadow-2xl border-l border-zinc-700/80 ${
+                disableDrawerMotion
                   ? "bg-zinc-950/96"
-                  : "bg-zinc-900/72 backdrop-blur-xl will-change-transform"
+                  : "bg-zinc-950/84 backdrop-blur-2xl will-change-transform transform-gpu"
               }`}
               onClick={(event) => event.stopPropagation()}
               onPointerDown={(event) => event.stopPropagation()}
-              onTap={(event) => event.stopPropagation()}
             >
               <div className="flex justify-start mb-8">
-                <motion.button
+                <button
                   type="button"
-                  whileTap={{ scale: 0.9, rotate: -8 }}
-                  whileHover={{ scale: 1.04 }}
-                  onTap={closeMenu}
-                  className="pointer-events-auto p-2"
+                  onClick={closeMenu}
+                  className="pointer-events-auto p-2 transition-transform duration-150 active:scale-90"
                   aria-label="Close navigation menu"
                 >
                   <FaTimes className="text-white h-8 w-8" />
-                </motion.button>
+                </button>
               </div>
-              <nav className="flex grow flex-col items-start justify-center pl-1 sm:pl-3">
+              <nav className="flex grow flex-col items-start justify-start overflow-y-auto pl-1 pr-1 sm:pl-3">
                 <ul className="w-full space-y-5 sm:space-y-6">
                   {navLinks.map((link, index) => {
                     if (link.type === "divider") {
@@ -241,17 +287,16 @@ export default function HomeHeader() {
                     }
 
                     return (
-                      <motion.li
+                      <li
                         key={index}
-                        whileTap={{ scale: 0.95 }}
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{
-                          delay: 0.15 * (index + 1),
-                          type: "spring",
-                          stiffness: 300,
-                          damping: 30,
-                        }}
+                        className={`transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                          simplifyMotion ? "" : "translate-x-0 opacity-100"
+                        }`}
+                        style={
+                          simplifyMotion
+                            ? undefined
+                            : { transitionDelay: `${Math.round(30 + 35 * index)}ms` }
+                        }
                       >
                         {link.href ? (
                           link.external ? (
@@ -292,32 +337,17 @@ export default function HomeHeader() {
                                 link.subtext ? featuredLinkStyles : linkStyles
                               }
                             >
-                              <motion.span
-                                whileHover={simplifyMotion ? undefined : { x: 4 }}
-                                transition={simplifyMotion ? undefined : {
-                                  duration: 0.22,
-                                  ease: [0.22, 1, 0.36, 1],
-                                }}
-                              >
+                              <span className="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">
                                 <span className="block">{link.text}</span>
                                 {link.subtext && (
                                   <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.28em] text-rose-200/82">
                                     {link.subtext}
                                   </span>
                                 )}
-                              </motion.span>
+                              </span>
                               {link.icon && <link.icon className="h-5 w-5" />}
                               {!link.icon && link.subtext && (
-                                <motion.span
-                                  animate={simplifyMotion ? undefined : { x: [0, 3, 0] }}
-                                  transition={simplifyMotion ? undefined : {
-                                    duration: 2.6,
-                                    repeat: Infinity,
-                                    ease: "easeInOut",
-                                  }}
-                                >
-                                  <FaArrowRight className="h-4 w-4 text-rose-300" />
-                                </motion.span>
+                                <FaArrowRight className="h-4 w-4 text-rose-300" />
                               )}
                             </PendingLink>
                           )
@@ -330,36 +360,21 @@ export default function HomeHeader() {
                               link.subtext ? featuredLinkStyles : linkStyles
                             }
                           >
-                            <motion.span
-                              whileHover={simplifyMotion ? undefined : { x: 4 }}
-                              transition={simplifyMotion ? undefined : {
-                                duration: 0.22,
-                                ease: [0.22, 1, 0.36, 1],
-                              }}
-                            >
+                            <span className="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">
                               <span className="block">{link.text}</span>
                               {link.subtext && (
                                 <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.28em] text-rose-200/82">
                                   {link.subtext}
                                 </span>
                               )}
-                            </motion.span>
+                            </span>
                             {link.icon && <link.icon className="h-5 w-5" />}
                             {!link.icon && link.subtext && (
-                              <motion.span
-                                animate={simplifyMotion ? undefined : { x: [0, 3, 0] }}
-                                transition={simplifyMotion ? undefined : {
-                                  duration: 2.6,
-                                  repeat: Infinity,
-                                  ease: "easeInOut",
-                                }}
-                              >
-                                <FaArrowRight className="h-4 w-4 text-rose-300" />
-                              </motion.span>
+                              <FaArrowRight className="h-4 w-4 text-rose-300" />
                             )}
                           </button>
                         )}
-                      </motion.li>
+                      </li>
                     );
                   })}
                 </ul>
@@ -368,6 +383,6 @@ export default function HomeHeader() {
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.header>
+    </>
   );
 }

@@ -23,6 +23,8 @@ import StepFlow from "../shared/StepFlow";
 import SafeMatchImage from "../shared/SafeMatchImage";
 import AnimatedSection from "./AnimatedSection";
 import LiquidSportText from "./LiquidSportText";
+import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
+import useHomeDesktopReveal from "./useHomeDesktopReveal";
 
 const gridVariants = {
   hidden: {},
@@ -1008,21 +1010,6 @@ function renderFeatureDetail() {
   return null;
 }
 
-function useUseFlatLaptopMotion() {
-  const [useFlatLaptopMotion, setUseFlatLaptopMotion] = useState(false);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(min-width: 1024px)");
-    const syncMotionMode = () => setUseFlatLaptopMotion(mediaQuery.matches);
-
-    syncMotionMode();
-    mediaQuery.addEventListener("change", syncMotionMode);
-    return () => mediaQuery.removeEventListener("change", syncMotionMode);
-  }, []);
-
-  return useFlatLaptopMotion;
-}
-
 function useCardScrollMotion(prefersReducedMotion, accent, index, useFlatLaptopMotion) {
   const ref = useRef(null);
   const { scrollYProgress } = useScroll({
@@ -1259,6 +1246,82 @@ function getFeatureCardWideOrder(previewType) {
   }
 }
 
+function DesktopRevealCard({ children, index = 0, className = "" }) {
+  const { ref, isVisible } = useHomeDesktopReveal(true, {
+    threshold: 0.06,
+    rootMargin: "0px 0px -6% 0px",
+  });
+
+  return (
+    <div
+      ref={ref}
+      className={`home-desktop-reveal home-desktop-reveal-card ${
+        isVisible ? "is-visible" : ""
+      } ${className}`}
+      style={{ "--home-reveal-delay": `${Math.min(index, 8) * 42}ms` }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function FeatureCardDesktop({ card, index }) {
+  return (
+    <DesktopRevealCard
+      index={index}
+      className={`liquid-glass-soft group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 ${
+        card.previewType === "director" ? "md:col-span-2 xl:col-span-2" : ""
+      } ${getFeatureCardWideSpan(card.previewType)} ${getFeatureCardWideOrder(card.previewType)}`}
+    >
+      <div
+        className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentRail(
+          card.accent
+        )} opacity-72`}
+      />
+      <div className="pointer-events-none absolute inset-0 rounded-[30px] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_28%)] opacity-65" />
+      <div className="relative z-10 flex h-full flex-col">
+        <div>{renderFeaturePreview(card)}</div>
+        <div className="mt-5 flex-1">
+          <h3 className="text-[1.45rem] font-semibold leading-[1.04] tracking-[-0.04em] text-white drop-shadow-[0_10px_22px_rgba(255,255,255,0.08)] sm:text-[1.6rem] xl:text-[1.32rem] 2xl:text-[1.45rem]">
+            {card.title}
+          </h3>
+          <p className="mt-3 text-[15px] leading-7 text-white/86 drop-shadow-[0_6px_18px_rgba(0,0,0,0.18)] xl:text-[13px] xl:leading-6 2xl:text-[15px] 2xl:leading-7">
+            {card.copy}
+          </p>
+          {renderFeatureDetail(card)}
+        </div>
+      </div>
+    </DesktopRevealCard>
+  );
+}
+
+function JourneyCardDesktop({ card, index }) {
+  return (
+    <DesktopRevealCard
+      index={index}
+      className={`liquid-glass-soft group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 ${getJourneyCardWideSpan()}`}
+    >
+      <div
+        className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentRail(
+          card.accent
+        )} opacity-72`}
+      />
+      <div className="pointer-events-none absolute inset-0 rounded-[30px] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_28%)] opacity-65" />
+      <div className="relative z-10 flex h-full flex-col">
+        <div>{renderJourneyPreview(card)}</div>
+        <div className="mt-5 flex-1">
+          <h3 className="text-[1.45rem] font-semibold leading-[1.04] tracking-[-0.04em] text-white drop-shadow-[0_10px_22px_rgba(255,255,255,0.08)] sm:text-[1.6rem] xl:text-[1.32rem] 2xl:text-[1.45rem]">
+            {card.title}
+          </h3>
+          <p className="mt-3 text-[15px] leading-7 text-white/86 drop-shadow-[0_6px_18px_rgba(0,0,0,0.18)] xl:text-[13px] xl:leading-6 2xl:text-[15px] 2xl:leading-7">
+            {card.copy}
+          </p>
+        </div>
+      </div>
+    </DesktopRevealCard>
+  );
+}
+
 function FeatureCard({ card, index, prefersReducedMotion, useFlatLaptopMotion }) {
   const { ref, cardStyle, glowStyle, previewStyle, contentStyle, accentSweepStyle } = useCardScrollMotion(
     prefersReducedMotion,
@@ -1411,8 +1474,17 @@ function JourneyCard({ card, index, prefersReducedMotion, useFlatLaptopMotion })
 
 export default function HowItWorksSection() {
   const prefersReducedMotion = useReducedMotion();
-  const shouldReduceMotion = prefersReducedMotion;
-  const useFlatLaptopMotion = useUseFlatLaptopMotion();
+  const useDesktopLiteMotion = useHomeDesktopLiteMotion();
+  const shouldReduceMotion = prefersReducedMotion || useDesktopLiteMotion;
+  const useFlatLaptopMotion = useDesktopLiteMotion;
+  const featurePanelReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
+    threshold: 0.06,
+    rootMargin: "0px 0px -6% 0px",
+  });
+  const journeyPanelReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
+    threshold: 0.06,
+    rootMargin: "0px 0px -6% 0px",
+  });
 
   return (
     <AnimatedSection
@@ -1422,6 +1494,7 @@ export default function HowItWorksSection() {
     >
       <div className="space-y-8">
         <motion.div
+            ref={useDesktopLiteMotion ? featurePanelReveal.ref : undefined}
             initial={
               shouldReduceMotion
                 ? false
@@ -1434,7 +1507,13 @@ export default function HowItWorksSection() {
             }
           viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
           transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1] }}
-          className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10"
+          className={`liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10 ${
+            useDesktopLiteMotion
+              ? `home-desktop-reveal home-desktop-reveal-panel ${
+                  featurePanelReveal.isVisible ? "is-visible" : ""
+                }`
+              : ""
+          }`}
         >
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex rounded-full border border-amber-200/22 bg-[linear-gradient(180deg,rgba(251,191,36,0.2),rgba(120,53,15,0.16))] px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.32em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_12px_28px_rgba(245,158,11,0.18)]">
@@ -1450,6 +1529,7 @@ export default function HowItWorksSection() {
                 characterStagger={0.02}
                 characterLineDelay={0.14}
                 simplifyMotion={shouldReduceMotion}
+                lightweightCharacterReveal={useDesktopLiteMotion}
                 className="text-4xl font-semibold tracking-[-0.04em] md:text-5xl"
                 lineClassName="leading-[0.98]"
               />
@@ -1458,24 +1538,29 @@ export default function HowItWorksSection() {
 
           <motion.div
             initial={shouldReduceMotion ? false : "hidden"}
-            whileInView="visible"
+            whileInView={shouldReduceMotion ? undefined : "visible"}
             viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
             variants={gridVariants}
             className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4 xl:gap-4 2xl:grid-cols-12 2xl:gap-5"
           >
             {featureCards.map((card, index) => (
-              <FeatureCard
-                key={card.title}
-                card={card}
-                index={index}
-                prefersReducedMotion={shouldReduceMotion}
-                useFlatLaptopMotion={useFlatLaptopMotion}
-              />
+              useDesktopLiteMotion ? (
+                <FeatureCardDesktop key={card.title} card={card} index={index} />
+              ) : (
+                <FeatureCard
+                  key={card.title}
+                  card={card}
+                  index={index}
+                  prefersReducedMotion={shouldReduceMotion}
+                  useFlatLaptopMotion={useFlatLaptopMotion}
+                />
+              )
             ))}
           </motion.div>
         </motion.div>
 
         <motion.div
+            ref={useDesktopLiteMotion ? journeyPanelReveal.ref : undefined}
             initial={
               shouldReduceMotion
                 ? false
@@ -1488,7 +1573,13 @@ export default function HowItWorksSection() {
             }
           viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
           transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1], delay: 0.03 }}
-          className="liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10"
+          className={`liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10 ${
+            useDesktopLiteMotion
+              ? `home-desktop-reveal home-desktop-reveal-panel ${
+                  journeyPanelReveal.isVisible ? "is-visible" : ""
+                }`
+              : ""
+          }`}
         >
           <div className="mx-auto max-w-3xl text-center">
             <LiquidSportText
@@ -1497,6 +1588,7 @@ export default function HowItWorksSection() {
               characterStagger={0.02}
               characterLineDelay={0.14}
               simplifyMotion={shouldReduceMotion}
+              lightweightCharacterReveal={useDesktopLiteMotion}
               className="text-4xl font-semibold tracking-[-0.04em] md:text-5xl"
               lineClassName="leading-[0.98]"
             />
@@ -1507,19 +1599,23 @@ export default function HowItWorksSection() {
 
           <motion.div
             initial={shouldReduceMotion ? false : "hidden"}
-            whileInView="visible"
+            whileInView={shouldReduceMotion ? undefined : "visible"}
             viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
             variants={gridVariants}
             className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3 xl:gap-4 2xl:grid-cols-12 2xl:gap-5"
           >
             {journeyCards.map((card, index) => (
-              <JourneyCard
-                key={card.title}
-                card={card}
-                index={index}
-                prefersReducedMotion={shouldReduceMotion}
-                useFlatLaptopMotion={useFlatLaptopMotion}
-              />
+              useDesktopLiteMotion ? (
+                <JourneyCardDesktop key={card.title} card={card} index={index} />
+              ) : (
+                <JourneyCard
+                  key={card.title}
+                  card={card}
+                  index={index}
+                  prefersReducedMotion={shouldReduceMotion}
+                  useFlatLaptopMotion={useFlatLaptopMotion}
+                />
+              )
             ))}
           </motion.div>
         </motion.div>

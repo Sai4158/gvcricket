@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { FaArrowRight } from "react-icons/fa";
 import PendingLink from "../shared/PendingLink";
 import SafeMatchImage from "../shared/SafeMatchImage";
+import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
 
 const LIVE_NOW_BANNER_CACHE_TTL_MS = 15_000;
 const LIVE_NOW_BANNER_CACHE_KEY = "gv-home-live-banner-v1";
@@ -68,6 +69,9 @@ function writeCachedLiveBanner(liveMatch) {
 }
 
 export default function LiveNowBanner({ liveMatch }) {
+  const prefersReducedMotion = useReducedMotion();
+  const useDesktopLiteMotion = useHomeDesktopLiteMotion();
+  const shouldReduceMotion = prefersReducedMotion || useDesktopLiteMotion;
   const [fetchedLiveMatch, setFetchedLiveMatch] = useState(() =>
     liveMatch ? null : readCachedLiveBanner()
   );
@@ -140,15 +144,19 @@ export default function LiveNowBanner({ liveMatch }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -28, scale: 0.985 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{
-        type: "spring",
-        stiffness: 220,
-        damping: 24,
-        mass: 0.8,
-        delay: 0.08,
-      }}
+      initial={shouldReduceMotion ? false : { opacity: 0, y: -28, scale: 0.985 }}
+      animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+      transition={
+        shouldReduceMotion
+          ? undefined
+          : {
+              type: "spring",
+              stiffness: 220,
+              damping: 24,
+              mass: 0.8,
+              delay: 0.08,
+            }
+      }
       className="pointer-events-none absolute inset-x-0 top-0 z-40 flex justify-start px-4 pr-20 pt-5 md:justify-center md:px-6 md:pr-6 md:pt-7"
     >
       <PendingLink

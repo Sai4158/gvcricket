@@ -9,10 +9,17 @@ import {
 import { FaCircleDot } from "react-icons/fa6";
 import { GiCricketBat } from "react-icons/gi";
 import LiquidSportText from "./LiquidSportText";
+import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
+import useHomeDesktopReveal from "./useHomeDesktopReveal";
 
 export default function LearnCricketCard() {
   const prefersReducedMotion = useReducedMotion();
-  const shouldReduceMotion = prefersReducedMotion;
+  const useDesktopLiteMotion = useHomeDesktopLiteMotion();
+  const shouldReduceMotion = prefersReducedMotion || useDesktopLiteMotion;
+  const sectionReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
+    threshold: 0.08,
+    rootMargin: "0px 0px -6% 0px",
+  });
   const learnSteps = [
     {
       title: "1. Two teams play",
@@ -39,6 +46,7 @@ export default function LearnCricketCard() {
   return (
     <motion.section
       id="learn-cricket"
+      ref={useDesktopLiteMotion ? sectionReveal.ref : undefined}
       initial={
         shouldReduceMotion
           ? false
@@ -51,7 +59,13 @@ export default function LearnCricketCard() {
       }
       viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
       transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1] }}
-      className="mx-auto w-full max-w-6xl scroll-mt-28 2xl:max-w-[108rem]"
+      className={`mx-auto w-full max-w-6xl scroll-mt-28 2xl:max-w-[108rem] ${
+        useDesktopLiteMotion
+          ? `home-desktop-reveal home-desktop-reveal-panel ${
+              sectionReveal.isVisible ? "is-visible" : ""
+            }`
+          : ""
+      }`}
     >
       <motion.a
         href="https://usacricket.org/what-is-cricket/"
@@ -134,6 +148,7 @@ export default function LearnCricketCard() {
                 characterStagger={0.02}
                 characterLineDelay={0.14}
                 simplifyMotion={shouldReduceMotion}
+                lightweightCharacterReveal={useDesktopLiteMotion}
                 className="max-w-xl text-3xl font-semibold tracking-tight md:text-4xl lg:max-w-2xl"
                 lineClassName="leading-[1.02]"
               />

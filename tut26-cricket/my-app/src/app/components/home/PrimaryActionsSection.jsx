@@ -11,6 +11,8 @@ import {
 } from "react-icons/fa";
 import LiquidSportText from "./LiquidSportText";
 import PendingLink from "../shared/PendingLink";
+import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
+import useHomeDesktopReveal from "./useHomeDesktopReveal";
 
 const sectionVariants = {
   hidden: {},
@@ -62,7 +64,20 @@ const cardItemVariants = {
 
 export default function PrimaryActionsSection() {
   const prefersReducedMotion = useReducedMotion();
-  const shouldReduceMotion = prefersReducedMotion;
+  const useDesktopLiteMotion = useHomeDesktopLiteMotion();
+  const shouldReduceMotion = prefersReducedMotion || useDesktopLiteMotion;
+  const introReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
+    threshold: 0.08,
+    rootMargin: "0px 0px -6% 0px",
+  });
+  const cardsReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
+    threshold: 0.08,
+    rootMargin: "0px 0px -6% 0px",
+  });
+  const directorReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
+    threshold: 0.08,
+    rootMargin: "0px 0px -6% 0px",
+  });
   const handleScrollToUpdates = (event) => {
     event.preventDefault();
     const target = document.getElementById("updates");
@@ -77,6 +92,7 @@ export default function PrimaryActionsSection() {
       className="mx-auto flex w-full max-w-4xl scroll-mt-24 flex-col items-center gap-10 text-center xl:max-w-6xl xl:gap-12 2xl:max-w-7xl"
     >
       <motion.div
+        ref={useDesktopLiteMotion ? introReveal.ref : undefined}
         initial={
           shouldReduceMotion
             ? false
@@ -89,7 +105,18 @@ export default function PrimaryActionsSection() {
         }
         viewport={{ once: true, amount: 0.18, margin: "0px 0px -6% 0px" }}
         transition={{ duration: 0.64, ease: [0.22, 1, 0.36, 1] }}
-        className="max-w-2xl space-y-4 xl:max-w-3xl"
+        className={`max-w-2xl space-y-4 xl:max-w-3xl ${
+          useDesktopLiteMotion
+            ? `home-desktop-reveal home-desktop-reveal-sm home-desktop-panel-sequence ${
+                introReveal.isVisible ? "is-visible" : ""
+              }`
+            : ""
+        }`}
+        style={
+          useDesktopLiteMotion
+            ? { "--home-reveal-delay": "40ms" }
+            : undefined
+        }
       >
         <div className="mx-auto inline-flex items-center rounded-full border border-amber-300/16 bg-amber-300/8 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.34em] text-amber-100">
           GV Cricket 2.0
@@ -100,6 +127,7 @@ export default function PrimaryActionsSection() {
           characterStagger={0.02}
           characterLineDelay={0.14}
           simplifyMotion={shouldReduceMotion}
+          lightweightCharacterReveal={useDesktopLiteMotion}
           className="text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl"
           lineClassName="leading-[1.02]"
         />
@@ -121,11 +149,23 @@ export default function PrimaryActionsSection() {
       </motion.div>
 
       <motion.div
+        ref={useDesktopLiteMotion ? cardsReveal.ref : undefined}
         initial={shouldReduceMotion ? false : "hidden"}
-        whileInView="visible"
+        whileInView={shouldReduceMotion ? undefined : "visible"}
         viewport={{ once: true, amount: 0.16, margin: "0px 0px -6% 0px" }}
         variants={sectionVariants}
-        className="grid w-full max-w-3xl gap-4 sm:grid-cols-2 xl:max-w-6xl xl:gap-5 2xl:max-w-7xl"
+        className={`grid w-full max-w-3xl gap-4 sm:grid-cols-2 xl:max-w-6xl xl:gap-5 2xl:max-w-7xl ${
+          useDesktopLiteMotion
+            ? `home-desktop-reveal home-desktop-reveal-panel home-desktop-grid-sequence ${
+                cardsReveal.isVisible ? "is-visible" : ""
+              }`
+            : ""
+        }`}
+        style={
+          useDesktopLiteMotion
+            ? { "--home-reveal-delay": "110ms" }
+            : undefined
+        }
       >
         <PendingLink
           href="/session/new"
@@ -170,7 +210,7 @@ export default function PrimaryActionsSection() {
             </motion.div>
             <motion.div
               initial={shouldReduceMotion ? false : "hidden"}
-              whileInView="visible"
+              whileInView={shouldReduceMotion ? undefined : "visible"}
               viewport={{ once: true, amount: 0.4 }}
               variants={cardContentVariants}
               className="relative z-10 flex h-full min-h-38 flex-col justify-between gap-6"
@@ -264,7 +304,7 @@ export default function PrimaryActionsSection() {
             </motion.div>
             <motion.div
               initial={shouldReduceMotion ? false : "hidden"}
-              whileInView="visible"
+              whileInView={shouldReduceMotion ? undefined : "visible"}
               viewport={{ once: true, amount: 0.4 }}
               variants={cardContentVariants}
               className="relative z-10 flex h-full min-h-38 flex-col justify-between gap-6"
@@ -322,6 +362,7 @@ export default function PrimaryActionsSection() {
         className="block w-full max-w-3xl xl:max-w-6xl 2xl:max-w-7xl"
       >
         <motion.div
+        ref={useDesktopLiteMotion ? directorReveal.ref : undefined}
         initial={
           shouldReduceMotion
               ? false
@@ -336,7 +377,18 @@ export default function PrimaryActionsSection() {
           transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
           whileHover={shouldReduceMotion ? undefined : { scale: 1.012 }}
           whileTap={{ scale: 0.99 }}
-          className="liquid-glass group flex w-full items-center gap-4 rounded-[28px] px-6 py-5 text-left transition duration-300 hover:border-white/28 sm:gap-5"
+          className={`liquid-glass group flex w-full items-center gap-4 rounded-[28px] px-6 py-5 text-left transition duration-300 hover:border-white/28 sm:gap-5 ${
+            useDesktopLiteMotion
+              ? `home-desktop-reveal home-desktop-reveal-sm home-desktop-card-sequence ${
+                  directorReveal.isVisible ? "is-visible" : ""
+                }`
+              : ""
+          }`}
+          style={
+            useDesktopLiteMotion
+              ? { "--home-reveal-delay": "180ms" }
+              : undefined
+          }
         >
           <motion.div
             animate={

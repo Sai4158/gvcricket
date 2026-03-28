@@ -4,6 +4,8 @@ import { motion, useReducedMotion } from "framer-motion";
 import AnimatedSection from "./AnimatedSection";
 import LiquidSportText from "./LiquidSportText";
 import YouTubeVideoPlayer from "./YouTubeVideoPlayer";
+import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
+import useHomeDesktopReveal from "./useHomeDesktopReveal";
 
 const demoVideos = [
   { videoId: "FztXLCMn0SQ", title: "GV Community Highlight 1" },
@@ -14,7 +16,16 @@ const demoVideos = [
 
 export default function CommunityHighlightsSection() {
   const prefersReducedMotion = useReducedMotion();
-  const shouldReduceMotion = prefersReducedMotion;
+  const useDesktopLiteMotion = useHomeDesktopLiteMotion();
+  const shouldReduceMotion = prefersReducedMotion || useDesktopLiteMotion;
+  const headingReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
+    threshold: 0.08,
+    rootMargin: "0px 0px -6% 0px",
+  });
+  const copyReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
+    threshold: 0.08,
+    rootMargin: "0px 0px -6% 0px",
+  });
 
   return (
     <AnimatedSection
@@ -23,6 +34,7 @@ export default function CommunityHighlightsSection() {
       className="mx-auto flex w-full max-w-6xl flex-col items-center xl:max-w-7xl 2xl:max-w-[108rem]"
     >
       <motion.div
+        ref={useDesktopLiteMotion ? headingReveal.ref : undefined}
         initial={
           shouldReduceMotion
             ? false
@@ -35,7 +47,13 @@ export default function CommunityHighlightsSection() {
         }
         viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
         transition={{ duration: 0.64, ease: [0.22, 1, 0.36, 1] }}
-        className="mb-16"
+        className={`mb-16 ${
+          useDesktopLiteMotion
+            ? `home-desktop-reveal home-desktop-reveal-sm ${
+                headingReveal.isVisible ? "is-visible" : ""
+              }`
+            : ""
+        }`}
       >
         <LiquidSportText
           text={["From the", "Community"]}
@@ -44,11 +62,14 @@ export default function CommunityHighlightsSection() {
           characterStagger={0.022}
           characterLineDelay={0.16}
           simplifyMotion={shouldReduceMotion}
+          lightweightCharacterReveal={useDesktopLiteMotion}
+          delay={0.08}
           className="text-center text-5xl font-bold tracking-tight md:text-7xl"
           lineClassName="leading-[0.96]"
         />
       </motion.div>
       <motion.p
+        ref={useDesktopLiteMotion ? copyReveal.ref : undefined}
         initial={
           shouldReduceMotion
             ? false
@@ -61,7 +82,13 @@ export default function CommunityHighlightsSection() {
         }
         viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
         transition={{ duration: 0.6, delay: 0.04, ease: [0.22, 1, 0.36, 1] }}
-        className="text-lg text-white/78 leading-relaxed text-center max-w-3xl mx-auto -mt-8 mb-16"
+        className={`text-lg text-white/78 leading-relaxed text-center max-w-3xl mx-auto -mt-8 mb-16 ${
+          useDesktopLiteMotion
+            ? `home-desktop-reveal home-desktop-reveal-sm ${
+                copyReveal.isVisible ? "is-visible" : ""
+              }`
+            : ""
+        }`}
       >
         GV Cricket started in 2022 with a few friends who loved the game. Today, it helps power a friendly league of more than 50 members who come together for fun, competitive cricket.
       </motion.p>
