@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useState } from "react";
 
-const HOME_DESKTOP_LITE_QUERY = "(min-width: 1024px)";
+const HOME_DESKTOP_LITE_QUERY = "(min-width: 768px)";
 
 export default function useHomeDesktopLiteMotion() {
   const [useDesktopLiteMotion, setUseDesktopLiteMotion] = useState(true);

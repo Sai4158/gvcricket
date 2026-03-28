@@ -9,6 +9,7 @@ import {
   FaChartLine,
   FaClipboardList,
 } from "react-icons/fa";
+import HomeScrollFade from "./HomeScrollFade";
 import LiquidSportText from "./LiquidSportText";
 import PendingLink from "../shared/PendingLink";
 import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
@@ -27,11 +28,17 @@ const sectionVariants = {
 const cardVariants = {
   hidden: () => ({
     opacity: 0,
+    y: 14,
+    scale: 0.988,
+    filter: "blur(4px)",
   }),
   visible: {
     opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: "blur(0px)",
     transition: {
-      duration: 0.68,
+      duration: 0.62,
       ease: [0.22, 1, 0.36, 1],
     },
   },
@@ -50,13 +57,15 @@ const cardContentVariants = {
 const cardItemVariants = {
   hidden: {
     opacity: 0,
-    y: 16,
+    y: 12,
+    filter: "blur(3px)",
   },
   visible: {
     opacity: 1,
     y: 0,
+    filter: "blur(0px)",
     transition: {
-      duration: 0.5,
+      duration: 0.46,
       ease: [0.22, 1, 0.36, 1],
     },
   },
@@ -66,10 +75,6 @@ export default function PrimaryActionsSection() {
   const prefersReducedMotion = useReducedMotion();
   const useDesktopLiteMotion = useHomeDesktopLiteMotion();
   const shouldReduceMotion = prefersReducedMotion || useDesktopLiteMotion;
-  const introReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
-    threshold: 0.08,
-    rootMargin: "0px 0px -6% 0px",
-  });
   const startCardReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
     threshold: 0.08,
     rootMargin: "0px 0px -6% 0px",
@@ -95,32 +100,11 @@ export default function PrimaryActionsSection() {
       id="quick-start"
       className="mx-auto flex w-full max-w-4xl scroll-mt-24 flex-col items-center gap-10 text-center xl:max-w-6xl xl:gap-12 2xl:max-w-7xl"
     >
-      <motion.div
-        ref={useDesktopLiteMotion ? introReveal.ref : undefined}
-        initial={
-          shouldReduceMotion
-            ? false
-            : { opacity: 0, y: 24, scale: 0.992, filter: "blur(6px)" }
-        }
-        whileInView={
-          shouldReduceMotion
-            ? undefined
-            : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
-        }
-        viewport={{ once: true, amount: 0.18, margin: "0px 0px -6% 0px" }}
-        transition={{ duration: 0.64, ease: [0.22, 1, 0.36, 1] }}
-        className={`max-w-2xl space-y-4 xl:max-w-3xl ${
-          useDesktopLiteMotion
-            ? `home-desktop-reveal home-desktop-reveal-sm home-desktop-panel-sequence ${
-                introReveal.isVisible ? "is-visible" : ""
-              }`
-            : ""
-        }`}
-        style={
-          useDesktopLiteMotion
-            ? { "--home-reveal-delay": "40ms" }
-            : undefined
-        }
+      <HomeScrollFade
+        delayMs={40}
+        distance={12}
+        viewportAmount={0.18}
+        className="max-w-2xl space-y-4 xl:max-w-3xl"
       >
         <div className="mx-auto inline-flex items-center rounded-full border border-amber-300/16 bg-amber-300/8 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.34em] text-amber-100">
           GV Cricket 2.0
@@ -129,9 +113,11 @@ export default function PrimaryActionsSection() {
           text={["Live score, umpire mode,", "and match control in one app."]}
           characterTyping
           characterStagger={0.02}
-          characterLineDelay={0.14}
+          characterLineDelay={0.12}
+          characterDuration={0.34}
           simplifyMotion={shouldReduceMotion}
-          lightweightCharacterReveal={useDesktopLiteMotion}
+          lightweightCharacterReveal
+          delay={0.03}
           className="text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl"
           lineClassName="leading-[1.02]"
         />
@@ -150,7 +136,7 @@ export default function PrimaryActionsSection() {
             <FaAngleDown className="h-3.5 w-3.5" />
           </Link>
         </motion.div>
-      </motion.div>
+      </HomeScrollFade>
 
       <motion.div
         initial={shouldReduceMotion ? false : "hidden"}
@@ -172,6 +158,8 @@ export default function PrimaryActionsSection() {
             whileHover={shouldReduceMotion ? undefined : { scale: 1.015 }}
             whileTap={{ scale: 0.99 }}
             className={`liquid-glass group rounded-[30px] p-5 text-left transition duration-300 hover:border-white/28 ${
+              useDesktopLiteMotion ? "home-desktop-lite-card" : ""
+            } ${
               useDesktopLiteMotion
                 ? `home-desktop-reveal home-desktop-reveal-card ${
                     startCardReveal.isVisible ? "is-visible" : ""
@@ -278,6 +266,8 @@ export default function PrimaryActionsSection() {
             whileHover={shouldReduceMotion ? undefined : { scale: 1.015 }}
             whileTap={{ scale: 0.99 }}
             className={`liquid-glass group rounded-[30px] p-5 text-left transition duration-300 hover:border-white/28 ${
+              useDesktopLiteMotion ? "home-desktop-lite-card" : ""
+            } ${
               useDesktopLiteMotion
                 ? `home-desktop-reveal home-desktop-reveal-card ${
                     sessionsCardReveal.isVisible ? "is-visible" : ""
@@ -394,6 +384,8 @@ export default function PrimaryActionsSection() {
           whileHover={shouldReduceMotion ? undefined : { scale: 1.012 }}
           whileTap={{ scale: 0.99 }}
           className={`liquid-glass group flex w-full items-center gap-4 rounded-[28px] px-6 py-5 text-left transition duration-300 hover:border-white/28 sm:gap-5 ${
+            useDesktopLiteMotion ? "home-desktop-lite-card" : ""
+          } ${
             useDesktopLiteMotion
               ? `home-desktop-reveal home-desktop-reveal-sm home-desktop-card-sequence ${
                   directorReveal.isVisible ? "is-visible" : ""

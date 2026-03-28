@@ -59,11 +59,12 @@ export default function CommunityHighlightsSection() {
           text={["From the", "Community"]}
           variant="hero-bright"
           characterTyping
-          characterStagger={0.022}
-          characterLineDelay={0.16}
+          characterStagger={0.02}
+          characterLineDelay={0.12}
+          characterDuration={0.34}
           simplifyMotion={shouldReduceMotion}
-          lightweightCharacterReveal={useDesktopLiteMotion}
-          delay={0.08}
+          lightweightCharacterReveal
+          delay={0.04}
           className="text-center text-5xl font-bold tracking-tight md:text-7xl"
           lineClassName="leading-[0.96]"
         />

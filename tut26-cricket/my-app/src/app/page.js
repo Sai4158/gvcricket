@@ -2,6 +2,7 @@ import nextDynamic from "next/dynamic";
 import Image from "next/image";
 import BackToTopButton from "./components/home/BackToTopButton";
 import HeroSection from "./components/home/HeroSection";
+import HomeScrollFade from "./components/home/HomeScrollFade";
 import HomeHeader from "./components/home/HomeHeader";
 import PrimaryActionsSection from "./components/home/PrimaryActionsSection";
 import { absoluteUrl, siteConfig } from "./lib/site-metadata";
@@ -53,11 +54,14 @@ export default async function HomePage() {
           <CommunityHighlightsSection />
           <LearnCricketCard />
           <footer className="border-t border-white/10 pt-14 pb-12 text-center">
-            <div className="mb-6 flex justify-center">
+            <HomeScrollFade delayMs={20} className="mb-6 flex justify-center">
               <BackToTopButton />
-            </div>
-            <div className="mx-auto mb-8 h-px w-full max-w-4xl bg-[linear-gradient(90deg,rgba(255,255,255,0.06),rgba(255,255,255,0.9),rgba(255,255,255,0.06))]" />
-            <div className="mb-8 flex justify-center">
+            </HomeScrollFade>
+            <HomeScrollFade
+              delayMs={70}
+              className="mx-auto mb-8 h-px w-full max-w-4xl bg-[linear-gradient(90deg,rgba(255,255,255,0.06),rgba(255,255,255,0.9),rgba(255,255,255,0.06))]"
+            />
+            <HomeScrollFade delayMs={120} className="mb-8 flex justify-center">
               <Image
                 src="/gvLogo.png"
                 alt="GV Cricket logo"
@@ -66,19 +70,25 @@ export default async function HomePage() {
                 priority={false}
                 className="h-auto w-[150px] object-contain drop-shadow-[0_16px_40px_rgba(0,0,0,0.42)] sm:w-[180px]"
               />
-            </div>
-            <p className="text-zinc-400">
-              &copy; {new Date().getFullYear()} GV Cricket. All rights reserved.
-            </p>
-            <p className="mt-2 text-sm text-zinc-500">
-              GV Cricket brings live score, umpire mode, spectator view, director controls, walkie-talkie, and results into one fast mobile flow.
-            </p>
-            <a
-              href="https://gvcricket.com"
-              className="mt-2 inline-block text-zinc-400 transition-colors duration-200 hover:text-zinc-200"
-            >
-              gvcricket.com
-            </a>
+            </HomeScrollFade>
+            <HomeScrollFade delayMs={170}>
+              <p className="text-zinc-400">
+                &copy; {new Date().getFullYear()} GV Cricket. All rights reserved.
+              </p>
+            </HomeScrollFade>
+            <HomeScrollFade delayMs={220}>
+              <p className="mt-2 text-sm text-zinc-500">
+                GV Cricket brings live score, umpire mode, spectator view, director controls, walkie-talkie, and results into one fast mobile flow.
+              </p>
+            </HomeScrollFade>
+            <HomeScrollFade delayMs={270}>
+              <a
+                href="https://gvcricket.com"
+                className="mt-2 inline-block text-zinc-400 transition-colors duration-200 hover:text-zinc-200"
+              >
+                gvcricket.com
+              </a>
+            </HomeScrollFade>
           </footer>
         </div>
       </main>

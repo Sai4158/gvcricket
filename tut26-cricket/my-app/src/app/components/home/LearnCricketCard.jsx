@@ -12,6 +12,92 @@ import LiquidSportText from "./LiquidSportText";
 import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
 import useHomeDesktopReveal from "./useHomeDesktopReveal";
 
+function LearnStepCard({ title, copy, index, useDesktopLiteMotion, shouldReduceMotion }) {
+  const stepReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
+    threshold: 0.08,
+    rootMargin: "0px 0px -6% 0px",
+  });
+
+  return (
+    <motion.div
+      ref={useDesktopLiteMotion ? stepReveal.ref : undefined}
+      initial={
+        shouldReduceMotion
+          ? false
+          : { opacity: 0, y: 22, scale: 0.985, filter: "blur(5px)" }
+      }
+      whileInView={
+        shouldReduceMotion
+          ? undefined
+          : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
+      }
+      viewport={{ once: true, amount: 0.42, margin: "0px 0px -6% 0px" }}
+      transition={{
+        duration: 0.48,
+        delay: shouldReduceMotion ? 0 : index * 0.08,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      className={`rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-4 lg:min-h-[168px] ${
+        useDesktopLiteMotion ? `home-desktop-reveal home-desktop-reveal-sm home-desktop-lite-subpanel ${stepReveal.isVisible ? "is-visible" : ""}` : ""
+      }`}
+      style={
+        useDesktopLiteMotion
+          ? { "--home-reveal-delay": `${Math.min(index, 8) * 84}ms` }
+          : undefined
+      }
+    >
+      <span className="block text-sm font-semibold text-white">{title}</span>
+      <p className="mt-2 text-[12px] leading-5 text-zinc-300/86">{copy}</p>
+    </motion.div>
+  );
+}
+
+function LearnGuideCard({ index, useDesktopLiteMotion, shouldReduceMotion }) {
+  const guideReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
+    threshold: 0.08,
+    rootMargin: "0px 0px -6% 0px",
+  });
+
+  return (
+    <motion.div
+      ref={useDesktopLiteMotion ? guideReveal.ref : undefined}
+      initial={
+        shouldReduceMotion
+          ? false
+          : { opacity: 0, y: 22, scale: 0.985, filter: "blur(5px)" }
+      }
+      whileInView={
+        shouldReduceMotion
+          ? undefined
+          : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
+      }
+      viewport={{ once: true, amount: 0.42, margin: "0px 0px -6% 0px" }}
+      transition={{
+        duration: 0.56,
+        delay: shouldReduceMotion ? 0 : index * 0.08,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      className={`hidden rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-4 lg:flex lg:min-h-[168px] lg:items-center lg:justify-center ${
+        useDesktopLiteMotion
+          ? `home-desktop-reveal home-desktop-reveal-sm home-desktop-lite-subpanel ${
+              guideReveal.isVisible ? "is-visible" : ""
+            }`
+          : "home-desktop-lite-subpanel"
+      }`}
+      style={
+        useDesktopLiteMotion
+          ? { "--home-reveal-delay": `${Math.min(index, 8) * 84}ms` }
+          : undefined
+      }
+    >
+      <div className="inline-flex items-center gap-2 text-center text-sm font-semibold text-white">
+        <span>Open guide</span>
+        <FaArrowUpRightFromSquare className="text-sm text-white/90" />
+      </div>
+    </motion.div>
+  );
+}
+
 export default function LearnCricketCard() {
   const prefersReducedMotion = useReducedMotion();
   const useDesktopLiteMotion = useHomeDesktopLiteMotion();
@@ -81,7 +167,9 @@ export default function LearnCricketCard() {
             ? undefined
             : { y: -6, scale: 1.008, transition: { duration: 0.26 } }
         }
-        className="group relative block overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,24,0.96),rgba(8,8,14,0.94))] px-6 py-6 shadow-[0_28px_70px_rgba(0,0,0,0.42)] transition-transform duration-300 hover:-translate-y-1 md:px-8 md:py-8 lg:px-9 lg:py-9"
+        className={`group relative block overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,24,0.96),rgba(8,8,14,0.94))] px-6 py-6 shadow-[0_28px_70px_rgba(0,0,0,0.42)] transition-transform duration-300 hover:-translate-y-1 md:px-8 md:py-8 lg:px-9 lg:py-9 ${
+          useDesktopLiteMotion ? "home-desktop-lite-panel" : ""
+        }`}
       >
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(255,255,255,0.08),transparent_32%),radial-gradient(circle_at_80%_100%,rgba(245,158,11,0.08),transparent_34%)]" />
         <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-white/22 to-transparent" />
@@ -153,9 +241,11 @@ export default function LearnCricketCard() {
                 text={["Want to learn more", "about cricket?"]}
                 characterTyping
                 characterStagger={0.02}
-                characterLineDelay={0.14}
+                characterLineDelay={0.12}
+                characterDuration={0.34}
                 simplifyMotion={shouldReduceMotion}
-                lightweightCharacterReveal={useDesktopLiteMotion}
+                lightweightCharacterReveal
+                delay={0.03}
                 className="max-w-xl text-3xl font-semibold tracking-tight md:text-4xl lg:max-w-2xl"
                 lineClassName="leading-[1.02]"
               />
@@ -199,54 +289,20 @@ export default function LearnCricketCard() {
               useDesktopLiteMotion ? "home-desktop-grid-sequence" : ""
             }`}>
               {learnSteps.map(({ title, copy }, index) => (
-                <motion.div
+                <LearnStepCard
                   key={title}
-                  initial={
-                    shouldReduceMotion
-                      ? false
-                      : { opacity: 0, y: 22, scale: 0.985, filter: "blur(5px)" }
-                  }
-                  whileInView={
-                    shouldReduceMotion
-                      ? undefined
-                      : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
-                  }
-                  viewport={{ once: true, amount: 0.42, margin: "0px 0px -6% 0px" }}
-                  transition={{
-                    duration: 0.48,
-                    delay: shouldReduceMotion ? 0 : index * 0.08,
-                    ease: [0.22, 1, 0.36, 1],
-                  }}
-                  className="rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-4 lg:min-h-[168px]"
-                >
-                  <span className="block text-sm font-semibold text-white">{title}</span>
-                  <p className="mt-2 text-[12px] leading-5 text-zinc-300/86">{copy}</p>
-                </motion.div>
+                  title={title}
+                  copy={copy}
+                  index={index}
+                  useDesktopLiteMotion={useDesktopLiteMotion}
+                  shouldReduceMotion={shouldReduceMotion}
+                />
               ))}
-              <motion.div
-                initial={
-                  shouldReduceMotion
-                    ? false
-                    : { opacity: 0, y: 22, scale: 0.985, filter: "blur(5px)" }
-                }
-                whileInView={
-                  shouldReduceMotion
-                    ? undefined
-                    : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
-                }
-                viewport={{ once: true, amount: 0.42, margin: "0px 0px -6% 0px" }}
-                transition={{
-                  duration: 0.48,
-                  delay: shouldReduceMotion ? 0 : learnSteps.length * 0.08,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-                className="hidden rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-4 lg:flex lg:min-h-[168px] lg:items-center lg:justify-center"
-              >
-                <div className="inline-flex items-center gap-2 text-center text-sm font-semibold text-white">
-                  <span>Open guide</span>
-                  <FaArrowUpRightFromSquare className="text-sm text-white/90" />
-                </div>
-              </motion.div>
+              <LearnGuideCard
+                index={learnSteps.length}
+                useDesktopLiteMotion={useDesktopLiteMotion}
+                shouldReduceMotion={shouldReduceMotion}
+              />
             </div>
 
             <div className="flex items-center gap-3 pt-1 lg:hidden lg:pt-2">

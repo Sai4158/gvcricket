@@ -20,20 +20,16 @@ export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
     ? false
     : {
         opacity: 0,
-        scale: 0.94,
-        x: index % 2 === 0 ? -88 : 88,
-        y: 10,
-        rotate: index % 2 === 0 ? -4.5 : 4.5,
-        filter: "blur(10px)",
+        scale: 0.988,
+        y: 14,
+        filter: "blur(5px)",
       };
   const visibleMotion = shouldReduceMotion
     ? undefined
     : {
         opacity: 1,
         scale: 1,
-        x: 0,
         y: 0,
-        rotate: 0,
         filter: "blur(0px)",
       };
 
@@ -47,10 +43,8 @@ export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
         shouldReduceMotion
           ? undefined
           : {
-              type: "spring",
-              stiffness: 210,
-              damping: 22,
-              mass: 0.72,
+              duration: 0.62,
+              ease: [0.22, 1, 0.36, 1],
             }
       }
       whileHover={
@@ -63,6 +57,8 @@ export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
             }
       }
       className={`liquid-glass group relative overflow-hidden rounded-[30px] p-2.5 transition-all duration-300 hover:border-white/28 hover:shadow-[0_18px_48px_rgba(0,0,0,0.32)] ${
+        useDesktopLiteMotion ? "home-desktop-lite-card" : ""
+      } ${
         useDesktopLiteMotion
           ? `home-desktop-reveal home-desktop-reveal-card home-desktop-card-sequence ${
               cardReveal.isVisible ? "is-visible" : ""
@@ -71,7 +67,7 @@ export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
       }`}
       style={
         useDesktopLiteMotion
-          ? { "--home-reveal-delay": `${Math.min(index, 6) * 48}ms` }
+          ? { "--home-reveal-delay": `${Math.min(index, 6) * 82}ms` }
           : undefined
       }
     >

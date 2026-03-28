@@ -25,25 +25,27 @@ export default function AnimatedSection({
     ? false
     : {
         opacity: 0,
-        scale: 0.994,
+        scale: 0.992,
+        filter: "blur(4px)",
         x:
           direction === "left"
-            ? -distance
+            ? -Math.min(distance, 18)
             : direction === "right"
-            ? distance
+            ? Math.min(distance, 18)
             : 0,
         y:
           direction === "up"
-            ? distance
+            ? Math.min(distance, 18)
             : direction === "down"
-            ? -distance
-            : 0,
+            ? -Math.min(distance, 18)
+            : 10,
       };
   const visibleMotion = shouldReduceMotion
     ? undefined
     : {
         opacity: 1,
         scale: 1,
+        filter: "blur(0px)",
         x: 0,
         y: 0,
       };
@@ -70,7 +72,7 @@ export default function AnimatedSection({
       viewport={{ once: true, amount: viewportAmount, margin: viewportMargin }}
       transition={{
         delay,
-        duration: shouldReduceMotion ? 0 : 0.66,
+        duration: shouldReduceMotion ? 0 : 0.72,
         ease: [0.22, 1, 0.36, 1],
       }}
       className={`relative ${className}`}

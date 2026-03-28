@@ -37,24 +37,20 @@ const gridVariants = {
 };
 
 const cardVariants = {
-  hidden: (index) => ({
+  hidden: () => ({
     opacity: 0,
-    scale: 0.955,
-    x: index % 2 === 0 ? -72 : 72,
-    y: 26,
-    rotate: index % 2 === 0 ? -2.4 : 2.4,
+    scale: 0.986,
+    y: 18,
+    filter: "blur(6px)",
   }),
   visible: {
     opacity: 1,
     scale: 1,
-    x: 0,
     y: 0,
-    rotate: 0,
+    filter: "blur(0px)",
     transition: {
-      type: "spring",
-      stiffness: 210,
-      damping: 24,
-      mass: 0.7,
+      duration: 0.62,
+      ease: [0.22, 1, 0.36, 1],
     },
   },
 };
@@ -72,9 +68,9 @@ const previewStaggerVariants = {
 const previewItemVariants = {
   hidden: {
     opacity: 0,
-    y: 18,
-    scale: 0.94,
-    filter: "blur(4px)",
+    y: 12,
+    scale: 0.985,
+    filter: "blur(3px)",
   },
   visible: {
     opacity: 1,
@@ -82,10 +78,8 @@ const previewItemVariants = {
     scale: 1,
     filter: "blur(0px)",
     transition: {
-      type: "spring",
-      stiffness: 280,
-      damping: 24,
-      mass: 0.7,
+      duration: 0.48,
+      ease: [0.22, 1, 0.36, 1],
     },
   },
 };
@@ -93,8 +87,8 @@ const previewItemVariants = {
 const previewTitleVariants = {
   hidden: {
     opacity: 0,
-    y: 16,
-    filter: "blur(4px)",
+    y: 12,
+    filter: "blur(3px)",
   },
   visible: {
     opacity: 1,
@@ -1258,7 +1252,7 @@ function DesktopRevealCard({ children, index = 0, className = "" }) {
       className={`home-desktop-reveal home-desktop-reveal-card ${
         isVisible ? "is-visible" : ""
       } ${className}`}
-      style={{ "--home-reveal-delay": `${Math.min(index, 8) * 42}ms` }}
+      style={{ "--home-reveal-delay": `${Math.min(index, 8) * 72}ms` }}
     >
       {children}
     </div>
@@ -1269,7 +1263,7 @@ function FeatureCardDesktop({ card, index }) {
   return (
     <DesktopRevealCard
       index={index}
-      className={`liquid-glass-soft group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 ${
+      className={`liquid-glass-soft group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 home-desktop-lite-card ${
         card.previewType === "director" ? "md:col-span-2 xl:col-span-2" : ""
       } ${getFeatureCardWideSpan(card.previewType)} ${getFeatureCardWideOrder(card.previewType)}`}
     >
@@ -1299,7 +1293,7 @@ function JourneyCardDesktop({ card, index }) {
   return (
     <DesktopRevealCard
       index={index}
-      className={`liquid-glass-soft group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 ${getJourneyCardWideSpan()}`}
+      className={`liquid-glass-soft group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 home-desktop-lite-card ${getJourneyCardWideSpan()}`}
     >
       <div
         className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentRail(
@@ -1508,6 +1502,8 @@ export default function HowItWorksSection() {
           viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
           transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1] }}
           className={`liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10 ${
+            useDesktopLiteMotion ? "home-desktop-lite-panel" : ""
+          } ${
             useDesktopLiteMotion
               ? `home-desktop-reveal home-desktop-reveal-panel ${
                   featurePanelReveal.isVisible ? "is-visible" : ""
@@ -1527,9 +1523,11 @@ export default function HowItWorksSection() {
                 text={["New tools for", "live scoring"]}
                 characterTyping
                 characterStagger={0.02}
-                characterLineDelay={0.14}
+                characterLineDelay={0.12}
+                characterDuration={0.34}
                 simplifyMotion={shouldReduceMotion}
-                lightweightCharacterReveal={useDesktopLiteMotion}
+                lightweightCharacterReveal
+                delay={0.03}
                 className="text-4xl font-semibold tracking-[-0.04em] md:text-5xl"
                 lineClassName="leading-[0.98]"
               />
@@ -1574,6 +1572,8 @@ export default function HowItWorksSection() {
           viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
           transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1], delay: 0.03 }}
           className={`liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10 ${
+            useDesktopLiteMotion ? "home-desktop-lite-panel" : ""
+          } ${
             useDesktopLiteMotion
               ? `home-desktop-reveal home-desktop-reveal-panel ${
                   journeyPanelReveal.isVisible ? "is-visible" : ""
@@ -1586,9 +1586,11 @@ export default function HowItWorksSection() {
               text={["From toss to final", "result"]}
               characterTyping
               characterStagger={0.02}
-              characterLineDelay={0.14}
+              characterLineDelay={0.12}
+              characterDuration={0.34}
               simplifyMotion={shouldReduceMotion}
-              lightweightCharacterReveal={useDesktopLiteMotion}
+              lightweightCharacterReveal
+              delay={0.03}
               className="text-4xl font-semibold tracking-[-0.04em] md:text-5xl"
               lineClassName="leading-[0.98]"
             />

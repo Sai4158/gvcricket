@@ -45,7 +45,12 @@ function HeroDesktopScene({
           Your browser does not support the video tag.
         </video>
         <div className="absolute inset-0 z-10 bg-[linear-gradient(180deg,rgba(0,0,0,0.42)_0%,rgba(0,0,0,0.56)_48%,rgba(0,0,0,0.72)_100%)]" />
-        <div className="relative z-20 flex flex-col items-center px-4 pt-24 sm:pt-28 md:pt-18 lg:pt-16">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+          className="relative z-20 flex flex-col items-center px-4 pt-24 sm:pt-28 md:pt-18 lg:pt-16"
+        >
           <div className="relative">
             <div className="relative">
               <Image
@@ -68,16 +73,18 @@ function HeroDesktopScene({
                 cursor={false}
                 typing={false}
                 characterTyping
-                lineWave={false}
+                characterStagger={0.026}
+                characterLineDelay={0.14}
+                characterDuration={0.38}
                 simplifyMotion
                 lightweightCharacterReveal
-                delay={0.12}
+                delay={0.04}
                 className="block text-[3rem] font-semibold tracking-[-0.058em] sm:text-[4.8rem] md:text-[5.9rem] lg:text-[5.6rem] xl:text-[6.2rem] 2xl:text-[6.85rem]"
                 lineClassName="leading-[0.94]"
               />
             </div>
           </h1>
-        </div>
+        </motion.div>
         <button
           type="button"
           onClick={handleScrollToStart}
@@ -275,14 +282,12 @@ function HeroAnimatedScene({
                 cursor={false}
                 typing={false}
                 characterTyping
-                lineWave
-                lineWaveAmount={2.4}
-                lineWaveRotate={0.45}
-                lineWaveDuration={7.6}
-                characterStagger={0.048}
-                characterLineDelay={0.28}
-                characterDuration={0.54}
+                characterStagger={0.024}
+                characterLineDelay={0.12}
+                characterDuration={0.36}
                 simplifyMotion={false}
+                lightweightCharacterReveal
+                delay={0.03}
                 className="block text-[3rem] font-semibold tracking-[-0.058em] sm:text-[4.8rem] md:text-[5.9rem] lg:text-[5.6rem] xl:text-[6.2rem] 2xl:text-[6.85rem]"
                 lineClassName="leading-[0.94]"
               />
