@@ -22,7 +22,6 @@ function buildTypecheckTsconfig() {
   const existingNextIncludes = [
     ".next/types/routes.d.ts",
     ".next/types/validator.ts",
-    ".next/types/cache-life.d.ts",
     ".next/dev/types/**/*.ts",
   ].filter((entry) => {
     if (entry.includes("*")) {

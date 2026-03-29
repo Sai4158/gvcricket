@@ -6,12 +6,12 @@ import { FaPlay } from "react-icons/fa";
 import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
 import useHomeDesktopReveal from "./useHomeDesktopReveal";
 
-export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
+export default function YouTubeVideoPlayer({ videoId, title }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const useDesktopLiteMotion = useHomeDesktopLiteMotion();
   const shouldReduceMotion = prefersReducedMotion || useDesktopLiteMotion;
-  const cardReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
+  const cardReveal = useHomeDesktopReveal(!useDesktopLiteMotion, {
     threshold: 0.08,
     rootMargin: "0px 0px -6% 0px",
   });
@@ -35,7 +35,7 @@ export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
 
   return (
     <motion.figure
-      ref={useDesktopLiteMotion ? cardReveal.ref : undefined}
+      ref={!useDesktopLiteMotion ? cardReveal.ref : undefined}
       initial={initialMotion}
       whileInView={visibleMotion}
       viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
@@ -59,17 +59,12 @@ export default function YouTubeVideoPlayer({ videoId, title, index = 0 }) {
       className={`liquid-glass group relative overflow-hidden rounded-[30px] p-2.5 transition-all duration-300 hover:border-white/28 hover:shadow-[0_18px_48px_rgba(0,0,0,0.32)] ${
         useDesktopLiteMotion ? "home-desktop-lite-card" : ""
       } ${
-        useDesktopLiteMotion
+        !useDesktopLiteMotion
           ? `home-desktop-reveal home-desktop-reveal-card home-desktop-card-sequence ${
               cardReveal.isVisible ? "is-visible" : ""
             }`
           : ""
       }`}
-      style={
-        useDesktopLiteMotion
-          ? { "--home-reveal-delay": `${Math.min(index, 6) * 82}ms` }
-          : undefined
-      }
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.16),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,210,130,0.12),transparent_30%)] opacity-90" />
       <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-black/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">

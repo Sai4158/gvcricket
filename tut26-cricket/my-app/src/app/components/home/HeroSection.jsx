@@ -15,16 +15,21 @@ import LiquidSportText from "./LiquidSportText";
 import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
 
 const HERO_VIDEO_PATH = "/videos/Cricket1.mp4";
+const HERO_HEADLINE_DELAY = 0.5;
 
 function HeroDesktopScene({
   liveMatch,
   heroLines,
   videoReady,
   videoRef,
+  sectionRef,
   handleScrollToStart,
 }) {
   return (
-    <section className="relative h-[100svh] min-h-[100svh] overflow-hidden">
+    <section
+      ref={sectionRef}
+      className="relative h-[100svh] min-h-[100svh] overflow-hidden"
+    >
       <div className="sticky top-0 flex h-[100svh] min-h-[100svh] flex-col items-center justify-center text-center">
         <LiveNowBanner liveMatch={liveMatch} />
         <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_24%),linear-gradient(180deg,rgba(7,8,10,0.92),rgba(0,0,0,0.98))]" />
@@ -78,7 +83,7 @@ function HeroDesktopScene({
                 characterDuration={0.64}
                 simplifyMotion
                 lightweightCharacterReveal
-                delay={0.16}
+                delay={HERO_HEADLINE_DELAY}
                 className="block text-[3rem] font-semibold tracking-[-0.058em] sm:text-[4.8rem] md:text-[5.9rem] lg:text-[5.6rem] xl:text-[6.2rem] 2xl:text-[6.85rem]"
                 lineClassName="leading-[1.02] pb-[0.08em]"
               />
@@ -97,7 +102,7 @@ function HeroDesktopScene({
           <motion.span
             animate={{ y: [0, 7, 0], opacity: [0.88, 1, 0.88] }}
             transition={{ duration: 1.7, repeat: Infinity, ease: "easeInOut" }}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/24 bg-white/14 shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105 group-hover:border-white/36 group-hover:bg-white/20 group-hover:shadow-[0_14px_30px_rgba(0,0,0,0.32)]"
+            className="home-md-no-glass flex h-10 w-10 items-center justify-center rounded-full border border-white/24 bg-white/14 shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105 group-hover:border-white/36 group-hover:bg-white/20 group-hover:shadow-[0_14px_30px_rgba(0,0,0,0.32)]"
           >
             <FaAngleDown className="text-lg" />
           </motion.span>
@@ -112,9 +117,9 @@ function HeroAnimatedScene({
   heroLines,
   videoReady,
   videoRef,
+  sectionRef,
   handleScrollToStart,
 }) {
-  const sectionRef = useRef(null);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start start", "end start"],
@@ -290,7 +295,7 @@ function HeroAnimatedScene({
                 characterLineDelay={0.12}
                 characterDuration={0.36}
                 simplifyMotion={false}
-                delay={0.03}
+                delay={HERO_HEADLINE_DELAY}
                 className="block text-[3rem] font-semibold tracking-[-0.058em] sm:text-[4.8rem] md:text-[5.9rem] lg:text-[5.6rem] xl:text-[6.2rem] 2xl:text-[6.85rem]"
                 lineClassName="leading-[1.02] pb-[0.08em]"
               />
@@ -333,6 +338,7 @@ export default function HeroSection({ liveMatch = null }) {
   const useDesktopLiteMotion = useHomeDesktopLiteMotion();
   const shouldSimplifyMotion = prefersReducedMotion || useDesktopLiteMotion;
   const videoRef = useRef(null);
+  const heroSectionRef = useRef(null);
   const [heroLines, setHeroLines] = useState([
     "End-to-end",
     "cricket scoring,",
@@ -362,12 +368,17 @@ export default function HeroSection({ liveMatch = null }) {
 
   useEffect(() => {
     const video = videoRef.current;
+    const heroSection = heroSectionRef.current;
 
-    if (!video) {
+    if (!video || !heroSection) {
       return undefined;
     }
 
     let isMounted = true;
+    let isHeroVisible = true;
+    let scrollIdleTimer = 0;
+    let isScrollSettled = true;
+    let visibilityObserver;
 
     video.muted = true;
     video.defaultMuted = true;
@@ -390,9 +401,27 @@ export default function HeroSection({ liveMatch = null }) {
       }
     };
 
+    const syncPlayback = () => {
+      if (!isMounted) {
+        return;
+      }
+
+      const shouldPlay =
+        document.visibilityState === "visible" &&
+        isScrollSettled &&
+        (!useDesktopLiteMotion || isHeroVisible);
+
+      if (shouldPlay) {
+        tryPlay();
+        return;
+      }
+
+      video.pause();
+    };
+
     const handleLoadedMetadata = () => {
       markReady();
-      tryPlay();
+      syncPlayback();
     };
 
     if (video.readyState >= 2) {
@@ -404,15 +433,51 @@ export default function HeroSection({ liveMatch = null }) {
     video.addEventListener("canplay", handleLoadedMetadata);
     video.addEventListener("canplaythrough", handleLoadedMetadata);
     video.addEventListener("playing", markReady);
-    tryPlay();
+    if (typeof IntersectionObserver === "function") {
+      visibilityObserver = new IntersectionObserver(
+        (entries) => {
+          const nextEntry = entries[0];
+          if (!nextEntry) {
+            return;
+          }
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        tryPlay();
+          isHeroVisible =
+            nextEntry.isIntersecting && nextEntry.intersectionRatio > 0.18;
+          syncPlayback();
+        },
+        {
+          threshold: [0, 0.18, 0.4, 0.7],
+        }
+      );
+      visibilityObserver.observe(heroSection);
+    }
+
+    syncPlayback();
+
+    const handleScroll = () => {
+      if (!useDesktopLiteMotion) {
         return;
       }
 
+      isScrollSettled = false;
+      if (scrollIdleTimer) {
+        window.clearTimeout(scrollIdleTimer);
+      }
       video.pause();
+      scrollIdleTimer = window.setTimeout(() => {
+        isScrollSettled = true;
+        syncPlayback();
+      }, 140);
+    };
+
+    if (useDesktopLiteMotion) {
+      window.addEventListener("scroll", handleScroll, { passive: true });
+      window.addEventListener("wheel", handleScroll, { passive: true });
+      window.addEventListener("touchmove", handleScroll, { passive: true });
+    }
+
+    const handleVisibilityChange = () => {
+      syncPlayback();
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -426,8 +491,15 @@ export default function HeroSection({ liveMatch = null }) {
       video.removeEventListener("canplaythrough", handleLoadedMetadata);
       video.removeEventListener("playing", markReady);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (scrollIdleTimer) {
+        window.clearTimeout(scrollIdleTimer);
+      }
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("wheel", handleScroll);
+      window.removeEventListener("touchmove", handleScroll);
+      visibilityObserver?.disconnect();
     };
-  }, []);
+  }, [useDesktopLiteMotion]);
 
   const handleScrollToStart = () => {
     const target = document.getElementById("quick-start");
@@ -443,6 +515,7 @@ export default function HeroSection({ liveMatch = null }) {
         heroLines={heroLines}
         videoReady={videoReady}
         videoRef={videoRef}
+        sectionRef={heroSectionRef}
         handleScrollToStart={handleScrollToStart}
       />
     );
@@ -454,6 +527,7 @@ export default function HeroSection({ liveMatch = null }) {
       heroLines={heroLines}
       videoReady={videoReady}
       videoRef={videoRef}
+      sectionRef={heroSectionRef}
       handleScrollToStart={handleScrollToStart}
     />
   );

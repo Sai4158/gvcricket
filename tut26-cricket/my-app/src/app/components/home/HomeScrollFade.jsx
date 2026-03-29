@@ -21,9 +21,23 @@ export default function HomeScrollFade({
     revealDelayMs: Math.max(0, delayMs),
   });
 
+  if (useDesktopLiteMotion) {
+    return (
+      <div
+        ref={ref}
+        className={`${className} home-desktop-reveal home-desktop-reveal-sm ${
+          isVisible ? "is-visible" : ""
+        }`}
+        style={{ "--home-reveal-delay": `${delayMs}ms` }}
+      >
+        {children}
+      </div>
+    );
+  }
+
   return (
     <motion.div
-      ref={useDesktopLiteMotion ? ref : undefined}
+      ref={undefined}
       initial={
         shouldReduceMotion
           ? false
@@ -40,16 +54,7 @@ export default function HomeScrollFade({
         delay: shouldReduceMotion ? 0 : delayMs / 1000,
         ease: [0.22, 1, 0.36, 1],
       }}
-      className={`${className} ${
-        useDesktopLiteMotion
-          ? `home-desktop-reveal home-desktop-reveal-sm ${isVisible ? "is-visible" : ""}`
-          : ""
-      }`}
-      style={
-        useDesktopLiteMotion
-          ? { "--home-reveal-delay": `${delayMs}ms` }
-          : undefined
-      }
+      className={className}
     >
       {children}
     </motion.div>

@@ -164,7 +164,7 @@ export default function LiveNowBanner({ liveMatch }) {
         pendingLabel="Opening live score..."
         pendingClassName="pending-shimmer"
         primeAudioOnClick
-        className="liquid-glass pointer-events-auto flex w-full max-w-[calc(100vw-5rem)] items-center justify-between gap-3 rounded-[26px] px-3.5 py-2.5 text-white shadow-[0_18px_34px_rgba(0,0,0,0.2)] transition hover:border-white/28 md:max-w-md md:gap-4 md:px-4 md:py-3"
+        className="liquid-glass home-md-no-glass pointer-events-auto flex w-full max-w-[calc(100vw-5rem)] items-center justify-between gap-3 rounded-[26px] px-3.5 py-2.5 text-white shadow-[0_18px_34px_rgba(0,0,0,0.2)] transition hover:border-white/28 md:max-w-md md:gap-4 md:px-4 md:py-3"
       >
         {({ pending, spinner }) => (
           <>
@@ -194,7 +194,7 @@ export default function LiveNowBanner({ liveMatch }) {
                 </div>
               </div>
             </div>
-            <div className="liquid-pill relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] text-white md:h-12 md:w-12">
+            <div className="liquid-pill home-md-no-glass relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] text-white md:h-12 md:w-12">
               {pending ? spinner : <FaArrowRight className="h-4 w-4" />}
             </div>
           </>

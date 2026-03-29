@@ -93,13 +93,16 @@ export default function CommunityHighlightsSection() {
       >
         GV Cricket started in 2022 with a few friends who loved the game. Today, it helps power a friendly league of more than 50 members who come together for fun, competitive cricket.
       </motion.p>
-      <div className="grid w-full gap-8 sm:grid-cols-2 lg:grid-cols-2 xl:gap-10 2xl:gap-12">
-        {demoVideos.map((video, index) => (
+      <div
+        className={`grid w-full gap-8 sm:grid-cols-2 lg:grid-cols-2 xl:gap-10 2xl:gap-12 ${
+          useDesktopLiteMotion ? "home-desktop-grid-sequence" : ""
+        }`}
+      >
+        {demoVideos.map((video) => (
           <YouTubeVideoPlayer
             key={video.videoId}
             videoId={video.videoId}
             title={video.title}
-            index={index}
           />
         ))}
       </div>
