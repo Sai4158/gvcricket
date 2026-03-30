@@ -25,6 +25,10 @@ function getCompletedOvers(match) {
   return Math.floor(countLegalBalls(getActiveHistory(match)) / 6);
 }
 
+function getCompletedLegalBalls(match) {
+  return countLegalBalls(getActiveHistory(match));
+}
+
 function getOversLeft(match) {
   return Math.max(0, safeNumber(match?.overs) - getCompletedOvers(match));
 }
@@ -69,6 +73,24 @@ function formatRemainingOvers(match) {
   return `${overs} over${overs === 1 ? "" : "s"} and ${balls} ball${
     balls === 1 ? "" : "s"
   }`;
+}
+
+function formatCompletedProgress(match) {
+  const legalBalls = getCompletedLegalBalls(match);
+  const overs = Math.floor(legalBalls / 6);
+  const balls = legalBalls % 6;
+
+  if (overs <= 0) {
+    return `${legalBalls} ball${legalBalls === 1 ? "" : "s"} bowled.`;
+  }
+
+  if (balls === 0) {
+    return `${overs} over${overs === 1 ? "" : "s"} completed.`;
+  }
+
+  return `${overs} over${overs === 1 ? "" : "s"} and ${balls} ball${
+    balls === 1 ? "" : "s"
+  } bowled.`;
 }
 
 function isLegalBall(ball) {
@@ -353,13 +375,12 @@ export function buildSpectatorScoreAnnouncement(event, match) {
 export function buildSpectatorOverCompleteAnnouncement(match) {
   if (!match) return "";
 
-  const oversDone = getCompletedOvers(match);
   const oversLeft = getOversLeft(match);
   const wicketsInOver = getWicketsInCurrentOver(match);
   const parts = [
     "Over complete.",
     buildScoreSentence(match.score, match.outs),
-    oversDone === 1 ? "1 over is done." : `${oversDone} overs are done.`,
+    formatCompletedProgress(match),
   ];
 
   if (oversLeft > 0) {
@@ -652,17 +673,14 @@ export function buildLiveScoreAnnouncementSequence(
 export function buildCurrentScoreAnnouncement(match) {
   if (!match) return "";
 
-  const oversDone = getCompletedOvers(match);
-  const oversLeft = getOversLeft(match);
   const parts = [
     buildScoreSentence(match.score, match.outs),
-    oversDone === 1 ? "1 over is done." : `${oversDone} overs are done.`,
+    formatCompletedProgress(match),
   ];
 
-  if (oversLeft > 0) {
-    parts.push(
-      oversLeft === 1 ? "1 over is left." : `${oversLeft} overs are left.`,
-    );
+  const remainingProgress = formatRemainingOvers(match);
+  if (remainingProgress !== "0 balls") {
+    parts.push(`${remainingProgress} left.`);
   }
 
   if (match?.innings === "second") {
