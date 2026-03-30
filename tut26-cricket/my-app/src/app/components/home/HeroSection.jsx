@@ -409,6 +409,8 @@ export default function HeroSection({ liveMatch = null }) {
       const shouldPlay =
         document.visibilityState === "visible" &&
         isScrollSettled &&
+        (!useDesktopLiteMotion ||
+          window.scrollY < window.innerHeight * 0.32) &&
         (!useDesktopLiteMotion || isHeroVisible);
 
       if (shouldPlay) {
@@ -472,8 +474,6 @@ export default function HeroSection({ liveMatch = null }) {
 
     if (useDesktopLiteMotion) {
       window.addEventListener("scroll", handleScroll, { passive: true });
-      window.addEventListener("wheel", handleScroll, { passive: true });
-      window.addEventListener("touchmove", handleScroll, { passive: true });
     }
 
     const handleVisibilityChange = () => {
@@ -495,8 +495,6 @@ export default function HeroSection({ liveMatch = null }) {
         window.clearTimeout(scrollIdleTimer);
       }
       window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("wheel", handleScroll);
-      window.removeEventListener("touchmove", handleScroll);
       visibilityObserver?.disconnect();
     };
   }, [useDesktopLiteMotion]);

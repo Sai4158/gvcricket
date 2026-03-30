@@ -101,6 +101,59 @@ const previewTitleVariants = {
   },
 };
 
+function DesktopLiteHeadline({
+  text,
+  isVisible,
+  className = "",
+  lineClassName = "",
+  delay = 0,
+}) {
+  const lines = Array.isArray(text) ? text : [text];
+
+  return (
+    <div className={className}>
+      {lines.map((line, lineIndex) => {
+        const parts = line.split(/(\s+)/);
+        let wordIndex = 0;
+
+        return (
+          <span key={`${line}-${lineIndex}`} className={`block whitespace-pre ${lineClassName}`}>
+            {parts.map((part, partIndex) => {
+              if (!part) {
+                return null;
+              }
+
+              if (/^\s+$/.test(part)) {
+                return <span key={`${lineIndex}-space-${partIndex}`}>{part}</span>;
+              }
+
+              const wordDelayMs = Math.round(
+                (delay + lineIndex * 0.16 + wordIndex * 0.08) * 1000
+              );
+              wordIndex += 1;
+
+              return (
+                <span
+                  key={`${lineIndex}-word-${partIndex}`}
+                  className={`inline-block text-white [text-rendering:geometricPrecision] drop-shadow-[0_10px_26px_rgba(0,0,0,0.42)] home-heading-word-reveal ${
+                    isVisible ? "is-visible" : ""
+                  }`}
+                  style={{
+                    "--home-word-delay": `${wordDelayMs}ms`,
+                    "--home-word-duration": "0.78s",
+                  }}
+                >
+                  {part}
+                </span>
+              );
+            })}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 const featureCards = [
   {
     title: "Walkie-Talkie",
@@ -1316,6 +1369,7 @@ function DesktopRevealCard({ children, index = 0, className = "" }) {
   const { ref, isVisible } = useHomeDesktopReveal(true, {
     threshold: 0.06,
     rootMargin: "0px 0px -6% 0px",
+    resetOnExit: true,
   });
 
   return (
@@ -1332,21 +1386,13 @@ function DesktopRevealCard({ children, index = 0, className = "" }) {
 }
 
 function FeatureCardDesktop({ card, index }) {
-  const hueLayers = getAccentHueLayers(card.accent);
-
   return (
     <DesktopRevealCard
       index={index}
-      className={`liquid-glass-soft group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 home-desktop-lite-card ${
+      className={`group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 home-desktop-lite-card ${
         card.previewType === "director" ? "md:col-span-2 xl:col-span-2" : ""
       } ${getFeatureCardWideSpan(card.previewType)} ${getFeatureCardWideOrder(card.previewType)}`}
     >
-        <div
-          className={`home-md-lite-glow-primary pointer-events-none absolute -left-14 top-8 h-40 w-40 rounded-full blur-3xl ${hueLayers.primary} opacity-90`}
-        />
-        <div
-          className={`home-md-lite-glow-secondary pointer-events-none absolute -right-12 bottom-6 h-36 w-36 rounded-full blur-[72px] ${hueLayers.secondary} opacity-80`}
-        />
       <div
         className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentRail(
           card.accent
@@ -1370,19 +1416,11 @@ function FeatureCardDesktop({ card, index }) {
 }
 
 function JourneyCardDesktop({ card, index }) {
-  const hueLayers = getAccentHueLayers(card.accent);
-
   return (
     <DesktopRevealCard
       index={index}
-      className={`liquid-glass-soft group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 home-desktop-lite-card ${getJourneyCardWideSpan()}`}
+      className={`group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 home-desktop-lite-card ${getJourneyCardWideSpan()}`}
     >
-        <div
-          className={`home-md-lite-glow-primary pointer-events-none absolute -left-14 top-8 h-40 w-40 rounded-full blur-3xl ${hueLayers.primary} opacity-90`}
-        />
-        <div
-          className={`home-md-lite-glow-secondary pointer-events-none absolute -right-12 bottom-6 h-36 w-36 rounded-full blur-[72px] ${hueLayers.secondary} opacity-80`}
-        />
       <div
         className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentRail(
           card.accent
@@ -1562,10 +1600,12 @@ export default function HowItWorksSection() {
   const featurePanelReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
     threshold: 0.06,
     rootMargin: "0px 0px -6% 0px",
+    resetOnExit: true,
   });
   const journeyPanelReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
     threshold: 0.06,
     rootMargin: "0px 0px -6% 0px",
+    resetOnExit: true,
   });
   const FeaturePanelTag = useDesktopLiteMotion ? "div" : motion.div;
   const JourneyPanelTag = useDesktopLiteMotion ? "div" : motion.div;
@@ -1617,9 +1657,7 @@ export default function HowItWorksSection() {
       <div className="space-y-8">
         <FeaturePanelTag
           {...featurePanelProps}
-          className={`liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10 ${
-            useDesktopLiteMotion ? "home-desktop-lite-panel" : ""
-          } ${
+          className={`${useDesktopLiteMotion ? "home-desktop-lite-panel" : "liquid-glass-soft"} rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10 ${
             useDesktopLiteMotion
               ? `home-desktop-reveal home-desktop-reveal-panel ${
                   featurePanelReveal.isVisible ? "is-visible" : ""
@@ -1635,18 +1673,28 @@ export default function HowItWorksSection() {
               GV Cricket 2.0
             </p>
             <div className="mt-3">
-              <LiquidSportText
-                text={["New tools for", "live scoring"]}
-                characterTyping
-                characterStagger={0.02}
-                characterLineDelay={0.12}
-                characterDuration={0.34}
-                simplifyMotion={shouldReduceMotion}
-                lightweightCharacterReveal={useDesktopLiteMotion}
-                delay={0.03}
-                className="text-4xl font-semibold tracking-[-0.04em] md:text-5xl"
-                lineClassName="leading-[0.98]"
-              />
+              {useDesktopLiteMotion ? (
+                <DesktopLiteHeadline
+                  text={["New tools for", "live scoring"]}
+                  isVisible={featurePanelReveal.isVisible}
+                  delay={0.03}
+                  className="text-4xl font-semibold tracking-[-0.04em] md:text-5xl"
+                  lineClassName="leading-[0.98]"
+                />
+              ) : (
+                <LiquidSportText
+                  text={["New tools for", "live scoring"]}
+                  characterTyping
+                  characterStagger={0.02}
+                  characterLineDelay={0.12}
+                  characterDuration={0.34}
+                  simplifyMotion={shouldReduceMotion}
+                  lightweightCharacterReveal={useDesktopLiteMotion}
+                  delay={0.03}
+                  className="text-4xl font-semibold tracking-[-0.04em] md:text-5xl"
+                  lineClassName="leading-[0.98]"
+                />
+              )}
             </div>
           </div>
 
@@ -1672,9 +1720,7 @@ export default function HowItWorksSection() {
 
         <JourneyPanelTag
           {...journeyPanelProps}
-          className={`liquid-glass-soft rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10 ${
-            useDesktopLiteMotion ? "home-desktop-lite-panel" : ""
-          } ${
+          className={`${useDesktopLiteMotion ? "home-desktop-lite-panel" : "liquid-glass-soft"} rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10 ${
             useDesktopLiteMotion
               ? `home-desktop-reveal home-desktop-reveal-panel ${
                   journeyPanelReveal.isVisible ? "is-visible" : ""
@@ -1683,18 +1729,28 @@ export default function HowItWorksSection() {
           }`}
         >
           <div className="mx-auto max-w-3xl text-center">
-            <LiquidSportText
-              text={["From toss to final", "result"]}
-              characterTyping
-              characterStagger={0.02}
-              characterLineDelay={0.12}
-              characterDuration={0.34}
-              simplifyMotion={shouldReduceMotion}
-              lightweightCharacterReveal={useDesktopLiteMotion}
-              delay={0.03}
-              className="text-4xl font-semibold tracking-[-0.04em] md:text-5xl"
-              lineClassName="leading-[0.98]"
-            />
+            {useDesktopLiteMotion ? (
+              <DesktopLiteHeadline
+                text={["From toss to final", "result"]}
+                isVisible={journeyPanelReveal.isVisible}
+                delay={0.03}
+                className="text-4xl font-semibold tracking-[-0.04em] md:text-5xl"
+                lineClassName="leading-[0.98]"
+              />
+            ) : (
+              <LiquidSportText
+                text={["From toss to final", "result"]}
+                characterTyping
+                characterStagger={0.02}
+                characterLineDelay={0.12}
+                characterDuration={0.34}
+                simplifyMotion={shouldReduceMotion}
+                lightweightCharacterReveal={useDesktopLiteMotion}
+                delay={0.03}
+                className="text-4xl font-semibold tracking-[-0.04em] md:text-5xl"
+                lineClassName="leading-[0.98]"
+              />
+            )}
             <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-white/72 md:text-base">
               A fresh live match flow with instant scoring, premium spectator view, smarter match status, and secure access from start to finish.
             </p>

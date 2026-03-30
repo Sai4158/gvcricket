@@ -20,6 +20,7 @@ export default function AnimatedSection({
   const { ref, isVisible } = useHomeDesktopReveal(useDesktopLiteMotion, {
     threshold: 0.08,
     rootMargin: "0px 0px -6% 0px",
+    resetOnExit: true,
   });
   const hiddenMotion = shouldReduceMotion
     ? false

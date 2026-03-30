@@ -22,13 +22,9 @@ function getSharedObserver(threshold, rootMargin) {
   const observer = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
-        if (!entry.isIntersecting) {
-          continue;
-        }
-
         const listener = listeners.get(entry.target);
         if (listener) {
-          listener();
+          listener(entry);
         }
       }
     },
@@ -58,13 +54,15 @@ export default function useHomeDesktopReveal(
     threshold = 0.12,
     rootMargin = "0px 0px -8% 0px",
     revealDelayMs = 36,
+    resetOnExit = false,
   } = {}
 ) {
   const ref = useRef(null);
-  const [hasRevealed, setHasRevealed] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const visibilityRef = useRef(false);
 
   useEffect(() => {
-    if (!active || hasRevealed) {
+    if (!active) {
       return undefined;
     }
 
@@ -93,8 +91,17 @@ export default function useHomeDesktopReveal(
       }
     };
 
+    const syncVisibility = (nextVisible) => {
+      if (visibilityRef.current === nextVisible) {
+        return;
+      }
+
+      visibilityRef.current = nextVisible;
+      setIsVisible(nextVisible);
+    };
+
     const reveal = (instant = false) => {
-      if (hasRevealed) {
+      if (visibilityRef.current) {
         return;
       }
 
@@ -102,7 +109,7 @@ export default function useHomeDesktopReveal(
       frameOne = window.requestAnimationFrame(() => {
         const finishReveal = () => {
           frameTwo = window.requestAnimationFrame(() => {
-            setHasRevealed(true);
+            syncVisibility(true);
           });
         };
 
@@ -115,9 +122,14 @@ export default function useHomeDesktopReveal(
       });
     };
 
+    const hide = () => {
+      cleanupTimers();
+      syncVisibility(false);
+    };
+
     const element = ref.current;
     if (!element) {
-      reveal(true);
+      syncVisibility(true);
       return cleanupTimers;
     }
 
@@ -143,11 +155,15 @@ export default function useHomeDesktopReveal(
 
     if (isCurrentlyVisible()) {
       reveal(false);
+    } else if (resetOnExit) {
+      hide();
     }
 
     fallbackCheckId = window.setTimeout(() => {
       if (isCurrentlyVisible()) {
         reveal(true);
+      } else if (resetOnExit) {
+        hide();
       }
     }, Math.max(550, revealDelayMs * 10));
 
@@ -157,11 +173,20 @@ export default function useHomeDesktopReveal(
     }
 
     sharedObserver = getSharedObserver(threshold, rootMargin);
-    const handleIntersect = () => {
-      reveal();
-      sharedObserver.observer.unobserve(element);
-      sharedObserver.listeners.delete(element);
-      releaseSharedObserver(sharedObserver);
+    const handleIntersect = (entry) => {
+      if (entry.isIntersecting) {
+        reveal();
+        if (!resetOnExit) {
+          sharedObserver.observer.unobserve(element);
+          sharedObserver.listeners.delete(element);
+          releaseSharedObserver(sharedObserver);
+        }
+        return;
+      }
+
+      if (resetOnExit) {
+        hide();
+      }
     };
     sharedObserver.listeners.set(element, handleIntersect);
     sharedObserver.observer.observe(element);
@@ -174,7 +199,7 @@ export default function useHomeDesktopReveal(
       }
       cleanupTimers();
     };
-  }, [active, hasRevealed, revealDelayMs, rootMargin, threshold]);
+  }, [active, revealDelayMs, resetOnExit, rootMargin, threshold]);
 
-  return { ref, isVisible: !active || hasRevealed };
+  return { ref, isVisible: !active || isVisible };
 }

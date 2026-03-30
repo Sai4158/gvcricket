@@ -19,6 +19,7 @@ export default function HomeScrollFade({
     threshold: viewportAmount,
     rootMargin: viewportMargin,
     revealDelayMs: Math.max(0, delayMs),
+    resetOnExit: true,
   });
 
   if (useDesktopLiteMotion) {

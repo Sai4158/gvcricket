@@ -18,6 +18,18 @@ function LearnStepCard({ title, copy, index, useDesktopLiteMotion, shouldReduceM
     rootMargin: "0px 0px -6% 0px",
   });
 
+  if (useDesktopLiteMotion) {
+    return (
+      <div
+        className="rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-4 lg:min-h-[168px] home-desktop-lite-subpanel"
+        style={{ "--home-reveal-delay": `${index * 95}ms` }}
+      >
+        <span className="block text-sm font-semibold text-white">{title}</span>
+        <p className="mt-2 text-[12px] leading-5 text-zinc-300/86">{copy}</p>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       ref={!useDesktopLiteMotion && !shouldReduceMotion ? stepReveal.ref : undefined}
@@ -56,6 +68,20 @@ function LearnGuideCard({ index, useDesktopLiteMotion, shouldReduceMotion }) {
     threshold: 0.08,
     rootMargin: "0px 0px -6% 0px",
   });
+
+  if (useDesktopLiteMotion) {
+    return (
+      <div
+        className="hidden rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-4 py-4 lg:flex lg:min-h-[168px] lg:items-center lg:justify-center home-desktop-lite-subpanel"
+        style={{ "--home-reveal-delay": `${index * 95}ms` }}
+      >
+        <div className="inline-flex items-center gap-2 text-center text-sm font-semibold text-white">
+          <span>Open guide</span>
+          <FaArrowUpRightFromSquare className="text-sm text-white/90" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -99,6 +125,7 @@ export default function LearnCricketCard() {
   const sectionReveal = useHomeDesktopReveal(useDesktopLiteMotion, {
     threshold: 0.08,
     rootMargin: "0px 0px -6% 0px",
+    resetOnExit: true,
   });
   const learnSteps = [
     {
@@ -123,22 +150,28 @@ export default function LearnCricketCard() {
     },
   ];
 
+  const SectionTag = useDesktopLiteMotion ? "section" : motion.section;
+  const LinkTag = useDesktopLiteMotion ? "a" : motion.a;
+  const LeftMediaTag = useDesktopLiteMotion ? "div" : motion.div;
+  const RightContentTag = useDesktopLiteMotion ? "div" : motion.div;
+  const MobileMediaTag = useDesktopLiteMotion ? "div" : motion.div;
+
   return (
-    <motion.section
+    <SectionTag
       id="learn-cricket"
       ref={useDesktopLiteMotion ? sectionReveal.ref : undefined}
-      initial={
-        shouldReduceMotion
-          ? false
-          : { opacity: 0, y: 22, scale: 0.992, filter: "blur(6px)" }
-      }
-      whileInView={
-        shouldReduceMotion
-          ? undefined
-          : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
-      }
-      viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
-      transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1] }}
+      {...(!useDesktopLiteMotion
+        ? {
+            initial: shouldReduceMotion
+              ? false
+              : { opacity: 0, y: 22, scale: 0.992, filter: "blur(6px)" },
+            whileInView: shouldReduceMotion
+              ? undefined
+              : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" },
+            viewport: { once: true, amount: 0.02, margin: "0px 0px 14% 0px" },
+            transition: { duration: 0.68, ease: [0.22, 1, 0.36, 1] },
+          }
+        : {})}
       className={`mx-auto w-full max-w-6xl scroll-mt-28 2xl:max-w-[108rem] ${
         useDesktopLiteMotion
           ? `home-desktop-reveal home-desktop-reveal-panel ${
@@ -146,21 +179,19 @@ export default function LearnCricketCard() {
             }`
           : ""
       }`}
-      style={
-        useDesktopLiteMotion
-          ? { "--home-reveal-delay": "80ms" }
-          : undefined
-      }
+      style={useDesktopLiteMotion ? { "--home-reveal-delay": "80ms" } : undefined}
     >
-      <motion.a
+      <LinkTag
         href="https://usacricket.org/what-is-cricket/"
         target="_blank"
         rel="noopener noreferrer"
-        whileHover={
-          shouldReduceMotion
-            ? undefined
-            : { y: -6, scale: 1.008, transition: { duration: 0.26 } }
-        }
+        {...(!useDesktopLiteMotion
+          ? {
+              whileHover: shouldReduceMotion
+                ? undefined
+                : { y: -6, scale: 1.008, transition: { duration: 0.26 } },
+            }
+          : {})}
         className={`group relative block overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,24,0.96),rgba(8,8,14,0.94))] px-6 py-6 shadow-[0_28px_70px_rgba(0,0,0,0.42)] transition-transform duration-300 hover:-translate-y-1 md:px-8 md:py-8 lg:px-9 lg:py-9 ${
           useDesktopLiteMotion ? "home-desktop-lite-panel" : ""
         }`}
@@ -176,19 +207,19 @@ export default function LearnCricketCard() {
         <div className={`relative z-10 grid items-start gap-7 lg:grid-cols-[minmax(320px,0.84fr)_minmax(0,1.16fr)] lg:gap-9 xl:grid-cols-[minmax(360px,0.88fr)_minmax(0,1.12fr)] ${
           useDesktopLiteMotion ? "home-desktop-panel-sequence" : ""
         }`}>
-          <motion.div
-            initial={
-              shouldReduceMotion
-                ? false
-                : { opacity: 0, x: -34, y: 16, rotate: -0.4, filter: "blur(6px)" }
-            }
-            whileInView={
-              shouldReduceMotion
-                ? undefined
-                : { opacity: 1, x: 0, y: 0, rotate: 0, filter: "blur(0px)" }
-            }
-            viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.04 }}
+          <LeftMediaTag
+            {...(!useDesktopLiteMotion
+              ? {
+                  initial: shouldReduceMotion
+                    ? false
+                    : { opacity: 0, x: -34, y: 16, rotate: -0.4, filter: "blur(6px)" },
+                  whileInView: shouldReduceMotion
+                    ? undefined
+                    : { opacity: 1, x: 0, y: 0, rotate: 0, filter: "blur(0px)" },
+                  viewport: { once: true, amount: 0.02, margin: "0px 0px 14% 0px" },
+                  transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.04 },
+                }
+              : {})}
             className="relative hidden lg:block"
           >
             <div className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,20,28,0.9),rgba(10,10,16,0.94))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_42px_rgba(0,0,0,0.24)] lg:sticky lg:top-24">
@@ -209,21 +240,21 @@ export default function LearnCricketCard() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-white/6" />
               </div>
             </div>
-          </motion.div>
+          </LeftMediaTag>
 
-          <motion.div
-            initial={
-              shouldReduceMotion
-                ? false
-                : { opacity: 0, x: -30, y: 14, filter: "blur(5px)" }
-            }
-            whileInView={
-              shouldReduceMotion
-                ? undefined
-                : { opacity: 1, x: 0, y: 0, filter: "blur(0px)" }
-            }
-            viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
-            transition={{ duration: 0.64, ease: [0.22, 1, 0.36, 1] }}
+          <RightContentTag
+            {...(!useDesktopLiteMotion
+              ? {
+                  initial: shouldReduceMotion
+                    ? false
+                    : { opacity: 0, x: -30, y: 14, filter: "blur(5px)" },
+                  whileInView: shouldReduceMotion
+                    ? undefined
+                    : { opacity: 1, x: 0, y: 0, filter: "blur(0px)" },
+                  viewport: { once: true, amount: 0.02, margin: "0px 0px 14% 0px" },
+                  transition: { duration: 0.64, ease: [0.22, 1, 0.36, 1] },
+                }
+              : {})}
             className={`space-y-5 text-left ${useDesktopLiteMotion ? "home-desktop-card-sequence" : ""}`}
           >
             <span className="liquid-pill inline-flex items-center rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-zinc-100/90">
@@ -245,19 +276,19 @@ export default function LearnCricketCard() {
               />
             </div>
 
-            <motion.div
-              initial={
-                shouldReduceMotion
-                  ? false
-                  : { opacity: 0, x: 34, y: 16, rotate: 0.5, filter: "blur(6px)" }
-              }
-              whileInView={
-                shouldReduceMotion
-                  ? undefined
-                  : { opacity: 1, x: 0, y: 0, rotate: 0, filter: "blur(0px)" }
-              }
-              viewport={{ once: true, amount: 0.02, margin: "0px 0px 14% 0px" }}
-              transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.04 }}
+            <MobileMediaTag
+              {...(!useDesktopLiteMotion
+                ? {
+                    initial: shouldReduceMotion
+                      ? false
+                      : { opacity: 0, x: 34, y: 16, rotate: 0.5, filter: "blur(6px)" },
+                    whileInView: shouldReduceMotion
+                      ? undefined
+                      : { opacity: 1, x: 0, y: 0, rotate: 0, filter: "blur(0px)" },
+                    viewport: { once: true, amount: 0.02, margin: "0px 0px 14% 0px" },
+                    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.04 },
+                  }
+                : {})}
               className="relative lg:hidden"
             >
               <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,20,28,0.86),rgba(10,10,16,0.92))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
@@ -277,7 +308,7 @@ export default function LearnCricketCard() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-white/6" />
                 </div>
               </div>
-            </motion.div>
+            </MobileMediaTag>
 
             <div className={`grid gap-3 pt-1 sm:grid-cols-2 lg:grid-cols-3 ${
               useDesktopLiteMotion ? "home-desktop-grid-sequence" : ""
@@ -305,10 +336,10 @@ export default function LearnCricketCard() {
                 <FaArrowUpRightFromSquare className="text-sm text-white/90" />
               </span>
             </div>
-          </motion.div>
+          </RightContentTag>
 
         </div>
-      </motion.a>
-    </motion.section>
+      </LinkTag>
+    </SectionTag>
   );
 }

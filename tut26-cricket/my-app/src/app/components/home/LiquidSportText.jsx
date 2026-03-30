@@ -38,6 +38,7 @@ export default function LiquidSportText({
     {
       threshold: Math.max(0.02, Math.min(viewportAmount, 0.24)),
       rootMargin: viewportMargin,
+      resetOnExit: true,
     }
   );
   const lines = Array.isArray(text) ? text : [text];
