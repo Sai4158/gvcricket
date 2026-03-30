@@ -19,6 +19,8 @@ const SCORE_EFFECT_EVENTS = [
   { key: "six", label: "6 Runs", accent: "amber" },
 ];
 const RANDOM_SCORE_EFFECT_ID = "__random__";
+const KEYPAD_BUTTON_BASE =
+  "press-feedback rounded-2xl font-bold shadow-[0_16px_28px_rgba(0,0,0,0.28)] transition active:scale-[0.97]";
 
 function formatEffectDuration(durationSeconds) {
   const totalSeconds = Math.max(0, Math.round(Number(durationSeconds) || 0));
@@ -59,36 +61,41 @@ function ScrollingSoundLabel({ text = "", active = false }) {
 function getAccentClasses(accent) {
   if (accent === "rose") {
     return {
-      badge: "border-rose-400/20 bg-rose-400/10 text-rose-200",
-      button:
-        "border-rose-300/18 bg-transparent text-rose-100 hover:bg-rose-400/10",
+      tile:
+        "border border-rose-400/24 bg-[linear-gradient(180deg,#be123c,#9f1239)] text-white hover:brightness-105",
+      icon:
+        "border border-rose-300/16 bg-[linear-gradient(180deg,rgba(159,18,57,0.32),rgba(94,10,37,0.28))] text-rose-100 hover:bg-rose-500/20",
     };
   }
   if (accent === "sky") {
     return {
-      badge: "border-sky-400/20 bg-sky-400/10 text-sky-200",
-      button:
-        "border-sky-300/18 bg-transparent text-sky-100 hover:bg-sky-400/10",
+      tile:
+        "border border-sky-400/24 bg-[linear-gradient(180deg,#0284c7,#0369a1)] text-white hover:brightness-105",
+      icon:
+        "border border-sky-300/16 bg-[linear-gradient(180deg,rgba(2,132,199,0.26),rgba(3,105,161,0.22))] text-sky-100 hover:bg-sky-500/20",
     };
   }
   if (accent === "violet") {
     return {
-      badge: "border-violet-400/20 bg-violet-400/10 text-violet-200",
-      button:
-        "border-violet-300/18 bg-transparent text-violet-100 hover:bg-violet-400/10",
+      tile:
+        "border border-violet-400/24 bg-[linear-gradient(180deg,#6d28d9,#5b21b6)] text-white hover:brightness-105",
+      icon:
+        "border border-violet-300/16 bg-[linear-gradient(180deg,rgba(109,40,217,0.24),rgba(91,33,182,0.22))] text-violet-100 hover:bg-violet-500/20",
     };
   }
   if (accent === "emerald") {
     return {
-      badge: "border-emerald-400/20 bg-emerald-400/10 text-emerald-200",
-      button:
-        "border-emerald-300/18 bg-transparent text-emerald-100 hover:bg-emerald-400/10",
+      tile:
+        "border border-emerald-400/24 bg-[linear-gradient(180deg,#16a34a,#15803d)] text-white hover:brightness-105",
+      icon:
+        "border border-emerald-300/16 bg-[linear-gradient(180deg,rgba(22,163,74,0.24),rgba(21,128,61,0.22))] text-emerald-100 hover:bg-emerald-500/20",
     };
   }
   return {
-    badge: "border-amber-400/20 bg-amber-400/10 text-amber-200",
-    button:
-      "border-amber-300/18 bg-transparent text-amber-100 hover:bg-amber-400/10",
+    tile:
+      "border border-amber-400/24 bg-[linear-gradient(180deg,#f59e0b,#d97706)] text-white hover:brightness-105",
+    icon:
+      "border border-amber-300/16 bg-[linear-gradient(180deg,rgba(245,158,11,0.24),rgba(217,119,6,0.22))] text-amber-100 hover:bg-amber-500/20",
   };
 }
 
@@ -129,18 +136,28 @@ function SoundAssignmentRow({
   const hasAssignedSound = Boolean(selectedId) && canPreview;
 
   return (
-    <div className="rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-2.5">
-      <div className="relative flex items-center gap-2.5">
-        <button
+    <div className="rounded-[22px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-2.5">
+      <div className="grid grid-cols-[minmax(104px,124px)_1fr_52px] items-center gap-2.5">
+        <motion.button
           type="button"
+          whileTap={{ scale: 0.95, y: 2 }}
+          onClick={onEdit}
+          className={`${KEYPAD_BUTTON_BASE} min-h-[52px] px-3 py-3 text-[12px] uppercase tracking-[0.18em] ${accent.tile}`}
+          aria-label={`Edit ${event.label} sound`}
+        >
+          {event.label}
+        </motion.button>
+        <motion.button
+          type="button"
+          whileTap={hasAssignedSound ? { scale: 0.97, y: 2 } : undefined}
           onClick={onTogglePreview}
           disabled={!hasAssignedSound}
-          className={`flex min-w-0 flex-1 items-center gap-3 rounded-[18px] border px-3 py-2.5 text-left transition active:scale-[0.985] ${
+          className={`${KEYPAD_BUTTON_BASE} flex min-w-0 items-center justify-between gap-3 border border-white/10 bg-[linear-gradient(180deg,rgba(34,34,38,0.96),rgba(20,20,24,0.98))] px-4 py-3 text-left ${
             hasAssignedSound
-              ? `border-white/10 bg-white/[0.04] hover:bg-white/[0.06] ${
+              ? `text-white hover:bg-[linear-gradient(180deg,rgba(42,42,46,0.98),rgba(24,24,28,1))] ${
                   isPreviewing ? "ring-2 ring-emerald-400/30" : ""
                 }`
-              : "cursor-not-allowed border-white/8 bg-white/[0.03] opacity-80"
+              : "cursor-not-allowed text-white/55 opacity-75"
           }`}
           aria-label={
             hasAssignedSound
@@ -148,33 +165,29 @@ function SoundAssignmentRow({
               : `${event.label} has no sound selected`
           }
         >
-          <div
-            className={`inline-flex min-w-[84px] justify-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${accent.badge}`}
-          >
-            {event.label}
-          </div>
           <div className="min-w-0 flex-1">
             <ScrollingSoundLabel
               text={selectedLabel || ""}
               active={isPreviewing}
             />
           </div>
-          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-white/88">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/90">
             {isPreviewing ? (
               <FaPause className="text-xs" />
             ) : (
               <FaPlay className="text-xs" />
             )}
           </span>
-        </button>
-        <button
+        </motion.button>
+        <motion.button
           type="button"
           onClick={onEdit}
-          className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition active:scale-[0.97] ${accent.button}`}
+          whileTap={{ scale: 0.95, y: 2 }}
+          className={`${KEYPAD_BUTTON_BASE} inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center ${accent.icon}`}
           aria-label={`Edit ${event.label} sound`}
         >
           <FaEdit className="text-[11px]" />
-        </button>
+        </motion.button>
       </div>
     </div>
   );
@@ -204,7 +217,7 @@ function SoundPickerSheet({
             <div className="flex items-start justify-between gap-3 border-b border-white/8 pb-3">
               <div className="min-w-0">
                 <h4 className="text-lg font-black text-white">{eventLabel}</h4>
-                <p className="mt-1 text-xs text-zinc-500">
+                <p className="mt-1 text-xs text-white/70">
                   Select a sound
                 </p>
               </div>
@@ -222,38 +235,40 @@ function SoundPickerSheet({
               className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1"
               style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
             >
-              <button
+              <motion.button
                 type="button"
+                whileTap={{ scale: 0.95, y: 2 }}
                 onClick={() => onSelect("")}
-                className={`flex w-full items-center justify-between rounded-[20px] border px-4 py-3 text-left transition active:scale-[0.985] ${
+                className={`${KEYPAD_BUTTON_BASE} flex w-full items-center justify-between border px-4 py-4 text-left ${
                   !selectedId
-                    ? "border-emerald-300/28 bg-emerald-400/12 text-white"
-                    : "border-white/8 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.05]"
+                    ? "border-sky-300/30 bg-[linear-gradient(180deg,#0284c7,#0369a1)] text-white"
+                    : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
                 }`}
               >
-                <p className="text-sm font-semibold">None</p>
-                {!selectedId ? <FaCheck className="text-emerald-300" /> : null}
-              </button>
+                <p className="text-sm uppercase tracking-[0.16em]">None</p>
+                {!selectedId ? <FaCheck className="text-white" /> : null}
+              </motion.button>
 
-              <button
+              <motion.button
                 type="button"
+                whileTap={{ scale: 0.95, y: 2 }}
                 onClick={() => onSelect(RANDOM_SCORE_EFFECT_ID)}
-                className={`flex w-full items-center justify-between rounded-[20px] border px-4 py-3 text-left transition active:scale-[0.985] ${
+                className={`${KEYPAD_BUTTON_BASE} flex w-full items-center justify-between border px-4 py-4 text-left ${
                   selectedId === RANDOM_SCORE_EFFECT_ID
-                    ? "border-fuchsia-300/32 bg-[linear-gradient(90deg,rgba(217,70,239,0.18),rgba(56,189,248,0.16))] text-white"
-                    : "border-fuchsia-300/14 bg-[linear-gradient(90deg,rgba(217,70,239,0.12),rgba(56,189,248,0.08))] text-zinc-100 hover:bg-[linear-gradient(90deg,rgba(217,70,239,0.16),rgba(56,189,248,0.12))]"
+                    ? "border-fuchsia-300/30 bg-[linear-gradient(180deg,#c026d3,#7c3aed)] text-white"
+                    : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
                 }`}
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold">Random</p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.18em] text-white/60">
+                  <p className="text-sm uppercase tracking-[0.16em]">Random</p>
+                  <p className="mt-1 text-xs text-white/75">
                     Use a random sound
                   </p>
                 </div>
                 {selectedId === RANDOM_SCORE_EFFECT_ID ? (
-                  <FaCheck className="text-fuchsia-100" />
+                  <FaCheck className="text-white" />
                 ) : null}
-              </button>
+              </motion.button>
 
               {options.map((option) => {
                 const isSelected = selectedId === option.id;
@@ -262,17 +277,18 @@ function SoundPickerSheet({
                 return (
                   <div
                     key={option.id}
-                    className={`flex items-center gap-3 rounded-[20px] border px-4 py-3 transition ${
-                      isSelected
-                        ? "border-emerald-300/28 bg-emerald-400/12"
-                        : "border-white/8 bg-white/[0.03]"
-                    }`}
+                    className="grid grid-cols-[52px_1fr] items-center gap-3"
                   >
-                    <button
+                    <motion.button
                       type="button"
+                      whileTap={{ scale: 0.95, y: 2 }}
                       onClick={() => onPreview(option)}
-                      className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-white transition active:scale-[0.97] hover:bg-white/[0.08] ${
+                      className={`${KEYPAD_BUTTON_BASE} inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center border ${
                         isPreviewing ? "ring-2 ring-emerald-400/35" : ""
+                      } ${
+                        isPreviewing
+                          ? "border-emerald-300/30 bg-[linear-gradient(180deg,#16a34a,#15803d)] text-white"
+                          : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
                       }`}
                       aria-label={`${isPreviewing ? "Pause" : "Preview"} ${option.label}`}
                     >
@@ -281,33 +297,38 @@ function SoundPickerSheet({
                       ) : (
                         <FaPlay className="text-xs" />
                       )}
-                    </button>
-                    <button
+                    </motion.button>
+                    <motion.button
                       type="button"
+                      whileTap={{ scale: 0.97, y: 2 }}
                       onClick={() => onSelect(option.id)}
-                      className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left active:scale-[0.995]"
+                      className={`${KEYPAD_BUTTON_BASE} flex min-w-0 items-center justify-between gap-3 border px-4 py-4 text-left ${
+                        isSelected
+                          ? "border-emerald-300/30 bg-[linear-gradient(180deg,#16a34a,#15803d)] text-white"
+                          : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
+                      }`}
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-white">
                           {option.label}
                         </p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.18em] text-zinc-500">
+                        <p className="mt-1 text-xs uppercase tracking-[0.18em] text-white/65">
                           {option.fileName || option.id}
                         </p>
                       </div>
-                      <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">
+                      <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/85">
                         {Number(option.durationSeconds) > 0 ? (
-                          <span className="text-[11px] tracking-[0.14em] text-zinc-500">
+                          <span className="text-[11px] tracking-[0.14em] text-white/65">
                             {formatEffectDuration(option.durationSeconds)}
                           </span>
                         ) : null}
                         {isSelected ? (
-                          <FaCheck className="text-emerald-300" />
+                          <FaCheck className="text-white" />
                         ) : (
                           <FaChevronRight />
                         )}
                       </div>
-                    </button>
+                    </motion.button>
                   </div>
                 );
               })}
@@ -401,10 +422,10 @@ export default function ScoreSoundEffectsEditor({
     <div className={`${surfaceClassName} ${className}`.trim()}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-400">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white">
             Score Sounds
           </p>
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="mt-1 text-xs text-white/72">
             {scoreSoundsDescription}
           </p>
         </div>
@@ -424,10 +445,10 @@ export default function ScoreSoundEffectsEditor({
       </div>
 
       {showSpectatorBroadcastToggle ? (
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] border border-white/8 bg-white/[0.03] px-3.5 py-3">
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.025))] px-3.5 py-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-white">Spectators</p>
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-white/70">
               Play score sounds live.
             </p>
           </div>
@@ -446,12 +467,12 @@ export default function ScoreSoundEffectsEditor({
       ) : null}
 
       {showBroadcastStatus ? (
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] border border-white/8 bg-white/[0.03] px-3.5 py-3">
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.025))] px-3.5 py-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-white">
               {broadcastStatusLabel}
             </p>
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-white/70">
               {broadcastStatusText}
             </p>
           </div>

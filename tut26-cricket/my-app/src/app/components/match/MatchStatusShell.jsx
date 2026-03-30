@@ -90,16 +90,25 @@ export function Scoreboard({ match, history }) {
   return (
     <div className="grid grid-cols-2 gap-4 text-center mb-6 bg-zinc-900/50 p-4 rounded-2xl ring-1 ring-white/10">
       <div>
-        <div className="text-6xl font-bold text-white">
-          {match.score}
-          <span className="text-4xl text-rose-500">/{match.outs}</span>
+        <div className="text-6xl font-bold text-white tabular-nums [font-variant-numeric:tabular-nums]">
+          <span className="inline-flex items-baseline justify-center">
+            <span className="inline-block min-w-[2.4ch] text-right">
+              {match.score}
+            </span>
+            <span className="text-4xl text-rose-500">/</span>
+            <span className="inline-block min-w-[1.2ch] text-left text-rose-500">
+              {match.outs}
+            </span>
+          </span>
         </div>
         <div className="text-zinc-100 text-sm uppercase tracking-wider">
           Score / Wickets <strong>({battingTeam.players.length})</strong>
         </div>
       </div>
       <div>
-        <div className="text-6xl font-bold text-white">{oversDisplay}</div>
+        <div className="text-6xl font-bold text-white tabular-nums [font-variant-numeric:tabular-nums]">
+          <span className="inline-block min-w-[3ch]">{oversDisplay}</span>
+        </div>
         <div className="text-zinc-100 text-sm uppercase tracking-wider">
           Overs <strong>({match.overs})</strong>
           <strong className="block">({ballsLeft})</strong>

@@ -73,6 +73,41 @@ function normalizeQueuedActionEntry(entry) {
   };
 }
 
+function getAppliedActionIds(match) {
+  const history = Array.isArray(match?.actionHistory) ? match.actionHistory : [];
+
+  return new Set(
+    history
+      .map((entry) =>
+        typeof entry?.actionId === "string" ? entry.actionId : ""
+      )
+      .filter(Boolean),
+  );
+}
+
+function filterQueuedActionsAlreadyApplied(match, queuedEntries = []) {
+  if (!queuedEntries.length) {
+    return [];
+  }
+
+  const appliedActionIds = getAppliedActionIds(match);
+  if (!appliedActionIds.size) {
+    return queuedEntries;
+  }
+
+  return queuedEntries.filter(
+    (entry) => !appliedActionIds.has(entry?.action?.actionId),
+  );
+}
+
+function removeQueuedActionById(queuedEntries = [], actionId = "") {
+  if (!actionId) {
+    return queuedEntries;
+  }
+
+  return queuedEntries.filter((entry) => entry?.action?.actionId !== actionId);
+}
+
 function readStoredActionQueue(matchId) {
   if (typeof window === "undefined" || !matchId) {
     return [];
@@ -164,13 +199,22 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       return null;
     }
 
-    if (!actionQueueRef.current.length) {
+    const syncedQueue = filterQueuedActionsAlreadyApplied(
+      baseMatch,
+      actionQueueRef.current,
+    );
+
+    if (syncedQueue.length !== actionQueueRef.current.length) {
+      updateQueuedActions(syncedQueue);
+    }
+
+    if (!syncedQueue.length) {
       return baseMatch;
     }
 
     try {
       return normalizeOptimisticMatch(
-        replayQueuedMatchActions(baseMatch, actionQueueRef.current),
+        replayQueuedMatchActions(baseMatch, syncedQueue),
       );
     } catch {
       updateQueuedActions([]);
@@ -431,7 +475,10 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
         }
 
         if (body.match) {
-          const remainingQueue = actionQueueRef.current.slice(1);
+          const remainingQueue = removeQueuedActionById(
+            actionQueueRef.current,
+            currentEntry.action.actionId,
+          );
           updateQueuedActions(remainingQueue);
           const nextMatch = applyQueuedFallbackState(body.match);
           matchRef.current = nextMatch;
@@ -444,7 +491,12 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
             );
           });
         } else {
-          updateQueuedActions(actionQueueRef.current.slice(1));
+          updateQueuedActions(
+            removeQueuedActionById(
+              actionQueueRef.current,
+              currentEntry.action.actionId,
+            ),
+          );
         }
 
         setError(null);

@@ -398,10 +398,10 @@ export default function MatchSoundEffectsPanel({
         <div className="mt-4 rounded-[24px] border border-emerald-300/16 bg-[linear-gradient(180deg,rgba(18,30,26,0.96),rgba(8,10,14,0.98))] p-3 shadow-[0_18px_50px_rgba(0,0,0,0.34)] sm:p-4">
           <div className="mb-4 flex items-start justify-between gap-3 border-b border-white/8 pb-4">
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-200/88">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white">
                 Sound Setup
               </p>
-              <p className="mt-1 text-sm text-zinc-400">
+              <p className="mt-1 text-sm text-white/72">
                 Set sounds for out, 2, 3, 4, and 6.
               </p>
             </div>
