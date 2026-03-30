@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FaChevronDown,
+  FaEdit,
   FaGripVertical,
   FaMusic,
   FaPause,
   FaPlay,
+  FaTimes,
   FaVolumeUp,
 } from "react-icons/fa";
+import ScoreSoundEffectsEditor from "../live/ScoreSoundEffectsEditor";
 
 function formatAudioTime(seconds) {
   const safeSeconds = Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
@@ -34,11 +37,14 @@ export default function MatchSoundEffectsPanel({
   onStopEffect,
   onReorder,
   needsUnlock = false,
+  scoreSoundSettings = null,
+  onOpenScoreSoundSettings,
 }) {
   const effectCount = Array.isArray(files) ? files.length : 0;
   const [draggingId, setDraggingId] = useState("");
   const [dropTargetId, setDropTargetId] = useState("");
   const [pendingEffectId, setPendingEffectId] = useState("");
+  const [isScoreSoundSettingsOpen, setIsScoreSoundSettingsOpen] = useState(false);
   const pointerDragRef = useRef({
     pointerId: null,
     activeId: "",
@@ -303,6 +309,8 @@ export default function MatchSoundEffectsPanel({
     void onPlayEffect?.(file);
   }, [isDisabled, onPlayEffect, onStopEffect]);
 
+  const hasScoreSoundSettings = Boolean(scoreSoundSettings);
+
   return (
     <section
       className={`relative mt-6 overflow-hidden rounded-[30px] border px-4 py-4 transition ${
@@ -314,19 +322,21 @@ export default function MatchSoundEffectsPanel({
       <span className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/60 via-35% via-cyan-200/45 to-transparent" />
       <span className="pointer-events-none absolute -left-10 top-3 h-28 w-28 rounded-full bg-amber-400/10 blur-3xl" />
       <span className="pointer-events-none absolute -right-8 bottom-0 h-24 w-24 rounded-full bg-cyan-400/8 blur-3xl" />
-      <button
-        type="button"
-        onClick={onToggle}
+      <div
         className={`relative flex w-full items-center justify-between gap-4 overflow-hidden rounded-[24px] border px-4 py-3 text-left transition ${
           isOpen
             ? "border-amber-300/16 bg-[linear-gradient(180deg,rgba(29,22,14,0.58),rgba(16,18,28,0.72))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_16px_44px_rgba(0,0,0,0.24)]"
             : "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.055),rgba(255,255,255,0.025))] hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))]"
         }`}
-        aria-expanded={isOpen}
-        aria-label="Toggle sound effects"
       >
         <span className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
-        <span className="flex min-w-0 items-center gap-3">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          aria-expanded={isOpen}
+          aria-label="Toggle sound effects"
+        >
           <span className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border border-amber-300/16 bg-[linear-gradient(180deg,rgba(251,191,36,0.28),rgba(146,64,14,0.08))] text-amber-100 shadow-[0_10px_26px_rgba(245,158,11,0.2)]">
             <span className="pointer-events-none absolute inset-0 rounded-[18px] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),transparent_55%)]" />
             <FaVolumeUp />
@@ -343,17 +353,75 @@ export default function MatchSoundEffectsPanel({
                   : "Tap to load"}
             </span>
           </span>
-        </span>
-        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/8 bg-white/[0.045] text-zinc-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-          <FaChevronDown
-            className={`text-sm transition-transform ${
-              isOpen ? "rotate-180" : ""
-            }`}
-          />
-        </span>
-      </button>
+        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {hasScoreSoundSettings ? (
+            <button
+              type="button"
+              onClick={() => {
+                setIsScoreSoundSettingsOpen((current) => {
+                  const nextOpen = !current;
+                  if (nextOpen) {
+                    onOpenScoreSoundSettings?.();
+                  }
+                  return nextOpen;
+                });
+              }}
+              className={`inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition ${
+                isScoreSoundSettingsOpen
+                  ? "border-emerald-300/18 bg-emerald-500/12 text-emerald-100"
+                  : "border-white/8 bg-white/[0.045] text-zinc-300 hover:bg-white/[0.08]"
+              }`}
+              aria-label="Edit score sound assignments"
+              aria-pressed={isScoreSoundSettingsOpen}
+            >
+              <FaEdit className="text-[12px]" />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onToggle}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/8 bg-white/[0.045] text-zinc-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+            aria-expanded={isOpen}
+            aria-label={isOpen ? "Collapse sound effects" : "Expand sound effects"}
+          >
+            <FaChevronDown
+              className={`text-sm transition-transform ${
+                isOpen ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+        </div>
+      </div>
 
-      {isOpen ? (
+      {isScoreSoundSettingsOpen && hasScoreSoundSettings ? (
+        <div className="mt-4 rounded-[24px] border border-emerald-300/16 bg-[linear-gradient(180deg,rgba(18,30,26,0.96),rgba(8,10,14,0.98))] p-3 shadow-[0_18px_50px_rgba(0,0,0,0.34)] sm:p-4">
+          <div className="mb-4 flex items-start justify-between gap-3 border-b border-white/8 pb-4">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-200/88">
+                Sound Setup
+              </p>
+              <p className="mt-1 text-sm text-zinc-400">
+                Set sounds for out, 2, 3, 4, and 6.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsScoreSoundSettingsOpen(false)}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-zinc-200 transition hover:bg-white/[0.08]"
+              aria-label="Close score sound setup"
+            >
+              <FaTimes />
+            </button>
+          </div>
+          <ScoreSoundEffectsEditor
+            {...scoreSoundSettings}
+            surface="flat"
+          />
+        </div>
+      ) : null}
+
+      {isOpen && !isScoreSoundSettingsOpen ? (
         <div className="mt-4 space-y-3">
           {needsUnlock ? (
             <div className="rounded-[22px] border border-amber-300/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">

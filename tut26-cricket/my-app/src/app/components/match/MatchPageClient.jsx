@@ -1426,6 +1426,12 @@ export default function MatchPageClient({
   const isTestSequenceActionActive =
     activeCommentaryAction === "test-sequence" &&
     (status === "speaking" || isAnySoundEffectActive);
+  const previewingCommentarySoundEffectId =
+    activeCommentaryAction === "event-preview" &&
+    (activeSoundEffectStatus === "loading" ||
+      activeSoundEffectStatus === "playing")
+      ? activeCommentaryPreviewId
+      : "";
 
   const commentarySoundEffectOptions = useMemo(() => {
     const availableEffects = soundEffectFiles.length
@@ -1865,6 +1871,20 @@ export default function MatchPageClient({
               onPlayEffect={handlePlaySoundEffect}
               onStopEffect={handleStopLiveSoundEffect}
               onReorder={handleReorderSoundEffects}
+              scoreSoundSettings={{
+                settings: umpireSettings,
+                updateSetting: updateUmpireSetting,
+                showScoreSoundEffectsToggle: true,
+                showSpectatorBroadcastToggle: true,
+                showScoreEffectAssignments: true,
+                soundEffectOptions: commentarySoundEffectOptions,
+                previewingSoundEffectId: previewingCommentarySoundEffectId,
+                previewingSoundEffectStatus: activeSoundEffectStatus,
+                onPreviewSoundEffect: handlePreviewCommentarySoundEffect,
+              }}
+              onOpenScoreSoundSettings={() => {
+                void loadSoundEffectsLibrary();
+              }}
             />
           ) : null}
           <MatchActionGrid
@@ -1987,12 +2007,7 @@ export default function MatchPageClient({
                   showSpectatorBroadcastToggle: true,
                   showScoreEffectAssignments: true,
                   soundEffectOptions: commentarySoundEffectOptions,
-                  previewingSoundEffectId:
-                    activeCommentaryAction === "event-preview" &&
-                    (activeSoundEffectStatus === "loading" ||
-                      activeSoundEffectStatus === "playing")
-                      ? activeCommentaryPreviewId
-                      : "",
+                  previewingSoundEffectId: previewingCommentarySoundEffectId,
                   previewingSoundEffectStatus: activeSoundEffectStatus,
                   onPreviewSoundEffect: handlePreviewCommentarySoundEffect,
                   onTestSequence: handleCommentaryTestSequenceAction,

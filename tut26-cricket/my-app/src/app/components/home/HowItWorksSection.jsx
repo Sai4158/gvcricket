@@ -319,7 +319,11 @@ function PreviewSurface({ accent, heading, children, staticMode = false }) {
   return (
     <Div
       {...withVariants(previewStaggerVariants)}
-      className="home-desktop-preview-surface relative overflow-hidden rounded-[26px] border border-white/12 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_28%),linear-gradient(180deg,rgba(12,14,20,0.96),rgba(7,8,12,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+      className={`relative overflow-hidden rounded-[26px] border border-white/12 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_28%),linear-gradient(180deg,rgba(12,14,20,0.96),rgba(7,8,12,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ${
+        staticMode
+          ? "home-desktop-preview-surface home-updates-desktop-preview"
+          : "home-desktop-preview-surface"
+      }`}
     >
       <Div
         {...withVariants(previewItemVariants)}
@@ -400,10 +404,20 @@ function renderJourneyPreview(card, staticMode = false) {
         <PreviewSurface accent={card.accent} heading="Toss" staticMode={staticMode}>
           <div className="space-y-3">
             <Div {...withVariants(previewStaggerVariants)} className="grid grid-cols-2 gap-3">
-              <Div {...withVariants(previewItemVariants)} className="btn-ui btn-ui-glass-dark justify-center rounded-[18px] px-3 py-4 text-[12px]">
+              <Div
+                {...withVariants(previewItemVariants)}
+                className={`btn-ui justify-center rounded-[18px] px-3 py-4 text-[12px] ${
+                  staticMode ? "home-updates-desktop-button home-updates-desktop-button-warm" : "btn-ui-glass-dark"
+                }`}
+              >
                 Heads
               </Div>
-              <Div {...withVariants(previewItemVariants)} className="btn-ui btn-ui-glass-dark-alt justify-center rounded-[18px] px-3 py-4 text-[12px]">
+              <Div
+                {...withVariants(previewItemVariants)}
+                className={`btn-ui justify-center rounded-[18px] px-3 py-4 text-[12px] ${
+                  staticMode ? "home-updates-desktop-button home-updates-desktop-button-cool" : "btn-ui-glass-dark-alt"
+                }`}
+              >
                 Tails
               </Div>
             </Div>
@@ -1012,7 +1026,13 @@ function renderFeaturePreview(card, staticMode = false) {
               className="relative overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_36%),linear-gradient(180deg,rgba(22,24,30,0.96),rgba(10,12,16,0.98))] px-3 py-3"
             >
               <div className="relative z-10 flex items-center justify-between gap-2.5">
-                <div className="liquid-glass relative flex min-w-0 flex-1 items-center justify-between gap-2 rounded-[22px] px-3 py-2.5 text-white shadow-[0_18px_34px_rgba(0,0,0,0.2)]">
+                <div
+                  className={`relative flex min-w-0 flex-1 items-center justify-between gap-2 rounded-[22px] px-3 py-2.5 text-white ${
+                    staticMode
+                      ? "home-updates-desktop-inset"
+                      : "liquid-glass shadow-[0_18px_34px_rgba(0,0,0,0.2)]"
+                  }`}
+                >
                   <div className="absolute inset-0 rounded-[22px] bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.1),transparent_40%)]" />
                   <div className="relative z-10 flex min-w-0 items-center gap-2">
                     <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-[14px]">
@@ -1037,7 +1057,11 @@ function renderFeaturePreview(card, staticMode = false) {
                       </div>
                     </div>
                   </div>
-                  <div className="liquid-pill relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-[14px] text-white">
+                  <div
+                    className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-[14px] text-white ${
+                      staticMode ? "home-updates-desktop-pill" : "liquid-pill"
+                    }`}
+                  >
                     <FaArrowRight className="h-3 w-3" />
                   </div>
                 </div>
@@ -1389,7 +1413,7 @@ function FeatureCardDesktop({ card, index }) {
   return (
     <DesktopRevealCard
       index={index}
-      className={`group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 home-desktop-lite-card ${
+      className={`group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 home-desktop-lite-card home-updates-desktop-card ${
         card.previewType === "director" ? "md:col-span-2 xl:col-span-2" : ""
       } ${getFeatureCardWideSpan(card.previewType)} ${getFeatureCardWideOrder(card.previewType)}`}
     >
@@ -1419,7 +1443,7 @@ function JourneyCardDesktop({ card, index }) {
   return (
     <DesktopRevealCard
       index={index}
-      className={`group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 home-desktop-lite-card ${getJourneyCardWideSpan()}`}
+      className={`group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 home-desktop-lite-card home-updates-desktop-card ${getJourneyCardWideSpan()}`}
     >
       <div
         className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentRail(
@@ -1657,7 +1681,7 @@ export default function HowItWorksSection() {
       <div className="space-y-8">
         <FeaturePanelTag
           {...featurePanelProps}
-          className={`${useDesktopLiteMotion ? "home-desktop-lite-panel" : "liquid-glass-soft"} rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10 ${
+          className={`${useDesktopLiteMotion ? "home-desktop-lite-panel home-updates-desktop-panel" : "liquid-glass-soft"} rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10 ${
             useDesktopLiteMotion
               ? `home-desktop-reveal home-desktop-reveal-panel ${
                   featurePanelReveal.isVisible ? "is-visible" : ""
@@ -1720,7 +1744,7 @@ export default function HowItWorksSection() {
 
         <JourneyPanelTag
           {...journeyPanelProps}
-          className={`${useDesktopLiteMotion ? "home-desktop-lite-panel" : "liquid-glass-soft"} rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10 ${
+          className={`${useDesktopLiteMotion ? "home-desktop-lite-panel home-updates-desktop-panel" : "liquid-glass-soft"} rounded-[32px] border border-white/14 bg-[linear-gradient(180deg,rgba(14,14,18,0.74),rgba(8,8,14,0.62))] p-7 shadow-[0_24px_70px_rgba(0,0,0,0.32)] md:p-10 xl:p-8 2xl:p-10 ${
             useDesktopLiteMotion
               ? `home-desktop-reveal home-desktop-reveal-panel ${
                   journeyPanelReveal.isVisible ? "is-visible" : ""

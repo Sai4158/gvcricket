@@ -870,6 +870,72 @@ button:disabled,
     -webkit-backdrop-filter: none !important;
   }
 
+  .home-updates-desktop-panel {
+    background:
+      linear-gradient(180deg, rgba(18, 18, 24, 0.92), rgba(10, 10, 14, 0.94)),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)) !important;
+    box-shadow:
+      0 10px 24px rgba(0, 0, 0, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.04) !important;
+  }
+
+  .home-updates-desktop-card {
+    background:
+      linear-gradient(180deg, rgba(18, 18, 24, 0.94), rgba(10, 10, 14, 0.96)),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01)) !important;
+    box-shadow:
+      0 8px 18px rgba(0, 0, 0, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.03) !important;
+  }
+
+  .home-updates-desktop-preview {
+    background:
+      linear-gradient(180deg, rgba(16, 18, 24, 0.96), rgba(8, 10, 14, 0.98)),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 6px 14px rgba(0, 0, 0, 0.08) !important;
+  }
+
+  .home-updates-desktop-inset {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background:
+      linear-gradient(180deg, rgba(18, 18, 24, 0.92), rgba(10, 12, 16, 0.95)),
+      radial-gradient(circle at top left, rgba(52, 211, 153, 0.08), transparent 40%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 8px 18px rgba(0, 0, 0, 0.1);
+  }
+
+  .home-updates-desktop-pill {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .home-updates-desktop-button {
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow:
+      0 8px 18px rgba(0, 0, 0, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .home-updates-desktop-button-warm {
+    background:
+      linear-gradient(180deg, rgba(20, 20, 26, 0.96), rgba(10, 12, 18, 0.98)),
+      radial-gradient(circle at top center, rgba(251, 113, 133, 0.12), transparent 48%);
+    color: #fff5f5;
+  }
+
+  .home-updates-desktop-button-cool {
+    background:
+      linear-gradient(180deg, rgba(20, 20, 26, 0.96), rgba(10, 12, 18, 0.98)),
+      radial-gradient(circle at top center, rgba(96, 165, 250, 0.12), transparent 48%);
+    color: #f4f8ff;
+  }
+
   .home-desktop-lite-card::after,
   .home-desktop-lite-panel::after,
   .home-desktop-lite-subpanel::after,
@@ -894,6 +960,16 @@ button:disabled,
         0 18px 38px rgba(0, 0, 0, 0.18),
         inset 0 1px 0 rgba(255, 255, 255, 0.26),
         inset 0 -1px 0 rgba(255, 255, 255, 0.08) !important;
+    }
+
+    .home-updates-desktop-panel:hover,
+    .home-updates-desktop-card:hover,
+    .home-updates-desktop-preview:hover {
+      transform: translate3d(0, -2px, 0);
+      box-shadow:
+        0 12px 26px rgba(0, 0, 0, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.04) !important;
     }
 
     .home-desktop-lite-subpanel:hover {
