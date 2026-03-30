@@ -1,9 +1,31 @@
 "use client";
 
 import { useState } from "react";
+import { Barlow_Condensed } from "next/font/google";
 import LoadingButton from "../shared/LoadingButton";
 import { countLegalBalls } from "../../lib/match-scoring";
 import { getBattingTeamBundle } from "../../lib/team-utils";
+
+const scoreboardDisplayFont = Barlow_Condensed({
+  subsets: ["latin"],
+  weight: ["700", "800"],
+});
+
+function getBattingStripClasses(battingTeam) {
+  const normalizedName = String(battingTeam?.name || "").trim().toLowerCase();
+
+  if (normalizedName.includes("blue")) {
+    return "from-sky-400/20 via-sky-400 to-blue-600/20";
+  }
+
+  if (normalizedName.includes("red")) {
+    return "from-rose-400/20 via-rose-500 to-red-600/20";
+  }
+
+  return battingTeam?.key === "teamB"
+    ? "from-sky-400/20 via-sky-400 to-blue-600/20"
+    : "from-rose-400/20 via-rose-500 to-red-600/20";
+}
 
 export function Splash({ children }) {
   return (
@@ -86,28 +108,32 @@ export function Scoreboard({ match, history }) {
   const oversDisplay = `${Math.floor(legalBalls / 6)}.${legalBalls % 6}`;
   const battingTeam = getBattingTeamBundle(match);
   const ballsLeft = Math.max(Number(match?.overs || 0) * 6 - legalBalls, 0);
+  const stripClasses = getBattingStripClasses(battingTeam);
 
   return (
-    <div className="grid grid-cols-2 gap-4 text-center mb-6 bg-zinc-900/50 p-4 rounded-2xl ring-1 ring-white/10">
-      <div>
-        <div className="text-6xl font-bold text-white tabular-nums [font-variant-numeric:tabular-nums]">
+    <div className="relative grid grid-cols-2 gap-4 text-center mb-6 bg-zinc-900/50 p-4 rounded-2xl ring-1 ring-white/10">
+      <span
+        className={`pointer-events-none absolute inset-x-4 top-0 h-[3px] rounded-b-full bg-gradient-to-r ${stripClasses}`}
+      />
+      <div className="flex flex-col items-center justify-center">
+        <div
+          className={`${scoreboardDisplayFont.className} text-7xl font-bold text-white tabular-nums [font-variant-numeric:tabular-nums] sm:text-8xl`}
+        >
           <span className="inline-flex items-baseline justify-center">
-            <span className="inline-block min-w-[2.4ch] text-right">
-              {match.score}
-            </span>
+            <span>{match.score}</span>
             <span className="text-4xl text-rose-500">/</span>
-            <span className="inline-block min-w-[1.2ch] text-left text-rose-500">
-              {match.outs}
-            </span>
+            <span className="text-rose-500">{match.outs}</span>
           </span>
         </div>
         <div className="text-zinc-100 text-sm uppercase tracking-wider">
           Score / Wickets <strong>({battingTeam.players.length})</strong>
         </div>
       </div>
-      <div>
-        <div className="text-6xl font-bold text-white tabular-nums [font-variant-numeric:tabular-nums]">
-          <span className="inline-block min-w-[3ch]">{oversDisplay}</span>
+      <div className="flex flex-col items-center justify-center">
+        <div
+          className={`${scoreboardDisplayFont.className} text-7xl font-bold text-white tabular-nums [font-variant-numeric:tabular-nums] sm:text-8xl`}
+        >
+          <span>{oversDisplay}</span>
         </div>
         <div className="text-zinc-100 text-sm uppercase tracking-wider">
           Overs <strong>({match.overs})</strong>
