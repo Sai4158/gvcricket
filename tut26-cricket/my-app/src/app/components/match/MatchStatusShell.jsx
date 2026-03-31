@@ -111,7 +111,7 @@ export function Scoreboard({ match, history }) {
   const stripClasses = getBattingStripClasses(battingTeam);
 
   return (
-    <div className="relative grid grid-cols-2 gap-4 text-center mb-6 bg-zinc-900/50 p-4 rounded-2xl ring-1 ring-white/10">
+    <div className="relative grid grid-cols-2 gap-4 text-center bg-zinc-900/50 p-4 rounded-2xl ring-1 ring-white/10">
       <span
         className={`pointer-events-none absolute inset-x-4 top-0 h-[3px] rounded-b-full bg-gradient-to-r ${stripClasses}`}
       />
