@@ -248,6 +248,7 @@ export function WalkieNotice({
 export function WalkieRequestQueue({
   requests = [],
   onAccept,
+  onDismiss,
 }) {
   if (!requests.length) return null;
 
@@ -270,13 +271,20 @@ export function WalkieRequestQueue({
               </p>
             </div>
           </div>
-          <div className="mt-4">
+          <div className="mt-4 grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => onAccept?.(request.requestId)}
               className="flex w-full items-center justify-center rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black shadow-[0_14px_34px_rgba(16,185,129,0.24)] transition hover:bg-emerald-400"
             >
               Accept
+            </button>
+            <button
+              type="button"
+              onClick={() => onDismiss?.(request.requestId)}
+              className="flex w-full items-center justify-center rounded-2xl border border-white/12 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
+            >
+              Dismiss
             </button>
           </div>
         </div>

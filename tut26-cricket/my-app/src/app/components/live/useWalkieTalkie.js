@@ -88,6 +88,14 @@ function walkieMessageFor(error, fallback) {
   return messageFor(error, fallback);
 }
 
+function parseWalkieCooldownSeconds(message) {
+  const match = String(message || "").match(/please wait (\d+) seconds/i);
+  if (!match) {
+    return 0;
+  }
+  return Math.max(0, Number.parseInt(match[1], 10) || 0);
+}
+
 function isExpectedWalkieTransportError(error) {
   const rawCode = String(error?.code || "");
   const rawName = String(error?.name || "");
@@ -345,6 +353,16 @@ async function requestJson(url, body) {
   return payload;
 }
 
+async function requestWalkieState(url) {
+  const response = await fetch(url, {
+    method: "GET",
+    cache: "no-store",
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.message || "Request failed.");
+  return payload;
+}
+
 async function loadRtc() {
   const mod = await import("agora-rtc-sdk-ng");
   const rtc = mod.default || mod;
@@ -526,7 +544,6 @@ export default function useWalkieTalkie({
   const rtcSessionIdRef = useRef("");
   const signalingUserIdRef = useRef("");
   const signalingChannelRef = useRef("");
-  const metadataOperationRef = useRef(Promise.resolve());
   const signalingGenerationRef = useRef(0);
   const toggleEnabledPromiseRef = useRef(null);
   const requestEnablePromiseRef = useRef(null);
@@ -892,7 +909,10 @@ export default function useWalkieTalkie({
   }, [ensureParticipantId, ensureRtcSessionId, matchId, role]);
 
   const fetchSignalingToken = useCallback(async () => {
-    if (isTokenFresh(signalTokenRef.current, SIGNAL_TOKEN_REFRESH_BUFFER_MS)) {
+    if (
+      isTokenFresh(signalTokenRef.current, SIGNAL_TOKEN_REFRESH_BUFFER_MS) &&
+      signalTokenRef.current?.participantToken
+    ) {
       return signalTokenRef.current;
     }
     if (signalTokenPromiseRef.current) {
@@ -901,7 +921,10 @@ export default function useWalkieTalkie({
     const id = ensureParticipantId();
     if (!matchId || !id) throw new Error("Walkie is not ready yet.");
     const cached = readStoredWalkieToken("signal", matchId, role, id);
-    if (isTokenFresh(cached, SIGNAL_TOKEN_REFRESH_BUFFER_MS)) {
+    if (
+      isTokenFresh(cached, SIGNAL_TOKEN_REFRESH_BUFFER_MS) &&
+      cached?.participantToken
+    ) {
       const next = validateWalkieTokenPayload(cached, "Signaling");
       signalTokenRef.current = next;
       signalingUserIdRef.current = next?.userId || buildAgoraUserId(matchId, id, role);
@@ -910,6 +933,7 @@ export default function useWalkieTalkie({
       setHasWalkieToken(Boolean(next?.token));
       return next;
     }
+    clearStoredWalkieToken("signal", matchId, role, id);
     signalTokenPromiseRef.current = requestJson("/api/agora/signaling-token", {
       matchId,
       participantId: id,
@@ -1425,6 +1449,33 @@ export default function useWalkieTalkie({
     [refreshPresenceSnapshot]
   );
 
+  const syncMetadataState = useCallback(
+    async (nextState, client = rtmClientRef.current) => {
+      const normalized = {
+        enabled: Boolean(nextState?.enabled),
+        pendingRequests: filterAgoraWalkieRequests(nextState?.pendingRequests),
+      };
+      applyMetadataState(normalized);
+      await broadcastMetadataState(client, normalized);
+      return normalized;
+    },
+    [applyMetadataState, broadcastMetadataState]
+  );
+
+  const syncPersistentWalkieState = useCallback(async () => {
+    if (!matchId) {
+      return null;
+    }
+
+    const payload = await requestWalkieState(`/api/matches/${matchId}/walkie`);
+    const nextState = {
+      enabled: Boolean(payload?.walkie?.enabled),
+      pendingRequests: payload?.walkie?.pendingRequests,
+    };
+    applyMetadataState(nextState);
+    return nextState;
+  }, [applyMetadataState, matchId]);
+
   const ensureRtmSession = useCallback(async () => {
     if (
       !enabled ||
@@ -1601,17 +1652,25 @@ export default function useWalkieTalkie({
               metadataStateRef.current.pendingRequests.length > 0 ||
               role === "umpire"
             ) {
-              void broadcastMetadataState(client, metadataStateRef.current);
+              void (async () => {
+                const nextState =
+                  (await syncPersistentWalkieState().catch(() => null)) ||
+                  metadataStateRef.current;
+                await broadcastMetadataState(client, nextState);
+              })();
             }
             return;
           }
 
           if (payload.type === "walkie-enabled") {
+            const nextPendingRequests = Array.isArray(payload.pendingRequests)
+              ? payload.pendingRequests
+              : payload.enabled
+              ? metadataStateRef.current.pendingRequests
+              : [];
             applyMetadataState({
               enabled: Boolean(payload.enabled),
-              pendingRequests: payload.enabled
-                ? metadataStateRef.current.pendingRequests
-                : [],
+              pendingRequests: nextPendingRequests,
             });
             updateNotice(payload.enabled ? "Walkie-talkie is live." : "Walkie-talkie is off.");
             return;
@@ -1748,6 +1807,17 @@ export default function useWalkieTalkie({
       });
 
       await refreshRuntimeState(client);
+      try {
+        await syncPersistentWalkieState();
+      } catch (syncError) {
+        walkieConsole("warn", "Walkie persistent state sync skipped", {
+          stage: "persistent-sync",
+          message: messageFor(
+            syncError,
+            "Walkie persistent state could not be loaded."
+          ),
+        });
+      }
       const now = Date.now();
       const shouldRequestSync =
         now - lastSyncRequestAtRef.current >= SIGNALING_SYNC_REQUEST_MIN_GAP_MS;
@@ -1796,6 +1866,7 @@ export default function useWalkieTalkie({
     role,
     schedulePresenceRefresh,
     scheduleRequestReset,
+    syncPersistentWalkieState,
     syncSnapshot,
     updateNotice,
     publishWalkieMessage,
@@ -1928,29 +1999,6 @@ export default function useWalkieTalkie({
   }, [syncSnapshot]);
 
   cleanupSignalingHandlerRef.current = cleanupSignaling;
-
-  const runWithControlMetadata = useCallback(
-    async (updater) => {
-      const schedule = metadataOperationRef.current.catch(() => {}).then(async () => {
-        const client = await ensureRtmSession();
-        const current = {
-          enabled: metadataStateRef.current.enabled,
-          pendingRequests: metadataStateRef.current.pendingRequests,
-        };
-        const next = (await updater(current, client)) || current;
-        const normalized = {
-          enabled: Boolean(next.enabled),
-          pendingRequests: filterAgoraWalkieRequests(next.pendingRequests),
-        };
-        applyMetadataState(normalized);
-        await broadcastMetadataState(client, normalized);
-        return normalized;
-      });
-      metadataOperationRef.current = schedule.catch(() => {});
-      return schedule;
-    },
-    [applyMetadataState, broadcastMetadataState, ensureRtmSession]
-  );
 
   const stopTalking = useCallback(
     async (reason = "released") => {
@@ -2266,121 +2314,149 @@ export default function useWalkieTalkie({
     }
 
     requestEnablePromiseRef.current = (async () => {
-    enableManualSignaling();
-    const selfId = ensureParticipantId();
-    if (!selfId) {
-      setError("Walkie is still connecting.");
-      return false;
-    }
-    const client = await ensureRtmSession().catch((requestError) => {
-      setError(walkieMessageFor(requestError, "Could not request walkie."));
-      return null;
-    });
-    if (!client) return false;
-
-    try {
-      setError("");
-      setRequestState("pending");
-      const participant = participantsRef.current.get(signalingUserIdRef.current) || {
-        participantId: selfId,
-        role,
-        name: defaultDisplayName(role, displayName),
-      };
-      if (metadataStateRef.current.enabled) {
-        setRequestState("accepted");
-        updateNotice("Walkie-talkie is live.");
-        scheduleRequestReset();
-        return true;
+      enableManualSignaling();
+      const selfId = ensureParticipantId();
+      if (!selfId) {
+        setError("Walkie is still connecting.");
+        return false;
       }
-      if (
-        metadataStateRef.current.pendingRequests.some(
-          (item) => item.participantId === participant.participantId
-        )
-      ) {
+
+      const tokenPayload = await fetchSignalingToken().catch((requestError) => {
+        setError(walkieMessageFor(requestError, "Could not request walkie."));
+        return null;
+      });
+      if (!tokenPayload?.participantToken) {
+        setError("Could not request walkie.");
+        return false;
+      }
+
+      const client = await ensureRtmSession().catch(() => null);
+
+      try {
+        setError("");
+        setCooldown(0);
         setRequestState("pending");
-        updateNotice("Waiting for umpire approval.");
-        return true;
-      }
-      const request = {
-        requestId: `${participant.role}:${participant.participantId}:${Date.now()}`,
-        participantId: participant.participantId,
-        role: participant.role,
-        name: participant.name,
-        signalingUserId: signalingUserIdRef.current,
-        requestedAt: nowIso(),
-        expiresAt: new Date(Date.now() + WALKIE_REQUEST_MAX_AGE_MS).toISOString(),
-      };
-      let shouldPublishRequest = true;
-
-      await runWithControlMetadata((current) => {
-        if (current.enabled) {
-          shouldPublishRequest = false;
+        const participant = participantsRef.current.get(signalingUserIdRef.current) || {
+          participantId: selfId,
+          role,
+          name: defaultDisplayName(role, displayName),
+        };
+        if (metadataStateRef.current.enabled) {
           setRequestState("accepted");
           updateNotice("Walkie-talkie is live.");
           scheduleRequestReset();
-          return current;
+          return true;
         }
-        const exists = current.pendingRequests.some(
-          (item) => item.participantId === request.participantId
-        );
-        if (exists) {
-          shouldPublishRequest = false;
+        if (
+          metadataStateRef.current.pendingRequests.some(
+            (item) => item.participantId === participant.participantId
+          )
+        ) {
           setRequestState("pending");
           updateNotice("Waiting for umpire approval.");
-          return current;
+          return true;
         }
-        return {
-          ...current,
-          pendingRequests: upsertAgoraWalkieRequest(current.pendingRequests, request),
-        };
-      });
 
-      if (!shouldPublishRequest) {
+        const response = await requestJson(`/api/matches/${matchId}/walkie/request`, {
+          participantId: participant.participantId,
+          role: participant.role,
+          token: tokenPayload.participantToken,
+        });
+        const nextState = await syncMetadataState(
+          {
+            enabled: Boolean(response?.walkie?.enabled),
+            pendingRequests: response?.walkie?.pendingRequests,
+          },
+          client,
+        );
+        const request = nextState.pendingRequests.find(
+          (item) => item.participantId === participant.participantId
+        );
+
+        if (request) {
+          await publishWalkieMessage(
+            {
+              type: "walkie-request",
+              requestId: request.requestId,
+              participantId: request.participantId,
+              role: request.role,
+              name: request.name,
+              signalingUserId:
+                signalingUserIdRef.current || String(tokenPayload.userId || ""),
+              requestedAt: request.requestedAt || nowIso(),
+              expiresAt:
+                request.expiresAt ||
+                new Date(Date.now() + WALKIE_REQUEST_MAX_AGE_MS).toISOString(),
+            },
+            { client, bestEffort: true },
+          );
+        }
+
+        if (nextState.enabled) {
+          setRequestState("accepted");
+          updateNotice("Walkie-talkie is live.");
+          scheduleRequestReset();
+        } else {
+          setRequestState("pending");
+          updateNotice("Waiting for umpire approval.");
+        }
+        walkieConsole("info", "Walkie requested", {
+          participantId: participant.participantId,
+          role: participant.role,
+        });
         return true;
-      }
+      } catch (requestError) {
+        const message = walkieMessageFor(requestError, "Could not request walkie.");
+        const cooldownSeconds = parseWalkieCooldownSeconds(message);
 
-      await publishWalkieMessage(
-        {
-          type: "walkie-request",
-          requestId: request.requestId,
-          participantId: request.participantId,
-          role: request.role,
-          name: request.name,
-          signalingUserId: request.signalingUserId,
-          requestedAt: request.requestedAt,
-          expiresAt: request.expiresAt,
-        },
-        { client },
-      );
-      walkieConsole("info", "Walkie requested", {
-        participantId: request.participantId,
-        role: request.role,
-      });
-      return true;
-    } catch (requestError) {
-      const message = walkieMessageFor(requestError, "Could not request walkie.");
-      setError(message);
-      setRequestState("idle");
-      walkieConsole("error", "Walkie request failed", {
-        stage: "request-enable",
-        message,
-      });
-      return false;
-    }
+        if (message === "Walkie-talkie is already on.") {
+          await syncPersistentWalkieState().catch(() => {
+            applyMetadataState({
+              enabled: true,
+              pendingRequests: [],
+            });
+          });
+          setRequestState("accepted");
+          updateNotice("Walkie-talkie is live.");
+          scheduleRequestReset();
+          return true;
+        }
+
+        if (message === "Request already sent. Waiting for the umpire.") {
+          await syncPersistentWalkieState().catch(() => {});
+          setRequestState("pending");
+          updateNotice("Waiting for umpire approval.");
+          return true;
+        }
+
+        setCooldown(cooldownSeconds);
+        setError(message);
+        setRequestState("idle");
+        walkieConsole("error", "Walkie request failed", {
+          stage: "request-enable",
+          message,
+        });
+        return false;
+      }
     })().finally(() => {
       requestEnablePromiseRef.current = null;
     });
 
     return requestEnablePromiseRef.current;
   }, [
+    applyMetadataState,
     displayName,
     ensureParticipantId,
     ensureRtmSession,
     enableManualSignaling,
+    fetchSignalingToken,
+    matchId,
     publishWalkieMessage,
     role,
-    runWithControlMetadata,
     scheduleRequestReset,
+    setCooldown,
+    syncMetadataState,
+    syncPersistentWalkieState,
     updateNotice,
   ]);
 
@@ -2396,11 +2472,17 @@ export default function useWalkieTalkie({
         if (!canEnable) return false;
         try {
           setError("");
-          const client = await ensureRtmSession();
-          await runWithControlMetadata((current) => ({
+          const client = await ensureRtmSession().catch(() => null);
+          const response = await requestJson(`/api/matches/${matchId}/walkie`, {
             enabled: Boolean(nextEnabled),
-            pendingRequests: nextEnabled ? current.pendingRequests : [],
-          }));
+          });
+          const nextState = await syncMetadataState(
+            {
+              enabled: Boolean(response?.walkie?.enabled),
+              pendingRequests: response?.walkie?.pendingRequests,
+            },
+            client,
+          );
 
           if (!nextEnabled && activeSpeakerRef.current?.owner) {
             activeSpeakerRef.current = null;
@@ -2410,9 +2492,10 @@ export default function useWalkieTalkie({
           await publishWalkieMessage(
             {
               type: "walkie-enabled",
-              enabled: Boolean(nextEnabled),
+              enabled: nextState.enabled,
+              pendingRequests: nextState.pendingRequests,
             },
-            { client },
+            { client, bestEffort: true },
           );
 
           if (!nextEnabled) {
@@ -2453,9 +2536,10 @@ export default function useWalkieTalkie({
       enableManualSignaling,
       isFinishing,
       isSelfTalking,
+      matchId,
       publishWalkieMessage,
-      runWithControlMetadata,
       stopTalking,
+      syncMetadataState,
       syncSnapshot,
       updateNotice,
     ]
@@ -2468,48 +2552,57 @@ export default function useWalkieTalkie({
       }
 
       respondPromiseRef.current = (async () => {
-      enableManualSignaling();
-      try {
-        setError("");
-        const client = await ensureRtmSession();
-        let targetRequest = null;
-        await runWithControlMetadata((current) => {
-          targetRequest = current.pendingRequests.find((item) => item.requestId === requestId) || null;
-          if (!targetRequest) {
-            throw new Error("Walkie request not found.");
-          }
-          return {
-            enabled: action === "accept" ? true : current.enabled,
-            pendingRequests: removeAgoraWalkieRequest(current.pendingRequests, requestId),
-          };
-        });
+        enableManualSignaling();
+        try {
+          setError("");
+          const client = await ensureRtmSession().catch(() => null);
+          const targetRequest =
+            metadataStateRef.current.pendingRequests.find(
+              (item) => item.requestId === requestId
+            ) || null;
+          const response = await requestJson(`/api/matches/${matchId}/walkie/respond`, {
+            requestId,
+            action,
+          });
+          await syncMetadataState(
+            {
+              enabled: Boolean(response?.walkie?.enabled),
+              pendingRequests: response?.walkie?.pendingRequests,
+            },
+            client,
+          );
 
-        await publishWalkieMessage(
-          {
-            type: action === "accept" ? "walkie-request-accepted" : "walkie-request-dismissed",
+          await publishWalkieMessage(
+            {
+              type:
+                action === "accept"
+                  ? "walkie-request-accepted"
+                  : "walkie-request-dismissed",
+              requestId,
+              participantId: targetRequest?.participantId || "",
+            },
+            { client, bestEffort: true },
+          );
+          updateNotice(
+            action === "accept"
+              ? "Walkie-talkie is live."
+              : "Walkie request dismissed."
+          );
+          walkieConsole("info", "Walkie request resolved", {
+            action,
             requestId,
             participantId: targetRequest?.participantId || "",
-          },
-          { client },
-        );
-        if (action === "accept") {
-          updateNotice("Walkie-talkie is live.");
+          });
+          return true;
+        } catch (respondError) {
+          setError(walkieMessageFor(respondError, "Could not update walkie request."));
+          walkieConsole("error", "Walkie request resolve failed", {
+            stage: "request-response",
+            action,
+            message: messageFor(respondError, "Could not update walkie request."),
+          });
+          return false;
         }
-        walkieConsole("info", "Walkie request resolved", {
-          action,
-          requestId,
-          participantId: targetRequest?.participantId || "",
-        });
-        return true;
-      } catch (respondError) {
-        setError(walkieMessageFor(respondError, "Could not update walkie request."));
-        walkieConsole("error", "Walkie request resolve failed", {
-          stage: "request-response",
-          action,
-          message: messageFor(respondError, "Could not update walkie request."),
-        });
-        return false;
-      }
       })().finally(() => {
         respondPromiseRef.current = null;
       });
@@ -2519,8 +2612,9 @@ export default function useWalkieTalkie({
     [
       enableManualSignaling,
       ensureRtmSession,
+      matchId,
       publishWalkieMessage,
-      runWithControlMetadata,
+      syncMetadataState,
       updateNotice,
     ]
   );
@@ -2995,6 +3089,11 @@ export default function useWalkieTalkie({
     }
 
     if (snapshot.enabled) {
+      if (requestState === "pending") {
+        setRequestState("accepted");
+        updateNotice("Walkie-talkie is live.");
+        scheduleRequestReset();
+      }
       return;
     }
 
@@ -3005,7 +3104,14 @@ export default function useWalkieTalkie({
     }
 
     setRequestState((current) => (current === "pending" ? "idle" : current));
-  }, [hasOwnPendingRequest, role, snapshot.enabled, updateNotice]);
+  }, [
+    hasOwnPendingRequest,
+    requestState,
+    role,
+    scheduleRequestReset,
+    snapshot.enabled,
+    updateNotice,
+  ]);
 
   useEffect(() => {
     if (!snapshot.enabled && (isSelfTalking || isFinishing)) {

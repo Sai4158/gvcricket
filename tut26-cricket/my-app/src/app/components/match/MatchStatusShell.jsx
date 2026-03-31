@@ -117,12 +117,16 @@ export function Scoreboard({ match, history }) {
       />
       <div className="flex flex-col items-center justify-center">
         <div
-          className={`${scoreboardDisplayFont.className} text-7xl font-bold text-white tabular-nums [font-variant-numeric:tabular-nums] sm:text-8xl`}
+          className={`${scoreboardDisplayFont.className} font-bold tabular-nums [font-variant-numeric:tabular-nums]`}
         >
           <span className="inline-flex items-baseline justify-center">
-            <span>{match.score}</span>
-            <span className="text-4xl text-rose-500">/</span>
-            <span className="text-rose-500">{match.outs}</span>
+            <span className="text-8xl text-emerald-400 sm:text-9xl">
+              {match.score}
+            </span>
+            <span className="text-4xl text-rose-500 sm:text-5xl">/</span>
+            <span className="text-6xl text-rose-500 sm:text-7xl">
+              {match.outs}
+            </span>
           </span>
         </div>
         <div className="text-zinc-100 text-sm uppercase tracking-wider">

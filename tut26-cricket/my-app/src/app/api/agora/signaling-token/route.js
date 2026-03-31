@@ -12,6 +12,7 @@ import {
   hasValidMatchAccess,
 } from "../../../lib/match-access";
 import { parseJsonRequest } from "../../../lib/request-security";
+import { createWalkieParticipantToken } from "../../../lib/walkie-auth";
 import Match from "../../../../models/Match";
 
 const schema = z
@@ -78,7 +79,14 @@ export async function POST(req) {
   }
 
   return Response.json(
-    createAgoraSignalingToken(parsedRequest.value),
+    {
+      ...createAgoraSignalingToken(parsedRequest.value),
+      participantToken: createWalkieParticipantToken(
+        parsedRequest.value.matchId,
+        parsedRequest.value.participantId,
+        parsedRequest.value.role
+      ),
+    },
     {
       headers: {
         "Cache-Control": "no-store",
