@@ -1024,8 +1024,8 @@ test("spectator commentary uses simple ball-first wording and separate score lin
 
   const currentScoreLine = buildCurrentScoreAnnouncement(after);
   assert.match(currentScoreLine, /Score is 8 for 1\./);
-  assert.match(currentScoreLine, /0 overs are done\./);
-  assert.match(currentScoreLine, /2 overs are left\./);
+  assert.match(currentScoreLine, /1 ball bowled\./);
+  assert.match(currentScoreLine, /1 over and 5 balls left\./);
   assert.match(currentScoreLine, /3 needed from 11 balls\./);
 });
 
@@ -1171,7 +1171,7 @@ test("spectator commentary handles last-ball warnings and over summaries", () =>
   });
   assert.match(overLine, /Over complete\./);
   assert.match(overLine, /Score is 6 for 2\./);
-  assert.match(overLine, /1 over is done\./);
+  assert.match(overLine, /1 over completed\./);
   assert.match(overLine, /1 over is left\./);
   assert.match(overLine, /1 wicket fell in this over\./);
 });

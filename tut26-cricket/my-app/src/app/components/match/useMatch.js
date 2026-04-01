@@ -108,6 +108,35 @@ function removeQueuedActionById(queuedEntries = [], actionId = "") {
   return queuedEntries.filter((entry) => entry?.action?.actionId !== actionId);
 }
 
+function updateQueuedActionRetryFlag(
+  queuedEntries = [],
+  actionId = "",
+  allowOneRetry = true,
+) {
+  if (!actionId) {
+    return queuedEntries;
+  }
+
+  let changed = false;
+  const nextEntries = queuedEntries.map((entry) => {
+    if (entry?.action?.actionId !== actionId) {
+      return entry;
+    }
+
+    if (entry.allowOneRetry === allowOneRetry) {
+      return entry;
+    }
+
+    changed = true;
+    return {
+      ...entry,
+      allowOneRetry,
+    };
+  });
+
+  return changed ? nextEntries : queuedEntries;
+}
+
 function readStoredActionQueue(matchId) {
   if (typeof window === "undefined" || !matchId) {
     return [];
@@ -159,6 +188,12 @@ export function replayQueuedMatchActions(baseMatch, queuedEntries = []) {
     return applyMatchAction(nextMatch, entry.action);
   }, baseMatch);
 }
+
+export {
+  filterQueuedActionsAlreadyApplied,
+  removeQueuedActionById,
+  updateQueuedActionRetryFlag,
+};
 
 function isRetryableActionFailure(status) {
   return status === 408 || status === 425 || status === 429 || status >= 500;
@@ -451,7 +486,13 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
             const refreshedMatch = await refreshMatchFromServer();
 
             if (refreshedMatch?.tossReady && currentEntry.allowOneRetry) {
-              currentEntry.allowOneRetry = false;
+              updateQueuedActions(
+                updateQueuedActionRetryFlag(
+                  actionQueueRef.current,
+                  currentEntry.action.actionId,
+                  false,
+                ),
+              );
               continue;
             }
 
@@ -467,7 +508,12 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
           ) {
             await refreshMatchFromServer();
             setError(null);
-            actionQueueRef.current.shift();
+            updateQueuedActions(
+              removeQueuedActionById(
+                actionQueueRef.current,
+                currentEntry.action.actionId,
+              ),
+            );
             continue;
           }
 

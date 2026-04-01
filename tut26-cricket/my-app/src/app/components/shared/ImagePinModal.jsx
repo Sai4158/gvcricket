@@ -112,9 +112,9 @@ export default function ImagePinModal({
                     </p>
                   ) : null}
                   <div className="max-h-36 space-y-2 overflow-y-auto pr-1">
-                    {summaryItems.map((item) => (
+                    {summaryItems.map((item, index) => (
                       <div
-                        key={item}
+                        key={`${String(item)}-${index}`}
                         className="rounded-2xl border border-white/8 bg-black/20 px-3 py-2 text-sm text-zinc-100"
                       >
                         {item}

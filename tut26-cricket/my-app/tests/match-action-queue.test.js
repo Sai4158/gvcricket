@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { applyMatchAction } from "../src/app/lib/match-engine.js";
-import { replayQueuedMatchActions } from "../src/app/components/match/useMatch.js";
+import {
+  filterQueuedActionsAlreadyApplied,
+  removeQueuedActionById,
+  replayQueuedMatchActions,
+  updateQueuedActionRetryFlag,
+} from "../src/app/components/match/useMatch.js";
 
 function actionId(label) {
   return `${label}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -78,4 +83,45 @@ test("queued scoring actions can be replayed on top of a fresh server snapshot",
   assert.equal(replayedMatch.outs, 1);
   assert.equal(replayedMatch.innings1.score, 5);
   assert.equal(replayedMatch.actionHistory.length, 4);
+});
+
+test("queue helpers drop applied actions and persist retry flag changes safely", () => {
+  const queuedEntries = [
+    {
+      action: {
+        type: "score_ball",
+        runs: 1,
+        isOut: false,
+        extraType: null,
+        actionId: "action-1",
+      },
+      allowOneRetry: true,
+    },
+    {
+      action: {
+        type: "complete_innings",
+        actionId: "action-2",
+      },
+      allowOneRetry: true,
+    },
+  ];
+
+  const filteredQueue = filterQueuedActionsAlreadyApplied(
+    {
+      actionHistory: [{ actionId: "action-1" }],
+    },
+    queuedEntries,
+  );
+  assert.deepEqual(filteredQueue.map((entry) => entry.action.actionId), ["action-2"]);
+
+  const updatedRetryQueue = updateQueuedActionRetryFlag(
+    queuedEntries,
+    "action-2",
+    false,
+  );
+  assert.equal(updatedRetryQueue[1].allowOneRetry, false);
+  assert.equal(updatedRetryQueue[0].allowOneRetry, true);
+
+  const trimmedQueue = removeQueuedActionById(updatedRetryQueue, "action-2");
+  assert.deepEqual(trimmedQueue.map((entry) => entry.action.actionId), ["action-1"]);
 });

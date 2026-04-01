@@ -50,6 +50,7 @@ export default function MatchSoundEffectsPanel({
     activeId: "",
     targetId: "",
   });
+  const onOpenScoreSoundSettingsRef = useRef(onOpenScoreSoundSettings);
   const pendingEffectTimerRef = useRef(null);
   const usePointerReorder = useMemo(() => {
     if (typeof window === "undefined") {
@@ -284,12 +285,16 @@ export default function MatchSoundEffectsPanel({
   }, []);
 
   useEffect(() => {
+    onOpenScoreSoundSettingsRef.current = onOpenScoreSoundSettings;
+  }, [onOpenScoreSoundSettings]);
+
+  useEffect(() => {
     if (!isScoreSoundSettingsOpen) {
       return;
     }
 
-    onOpenScoreSoundSettings?.();
-  }, [isScoreSoundSettingsOpen, onOpenScoreSoundSettings]);
+    onOpenScoreSoundSettingsRef.current?.();
+  }, [isScoreSoundSettingsOpen]);
 
   const handleEffectTap = useCallback((file, isActive) => {
     if (isDisabled) {
