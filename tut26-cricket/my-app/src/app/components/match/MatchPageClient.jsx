@@ -944,7 +944,7 @@ export default function MatchPageClient({
     setActiveCommentaryAction("");
   }, [cancelBoundarySequence, stop]);
 
-  const ensureUmpireScoreFeedbackEnabled = () => {
+  const ensureUmpireScoreFeedbackEnabled = useCallback(() => {
     if (!umpireSettings.enabled) {
       updateUmpireSetting("enabled", true);
     }
@@ -952,7 +952,11 @@ export default function MatchPageClient({
     if (umpireSettings.mode === "silent") {
       updateUmpireSetting("mode", "simple");
     }
-  };
+  }, [
+    umpireSettings.enabled,
+    umpireSettings.mode,
+    updateUmpireSetting,
+  ]);
 
   const broadcastManualScoreAnnouncement = useCallback(async () => {
     if (!match?._id || !isLiveMatch) {
@@ -1427,6 +1431,28 @@ export default function MatchPageClient({
     status,
     stopCommentaryPlayback,
   ]);
+  const handleHeroReadScoreAction = useCallback(() => {
+    ensureUmpireScoreFeedbackEnabled();
+    void prime({ userGesture: true });
+
+    const isStoppingCurrentRead =
+      activeCommentaryAction === "read-score" &&
+      (status === "speaking" || isAnySoundEffectActive);
+
+    handleCommentaryReadScoreAction();
+
+    if (!isStoppingCurrentRead) {
+      void broadcastManualScoreAnnouncement();
+    }
+  }, [
+    activeCommentaryAction,
+    broadcastManualScoreAnnouncement,
+    ensureUmpireScoreFeedbackEnabled,
+    handleCommentaryReadScoreAction,
+    isAnySoundEffectActive,
+    prime,
+    status,
+  ]);
   const isReadScoreActionActive =
     activeCommentaryAction === "read-score" &&
     (status === "speaking" || isAnySoundEffectActive);
@@ -1768,8 +1794,8 @@ export default function MatchPageClient({
               >
                 <FaEllipsisV className="text-[1.45rem]" />
               </button>
-              <div className="mb-3 flex items-center justify-center gap-3 text-[12px] font-semibold text-zinc-300">
-                <span className="inline-flex items-center gap-2 uppercase tracking-[0.14em] text-zinc-100">
+              <div className="mb-3 flex items-center justify-center gap-3 text-[12px] font-semibold text-zinc-400">
+                <span className="inline-flex items-center gap-2 uppercase tracking-[0.14em] text-zinc-300">
                   <span className="relative flex h-2.5 w-2.5 items-center justify-center">
                     <span className="absolute inset-0 rounded-full bg-red-500/35 animate-ping"></span>
                     <span className="relative h-2.5 w-2.5 rounded-full bg-red-500"></span>
@@ -1779,7 +1805,7 @@ export default function MatchPageClient({
                 <span className="h-3 w-px bg-white/12"></span>
                 <span
                   suppressHydrationWarning
-                  className="normal-case tracking-normal text-zinc-300"
+                  className="normal-case tracking-normal text-zinc-400"
                 >
                   {liveUpdatedLabel}
                 </span>
@@ -1790,7 +1816,11 @@ export default function MatchPageClient({
                   <p>{match.result}</p>
                 </div>
               )}
-              <MatchHeader match={match} />
+              <MatchHeader
+                match={match}
+                onAnnounceScore={handleHeroReadScoreAction}
+                announceIsActive={isReadScoreActionActive}
+              />
               <Scoreboard match={match} history={oversHistory} />
             </div>
           </MatchHeroBackdrop>

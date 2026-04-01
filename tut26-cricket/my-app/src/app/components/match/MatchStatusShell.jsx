@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Barlow_Condensed } from "next/font/google";
+import { FaPause, FaVolumeUp } from "react-icons/fa";
 import LoadingButton from "../shared/LoadingButton";
 import { countLegalBalls } from "../../lib/match-scoring";
 import { getBattingTeamBundle } from "../../lib/team-utils";
@@ -113,12 +114,16 @@ export function AccessGate({ onSubmit, isSubmitting, error }) {
   );
 }
 
-export function MatchHeader({ match }) {
+export function MatchHeader({
+  match,
+  onAnnounceScore = null,
+  announceIsActive = false,
+}) {
   const battingTeam = getBattingTeamBundle(match);
   const accent = getBattingAccentClasses(battingTeam);
 
   return (
-    <header className="mb-4 text-center">
+    <header className="relative mb-4 text-center">
       <h1
         className={`${scoreboardDisplayFont.className} text-[3rem] font-black uppercase leading-none tracking-[0.04em] text-white sm:text-[3.6rem]`}
       >
@@ -136,6 +141,24 @@ export function MatchHeader({ match }) {
           </span>
         </div>
       )}
+      {onAnnounceScore ? (
+        <button
+          type="button"
+          onClick={onAnnounceScore}
+          aria-label={announceIsActive ? "Stop score announcement" : "Announce current score"}
+          className={`absolute bottom-0 right-0 inline-flex h-11 w-11 items-center justify-center rounded-[18px] border text-white transition-all active:scale-[0.94] ${
+            announceIsActive
+              ? "border-white/50 bg-[linear-gradient(145deg,rgba(20,24,34,0.98),rgba(8,12,18,0.98))] text-white shadow-[0_0_0_1px_rgba(255,255,255,0.26),0_0_22px_rgba(255,255,255,0.34),0_0_42px_rgba(255,255,255,0.16),inset_0_1px_0_rgba(255,255,255,0.16)]"
+              : "border-white/32 bg-[linear-gradient(145deg,rgba(28,28,34,0.98),rgba(10,10,14,0.98))] text-white shadow-[0_0_0_1px_rgba(255,255,255,0.16),0_0_18px_rgba(255,255,255,0.18),inset_0_1px_0_rgba(255,255,255,0.12)] hover:-translate-y-0.5 hover:border-white/60 hover:text-white hover:shadow-[0_0_0_1px_rgba(255,255,255,0.24),0_0_28px_rgba(255,255,255,0.28),0_0_46px_rgba(255,255,255,0.12),inset_0_1px_0_rgba(255,255,255,0.18)] active:translate-y-0"
+          }`}
+        >
+          {announceIsActive ? (
+            <FaPause className="text-[0.98rem]" />
+          ) : (
+            <FaVolumeUp className="text-[1.05rem]" />
+          )}
+        </button>
+      ) : null}
     </header>
   );
 }
