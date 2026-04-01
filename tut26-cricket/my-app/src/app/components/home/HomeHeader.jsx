@@ -10,6 +10,7 @@ export default function HomeHeader() {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const useDesktopLiteMotion = useHomeDesktopLiteMotion();
   const simplifyMotion = prefersReducedMotion || useDesktopLiteMotion;
+  const useLiteDrawerMotion = !prefersReducedMotion && useDesktopLiteMotion;
   const disableDrawerMotion = prefersReducedMotion;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -112,10 +113,19 @@ export default function HomeHeader() {
     }
 
     const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth = Math.max(
+      0,
+      window.innerWidth - document.documentElement.clientWidth,
+    );
     document.body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
 
     return () => {
       document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
     };
   }, [isMenuOpen]);
 
@@ -180,10 +190,34 @@ export default function HomeHeader() {
 
   const drawerOverlayTransition = disableDrawerMotion
     ? { duration: 0 }
-    : { duration: 0.4, ease: [0.22, 1, 0.36, 1] };
+    : useLiteDrawerMotion
+      ? { duration: 0.18, ease: [0.22, 1, 0.36, 1] }
+      : { duration: 0.32, ease: [0.22, 1, 0.36, 1] };
   const drawerPanelTransition = disableDrawerMotion
     ? { duration: 0 }
-    : { duration: 0.48, ease: [0.16, 1, 0.3, 1] };
+    : useLiteDrawerMotion
+      ? { duration: 0.22, ease: [0.2, 0.9, 0.2, 1] }
+      : { duration: 0.42, ease: [0.16, 1, 0.3, 1] };
+  const drawerOverlayClassName = disableDrawerMotion
+    ? "bg-black/60"
+    : useLiteDrawerMotion
+      ? "bg-black/52 will-change-[opacity]"
+      : "bg-black/42 backdrop-blur-[3px] will-change-[opacity]";
+  const drawerPanelClassName = disableDrawerMotion
+    ? "bg-zinc-950/96"
+    : useLiteDrawerMotion
+      ? "bg-zinc-950/96 will-change-transform transform-gpu"
+      : "bg-zinc-950/84 backdrop-blur-2xl will-change-transform transform-gpu";
+  const drawerDragProps =
+    disableDrawerMotion || useLiteDrawerMotion
+      ? {}
+      : {
+          drag: "x",
+          dragDirectionLock: true,
+          dragConstraints: { left: 0, right: 0 },
+          dragElastic: { left: 0, right: 0.12 },
+          onDragEnd: handleDrawerDragEnd,
+        };
 
   const linkStyles =
     "press-feedback flex w-full items-center justify-between gap-4 rounded-2xl px-3 py-3 text-[1.6rem] leading-tight font-light text-zinc-300 transition-all duration-200 hover:bg-white/6 hover:text-white active:bg-white/10 active:text-white sm:text-2xl";
@@ -227,34 +261,36 @@ export default function HomeHeader() {
           <FaBars className="h-8 w-8" />
         </button>
       </header>
-      <AnimatePresence mode="wait">
+      <AnimatePresence initial={false}>
         {isMenuOpen && (
           <motion.div
             initial={disableDrawerMotion ? false : { opacity: 0 }}
             animate={disableDrawerMotion ? undefined : { opacity: 1 }}
             exit={disableDrawerMotion ? undefined : { opacity: 0 }}
             transition={drawerOverlayTransition}
-            className={`pointer-events-auto fixed inset-0 z-80 ${
-              disableDrawerMotion
-                ? "bg-black/60"
-                : "bg-black/42 backdrop-blur-[3px]"
-            }`}
+            className={`pointer-events-auto fixed inset-0 z-80 ${drawerOverlayClassName}`}
             onClick={closeMenu}
           >
             <motion.div
-              initial={disableDrawerMotion ? false : { x: "100%", opacity: 0.98 }}
-              animate={disableDrawerMotion ? undefined : { x: 0, opacity: 1 }}
-              exit={disableDrawerMotion ? undefined : { x: "100%", opacity: 0.98 }}
-              transition={drawerPanelTransition}
-              drag="x"
-              dragDirectionLock
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={{ left: 0, right: 0.12 }}
-              onDragEnd={handleDrawerDragEnd}
-              className={`pointer-events-auto fixed top-0 right-0 bottom-0 w-[min(84vw,22rem)] max-w-full px-5 py-6 sm:px-6 flex flex-col shadow-2xl border-l border-zinc-700/80 ${
+              initial={
                 disableDrawerMotion
-                  ? "bg-zinc-950/96"
-                  : "bg-zinc-950/84 backdrop-blur-2xl will-change-transform transform-gpu"
+                  ? false
+                  : useLiteDrawerMotion
+                    ? { x: 32, opacity: 1 }
+                    : { x: "100%", opacity: 0.98 }
+              }
+              animate={disableDrawerMotion ? undefined : { x: 0, opacity: 1 }}
+              exit={
+                disableDrawerMotion
+                  ? undefined
+                  : useLiteDrawerMotion
+                    ? { x: 24, opacity: 1 }
+                    : { x: "100%", opacity: 0.98 }
+              }
+              transition={drawerPanelTransition}
+              {...drawerDragProps}
+              className={`pointer-events-auto fixed top-0 right-0 bottom-0 w-[min(84vw,22rem)] max-w-full px-5 py-6 sm:px-6 flex flex-col shadow-2xl border-l border-zinc-700/80 ${
+                drawerPanelClassName
               }`}
               onClick={(event) => event.stopPropagation()}
               onPointerDown={(event) => event.stopPropagation()}
