@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FaBroadcastTower } from "react-icons/fa";
+import { FaBroadcastTower, FaEllipsisV } from "react-icons/fa";
 import useLocalMicMonitor from "../live/useLocalMicMonitor";
 import useAnnouncementSettings from "../live/useAnnouncementSettings";
 import useLiveSoundEffectsPlayer from "../live/useLiveSoundEffectsPlayer";
@@ -178,6 +178,13 @@ export default function MatchPageClient({
   const boundarySequenceVersionRef = useRef(0);
   const boundarySequenceTimerRef = useRef(null);
   const lastPersistedAnnouncerSettingsRef = useRef("");
+  const contentStartRef = useRef(null);
+  const handleHeroMenuScroll = useCallback(() => {
+    contentStartRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, []);
 
   useEffect(() => {
     const restoreTimer = window.setTimeout(() => {
@@ -1752,13 +1759,30 @@ export default function MatchPageClient({
       <main className="min-h-screen font-sans bg-zinc-950 text-white p-4">
         <div className="max-w-md mx-auto pt-8 pb-24">
           <MatchHeroBackdrop match={match} className="mb-5">
-            <div className="px-5 pt-6 pb-5">
-              <div className="flex items-center justify-center gap-3 mb-4 text-sm text-zinc-200">
-                <span className="inline-flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse"></span>
-                  Live
+            <div className="relative px-5 pt-6 pb-5">
+              <button
+                type="button"
+                onClick={handleHeroMenuScroll}
+                aria-label="Scroll to match controls"
+                className="absolute right-5 top-5 inline-flex h-12 w-12 items-center justify-center text-white transition hover:scale-105 hover:text-white/85"
+              >
+                <FaEllipsisV className="text-[1.45rem]" />
+              </button>
+              <div className="mb-3 flex items-center justify-center gap-3 text-[12px] font-semibold text-zinc-300">
+                <span className="inline-flex items-center gap-2 uppercase tracking-[0.14em] text-zinc-100">
+                  <span className="relative flex h-2.5 w-2.5 items-center justify-center">
+                    <span className="absolute inset-0 rounded-full bg-red-500/35 animate-ping"></span>
+                    <span className="relative h-2.5 w-2.5 rounded-full bg-red-500"></span>
+                  </span>
+                  <span>Live</span>
                 </span>
-                <span suppressHydrationWarning>{liveUpdatedLabel}</span>
+                <span className="h-3 w-px bg-white/12"></span>
+                <span
+                  suppressHydrationWarning
+                  className="normal-case tracking-normal text-zinc-300"
+                >
+                  {liveUpdatedLabel}
+                </span>
               </div>
               {match.result && (
                 <div className="bg-green-900/50 text-green-300 p-4 rounded-xl text-center mb-4 ring-1 ring-green-500">
@@ -1770,6 +1794,7 @@ export default function MatchPageClient({
               <Scoreboard match={match} history={oversHistory} />
             </div>
           </MatchHeroBackdrop>
+          <div ref={contentStartRef} />
           {error ? (
             <div className="mb-4 rounded-2xl border border-rose-500/30 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">
               {error.message || "Match update failed."}

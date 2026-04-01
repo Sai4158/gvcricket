@@ -27,6 +27,38 @@ function getBattingStripClasses(battingTeam) {
     : "from-rose-400/20 via-rose-500 to-red-600/20";
 }
 
+function getBattingAccentClasses(battingTeam) {
+  const normalizedName = String(battingTeam?.name || "").trim().toLowerCase();
+
+  if (normalizedName.includes("blue")) {
+    return {
+      badge:
+        "border-sky-400/20 bg-[linear-gradient(180deg,rgba(14,165,233,0.16),rgba(14,165,233,0.08))] text-sky-100 shadow-[0_18px_40px_rgba(14,165,233,0.12)]",
+      team: "text-sky-300",
+    };
+  }
+
+  if (normalizedName.includes("red")) {
+    return {
+      badge:
+        "border-rose-400/20 bg-[linear-gradient(180deg,rgba(244,63,94,0.16),rgba(244,63,94,0.08))] text-rose-100 shadow-[0_18px_40px_rgba(244,63,94,0.12)]",
+      team: "text-rose-300",
+    };
+  }
+
+  return battingTeam?.key === "teamB"
+    ? {
+        badge:
+          "border-sky-400/20 bg-[linear-gradient(180deg,rgba(14,165,233,0.16),rgba(14,165,233,0.08))] text-sky-100 shadow-[0_18px_40px_rgba(14,165,233,0.12)]",
+        team: "text-sky-300",
+      }
+    : {
+        badge:
+          "border-rose-400/20 bg-[linear-gradient(180deg,rgba(244,63,94,0.16),rgba(244,63,94,0.08))] text-rose-100 shadow-[0_18px_40px_rgba(244,63,94,0.12)]",
+        team: "text-rose-300",
+      };
+}
+
 export function Splash({ children }) {
   return (
     <main className="h-screen w-full flex items-center justify-center bg-zinc-950 text-white text-xl">
@@ -83,21 +115,26 @@ export function AccessGate({ onSubmit, isSubmitting, error }) {
 
 export function MatchHeader({ match }) {
   const battingTeam = getBattingTeamBundle(match);
+  const accent = getBattingAccentClasses(battingTeam);
 
   return (
-    <header className="text-center mb-6">
-      <h1 className="text-5xl md:text-6xl font-bold text-white tracking-tight">
+    <header className="mb-4 text-center">
+      <h1
+        className={`${scoreboardDisplayFont.className} text-[3rem] font-black uppercase leading-none tracking-[0.04em] text-white sm:text-[3.6rem]`}
+      >
         Umpire View
       </h1>
-      <br />
-      <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight">
-        <span className="font-bold text-amber-300">{battingTeam.name}</span> is
-        batting now
-      </h2>
+      <div className="mt-2 text-lg font-semibold tracking-tight text-white sm:text-xl">
+        <span className={`${accent.team} uppercase`}>{battingTeam.name}</span>
+        <span className="text-white/88"> batting now</span>
+      </div>
       {match.innings === "second" && (
-        <p className="text-zinc-400 text-lg mt-1">
-          Target: <span className="font-bold text-amber-300">{match.innings1.score + 1}</span>
-        </p>
+        <div className="mt-1 text-lg font-semibold text-zinc-300 sm:text-xl">
+          <span className="text-white/70">Target:</span>{" "}
+          <span className="text-[1.6rem] font-black text-amber-300 sm:text-[1.9rem]">
+            {match.innings1.score + 1}
+          </span>
+        </div>
       )}
     </header>
   );

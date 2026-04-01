@@ -15,7 +15,7 @@ import LiquidSportText from "./LiquidSportText";
 import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
 
 const HERO_VIDEO_PATH = "/videos/Cricket1.mp4";
-const HERO_HEADLINE_DELAY = 0.5;
+const HERO_HEADLINE_DELAY = 0.5/*  */;
 
 function HeroDesktopScene({
   liveMatch,
