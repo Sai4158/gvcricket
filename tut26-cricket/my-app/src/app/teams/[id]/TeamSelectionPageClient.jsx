@@ -369,7 +369,7 @@ export default function TeamSelectionPageClient({ sessionId }) {
               />
             </div>
 
-            <div className="mb-4 flex justify-end">
+            <div className="mb-4 flex justify-center">
               {tossStatus !== "choosing" ? (
                 <button
                   type="button"
