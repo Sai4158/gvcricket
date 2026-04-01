@@ -15,6 +15,11 @@ import LoadingButton from "../shared/LoadingButton";
 import { verifyImageActionPin } from "../../lib/image-pin-client";
 import { getImagePinPromptConfig } from "../../lib/image-pin-policy";
 import {
+  clearClientPinRateLimit,
+  registerClientPinFailure,
+  useClientPinRateLimit,
+} from "../../lib/pin-attempt-client";
+import {
   compressMatchImage,
   getAcceptedMatchImageTypes,
 } from "./match-image-client";
@@ -888,6 +893,10 @@ export default function MatchImageUploader({
         ? plannedGalleryCount
         : galleryItems.length || existingImageCount,
   });
+  const imagePinRateLimit = useClientPinRateLimit("media-pin", showPinPrompt);
+  const pinPromptError = imagePinRateLimit.isBlocked
+    ? imagePinRateLimit.message
+    : error;
 
   const handleProtectedSubmit = useCallback(async () => {
     if (
@@ -898,13 +907,24 @@ export default function MatchImageUploader({
       return;
     }
 
+    if (imagePinRateLimit.isBlocked) {
+      setError(imagePinRateLimit.message);
+      return;
+    }
+
     try {
       setError("");
       await verifyImageActionPin({
         pin,
         usesManagePin: protectedPinConfig.usesManagePin,
       });
+      clearClientPinRateLimit("media-pin");
+      imagePinRateLimit.sync();
     } catch (caughtError) {
+      registerClientPinFailure("media-pin", {
+        retryAfterMs: Number(caughtError?.retryAfterMs || 0),
+      });
+      imagePinRateLimit.sync();
       setError(caughtError.message || "Incorrect PIN.");
       return;
     }
@@ -933,6 +953,7 @@ export default function MatchImageUploader({
     isSubmitting,
     pendingProtectedAction,
     pin,
+    imagePinRateLimit,
     protectedPinConfig.usesManagePin,
     protectedPinConfig.digitCount,
   ]);
@@ -1255,6 +1276,7 @@ export default function MatchImageUploader({
                     autoComplete="one-time-code"
                     maxLength={protectedPinConfig.digitCount}
                     value={pin}
+                    disabled={isSubmitting || imagePinRateLimit.isBlocked}
                     onChange={(event) => {
                       setPin(
                         event.target.value
@@ -1276,9 +1298,9 @@ export default function MatchImageUploader({
                 />
               </div>
 
-                {error ? (
+                {pinPromptError ? (
                   <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                    {error}
+                    {pinPromptError}
                   </div>
                 ) : null}
 
@@ -1293,7 +1315,10 @@ export default function MatchImageUploader({
                   <LoadingButton
                     type="button"
                     onClick={handleProtectedSubmit}
-                    disabled={pin.length !== protectedPinConfig.digitCount}
+                    disabled={
+                      pin.length !== protectedPinConfig.digitCount ||
+                      imagePinRateLimit.isBlocked
+                    }
                     loading={isSubmitting}
                     pendingLabel="Checking..."
                     className="rounded-2xl bg-[linear-gradient(90deg,#facc15_0%,#f59e0b_52%,#fb7185_100%)] px-4 py-3 text-sm font-bold text-black shadow-[0_16px_36px_rgba(245,158,11,0.2)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"

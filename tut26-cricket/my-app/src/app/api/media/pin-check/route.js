@@ -7,8 +7,8 @@ import {
 } from "../../../lib/image-pin-policy";
 import { isValidManagePin, isValidUmpirePin } from "../../../lib/match-access";
 import { getRequestMeta } from "../../../lib/request-meta";
-import { enforceRateLimit } from "../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../lib/request-security";
+import { enforceSmartPinRateLimit } from "../../../lib/pin-attempt-server";
 import { z } from "zod";
 
 const mediaPinCheckSchema = z
@@ -23,11 +23,11 @@ const mediaPinCheckSchema = z
 
 export async function POST(req) {
   const meta = getRequestMeta(req);
-  const pinAttemptLimit = enforceRateLimit({
+  const pinAttemptLimit = enforceSmartPinRateLimit({
     key: `media-pin-check:${meta.ip}`,
-    limit: IMAGE_PIN_ATTEMPT_LIMIT,
-    windowMs: IMAGE_PIN_ATTEMPT_WINDOW_MS,
-    blockMs: IMAGE_PIN_ATTEMPT_BLOCK_MS,
+    longLimit: IMAGE_PIN_ATTEMPT_LIMIT,
+    longWindowMs: IMAGE_PIN_ATTEMPT_WINDOW_MS,
+    longBlockMs: IMAGE_PIN_ATTEMPT_BLOCK_MS,
   });
 
   if (!pinAttemptLimit.allowed) {

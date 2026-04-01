@@ -4,6 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FaArrowRight, FaImage, FaTimes } from "react-icons/fa";
 import LoadingButton from "./LoadingButton";
+import {
+  clearClientPinRateLimit,
+  registerClientPinFailure,
+  useClientPinRateLimit,
+} from "../../lib/pin-attempt-client";
 
 export default function ImagePinModal({
   isOpen,
@@ -17,6 +22,7 @@ export default function ImagePinModal({
   hideHeaderCopy = false,
   summaryTitle = "",
   summaryItems = [],
+  rateLimitScope = "media-pin",
   onConfirm,
   onContinueWithout,
   onClose,
@@ -25,6 +31,8 @@ export default function ImagePinModal({
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef(null);
+  const pinRateLimit = useClientPinRateLimit(rateLimitScope, isOpen);
+  const displayError = pinRateLimit.isBlocked ? pinRateLimit.message : error;
 
   useEffect(() => {
     if (!isOpen) {
@@ -44,13 +52,24 @@ export default function ImagePinModal({
   const handleSubmit = async () => {
     if (isSubmitting) return;
 
+    if (pinRateLimit.isBlocked) {
+      setError(pinRateLimit.message);
+      return;
+    }
+
     setIsSubmitting(true);
     setError("");
 
     try {
       await onConfirm?.(pin);
+      clearClientPinRateLimit(rateLimitScope);
+      pinRateLimit.sync();
       setPin("");
     } catch (caughtError) {
+      registerClientPinFailure(rateLimitScope, {
+        retryAfterMs: Number(caughtError?.retryAfterMs || 0),
+      });
+      pinRateLimit.sync();
       setError(caughtError.message || "Incorrect PIN.");
     } finally {
       setIsSubmitting(false);
@@ -141,6 +160,7 @@ export default function ImagePinModal({
                   autoComplete="one-time-code"
                   maxLength={digitCount}
                   value={pin}
+                  disabled={isSubmitting || pinRateLimit.isBlocked}
                   onChange={(event) =>
                     setPin(
                       event.target.value.replace(/\D/g, "").slice(0, digitCount)
@@ -158,9 +178,9 @@ export default function ImagePinModal({
                 />
               </div>
 
-              {error ? (
+              {displayError ? (
                 <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                  {error}
+                  {displayError}
                 </div>
               ) : null}
 
@@ -168,7 +188,7 @@ export default function ImagePinModal({
                 <LoadingButton
                   type="button"
                   onClick={handleSubmit}
-                  disabled={pin.length !== digitCount}
+                  disabled={pin.length !== digitCount || pinRateLimit.isBlocked}
                   loading={isSubmitting}
                   pendingLabel="Checking..."
                   trailingIcon={<FaArrowRight />}

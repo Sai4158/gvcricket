@@ -24,6 +24,8 @@ import {
   IMAGE_PIN_ATTEMPT_LIMIT,
   IMAGE_PIN_KIND,
 } from "../src/app/lib/image-pin-policy.js";
+import { PIN_BURST_BLOCK_MS } from "../src/app/lib/pin-attempt-policy.js";
+import { enforceSmartPinRateLimit } from "../src/app/lib/pin-attempt-server.js";
 import {
   applyMatchAction,
   applySafeMatchPatch,
@@ -155,6 +157,54 @@ test("home live banner match filter stays cast-safe for the Match result field",
   assert.doesNotThrow(() => {
     Match.findOne(HOME_LIVE_BANNER_MATCH_FILTER).cast(Match);
   });
+});
+
+test("smart pin rate limit blocks the fourth rapid attempt inside 10 seconds", () => {
+  const key = `pin-burst-${crypto.randomBytes(6).toString("hex")}`;
+  const baseNow = 1_710_000_000_000;
+
+  assert.equal(
+    enforceSmartPinRateLimit({
+      key,
+      longLimit: 10,
+      longWindowMs: 60 * 1000,
+      longBlockMs: 60 * 1000,
+      now: baseNow,
+    }).allowed,
+    true,
+  );
+  assert.equal(
+    enforceSmartPinRateLimit({
+      key,
+      longLimit: 10,
+      longWindowMs: 60 * 1000,
+      longBlockMs: 60 * 1000,
+      now: baseNow + 1_000,
+    }).allowed,
+    true,
+  );
+  assert.equal(
+    enforceSmartPinRateLimit({
+      key,
+      longLimit: 10,
+      longWindowMs: 60 * 1000,
+      longBlockMs: 60 * 1000,
+      now: baseNow + 2_000,
+    }).allowed,
+    true,
+  );
+
+  const blockedAttempt = enforceSmartPinRateLimit({
+    key,
+    longLimit: 10,
+    longWindowMs: 60 * 1000,
+    longBlockMs: 60 * 1000,
+    now: baseNow + 3_000,
+  });
+
+  assert.equal(blockedAttempt.allowed, false);
+  assert.ok(blockedAttempt.retryAfterMs > 0);
+  assert.ok(blockedAttempt.retryAfterMs <= PIN_BURST_BLOCK_MS);
 });
 
 test("match access tokens validate by version and PIN checks use constant-time flow", () => {

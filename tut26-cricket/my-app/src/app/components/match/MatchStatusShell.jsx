@@ -6,6 +6,11 @@ import { FaPause, FaVolumeUp } from "react-icons/fa";
 import LoadingButton from "../shared/LoadingButton";
 import { countLegalBalls } from "../../lib/match-scoring";
 import { getBattingTeamBundle } from "../../lib/team-utils";
+import {
+  clearClientPinRateLimit,
+  registerClientPinFailure,
+  useClientPinRateLimit,
+} from "../../lib/pin-attempt-client";
 
 const scoreboardDisplayFont = Barlow_Condensed({
   subsets: ["latin"],
@@ -68,8 +73,43 @@ export function Splash({ children }) {
   );
 }
 
-export function AccessGate({ onSubmit, isSubmitting, error }) {
+export function AccessGate({
+  onSubmit,
+  isSubmitting,
+  error,
+  rateLimitScope = "match-auth",
+}) {
   const [pin, setPin] = useState("");
+  const [localError, setLocalError] = useState("");
+  const pinRateLimit = useClientPinRateLimit(rateLimitScope);
+  const displayError = pinRateLimit.isBlocked
+    ? pinRateLimit.message
+    : error || localError;
+
+  const handleSubmit = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (pinRateLimit.isBlocked) {
+      setLocalError(pinRateLimit.message);
+      return;
+    }
+
+    setLocalError("");
+
+    try {
+      await onSubmit(pin);
+      clearClientPinRateLimit(rateLimitScope);
+      pinRateLimit.sync();
+    } catch (caughtError) {
+      registerClientPinFailure(rateLimitScope, {
+        retryAfterMs: Number(caughtError?.retryAfterMs || 0),
+      });
+      pinRateLimit.sync();
+      setLocalError(caughtError?.message || "Incorrect PIN.");
+    }
+  };
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-zinc-950 text-white p-4">
@@ -85,13 +125,14 @@ export function AccessGate({ onSubmit, isSubmitting, error }) {
             autoComplete="one-time-code"
             maxLength={4}
             value={pin}
+            disabled={isSubmitting || pinRateLimit.isBlocked}
             onChange={(event) =>
               setPin(event.target.value.replace(/\D/g, "").slice(0, 4))
             }
             onKeyDown={(event) => {
               if (event.key === "Enter") {
                 event.preventDefault();
-                onSubmit(pin);
+                void handleSubmit();
               }
             }}
             placeholder="0000"
@@ -99,8 +140,8 @@ export function AccessGate({ onSubmit, isSubmitting, error }) {
           />
           <LoadingButton
             type="button"
-            onClick={() => onSubmit(pin)}
-            disabled={pin.length !== 4}
+            onClick={handleSubmit}
+            disabled={pin.length !== 4 || pinRateLimit.isBlocked}
             loading={isSubmitting}
             pendingLabel="Checking..."
             className="w-full rounded-2xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
@@ -108,7 +149,9 @@ export function AccessGate({ onSubmit, isSubmitting, error }) {
             Enter
           </LoadingButton>
         </div>
-        {error && <p className="text-red-400 text-sm mt-4 text-center">{error}</p>}
+        {displayError ? (
+          <p className="text-red-400 text-sm mt-4 text-center">{displayError}</p>
+        ) : null}
       </div>
     </main>
   );

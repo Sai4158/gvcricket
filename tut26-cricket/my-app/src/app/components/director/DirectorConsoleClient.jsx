@@ -63,6 +63,12 @@ import {
   subscribeUiAudioUnlock,
 } from "../../lib/page-audio";
 import { countLegalBalls } from "../../lib/match-scoring";
+import {
+  buildPinRequestError,
+  clearClientPinRateLimit,
+  registerClientPinFailure,
+  useClientPinRateLimit,
+} from "../../lib/pin-attempt-client";
 
 const DIRECTOR_AUDIO_LIBRARY_CACHE_KEY = "gv-director-audio-library-v1";
 const DIRECTOR_AUDIO_METADATA_CACHE_KEY = "gv-director-audio-metadata-v1";
@@ -1066,6 +1072,13 @@ export default function DirectorConsoleClient({
   const [pin, setPin] = useState("");
   const [authError, setAuthError] = useState("");
   const [isSubmittingPin, setIsSubmittingPin] = useState(false);
+  const directorPinRateLimit = useClientPinRateLimit(
+    "director-auth",
+    !authorized,
+  );
+  const directorPinError = directorPinRateLimit.isBlocked
+    ? directorPinRateLimit.message
+    : authError;
   const [showDirectorPinStep, setShowDirectorPinStep] = useState(
     Boolean(initialAutoManage && initialTargetSessionId && !initialAuthorized),
   );
@@ -2736,6 +2749,15 @@ export default function DirectorConsoleClient({
   ]);
 
   const submitDirectorPin = async () => {
+    if (isSubmittingPin) {
+      return;
+    }
+
+    if (directorPinRateLimit.isBlocked) {
+      setAuthError(directorPinRateLimit.message);
+      return;
+    }
+
     setIsSubmittingPin(true);
     setAuthError("");
 
@@ -2750,10 +2772,11 @@ export default function DirectorConsoleClient({
         .catch(() => ({ message: "Could not verify PIN." }));
 
       if (!response.ok) {
-        setAuthError(payload.message || "Could not verify PIN.");
-        return;
+        throw buildPinRequestError(response, payload, "Could not verify PIN.");
       }
 
+      clearClientPinRateLimit("director-auth");
+      directorPinRateLimit.sync();
       setConsoleError("");
       setAuthorized(true);
       setPin("");
@@ -2786,8 +2809,12 @@ export default function DirectorConsoleClient({
         }
       }
       setShowDirectorPinStep(false);
-    } catch {
-      setAuthError("Could not verify PIN.");
+    } catch (caughtError) {
+      registerClientPinFailure("director-auth", {
+        retryAfterMs: Number(caughtError?.retryAfterMs || 0),
+      });
+      directorPinRateLimit.sync();
+      setAuthError(caughtError?.message || "Could not verify PIN.");
     } finally {
       setIsSubmittingPin(false);
     }
@@ -4101,9 +4128,9 @@ export default function DirectorConsoleClient({
                     className="text-2xl font-semibold tracking-[-0.03em] sm:text-[2rem]"
                   />
                 </div>
-                {authError ? (
+                {directorPinError ? (
                   <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                    {authError}
+                    {directorPinError}
                   </div>
                 ) : null}
                 {!showDirectorPinStep ? (
@@ -4156,6 +4183,9 @@ export default function DirectorConsoleClient({
                       autoComplete="one-time-code"
                       maxLength={4}
                       value={pin}
+                      disabled={
+                        isSubmittingPin || directorPinRateLimit.isBlocked
+                      }
                       onChange={(event) =>
                         setPin(
                           event.target.value.replace(/\D/g, "").slice(0, 4),
@@ -4173,7 +4203,9 @@ export default function DirectorConsoleClient({
                     <LoadingButton
                       type="button"
                       onClick={() => void submitDirectorPin()}
-                      disabled={pin.length !== 4}
+                      disabled={
+                        pin.length !== 4 || directorPinRateLimit.isBlocked
+                      }
                       loading={isSubmittingPin}
                       pendingLabel="Checking..."
                       className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(90deg,#10b981_0%,#22c55e_58%,#34d399_100%)] px-5 py-3.5 font-bold text-black shadow-[0_16px_36px_rgba(16,185,129,0.2)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"

@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  buildPinRateLimitMessage,
+  buildPinRequestError,
+  clearClientPinRateLimit,
+  getClientPinRateLimitState,
+} from "../../lib/pin-attempt-client";
 
 const MATCH_AUTH_CACHE_TTL_MS = 30 * 1000;
 let matchAuthStatusMemoryCache = new Map();
@@ -206,6 +212,13 @@ export default function useMatchAccess(matchId, initialAuthStatus = "checking") 
   }, [initialAuthStatus, matchId]);
 
   const submitPin = async (pin) => {
+    const rateLimitScope = matchId ? `match-auth:${matchId}` : "match-auth";
+    const pinRateLimit = getClientPinRateLimitState(rateLimitScope);
+    if (pinRateLimit.isBlocked) {
+      setAuthError(buildPinRateLimitMessage(pinRateLimit.retryAfterMs));
+      return;
+    }
+
     setAuthSubmitting(true);
     setAuthError("");
 
@@ -220,12 +233,13 @@ export default function useMatchAccess(matchId, initialAuthStatus = "checking") 
         const body = await response
           .json()
           .catch(() => ({ message: "Incorrect PIN." }));
-        throw new Error(body.message || "Incorrect PIN.");
+        throw buildPinRequestError(response, body, "Incorrect PIN.");
       }
 
       if (typeof window !== "undefined" && matchId) {
         writeRememberedGrant(matchId);
       }
+      clearClientPinRateLimit(rateLimitScope);
       writeCachedAuthStatus(matchId, "granted");
       setAuthStatus("granted");
     } catch (caughtError) {
@@ -234,6 +248,7 @@ export default function useMatchAccess(matchId, initialAuthStatus = "checking") 
       }
       clearCachedAuthStatus(matchId);
       setAuthError(caughtError?.message || "Incorrect PIN.");
+      throw caughtError;
     } finally {
       setAuthSubmitting(false);
     }

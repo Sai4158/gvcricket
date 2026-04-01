@@ -6,8 +6,8 @@ import { jsonError, jsonRateLimit } from "../../../lib/api-response";
 import { writeAuditLog } from "../../../lib/audit-log";
 import { connectDB } from "../../../lib/db";
 import { isValidManagePin } from "../../../lib/match-access";
+import { enforceSmartPinRateLimit } from "../../../lib/pin-attempt-server";
 import { getRequestMeta } from "../../../lib/request-meta";
-import { enforceRateLimit } from "../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../lib/request-security";
 import { secretPinSchema } from "../../../lib/validators";
 
@@ -23,16 +23,16 @@ const bulkDeleteSchema = z
 
 export async function POST(req) {
   const meta = getRequestMeta(req);
-  const deleteLimit = enforceRateLimit({
+  const deleteLimit = enforceSmartPinRateLimit({
     key: `session-bulk-delete:${meta.ip}`,
-    limit: 4,
-    windowMs: 60 * 1000,
-    blockMs: 60 * 1000,
+    longLimit: 4,
+    longWindowMs: 60 * 1000,
+    longBlockMs: 60 * 1000,
   });
 
   if (!deleteLimit.allowed) {
     return jsonRateLimit(
-      "Too many delete attempts. Try again shortly.",
+      "Too many PIN attempts. Try again shortly.",
       deleteLimit.retryAfterMs,
     );
   }

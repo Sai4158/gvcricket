@@ -32,6 +32,7 @@ import ImagePinModal from "../shared/ImagePinModal";
 import { ModalBase } from "../match/MatchBaseModals";
 import MatchImageUploader from "../match/MatchImageUploader";
 import { verifyImageActionPin } from "../../lib/image-pin-client";
+import { buildPinRequestError } from "../../lib/pin-attempt-client";
 import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
 
 const SORT_OPTIONS = [
@@ -545,7 +546,7 @@ export default function SessionsPageClient({
         .catch(() => ({ message: "Incorrect PIN." }));
 
       if (!response.ok) {
-        throw new Error(payload.message || "Incorrect PIN.");
+        throw buildPinRequestError(response, payload, "Incorrect PIN.");
       }
 
       const session = managePinPrompt.session;
@@ -720,7 +721,11 @@ export default function SessionsPageClient({
         .catch(() => ({ message: "Could not delete the selected sessions." }));
 
       if (!response.ok) {
-        throw new Error(payload.message || "Could not delete the selected sessions.");
+        throw buildPinRequestError(
+          response,
+          payload,
+          "Could not delete the selected sessions.",
+        );
       }
 
       const deletedIds = Array.isArray(payload.deletedSessionIds)
@@ -773,7 +778,11 @@ export default function SessionsPageClient({
         .catch(() => ({ message: "Could not remove the image." }));
 
       if (!response.ok) {
-        throw new Error(payload.message || "Could not remove the image.");
+        throw buildPinRequestError(
+          response,
+          payload,
+          "Could not remove the image.",
+        );
       }
 
       mergeMatchImageUpdateIntoSession(imageDeleteContext.sessionId, payload);
@@ -800,7 +809,7 @@ export default function SessionsPageClient({
           const payload = await response
             .json()
             .catch(() => ({ message: "Incorrect PIN." }));
-          throw new Error(payload.message || "Incorrect PIN.");
+          throw buildPinRequestError(response, payload, "Incorrect PIN.");
         }
 
         const directorSessionId = pinPrompt.session._id;
@@ -820,7 +829,7 @@ export default function SessionsPageClient({
         const payload = await response
           .json()
           .catch(() => ({ message: "Incorrect PIN." }));
-        throw new Error(payload.message || "Incorrect PIN.");
+        throw buildPinRequestError(response, payload, "Incorrect PIN.");
       }
 
       const needsToss = !pinPrompt.session.tossReady;
@@ -831,6 +840,7 @@ export default function SessionsPageClient({
       setPinPrompt(null);
     } catch (error) {
       setPinError(error.message);
+      throw error;
     } finally {
       setPinSubmitting(false);
     }
@@ -1147,6 +1157,13 @@ export default function SessionsPageClient({
             submitLabel={
               pinPrompt.mode === "director" ? "Join Director Mode" : "Enter Umpire Mode"
             }
+            rateLimitScope={
+              pinPrompt.mode === "director"
+                ? "director-auth"
+                : pinPrompt.session?.match
+                  ? `match-auth:${pinPrompt.session.match}`
+                  : "match-auth"
+            }
           />
         ) : null}
         {managePinPrompt ? (
@@ -1168,6 +1185,7 @@ export default function SessionsPageClient({
             digitCount={6}
             pinLabel="Manage PIN"
             placeholder="- - - - - -"
+            rateLimitScope="session-manage-pin"
             onConfirm={handleManagePinSubmit}
             onClose={() => {
               setManagePinPrompt(null);
@@ -1193,6 +1211,7 @@ export default function SessionsPageClient({
             digitCount={6}
             pinLabel="Manage PIN"
             placeholder="- - - - - -"
+            rateLimitScope="session-bulk-delete-pin"
             onConfirm={handleBulkDeleteSessions}
             onClose={() => setBulkDeletePromptOpen(false)}
           />
@@ -1378,6 +1397,11 @@ export default function SessionsPageClient({
             digitCount={6}
             pinLabel="Manage PIN"
             placeholder="- - - - - -"
+            rateLimitScope={
+              imageDeleteContext?.matchId
+                ? `match-image-delete:${imageDeleteContext.matchId}`
+                : "match-image-delete"
+            }
             onConfirm={handleDeleteSessionImage}
             onClose={closeImageActionFlows}
           />

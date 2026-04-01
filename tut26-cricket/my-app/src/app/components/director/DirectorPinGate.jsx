@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useState } from "react";
 import { FaArrowLeft, FaBroadcastTower, FaInfoCircle } from "react-icons/fa";
+import {
+  clearClientPinRateLimit,
+  registerClientPinFailure,
+  useClientPinRateLimit,
+} from "../../lib/pin-attempt-client";
 
 export default function DirectorPinGate({
   pin,
@@ -10,8 +15,39 @@ export default function DirectorPinGate({
   onSubmit,
   isSubmitting = false,
   error = "",
+  rateLimitScope = "director-auth",
 }) {
   const [showHelp, setShowHelp] = useState(false);
+  const [localError, setLocalError] = useState("");
+  const pinRateLimit = useClientPinRateLimit(rateLimitScope);
+  const displayError = pinRateLimit.isBlocked
+    ? pinRateLimit.message
+    : error || localError;
+
+  const handleSubmit = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (pinRateLimit.isBlocked) {
+      setLocalError(pinRateLimit.message);
+      return;
+    }
+
+    setLocalError("");
+
+    try {
+      await onSubmit?.();
+      clearClientPinRateLimit(rateLimitScope);
+      pinRateLimit.sync();
+    } catch (caughtError) {
+      registerClientPinFailure(rateLimitScope, {
+        retryAfterMs: Number(caughtError?.retryAfterMs || 0),
+      });
+      pinRateLimit.sync();
+      setLocalError(caughtError?.message || "Incorrect PIN.");
+    }
+  };
 
   return (
     <section className="mx-auto w-full max-w-md">
@@ -56,9 +92,9 @@ export default function DirectorPinGate({
           </div>
         ) : null}
 
-        {error ? (
+        {displayError ? (
           <div className="mt-5 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-            {error}
+            {displayError}
           </div>
         ) : null}
 
@@ -77,13 +113,14 @@ export default function DirectorPinGate({
               autoComplete="one-time-code"
               maxLength={4}
               value={pin}
+              disabled={isSubmitting || pinRateLimit.isBlocked}
               onChange={(event) =>
                 onPinChange?.(event.target.value.replace(/\D/g, "").slice(0, 4))
               }
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
-                  onSubmit?.();
+                  void handleSubmit();
                 }
               }}
               placeholder="0000"
@@ -92,8 +129,8 @@ export default function DirectorPinGate({
           </div>
           <button
             type="button"
-            onClick={onSubmit}
-            disabled={isSubmitting || pin.length !== 4}
+            onClick={handleSubmit}
+            disabled={isSubmitting || pin.length !== 4 || pinRateLimit.isBlocked}
             className="inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(90deg,#10b981_0%,#22c55e_58%,#34d399_100%)] px-5 py-3.5 font-bold text-black shadow-[0_16px_36px_rgba(16,185,129,0.2)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting ? "Checking..." : "Enter Director Mode"}

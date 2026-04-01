@@ -12,6 +12,7 @@ import {
   isValidUmpirePin,
 } from "../../../lib/match-access";
 import { serializePublicSession } from "../../../lib/public-data";
+import { enforceSmartPinRateLimit } from "../../../lib/pin-attempt-server";
 import { getRequestMeta } from "../../../lib/request-meta";
 import { enforceRateLimit } from "../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../lib/request-security";
@@ -96,6 +97,22 @@ export async function PATCH(req, { params }) {
     if (!parsedRequest.ok) {
       return jsonError(parsedRequest.message, parsedRequest.status);
     }
+    const pinValue = String(parsedRequest.value.pin || "").trim();
+    if (pinValue) {
+      const pinAttemptLimit = enforceSmartPinRateLimit({
+        key: `session-patch-pin:${id}:${meta.ip}`,
+        longLimit: 5,
+        longWindowMs: 5 * 60 * 1000,
+        longBlockMs: 2 * 60 * 1000,
+      });
+
+      if (!pinAttemptLimit.allowed) {
+        return jsonRateLimit(
+          "Too many PIN attempts. Try again shortly.",
+          pinAttemptLimit.retryAfterMs,
+        );
+      }
+    }
 
     await connectDB();
     const session = await Session.findById(id);
@@ -104,9 +121,8 @@ export async function PATCH(req, { params }) {
     }
 
     const hasCookieAccess = await hasSessionAdminAccess(session);
-    const hasPinAccess = parsedRequest.value.pin
-      ? isValidUmpirePin(parsedRequest.value.pin) ||
-        isValidManagePin(parsedRequest.value.pin)
+    const hasPinAccess = pinValue
+      ? isValidUmpirePin(pinValue) || isValidManagePin(pinValue)
       : false;
 
     if (!hasCookieAccess && !hasPinAccess) {
@@ -208,6 +224,22 @@ export async function DELETE(req, { params }) {
     if (!parsedRequest.ok) {
       return jsonError(parsedRequest.message, parsedRequest.status);
     }
+    const pinValue = String(parsedRequest.value.pin || "").trim();
+    if (pinValue) {
+      const pinAttemptLimit = enforceSmartPinRateLimit({
+        key: `session-delete-pin:${id}:${meta.ip}`,
+        longLimit: 5,
+        longWindowMs: 5 * 60 * 1000,
+        longBlockMs: 2 * 60 * 1000,
+      });
+
+      if (!pinAttemptLimit.allowed) {
+        return jsonRateLimit(
+          "Too many PIN attempts. Try again shortly.",
+          pinAttemptLimit.retryAfterMs,
+        );
+      }
+    }
 
     await connectDB();
     const session = await Session.findById(id).lean();
@@ -250,9 +282,7 @@ export async function DELETE(req, { params }) {
     }
 
     const hasCookieAccess = await hasSessionAdminAccess(session);
-    const hasPinAccess = parsedRequest.value.pin
-      ? isValidManagePin(parsedRequest.value.pin)
-      : false;
+    const hasPinAccess = pinValue ? isValidManagePin(pinValue) : false;
 
     if (!hasCookieAccess && !hasPinAccess) {
       return jsonError("Manage access denied.", 403);

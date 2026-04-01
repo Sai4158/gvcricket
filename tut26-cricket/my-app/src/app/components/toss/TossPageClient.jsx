@@ -341,6 +341,7 @@ export default function TossPageClient({
           onSubmit={submitPin}
           isSubmitting={authSubmitting}
           error={authError}
+          rateLimitScope={matchId ? `match-auth:${matchId}` : "match-auth"}
         />
       )
     ) : (

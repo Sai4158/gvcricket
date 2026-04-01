@@ -1,6 +1,9 @@
 "use client";
 
 import { getImagePinCheckPayload } from "./image-pin-policy";
+import {
+  buildPinRequestError,
+} from "./pin-attempt-client";
 
 export async function verifyImageActionPin({
   pin = "",
@@ -19,7 +22,7 @@ export async function verifyImageActionPin({
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(payload.message || "Incorrect PIN.");
+    throw buildPinRequestError(response, payload, "Incorrect PIN.");
   }
 
   return true;

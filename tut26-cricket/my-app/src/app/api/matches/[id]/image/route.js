@@ -24,6 +24,7 @@ import {
 import { getRequiredImagePinKind, IMAGE_PIN_KIND } from "../../../../lib/image-pin-policy";
 import { moderateMatchImageBuffer } from "../../../../lib/match-image-moderation";
 import { serializePublicMatch } from "../../../../lib/public-data";
+import { enforceSmartPinRateLimit } from "../../../../lib/pin-attempt-server";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
 import {
@@ -122,6 +123,22 @@ export async function POST(req, { params }) {
     if (!parsedRequest.ok) {
       return jsonError(parsedRequest.message, parsedRequest.status);
     }
+    const pinValue = String(parsedRequest.value.get("pin") || "").trim();
+    if (pinValue) {
+      const pinAttemptLimit = enforceSmartPinRateLimit({
+        key: `match-image-upload-pin:${id}:${meta.ip}`,
+        longLimit: 5,
+        longWindowMs: 5 * 60 * 1000,
+        longBlockMs: 2 * 60 * 1000,
+      });
+
+      if (!pinAttemptLimit.allowed) {
+        return jsonRateLimit(
+          "Too many PIN attempts. Try again shortly.",
+          pinAttemptLimit.retryAfterMs,
+        );
+      }
+    }
 
     await connectDB();
     const match = await Match.findById(id);
@@ -152,7 +169,6 @@ export async function POST(req, { params }) {
       accessToken,
       Number(match.adminAccessVersion || 1)
     );
-    const pinValue = String(parsedRequest.value.get("pin") || "").trim();
     const hasUmpirePinAccess = Boolean(pinValue) && isValidUmpirePin(pinValue);
     const hasManagePinAccess = Boolean(pinValue) && isValidManagePin(pinValue);
     const uploadPinKind = getRequiredImagePinKind({
@@ -387,6 +403,22 @@ export async function DELETE(req, { params }) {
     if (!parsedRequest.ok) {
       return jsonError(parsedRequest.message, parsedRequest.status);
     }
+    const pinValue = String(parsedRequest.value.pin || "").trim();
+    if (pinValue) {
+      const pinAttemptLimit = enforceSmartPinRateLimit({
+        key: `match-image-delete-pin:${id}:${meta.ip}`,
+        longLimit: 5,
+        longWindowMs: 5 * 60 * 1000,
+        longBlockMs: 2 * 60 * 1000,
+      });
+
+      if (!pinAttemptLimit.allowed) {
+        return jsonRateLimit(
+          "Too many PIN attempts. Try again shortly.",
+          pinAttemptLimit.retryAfterMs,
+        );
+      }
+    }
 
     await connectDB();
     const match = await Match.findById(id);
@@ -394,7 +426,6 @@ export async function DELETE(req, { params }) {
       return jsonError("Match not found.", 404);
     }
 
-    const pinValue = String(parsedRequest.value.pin || "").trim();
     const hasManagePinAccess = Boolean(pinValue) && isValidManagePin(pinValue);
     const currentImages = getStoredMatchImages(match, { matchId: id });
     const deletePinKind = getRequiredImagePinKind({
@@ -506,6 +537,22 @@ export async function PATCH(req, { params }) {
     if (!parsedRequest.ok) {
       return jsonError(parsedRequest.message, parsedRequest.status);
     }
+    const pinValue = String(parsedRequest.value.pin || "").trim();
+    if (pinValue) {
+      const pinAttemptLimit = enforceSmartPinRateLimit({
+        key: `match-image-reorder-pin:${id}:${meta.ip}`,
+        longLimit: 5,
+        longWindowMs: 5 * 60 * 1000,
+        longBlockMs: 2 * 60 * 1000,
+      });
+
+      if (!pinAttemptLimit.allowed) {
+        return jsonRateLimit(
+          "Too many PIN attempts. Try again shortly.",
+          pinAttemptLimit.retryAfterMs,
+        );
+      }
+    }
 
     await connectDB();
     const match = await Match.findById(id);
@@ -521,7 +568,6 @@ export async function PATCH(req, { params }) {
       Number(match.adminAccessVersion || 1),
     );
     const currentImages = getStoredMatchImages(match, { matchId: id });
-    const pinValue = String(parsedRequest.value.pin || "").trim();
     const hasManagePinAccess = Boolean(pinValue) && isValidManagePin(pinValue);
     const reorderPinKind = getRequiredImagePinKind({
       actionType: "reorder",
