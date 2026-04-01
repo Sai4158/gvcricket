@@ -4,6 +4,21 @@ import { getPublicMatchImages } from "./match-image-gallery";
 import { isSafeMatchImageUrl } from "./match-image";
 import { hasCompleteTossState, normalizeLegacyTossState } from "./match-toss";
 
+function getPublicMatchImagesWithFallback(match, fallbackState = null) {
+  const matchId = String(match?._id || "");
+  const directImages = getPublicMatchImages(match, {
+    matchId,
+  });
+
+  if (directImages.length || !fallbackState) {
+    return directImages;
+  }
+
+  return getPublicMatchImages(fallbackState, {
+    matchId,
+  });
+}
+
 export function serializePublicMatch(
   matchDocument,
   fallbackState = null,
@@ -17,9 +32,7 @@ export function serializePublicMatch(
       : matchDocument;
   const match = normalizeLegacyTossState(rawMatch, fallbackState);
   const includeActionHistory = Boolean(options.includeActionHistory);
-  const publicImages = getPublicMatchImages(match, {
-    matchId: String(match._id || ""),
-  });
+  const publicImages = getPublicMatchImagesWithFallback(match, fallbackState);
 
   return {
     _id: String(match._id),

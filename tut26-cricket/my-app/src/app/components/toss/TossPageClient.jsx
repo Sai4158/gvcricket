@@ -11,9 +11,8 @@ import TossStatePanels from "./TossStatePanels";
 import { getTeamBundle } from "../../lib/team-utils";
 import { getStartedMatchFromPayload, getStartedMatchId } from "../../lib/match-start";
 import {
-  clearPendingSessionImage,
-  getPendingSessionImage,
-  uploadPendingSessionImageToMatch,
+  clearPendingSessionImageNotice,
+  uploadStoredPendingSessionImageToMatch,
 } from "../../lib/pending-session-image";
 import StepFlow from "../shared/StepFlow";
 import LiquidSportText from "../home/LiquidSportText";
@@ -34,8 +33,8 @@ function createActionId(prefix) {
   return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
 }
 
-async function uploadPendingSessionImage(matchId, pendingImage) {
-  if (!pendingImage?.dataUrl || !matchId || typeof window === "undefined") {
+async function uploadPendingSessionImage(matchId, sessionId) {
+  if (!matchId || typeof window === "undefined") {
     return;
   }
 
@@ -43,11 +42,13 @@ async function uploadPendingSessionImage(matchId, pendingImage) {
   const timeoutId = window.setTimeout(() => controller.abort(), 12000);
 
   try {
-    await uploadPendingSessionImageToMatch({
+    const didUpload = await uploadStoredPendingSessionImageToMatch({
       matchId,
-      pendingImage,
       signal: controller.signal,
     });
+    if (didUpload && sessionId) {
+      clearPendingSessionImageNotice(sessionId);
+    }
   } catch {
     // Optional image upload should never block match start.
   } finally {
@@ -200,12 +201,6 @@ export default function TossPageClient({
     setCountdown(3);
     setTossResult({ side: null, winnerName: null, call: null });
     setStatus("counting");
-    window.setTimeout(() => {
-      const didSpeak = speak("3", { userGesture: true, interrupt: true });
-      if (didSpeak) {
-        spokenCountdownRef.current = 3;
-      }
-    }, 0);
   };
 
   const startMatch = async (decision) => {
@@ -271,13 +266,8 @@ export default function TossPageClient({
         window.sessionStorage.removeItem(getDraftTokenKey(sessionId));
       }
 
-      const pendingImage = getPendingSessionImage();
-      if (typeof window !== "undefined") {
-        clearPendingSessionImage();
-      }
-
-      if (pendingImage && finalMatchId) {
-        void uploadPendingSessionImage(finalMatchId, pendingImage);
+      if (finalMatchId) {
+        void uploadPendingSessionImage(finalMatchId, sessionId);
       }
 
       router.push(`/match/${finalMatchId}`);

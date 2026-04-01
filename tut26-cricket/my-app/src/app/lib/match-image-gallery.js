@@ -1,6 +1,10 @@
 import crypto from "node:crypto";
 import { createRequire } from "node:module";
-import { isSafeRemoteMatchImageUrl } from "./match-image";
+import {
+  isInlineMatchImageDataUrl,
+  isSafeMatchImageUrl,
+  isSafeRemoteMatchImageUrl,
+} from "./match-image";
 import {
   buildSignedMatchImageUrl,
   encryptMatchImageSourceUrl,
@@ -37,11 +41,26 @@ function getImageVersion(entry) {
 }
 
 function buildImageUrl(matchId, entry) {
+  const safeUrl = isSafeMatchImageUrl(entry?.url) ? String(entry.url) : "";
+
   if (!matchId) {
-    return isSafeRemoteMatchImageUrl(entry?.url) ? String(entry.url) : "";
+    return safeUrl;
+  }
+
+  if (isInlineMatchImageDataUrl(safeUrl)) {
+    return safeUrl;
   }
 
   return buildSignedMatchImageUrl(matchId, getImageVersion(entry), entry?.id || "");
+}
+
+function getLegacyCoverUrl(entry) {
+  const safeUrl = isSafeMatchImageUrl(entry?.url) ? String(entry.url) : "";
+  if (!safeUrl || isInlineMatchImageDataUrl(safeUrl)) {
+    return "";
+  }
+
+  return safeUrl;
 }
 
 function normalizeStoredImageEntry(entry, { matchId = "" } = {}) {
@@ -52,10 +71,10 @@ function normalizeStoredImageEntry(entry, { matchId = "" } = {}) {
   const id = String(entry.id || "").trim();
   const storageUrlEnc = String(entry.storageUrlEnc || "").trim();
   const storageUrlHash = String(entry.storageUrlHash || "").trim();
-  const remoteUrl = String(entry.url || "").trim();
+  const directUrl = String(entry.url || "").trim();
   const uploadedAt = toIsoDate(entry.uploadedAt);
 
-  if (!id || (!storageUrlEnc && !isSafeRemoteMatchImageUrl(remoteUrl))) {
+  if (!id || (!storageUrlEnc && !isSafeMatchImageUrl(directUrl))) {
     return null;
   }
 
@@ -64,7 +83,7 @@ function normalizeStoredImageEntry(entry, { matchId = "" } = {}) {
     url: buildImageUrl(matchId, {
       ...entry,
       id,
-      url: remoteUrl,
+      url: directUrl,
       uploadedAt,
     }),
     publicId: String(entry.publicId || "").trim(),
@@ -81,8 +100,8 @@ function buildLegacyCoverEntry(record, { matchId = "" } = {}) {
   const currentUrl = String(record?.matchImageUrl || "").trim();
   const storageUrlEnc = String(record?.matchImageStorageUrlEnc || "").trim();
   const storageUrlHash = String(record?.matchImageStorageUrlHash || "").trim();
-  const remoteUrl = isSafeRemoteMatchImageUrl(currentUrl) ? currentUrl : "";
-  if (!storageUrlEnc && !remoteUrl && !getPublicMatchImagePath(record)) {
+  const safeCurrentUrl = isSafeMatchImageUrl(currentUrl) ? currentUrl : "";
+  if (!storageUrlEnc && !safeCurrentUrl && !getPublicMatchImagePath(record)) {
     return null;
   }
 
@@ -90,7 +109,7 @@ function buildLegacyCoverEntry(record, { matchId = "" } = {}) {
     {
       id: "cover",
       url:
-        remoteUrl ||
+        safeCurrentUrl ||
         getPublicMatchImagePath({
           ...record,
           _id: matchId || record?._id || "",
@@ -115,8 +134,8 @@ export function createStoredMatchImageEntry({
   id = "",
 }) {
   const safeSourceUrl = String(sourceUrl || "").trim();
-  if (!isSafeRemoteMatchImageUrl(safeSourceUrl)) {
-    throw new Error("Remote image URL was rejected.");
+  if (!isSafeMatchImageUrl(safeSourceUrl)) {
+    throw new Error("Image URL was rejected.");
   }
 
   const nextUploadedAt = toIsoDate(uploadedAt) || new Date();
@@ -124,8 +143,12 @@ export function createStoredMatchImageEntry({
     id: String(id || crypto.randomBytes(8).toString("hex")).trim(),
     url: safeSourceUrl,
     publicId: String(publicId || "").trim(),
-    storageUrlEnc: encryptMatchImageSourceUrl(safeSourceUrl),
-    storageUrlHash: hashMatchImageSourceUrl(safeSourceUrl),
+    storageUrlEnc: isSafeRemoteMatchImageUrl(safeSourceUrl)
+      ? encryptMatchImageSourceUrl(safeSourceUrl)
+      : "",
+    storageUrlHash: isSafeRemoteMatchImageUrl(safeSourceUrl)
+      ? hashMatchImageSourceUrl(safeSourceUrl)
+      : "",
     uploadedAt: nextUploadedAt,
     uploadedBy: String(uploadedBy || "").trim(),
   };
@@ -168,7 +191,7 @@ export function applyStoredMatchImages(record, images, { matchId = "" } = {}) {
     return normalized;
   }
 
-  record.matchImageUrl = cover.url || "";
+  record.matchImageUrl = getLegacyCoverUrl(cover);
   record.matchImagePublicId = cover.publicId || "";
   record.matchImageStorageUrlEnc = cover.storageUrlEnc || "";
   record.matchImageStorageUrlHash = cover.storageUrlHash || "";

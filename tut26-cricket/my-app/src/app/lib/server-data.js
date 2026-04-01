@@ -20,7 +20,7 @@ const PUBLIC_MATCH_FIELDS = `${READ_ONLY_PUBLIC_MATCH_FIELDS} actionHistory`;
 const SESSION_MATCH_SUMMARY_FIELDS =
   "_id teamA teamB teamAName teamBName tossWinner tossDecision score outs innings innings1 innings2 isOngoing result updatedAt sessionId matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy createdAt";
 const FALLBACK_SESSION_FIELDS =
-  "tossWinner tossDecision teamAName teamBName teamA teamB";
+  "tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy updatedAt";
 const NON_DRAFT_SESSION_COLLECTION_FILTER = {
   isDraft: { $ne: true },
 };
@@ -266,6 +266,7 @@ async function readSessionsIndexPageData() {
 
     return {
       ...publicSession,
+      matchImageUrl: publicMatch?.matchImageUrl || publicSession.matchImageUrl || "",
       matchImages:
         publicMatch?.matchImages?.length > 0
           ? publicMatch.matchImages

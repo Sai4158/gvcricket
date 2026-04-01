@@ -31,6 +31,7 @@ import LiquidSportText from "../home/LiquidSportText";
 import ImagePinModal from "../shared/ImagePinModal";
 import { ModalBase } from "../match/MatchBaseModals";
 import MatchImageUploader from "../match/MatchImageUploader";
+import { verifyImageActionPin } from "../../lib/image-pin-client";
 import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
 
 const SORT_OPTIONS = [
@@ -751,6 +752,11 @@ export default function SessionsPageClient({
         throw new Error("Match image is not ready.");
       }
 
+      await verifyImageActionPin({
+        pin,
+        usesManagePin: true,
+      });
+
       const response = await fetch(
         `/api/matches/${imageDeleteContext.matchId}/image`,
         {
@@ -1359,6 +1365,7 @@ export default function SessionsPageClient({
               title="Match Gallery"
               description="Manage session images."
               primaryLabel="Save Images"
+              promptForUploadPin
             />
           </ModalBase>
         ) : null}
@@ -1366,8 +1373,11 @@ export default function SessionsPageClient({
           <ImagePinModal
             isOpen={Boolean(imageDeleteContext)}
             title="Delete image"
-            subtitle="Enter the 6-digit PIN to remove this image."
+            subtitle="Enter the 6-digit manage PIN to remove this image."
             confirmLabel="Delete image"
+            digitCount={6}
+            pinLabel="Manage PIN"
+            placeholder="- - - - - -"
             onConfirm={handleDeleteSessionImage}
             onClose={closeImageActionFlows}
           />

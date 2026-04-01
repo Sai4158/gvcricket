@@ -1745,7 +1745,38 @@ export default function MatchPageClient({
 
   if (isLoading) return <Splash>Loading match...</Splash>;
   if (error && !match) return <Splash>Error: Could not load the match data.</Splash>;
-  if (!match) return <Splash>Match not found.</Splash>;
+  if (!match) {
+    return (
+      <main className="min-h-screen bg-zinc-950 px-4 py-8 text-white">
+        <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md items-center justify-center">
+          <section className="w-full rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,20,24,0.96),rgba(8,8,12,0.98))] p-6 text-center shadow-[0_24px_80px_rgba(0,0,0,0.42)]">
+            <p className="text-2xl font-semibold tracking-tight text-white">
+              Match not found
+            </p>
+            <p className="mt-2 text-sm leading-6 text-zinc-400">
+              This match may have ended, moved, or never existed.
+            </p>
+            <div className="mt-6 grid gap-3">
+              <button
+                type="button"
+                onClick={() => router.push("/session/new")}
+                className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200"
+              >
+                Create New Session
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/session")}
+                className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
+              >
+                All Sessions
+              </button>
+            </div>
+          </section>
+        </div>
+      </main>
+    );
+  }
   if (tossPending) return <Splash>Opening toss...</Splash>;
 
   const activeInningsKey = match.innings === "first" ? "innings1" : "innings2";

@@ -18,6 +18,13 @@ import {
   isValidDirectorPin,
 } from "../src/app/lib/director-access.js";
 import {
+  getImagePinCheckPayload,
+  getImagePinPromptConfig,
+  getRequiredImagePinKind,
+  IMAGE_PIN_ATTEMPT_LIMIT,
+  IMAGE_PIN_KIND,
+} from "../src/app/lib/image-pin-policy.js";
+import {
   applyMatchAction,
   applySafeMatchPatch,
   MatchEngineError,
@@ -201,6 +208,90 @@ test("manage PIN validation supports hashed env configuration", () => {
     if (previousManagePinHash === undefined) delete process.env.SESSION_MANAGE_PIN_HASH;
     else process.env.SESSION_MANAGE_PIN_HASH = previousManagePinHash;
   }
+});
+
+test("image pin policy keeps first upload on umpire PIN and protects gallery deletes with manage PIN", () => {
+  assert.equal(IMAGE_PIN_ATTEMPT_LIMIT, 4);
+
+  assert.equal(
+    getRequiredImagePinKind({
+      actionType: "upload",
+      plannedGalleryCount: 1,
+    }),
+    IMAGE_PIN_KIND.UMPIRE_OR_MANAGE
+  );
+  assert.equal(
+    getRequiredImagePinKind({
+      actionType: "upload",
+      plannedGalleryCount: 2,
+    }),
+    IMAGE_PIN_KIND.MANAGE
+  );
+  assert.equal(
+    getRequiredImagePinKind({
+      actionType: "remove",
+      plannedGalleryCount: 1,
+    }),
+    IMAGE_PIN_KIND.MANAGE
+  );
+  assert.equal(
+    getRequiredImagePinKind({
+      actionType: "reorder",
+      plannedGalleryCount: 3,
+    }),
+    IMAGE_PIN_KIND.MANAGE
+  );
+
+  assert.deepEqual(
+    getImagePinPromptConfig({
+      actionType: "upload",
+      plannedGalleryCount: 1,
+    }),
+    {
+      pinKind: IMAGE_PIN_KIND.UMPIRE_OR_MANAGE,
+      usesManagePin: false,
+      digitCount: 4,
+      title: "Umpire PIN",
+      label: "4-digit PIN",
+      placeholder: "0000",
+      description: "Enter PIN to upload.",
+    }
+  );
+  assert.deepEqual(
+    getImagePinPromptConfig({
+      actionType: "remove",
+      plannedGalleryCount: 1,
+    }),
+    {
+      pinKind: IMAGE_PIN_KIND.MANAGE,
+      usesManagePin: true,
+      digitCount: 6,
+      title: "Manage PIN",
+      label: "Manage PIN",
+      placeholder: "- - - - - -",
+      description: "Enter manage PIN to remove.",
+    }
+  );
+  assert.deepEqual(
+    getImagePinCheckPayload({
+      pin: " 636363 ",
+      usesManagePin: true,
+    }),
+    {
+      pin: "636363",
+      allowUmpirePin: false,
+    }
+  );
+  assert.deepEqual(
+    getImagePinCheckPayload({
+      pin: "0000",
+      usesManagePin: false,
+    }),
+    {
+      pin: "0000",
+      allowUmpirePin: true,
+    }
+  );
 });
 
 test("director access tokens validate and director PIN uses the configured secret", () => {
@@ -946,6 +1037,10 @@ test("match image fallback resolves unsafe or missing images to the GV logo", ()
   assert.equal(
     resolveSafeMatchImage("https://i.ibb.co/demo/sample.jpg"),
     "https://i.ibb.co/demo/sample.jpg"
+  );
+  assert.equal(
+    resolveSafeMatchImage("data:image/jpeg;base64,Zm9vYmFy"),
+    "data:image/jpeg;base64,Zm9vYmFy"
   );
 });
 

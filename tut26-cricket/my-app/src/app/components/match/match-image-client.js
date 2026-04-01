@@ -1,11 +1,29 @@
 "use client";
 
-const MAX_DIMENSION = 1600;
-const FAST_PATH_MAX_BYTES = 2 * 1024 * 1024;
-const FAST_PATH_PNG_MAX_BYTES = 900 * 1024;
+const MAX_DIMENSION = 1280;
+const TARGET_MAX_BYTES = 450 * 1024;
+const FAST_PATH_MAX_BYTES = 450 * 1024;
+const FAST_PATH_PNG_MAX_BYTES = 350 * 1024;
 
 export function getAcceptedMatchImageTypes() {
   return "image/jpeg,image/png,image/webp";
+}
+
+async function canvasToJpegBlob(canvas, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (nextBlob) => {
+        if (!nextBlob) {
+          reject(new Error("Could not compress the image."));
+          return;
+        }
+
+        resolve(nextBlob);
+      },
+      "image/jpeg",
+      quality
+    );
+  });
 }
 
 export async function compressMatchImage(file) {
@@ -29,33 +47,42 @@ export async function compressMatchImage(file) {
   const width = Math.max(1, Math.round(bitmap.width * scale));
   const height = Math.max(1, Math.round(bitmap.height * scale));
   const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
   const ctx = canvas.getContext("2d");
 
   if (!ctx) {
     throw new Error("Could not prepare image compression.");
   }
 
-  ctx.drawImage(bitmap, 0, 0, width, height);
+  let nextWidth = width;
+  let nextHeight = height;
+  let quality = 0.82;
+  let bestBlob = null;
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    canvas.width = nextWidth;
+    canvas.height = nextHeight;
+    ctx.clearRect(0, 0, nextWidth, nextHeight);
+    ctx.drawImage(bitmap, 0, 0, nextWidth, nextHeight);
+
+    const blob = await canvasToJpegBlob(canvas, quality);
+    bestBlob = blob;
+
+    if (blob.size <= TARGET_MAX_BYTES) {
+      break;
+    }
+
+    quality = Math.max(0.58, quality - 0.1);
+    nextWidth = Math.max(1, Math.round(nextWidth * 0.86));
+    nextHeight = Math.max(1, Math.round(nextHeight * 0.86));
+  }
+
   bitmap.close();
 
-  const blob = await new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (nextBlob) => {
-        if (!nextBlob) {
-          reject(new Error("Could not compress the image."));
-          return;
-        }
+  if (!bestBlob) {
+    throw new Error("Could not compress the image.");
+  }
 
-        resolve(nextBlob);
-      },
-      "image/jpeg",
-      0.82
-    );
-  });
-
-  return new File([blob], `${file.name.replace(/\.[^.]+$/, "")}.jpg`, {
+  return new File([bestBlob], `${file.name.replace(/\.[^.]+$/, "")}.jpg`, {
     type: "image/jpeg",
   });
 }

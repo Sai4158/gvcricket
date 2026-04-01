@@ -362,6 +362,7 @@ export function MatchImageModal({ match, onUploaded, onClose }) {
           onClose?.();
         }}
         onRequestClose={onClose}
+        promptForUploadPin
         title={match?.matchImageUrl ? "Replace Match Image" : "Add Match Image"}
         description="Manage match images."
         primaryLabel={match?.matchImageUrl ? "Save Images" : "Upload Images"}

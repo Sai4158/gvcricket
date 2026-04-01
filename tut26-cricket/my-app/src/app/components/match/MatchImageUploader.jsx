@@ -12,6 +12,8 @@ import {
   FaTrash,
 } from "react-icons/fa";
 import LoadingButton from "../shared/LoadingButton";
+import { verifyImageActionPin } from "../../lib/image-pin-client";
+import { getImagePinPromptConfig } from "../../lib/image-pin-policy";
 import {
   compressMatchImage,
   getAcceptedMatchImageTypes,
@@ -115,37 +117,6 @@ function getPlannedGalleryCount({
   }
 
   return existingCount + nextSelectedCount;
-}
-
-function getProtectedPinConfig({
-  actionType = "",
-  plannedGalleryCount = 0,
-  galleryCount = 0,
-}) {
-  const usesManagePin =
-    actionType === "upload"
-      ? Number(plannedGalleryCount || 0) > 1
-      : Number(galleryCount || 0) > 1;
-
-  return {
-    usesManagePin,
-    digitCount: usesManagePin ? 6 : 4,
-    title: usesManagePin ? "Manage PIN" : "Umpire PIN",
-    label: usesManagePin ? "Manage PIN" : "4-digit PIN",
-    placeholder: usesManagePin ? "- - - - - -" : "0000",
-    description:
-      actionType === "remove"
-        ? usesManagePin
-          ? "Enter PIN to remove from this gallery."
-          : "Enter PIN to remove."
-        : actionType === "reorder"
-        ? usesManagePin
-          ? "Enter PIN to save this gallery order."
-          : "Enter PIN to save order."
-        : usesManagePin
-        ? "Enter PIN to upload to this gallery."
-        : "Enter PIN to upload.",
-  };
 }
 
 function SelectedImageTile({
@@ -481,11 +452,14 @@ export default function MatchImageUploader({
     uploadPlan,
     targetImageId: replaceTargetId,
   });
-  const uploadNeedsPin = plannedGalleryCount > 1;
   const isSubmitting =
     submitMode === "upload" ||
     submitMode === "remove" ||
     submitMode === "reorder";
+  const uploadPinConfig = getImagePinPromptConfig({
+    actionType: "upload",
+    plannedGalleryCount,
+  });
 
   useEffect(() => {
     setGalleryItems(normalizedExistingImages);
@@ -719,14 +693,17 @@ export default function MatchImageUploader({
       }
 
       const submittedPin = String(pinOverride || pin || "").trim();
-      if (uploadNeedsPin && submittedPin.length !== 4) {
+      if (
+        (promptForUploadPin || Boolean(submittedPin)) &&
+        submittedPin.length !== uploadPinConfig.digitCount
+      ) {
         requestProtectedAction({ type: "upload" });
         return;
       }
 
       setSubmitMode("upload");
       setShowPinPrompt(
-        (current) => current || uploadNeedsPin || Boolean(submittedPin),
+        (current) => current || Boolean(submittedPin),
       );
       setError("");
       try {
@@ -798,13 +775,14 @@ export default function MatchImageUploader({
       matchId,
       pin,
       plannedGalleryCount,
+      promptForUploadPin,
       replaceTargetId,
       requestProtectedAction,
       resetSelectedFiles,
       selectedFiles,
       syncGalleryFromPayload,
       onComplete,
-      uploadNeedsPin,
+      uploadPinConfig.digitCount,
     ],
   );
 
@@ -903,18 +881,31 @@ export default function MatchImageUploader({
     [isSubmitting, matchId, pin, requestProtectedAction, syncGalleryFromPayload],
   );
 
-  const protectedPinConfig = getProtectedPinConfig({
+  const protectedPinConfig = getImagePinPromptConfig({
     actionType: pendingProtectedAction?.type || "upload",
-    plannedGalleryCount,
-    galleryCount: galleryItems.length || existingImageCount,
+    plannedGalleryCount:
+      pendingProtectedAction?.type === "upload"
+        ? plannedGalleryCount
+        : galleryItems.length || existingImageCount,
   });
 
-  const handleProtectedSubmit = useCallback(() => {
+  const handleProtectedSubmit = useCallback(async () => {
     if (
       isSubmitting ||
       pin.length !== protectedPinConfig.digitCount ||
       !pendingProtectedAction
     ) {
+      return;
+    }
+
+    try {
+      setError("");
+      await verifyImageActionPin({
+        pin,
+        usesManagePin: protectedPinConfig.usesManagePin,
+      });
+    } catch (caughtError) {
+      setError(caughtError.message || "Incorrect PIN.");
       return;
     }
 
@@ -942,6 +933,7 @@ export default function MatchImageUploader({
     isSubmitting,
     pendingProtectedAction,
     pin,
+    protectedPinConfig.usesManagePin,
     protectedPinConfig.digitCount,
   ]);
 
@@ -987,8 +979,8 @@ export default function MatchImageUploader({
 
     const nextImageId = deleteConfirmTarget.id;
     setDeleteConfirmTarget(null);
-    void executeRemoveImage(nextImageId);
-  }, [deleteConfirmTarget, executeRemoveImage, isSubmitting]);
+    requestProtectedAction({ type: "remove", imageId: nextImageId });
+  }, [deleteConfirmTarget, isSubmitting, requestProtectedAction]);
 
   const handleMoveExistingImage = useCallback(
     (imageId, direction) => {
@@ -1007,12 +999,13 @@ export default function MatchImageUploader({
       const [movedImage] = nextImages.splice(currentIndex, 1);
       nextImages.splice(nextIndex, 0, movedImage);
 
-      void executeReorderImages(
-        nextImages.map((image) => image.id),
-        imageId,
-      );
+      requestProtectedAction({
+        type: "reorder",
+        imageIds: nextImages.map((image) => image.id),
+        focusImageId: imageId,
+      });
     },
-    [executeReorderImages, galleryItems],
+    [galleryItems, requestProtectedAction],
   );
 
   const showGallerySection = galleryItems.length > 0;

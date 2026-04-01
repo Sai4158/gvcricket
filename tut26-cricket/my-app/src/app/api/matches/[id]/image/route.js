@@ -21,6 +21,7 @@ import {
   createStoredMatchImageEntry,
   getStoredMatchImages,
 } from "../../../../lib/match-image-gallery";
+import { getRequiredImagePinKind, IMAGE_PIN_KIND } from "../../../../lib/image-pin-policy";
 import { moderateMatchImageBuffer } from "../../../../lib/match-image-moderation";
 import { serializePublicMatch } from "../../../../lib/public-data";
 import { getRequestMeta } from "../../../../lib/request-meta";
@@ -85,10 +86,6 @@ function getProjectedGalleryCount({
   }
 
   return Math.max(projectedCount, declaredTotal);
-}
-
-function requiresManageGalleryPin(totalImageCount = 0) {
-  return Math.max(0, Number(totalImageCount || 0)) > 1;
 }
 
 export async function POST(req, { params }) {
@@ -158,7 +155,11 @@ export async function POST(req, { params }) {
     const pinValue = String(parsedRequest.value.get("pin") || "").trim();
     const hasUmpirePinAccess = Boolean(pinValue) && isValidUmpirePin(pinValue);
     const hasManagePinAccess = Boolean(pinValue) && isValidManagePin(pinValue);
-    const requiresManagePinForUpload = requiresManageGalleryPin(projectedGalleryCount);
+    const uploadPinKind = getRequiredImagePinKind({
+      actionType: "upload",
+      plannedGalleryCount: projectedGalleryCount,
+    });
+    const requiresManagePinForUpload = uploadPinKind === IMAGE_PIN_KIND.MANAGE;
     const hasRequiredUploadPinAccess = requiresManagePinForUpload
       ? hasManagePinAccess
       : hasUmpirePinAccess || hasManagePinAccess;
@@ -393,26 +394,16 @@ export async function DELETE(req, { params }) {
       return jsonError("Match not found.", 404);
     }
 
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get(getMatchAccessCookieName(id))?.value;
-    const hasCookieAccess = hasValidMatchAccess(
-      id,
-      accessToken,
-      Number(match.adminAccessVersion || 1)
-    );
     const pinValue = String(parsedRequest.value.pin || "").trim();
-    const hasUmpirePinAccess = Boolean(pinValue) && isValidUmpirePin(pinValue);
     const hasManagePinAccess = Boolean(pinValue) && isValidManagePin(pinValue);
     const currentImages = getStoredMatchImages(match, { matchId: id });
-    const requiresManagePinForDelete = requiresManageGalleryPin(currentImages.length);
+    const deletePinKind = getRequiredImagePinKind({
+      actionType: "remove",
+      plannedGalleryCount: currentImages.length,
+    });
+    const requiresManagePinForDelete = deletePinKind === IMAGE_PIN_KIND.MANAGE;
 
-    if (
-      (requiresManagePinForDelete && !hasManagePinAccess) ||
-      (!requiresManagePinForDelete &&
-        !hasCookieAccess &&
-        !hasUmpirePinAccess &&
-        !hasManagePinAccess)
-    ) {
+    if (!hasManagePinAccess) {
       await writeAuditLog({
         action: "match_media_delete_denied",
         targetType: "match",
@@ -424,7 +415,7 @@ export async function DELETE(req, { params }) {
 
       return jsonError(
         requiresManagePinForDelete
-          ? "Manage PIN required for gallery changes."
+          ? "Manage PIN required for image deletion."
           : "Incorrect PIN.",
         401,
       );
@@ -531,15 +522,18 @@ export async function PATCH(req, { params }) {
     );
     const currentImages = getStoredMatchImages(match, { matchId: id });
     const pinValue = String(parsedRequest.value.pin || "").trim();
-    const hasUmpirePinAccess = Boolean(pinValue) && isValidUmpirePin(pinValue);
     const hasManagePinAccess = Boolean(pinValue) && isValidManagePin(pinValue);
-    const requiresManagePinForReorder = requiresManageGalleryPin(currentImages.length);
+    const reorderPinKind = getRequiredImagePinKind({
+      actionType: "reorder",
+      plannedGalleryCount: currentImages.length,
+    });
+    const requiresManagePinForReorder =
+      reorderPinKind === IMAGE_PIN_KIND.MANAGE;
 
     if (
       (requiresManagePinForReorder && !hasManagePinAccess) ||
       (!requiresManagePinForReorder &&
         !hasCookieAccess &&
-        !hasUmpirePinAccess &&
         !hasManagePinAccess)
     ) {
       return jsonError(

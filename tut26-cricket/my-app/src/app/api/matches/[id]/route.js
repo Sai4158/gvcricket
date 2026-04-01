@@ -26,6 +26,9 @@ import { matchPatchSchema } from "../../../lib/validators";
 import Match from "../../../../models/Match";
 import Session from "../../../../models/Session";
 
+const FALLBACK_SESSION_FIELDS =
+  "tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy updatedAt";
+
 async function hasMatchAccess(matchId, accessVersion) {
   const cookieStore = await cookies();
   const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
@@ -49,7 +52,7 @@ export async function GET(_req, { params }) {
 
     const fallbackSession = match.sessionId
       ? await Session.findById(match.sessionId).select(
-          "tossWinner tossDecision teamAName teamBName teamA teamB"
+          FALLBACK_SESSION_FIELDS
         )
       : null;
 
@@ -135,7 +138,7 @@ export async function PATCH(req, { params }) {
 
     const fallbackSession = match.sessionId
       ? await Session.findById(match.sessionId).select(
-          "tossWinner tossDecision teamAName teamBName teamA teamB"
+          FALLBACK_SESSION_FIELDS
         )
       : null;
 
@@ -188,7 +191,7 @@ export async function PATCH(req, { params }) {
       metadata: { fields: Object.keys(parsedRequest.value) },
     });
 
-    return Response.json(serializePublicMatch(match, null, { includeActionHistory: true }), {
+    return Response.json(serializePublicMatch(match, fallbackSession, { includeActionHistory: true }), {
       headers: {
         "Cache-Control": "no-store",
       },

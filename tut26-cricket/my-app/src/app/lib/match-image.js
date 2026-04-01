@@ -2,6 +2,8 @@ const SAFE_IMAGE_HOSTS = new Set(["i.ibb.co", "ibb.co"]);
 const MAX_MATCH_IMAGE_BYTES = 5 * 1024 * 1024;
 const INTERNAL_MATCH_IMAGE_PATH =
   /^\/api\/matches\/[a-f0-9]{24}\/image\/file(?:\?[^#]*)?$/i;
+const INLINE_MATCH_IMAGE_DATA_URL =
+  /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=]+$/i;
 const ALLOWED_IMAGE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -101,14 +103,39 @@ export function isSafeRemoteMatchImageUrl(value) {
   }
 }
 
+export function buildInlineMatchImageDataUrl(buffer, mimeType) {
+  const safeMimeType = String(mimeType || "").toLowerCase();
+  if (!isAllowedMatchImageMime(safeMimeType) || !buffer?.length) {
+    return "";
+  }
+
+  return `data:${safeMimeType};base64,${Buffer.from(buffer).toString("base64")}`;
+}
+
+export function isInlineMatchImageDataUrl(value) {
+  return (
+    typeof value === "string" &&
+    INLINE_MATCH_IMAGE_DATA_URL.test(value.trim())
+  );
+}
+
 export function isSafeMatchImageUrl(value) {
   if (!value) return false;
 
-  if (typeof value === "string" && INTERNAL_MATCH_IMAGE_PATH.test(value.trim())) {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const trimmedValue = value.trim();
+  if (INTERNAL_MATCH_IMAGE_PATH.test(trimmedValue)) {
     return true;
   }
 
-  return isSafeRemoteMatchImageUrl(value);
+  if (isInlineMatchImageDataUrl(trimmedValue)) {
+    return true;
+  }
+
+  return isSafeRemoteMatchImageUrl(trimmedValue);
 }
 
 export function normalizeMatchImageMetadata(uploadData, uploadedBy = "admin") {

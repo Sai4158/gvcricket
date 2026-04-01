@@ -19,7 +19,9 @@ import LoadingButton from "../../components/shared/LoadingButton";
 import LiquidSportText from "../../components/home/LiquidSportText";
 import {
   clearPendingSessionImage,
+  clearPendingSessionImageNotice,
   getPendingSessionImage,
+  getPendingSessionImageNotice,
   uploadPendingSessionImageToDraftSession,
 } from "../../lib/pending-session-image";
 import { primeUiAudio } from "../../lib/page-audio";
@@ -62,6 +64,7 @@ export default function TeamSelectionPageClient({ sessionId }) {
   const [error, setError] = useState("");
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [imageUploadState, setImageUploadState] = useState("idle");
+  const [imageUploadNotice, setImageUploadNotice] = useState("");
   const [tossStatus, setTossStatus] = useState("choosing");
   const [tossCountdown, setTossCountdown] = useState(3);
   const [tossCall, setTossCall] = useState("");
@@ -104,6 +107,8 @@ export default function TeamSelectionPageClient({ sessionId }) {
       .then((didUpload) => {
         if (didUpload) {
           clearPendingSessionImage();
+          clearPendingSessionImageNotice(resolvedSessionId);
+          setImageUploadNotice("");
           setImageUploadState("done");
           return true;
         }
@@ -122,6 +127,10 @@ export default function TeamSelectionPageClient({ sessionId }) {
     imageUploadPromiseRef.current = uploadPromise;
     return uploadPromise;
   }, [draftTokenKey, resolvedSessionId]);
+
+  useEffect(() => {
+    setImageUploadNotice(getPendingSessionImageNotice(resolvedSessionId));
+  }, [resolvedSessionId]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -205,12 +214,6 @@ export default function TeamSelectionPageClient({ sessionId }) {
     prime({ userGesture: true });
     setTossCountdown(3);
     setTossStatus("counting");
-    window.setTimeout(() => {
-      const didSpeak = speak("3", { userGesture: true, interrupt: true });
-      if (didSpeak) {
-        spokenCountdownRef.current = 3;
-      }
-    }, 0);
   };
 
   const redoCompactToss = () => {
@@ -238,6 +241,7 @@ export default function TeamSelectionPageClient({ sessionId }) {
       // Ignore cleanup errors; the session is hidden as a draft anyway.
     } finally {
       window.sessionStorage.removeItem(draftTokenKey);
+      clearPendingSessionImageNotice(resolvedSessionId);
       window.sessionStorage.removeItem(`session_${resolvedSessionId}_teamA_v2`);
       window.sessionStorage.removeItem(`session_${resolvedSessionId}_teamB_v2`);
       window.sessionStorage.removeItem(`session_${resolvedSessionId}_overs_v2`);
@@ -277,9 +281,8 @@ export default function TeamSelectionPageClient({ sessionId }) {
     await primeUiAudio().catch(() => false);
 
     try {
-      const imageReady = await uploadDraftImageIfNeeded();
-      if (!imageReady) {
-        throw new Error("Cover image is still uploading. Please try again in a moment.");
+      if (getPendingSessionImage()?.dataUrl) {
+        void uploadDraftImageIfNeeded();
       }
 
       const response = await fetch(`/api/sessions/${resolvedSessionId}/setup-match`, {
@@ -497,8 +500,11 @@ export default function TeamSelectionPageClient({ sessionId }) {
             <p className="text-center text-xs font-medium text-cyan-200/80">
               Cover image is uploading in the background while you set up teams.
             </p>
-          ) : null}
-          {imageUploadState === "failed" ? (
+          ) : imageUploadNotice ? (
+            <p className="text-center text-xs font-medium text-zinc-500">
+              {imageUploadNotice}
+            </p>
+          ) : imageUploadState === "failed" ? (
             <p className="text-center text-xs font-medium text-zinc-500">
               Cover image will keep trying later and will not block the match setup.
             </p>

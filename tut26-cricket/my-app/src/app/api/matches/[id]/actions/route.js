@@ -21,6 +21,9 @@ import { matchActionSchema } from "../../../../lib/validators";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 
+const FALLBACK_SESSION_FIELDS =
+  "tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy updatedAt";
+
 const MUTABLE_ACTION_KEYS = [
   "tossWinner",
   "tossDecision",
@@ -83,7 +86,7 @@ export async function POST(req, { params }) {
 
     const fallbackSession = match.sessionId
       ? await Session.findById(match.sessionId).select(
-          "tossWinner tossDecision teamAName teamBName teamA teamB"
+          FALLBACK_SESSION_FIELDS
         )
       : null;
 
@@ -97,7 +100,9 @@ export async function POST(req, { params }) {
     if (isProcessedAction(match, parsedRequest.value.actionId)) {
       return Response.json(
         {
-          match: serializePublicMatch(match, null, { includeActionHistory: true }),
+          match: serializePublicMatch(match, fallbackSession, {
+            includeActionHistory: true,
+          }),
           replayed: true,
         },
         {
@@ -140,11 +145,11 @@ export async function POST(req, { params }) {
     });
 
     return Response.json(
-      {
-        match: serializePublicMatch(updatedMatch, null, {
-          includeActionHistory: true,
-        }),
-      },
+        {
+          match: serializePublicMatch(updatedMatch, fallbackSession, {
+            includeActionHistory: true,
+          }),
+        },
       {
         headers: {
           "Cache-Control": "no-store",

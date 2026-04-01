@@ -19,7 +19,7 @@ const LIVE_MATCH_FIELDS =
 const READ_ONLY_LIVE_MATCH_FIELDS =
   "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText createdAt updatedAt";
 const FALLBACK_SESSION_FIELDS =
-  "tossWinner tossDecision teamAName teamBName teamA teamB";
+  "tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy updatedAt";
 const globalMatchSnapshotCache =
   globalThis.__gvLiveMatchSnapshotCache || new Map();
 
