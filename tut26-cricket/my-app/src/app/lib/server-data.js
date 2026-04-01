@@ -10,6 +10,7 @@ import {
 import { getMatchAccessCookieName, hasValidMatchAccess } from "./match-access";
 import { serializePublicMatch, serializePublicSession } from "./public-data";
 import { hasCompleteTossState, hydrateLegacyTossState, normalizeLegacyTossState } from "./match-toss";
+import { HOME_LIVE_BANNER_MATCH_FILTER } from "./home-live-banner";
 
 const SERVER_DATA_CACHE_TTL_MS = 15000;
 const PUBLIC_SESSION_FIELDS =
@@ -486,10 +487,7 @@ export async function loadMatchAccessData(matchId) {
 export async function loadHomeLiveBannerData() {
   await connectDB();
 
-  const match = await Match.findOne({
-    isOngoing: true,
-    $or: [{ result: "" }, { result: null }, { result: { $exists: false } }],
-  })
+  const match = await Match.findOne(HOME_LIVE_BANNER_MATCH_FILTER)
     .select(SESSION_MATCH_SUMMARY_FIELDS)
     .sort({ updatedAt: -1, _id: -1 })
     .lean();

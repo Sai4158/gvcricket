@@ -63,6 +63,8 @@ import {
   hasCompleteTossState,
   normalizeLegacyTossState,
 } from "../src/app/lib/match-toss.js";
+import MatchImport from "../src/models/Match.js";
+import { HOME_LIVE_BANNER_MATCH_FILTER } from "../src/app/lib/home-live-banner.js";
 import {
   getWalkieSnapshot,
   hydrateWalkieEnabled,
@@ -96,6 +98,8 @@ function buildBaseMatch() {
     processedActionIds: [],
   };
 }
+
+const Match = MatchImport.default || MatchImport;
 
 test("validators reject unknown fields and malformed scoring payloads", () => {
   const invalidSession = sessionCreateSchema.safeParse({
@@ -145,6 +149,12 @@ test("validators reject unknown fields and malformed scoring payloads", () => {
     extraType: null,
   });
   assert.equal(invalidAction.success, false);
+});
+
+test("home live banner match filter stays cast-safe for the Match result field", () => {
+  assert.doesNotThrow(() => {
+    Match.findOne(HOME_LIVE_BANNER_MATCH_FILTER).cast(Match);
+  });
 });
 
 test("match access tokens validate by version and PIN checks use constant-time flow", () => {

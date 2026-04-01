@@ -12,6 +12,7 @@ import LiquidSportText from "../../components/home/LiquidSportText";
 import { verifyImageActionPin } from "../../lib/image-pin-client";
 import {
   clearPendingSessionImage,
+  getPendingSessionImage,
   clearPendingSessionImageNotice,
   setPendingSessionImageNotice,
   PENDING_SESSION_IMAGE_KEY,
@@ -118,6 +119,11 @@ export default function NewSessionPage() {
 
   const uploadPendingImageBeforeContinue = async (session) => {
     if (!session?.draftToken || !session?._id || typeof window === "undefined") {
+      return;
+    }
+
+    const storedPendingImage = getPendingSessionImage();
+    if (!(preparedImageFile instanceof File) && !storedPendingImage?.dataUrl) {
       return;
     }
 

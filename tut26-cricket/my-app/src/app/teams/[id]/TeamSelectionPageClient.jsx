@@ -129,6 +129,15 @@ export default function TeamSelectionPageClient({ sessionId }) {
   }, [draftTokenKey, resolvedSessionId]);
 
   useEffect(() => {
+    const pendingImage = getPendingSessionImage();
+
+    if (!pendingImage?.dataUrl) {
+      clearPendingSessionImageNotice(resolvedSessionId);
+      setImageUploadNotice("");
+      setImageUploadState("done");
+      return;
+    }
+
     setImageUploadNotice(getPendingSessionImageNotice(resolvedSessionId));
   }, [resolvedSessionId]);
 
