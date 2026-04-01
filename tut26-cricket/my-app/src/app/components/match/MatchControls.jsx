@@ -1,13 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Rajdhani } from "next/font/google";
 import { FaInfoCircle } from "react-icons/fa";
-
-const matchControlsFont = Rajdhani({
-  subsets: ["latin"],
-  weight: ["600", "700"],
-});
+import {
+  getScoreControlToneClasses,
+  scoreControlFont,
+} from "./score-control-theme";
 
 function ScoreButton({ onClick, disabled, className, children }) {
   return (
@@ -18,7 +16,7 @@ function ScoreButton({ onClick, disabled, className, children }) {
       className={`press-feedback ${className}`}
     >
       <span
-        className={`${matchControlsFont.className} inline-flex origin-center scale-[1.08] items-center justify-center whitespace-nowrap text-[1.45rem] font-bold leading-none`}
+        className={`${scoreControlFont.className} inline-flex origin-center scale-[1.08] items-center justify-center whitespace-nowrap text-[1.45rem] font-bold leading-none`}
       >
         {children}
       </span>
@@ -43,7 +41,7 @@ function ButtonWithInfo({
         className={`press-feedback pr-12 ${className}`}
       >
         <span
-          className={`${matchControlsFont.className} inline-flex origin-center scale-[1.08] items-center justify-center whitespace-nowrap text-[1.45rem] font-bold leading-none`}
+          className={`${scoreControlFont.className} inline-flex origin-center scale-[1.08] items-center justify-center whitespace-nowrap text-[1.45rem] font-bold leading-none`}
         >
           {children}
         </span>
@@ -84,16 +82,22 @@ export function Controls({
       <ScoreButton
         onClick={() => onScore(0)}
         disabled={disabled}
-        className={`${baseBtn} bg-sky-700 hover:bg-sky-600`}
+        className={`${baseBtn} ${getScoreControlToneClasses("dot")}`}
       >
         Dot
       </ScoreButton>
-      {[1, 2, 3, 4, 6].map((runs) => (
+      {[
+        { key: "one", runs: 1 },
+        { key: "two", runs: 2 },
+        { key: "three", runs: 3 },
+        { key: "four", runs: 4 },
+        { key: "six", runs: 6 },
+      ].map(({ key, runs }) => (
         <ScoreButton
-          key={runs}
+          key={key}
           onClick={() => onScore(runs)}
           disabled={disabled}
-          className={`${baseBtn} bg-zinc-800 hover:bg-zinc-700`}
+          className={`${baseBtn} ${getScoreControlToneClasses("neutral")}`}
         >
           {runs}
         </ScoreButton>
@@ -103,7 +107,7 @@ export function Controls({
         setInfoText={setInfoText}
         onClick={onOut}
         disabled={disabled}
-        className={`${baseBtn} bg-rose-700 hover:bg-rose-600`}
+        className={`${baseBtn} ${getScoreControlToneClasses("out")}`}
       >
         OUT
       </ButtonWithInfo>
@@ -112,7 +116,7 @@ export function Controls({
         setInfoText={setInfoText}
         onClick={onWide}
         disabled={disabled}
-        className={`${baseBtn} bg-green-600 hover:bg-green-500`}
+        className={`${baseBtn} ${getScoreControlToneClasses("wide")}`}
       >
         WIDE
       </ButtonWithInfo>
@@ -121,7 +125,7 @@ export function Controls({
         setInfoText={setInfoText}
         onClick={onNoBall}
         disabled={disabled}
-        className={`${baseBtn} bg-orange-600 hover:bg-orange-500`}
+        className={`${baseBtn} ${getScoreControlToneClasses("noball")}`}
       >
         NO BALL
       </ButtonWithInfo>

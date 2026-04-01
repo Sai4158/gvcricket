@@ -449,7 +449,7 @@ export default function AnnouncementControls({
                 }
               />
               <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500">
-                4/6 sound FX
+                Score FX
               </span>
             </div>
           ) : null}

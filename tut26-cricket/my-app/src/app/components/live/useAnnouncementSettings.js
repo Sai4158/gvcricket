@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { EMPTY_SCORE_SOUND_EFFECT_MAP } from "../../lib/score-sound-effects";
 
-const SETTINGS_VERSION = 9;
+const SETTINGS_VERSION = 10;
 
 const DEFAULTS = {
   spectator: {
@@ -15,11 +16,7 @@ const DEFAULTS = {
     playScoreSoundEffects: true,
     broadcastScoreSoundEffects: true,
     scoreSoundEffectMap: {
-      out: "",
-      two: "",
-      three: "",
-      four: "",
-      six: "",
+      ...EMPTY_SCORE_SOUND_EFFECT_MAP,
     },
   },
   umpire: {
@@ -32,10 +29,7 @@ const DEFAULTS = {
     playScoreSoundEffects: true,
     broadcastScoreSoundEffects: true,
     scoreSoundEffectMap: {
-      out: "",
-      two: "",
-      three: "",
-      four: "",
+      ...EMPTY_SCORE_SOUND_EFFECT_MAP,
       six: "ipl_theme_song.mp3",
     },
   },

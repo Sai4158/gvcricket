@@ -572,7 +572,7 @@ export default function MatchActionGrid({
                   title="Announcer / Effects"
                   description={[
                     "Open score voice settings.",
-                    "Pick sound effects for out, 2, 3, 4 and 6.",
+                    "Pick sounds for dot, 1, 2, 3, 4, 6, out, wide, and no ball.",
                     "Test the announcer and effect flow.",
                   ]}
                   colorClass="text-cyan-300"

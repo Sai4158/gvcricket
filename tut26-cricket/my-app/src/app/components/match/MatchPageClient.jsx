@@ -18,6 +18,12 @@ import {
   createScoreLiveEvent,
   createUndoLiveEvent,
 } from "../../lib/live-announcements";
+import {
+  getScoreSoundEffectEventKey,
+  getScoreSoundEffectPreviewInput,
+  RANDOM_SCORE_EFFECT_ID,
+  SCORE_SOUND_EFFECT_KEYS,
+} from "../../lib/score-sound-effects";
 import { getWalkieRemoteSpeakerState } from "../../lib/walkie-ui";
 import { getTotalDismissalsAllowed } from "../../lib/team-utils";
 import {
@@ -63,33 +69,8 @@ const IPL_HORN_EFFECT = {
   label: "ipl theme song",
   src: "/audio/effects/ipl_theme_song.mp3",
 };
-const SIX_PRE_EFFECT_TEXT = "Umpire has given 6 runs.";
-const SIX_PRE_EFFECT_RATE = 0.8;
-const SIX_PRE_EFFECT_GAP_MS = 1000;
-const SCORE_EFFECT_KEYS = ["out", "two", "three", "four", "six"];
-const RANDOM_SCORE_EFFECT_ID = "__random__";
-
-function getScoreSoundEffectEventKey(runs, isOut = false, extraType = null) {
-  if (extraType) {
-    return "";
-  }
-  if (isOut) {
-    return "out";
-  }
-  if (Number(runs) === 2) {
-    return "two";
-  }
-  if (Number(runs) === 3) {
-    return "three";
-  }
-  if (Number(runs) === 4) {
-    return "four";
-  }
-  if (Number(runs) === 6) {
-    return "six";
-  }
-  return "";
-}
+const SCORE_PRE_EFFECT_RATE = 0.8;
+const SCORE_PRE_EFFECT_GAP_MS = 1000;
 
 function estimateSpeechLeadDelayMs(text, rate = 1) {
   const words = String(text || "")
@@ -102,7 +83,7 @@ function estimateSpeechLeadDelayMs(text, rate = 1) {
 }
 
 function estimateBoundaryLeadDelayMs(text, rate = 1) {
-  return estimateSpeechLeadDelayMs(text, rate) + SIX_PRE_EFFECT_GAP_MS;
+  return estimateSpeechLeadDelayMs(text, rate) + SCORE_PRE_EFFECT_GAP_MS;
 }
 
 const SOUND_EFFECT_DURATION_CACHE_KEY = "gv-sound-effect-durations-v1";
@@ -805,7 +786,7 @@ export default function MatchPageClient({
               preAnnouncementDelayMs: String(scorePreview.leadItem?.text || "").trim()
                 ? estimateBoundaryLeadDelayMs(
                     String(scorePreview.leadItem?.text || "").trim(),
-                    Number(scorePreview.leadItem?.rate || SIX_PRE_EFFECT_RATE),
+                    Number(scorePreview.leadItem?.rate || SCORE_PRE_EFFECT_RATE),
                   )
                 : 0,
             }),
@@ -820,7 +801,7 @@ export default function MatchPageClient({
 
       const boundarySequenceVersion = boundarySequenceVersionRef.current + 1;
       const leadText = String(scorePreview.leadItem?.text || "").trim();
-      const leadRate = Number(scorePreview.leadItem?.rate || SIX_PRE_EFFECT_RATE);
+      const leadRate = Number(scorePreview.leadItem?.rate || SCORE_PRE_EFFECT_RATE);
       const leadDelayMs = leadText
         ? estimateBoundaryLeadDelayMs(leadText, leadRate)
         : 0;
@@ -1310,23 +1291,24 @@ export default function MatchPageClient({
 
   const handleTestCommentarySequence = useCallback(
     async (eventKey = "out") => {
-      const normalizedKey = SCORE_EFFECT_KEYS.includes(eventKey) ? eventKey : "out";
-      const leadText =
-        normalizedKey === "out"
-          ? "Umpire has given 1 out."
-          : normalizedKey === "two"
-          ? "Umpire has given 2 runs."
-          : normalizedKey === "three"
-          ? "Umpire has given 3 runs."
-          : normalizedKey === "four"
-          ? "Umpire has given 4 runs."
-          : SIX_PRE_EFFECT_TEXT;
+      const normalizedKey = SCORE_SOUND_EFFECT_KEYS.includes(eventKey)
+        ? eventKey
+        : "out";
+      const previewInput =
+        getScoreSoundEffectPreviewInput(normalizedKey) ||
+        getScoreSoundEffectPreviewInput("out");
+      const scorePreview = buildUmpireScorePreview(
+        previewInput?.runs || 0,
+        Boolean(previewInput?.isOut),
+        previewInput?.extraType || null,
+      );
+      const leadText = String(scorePreview.leadItem?.text || "").trim();
       const previewEffect =
         umpireSettings.playScoreSoundEffects !== false
           ? await resolveConfiguredScoreSoundEffect(
-              normalizedKey === "out" ? 0 : normalizedKey === "two" ? 2 : normalizedKey === "three" ? 3 : normalizedKey === "four" ? 4 : 6,
-              normalizedKey === "out",
-              null,
+              previewInput?.runs || 0,
+              Boolean(previewInput?.isOut),
+              previewInput?.extraType || null,
             )
           : null;
 
@@ -1334,20 +1316,22 @@ export default function MatchPageClient({
       setActiveCommentaryAction("test-sequence");
 
       if (umpireSettings.enabled && umpireSettings.mode !== "silent") {
-        speak(leadText, {
-          key: `umpire-sequence-test-${normalizedKey}`,
-          rate: 0.8,
-          interrupt: true,
-          minGapMs: 0,
-          userGesture: true,
-          ignoreEnabled: true,
-        });
-        await new Promise((resolve) => {
-          boundarySequenceTimerRef.current = window.setTimeout(() => {
-            boundarySequenceTimerRef.current = null;
-            resolve();
-          }, estimateBoundaryLeadDelayMs(leadText, 0.8));
-        });
+        if (leadText) {
+          speak(leadText, {
+            key: `umpire-sequence-test-${normalizedKey}`,
+            rate: SCORE_PRE_EFFECT_RATE,
+            interrupt: true,
+            minGapMs: 0,
+            userGesture: true,
+            ignoreEnabled: true,
+          });
+          await new Promise((resolve) => {
+            boundarySequenceTimerRef.current = window.setTimeout(() => {
+              boundarySequenceTimerRef.current = null;
+              resolve();
+            }, estimateBoundaryLeadDelayMs(leadText, SCORE_PRE_EFFECT_RATE));
+          });
+        }
       }
 
       if (
@@ -1363,14 +1347,19 @@ export default function MatchPageClient({
       }
 
       if (umpireSettings.enabled && umpireSettings.mode !== "silent") {
+        const followUpItems = scorePreview.followUpItems?.length
+          ? scorePreview.followUpItems
+          : [
+              {
+                text:
+                  buildCurrentScoreAnnouncement(scorePreview.nextMatch) ||
+                  "Score is 42 for 2.",
+                pauseAfterMs: 0,
+                rate: 0.8,
+              },
+            ];
         speakSequence(
-          [
-            {
-              text: "Score is 42 for 2. This is ball 4.",
-              pauseAfterMs: 0,
-              rate: 0.8,
-            },
-          ],
+          followUpItems,
           {
             key: `umpire-sequence-score-${normalizedKey}-${Date.now()}`,
             priority: 2,
@@ -1383,6 +1372,7 @@ export default function MatchPageClient({
       }
     },
     [
+      buildUmpireScorePreview,
       cancelBoundarySequence,
       handlePreviewCommentarySoundEffect,
       resolveConfiguredScoreSoundEffect,

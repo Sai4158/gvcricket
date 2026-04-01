@@ -10,15 +10,14 @@ import {
   FaPlay,
   FaTimes,
 } from "react-icons/fa";
-
-const SCORE_EFFECT_EVENTS = [
-  { key: "out", label: "Out", accent: "rose" },
-  { key: "two", label: "2 Runs", accent: "emerald" },
-  { key: "three", label: "3 Runs", accent: "violet" },
-  { key: "four", label: "4 Runs", accent: "sky" },
-  { key: "six", label: "6 Runs", accent: "amber" },
-];
-const RANDOM_SCORE_EFFECT_ID = "__random__";
+import {
+  RANDOM_SCORE_EFFECT_ID,
+  SCORE_SOUND_EFFECT_EVENTS,
+} from "../../lib/score-sound-effects";
+import {
+  getScoreControlToneClasses,
+  scoreControlFont,
+} from "../match/score-control-theme";
 const KEYPAD_BUTTON_BASE =
   "press-feedback rounded-2xl font-bold shadow-[0_16px_28px_rgba(0,0,0,0.28)] transition active:scale-[0.97]";
 
@@ -58,47 +57,6 @@ function ScrollingSoundLabel({ text = "", active = false }) {
   );
 }
 
-function getAccentClasses(accent) {
-  if (accent === "rose") {
-    return {
-      tile:
-        "border border-rose-400/24 bg-[linear-gradient(180deg,#be123c,#9f1239)] text-white hover:brightness-105",
-      icon:
-        "border border-rose-300/16 bg-[linear-gradient(180deg,rgba(159,18,57,0.32),rgba(94,10,37,0.28))] text-rose-100 hover:bg-rose-500/20",
-    };
-  }
-  if (accent === "sky") {
-    return {
-      tile:
-        "border border-sky-400/24 bg-[linear-gradient(180deg,#0284c7,#0369a1)] text-white hover:brightness-105",
-      icon:
-        "border border-sky-300/16 bg-[linear-gradient(180deg,rgba(2,132,199,0.26),rgba(3,105,161,0.22))] text-sky-100 hover:bg-sky-500/20",
-    };
-  }
-  if (accent === "violet") {
-    return {
-      tile:
-        "border border-violet-400/24 bg-[linear-gradient(180deg,#6d28d9,#5b21b6)] text-white hover:brightness-105",
-      icon:
-        "border border-violet-300/16 bg-[linear-gradient(180deg,rgba(109,40,217,0.24),rgba(91,33,182,0.22))] text-violet-100 hover:bg-violet-500/20",
-    };
-  }
-  if (accent === "emerald") {
-    return {
-      tile:
-        "border border-emerald-400/24 bg-[linear-gradient(180deg,#16a34a,#15803d)] text-white hover:brightness-105",
-      icon:
-        "border border-emerald-300/16 bg-[linear-gradient(180deg,rgba(22,163,74,0.24),rgba(21,128,61,0.22))] text-emerald-100 hover:bg-emerald-500/20",
-    };
-  }
-  return {
-    tile:
-      "border border-amber-400/24 bg-[linear-gradient(180deg,#f59e0b,#d97706)] text-white hover:brightness-105",
-    icon:
-      "border border-amber-300/16 bg-[linear-gradient(180deg,rgba(245,158,11,0.24),rgba(217,119,6,0.22))] text-amber-100 hover:bg-amber-500/20",
-  };
-}
-
 function IosSwitch({ checked, onChange, disabled = false, label }) {
   return (
     <button
@@ -132,30 +90,36 @@ function SoundAssignmentRow({
   onTogglePreview,
   onEdit,
 }) {
-  const accent = getAccentClasses(event.accent);
+  const toneClass = getScoreControlToneClasses(event.buttonTone);
   const hasAssignedSound = Boolean(selectedId) && canPreview;
+  const buttonTextClassName =
+    event.buttonTextClassName || "text-[1.2rem]";
 
   return (
-    <div className="rounded-[22px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-2.5">
-      <div className="grid grid-cols-[minmax(104px,124px)_1fr_52px] items-center gap-2.5">
+    <div className="rounded-[22px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.022))] p-2.5 shadow-[0_14px_36px_rgba(0,0,0,0.22)]">
+      <div className="grid grid-cols-[minmax(112px,132px)_1fr_48px] items-center gap-2.5">
         <motion.button
           type="button"
           whileTap={{ scale: 0.95, y: 2 }}
           onClick={onEdit}
-          className={`${KEYPAD_BUTTON_BASE} min-h-[52px] px-3 py-3 text-[12px] uppercase tracking-[0.18em] ${accent.tile}`}
+          className={`${KEYPAD_BUTTON_BASE} ${toneClass} min-h-[52px] px-3 py-3 text-white`}
           aria-label={`Edit ${event.label} sound`}
         >
-          {event.label}
+          <span
+            className={`${scoreControlFont.className} inline-flex origin-center scale-[1.08] items-center justify-center whitespace-nowrap font-bold leading-none ${buttonTextClassName}`}
+          >
+            {event.buttonLabel || event.label}
+          </span>
         </motion.button>
         <motion.button
           type="button"
           whileTap={hasAssignedSound ? { scale: 0.97, y: 2 } : undefined}
           onClick={onTogglePreview}
           disabled={!hasAssignedSound}
-          className={`${KEYPAD_BUTTON_BASE} flex min-w-0 items-center justify-between gap-3 border border-white/10 bg-[linear-gradient(180deg,rgba(34,34,38,0.96),rgba(20,20,24,0.98))] px-4 py-3 text-left ${
+          className={`${KEYPAD_BUTTON_BASE} flex min-w-0 items-center justify-between gap-3 border border-white/10 bg-[linear-gradient(180deg,rgba(30,30,34,0.98),rgba(15,15,19,1))] px-4 py-3 text-left ${
             hasAssignedSound
-              ? `text-white hover:bg-[linear-gradient(180deg,rgba(42,42,46,0.98),rgba(24,24,28,1))] ${
-                  isPreviewing ? "ring-2 ring-emerald-400/30" : ""
+              ? `text-white hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(40,40,44,1),rgba(20,20,24,1))] ${
+                  isPreviewing ? "ring-2 ring-white/18" : ""
                 }`
               : "cursor-not-allowed text-white/55 opacity-75"
           }`}
@@ -171,7 +135,7 @@ function SoundAssignmentRow({
               active={isPreviewing}
             />
           </div>
-          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/90">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/82">
             {isPreviewing ? (
               <FaPause className="text-xs" />
             ) : (
@@ -183,10 +147,10 @@ function SoundAssignmentRow({
           type="button"
           onClick={onEdit}
           whileTap={{ scale: 0.95, y: 2 }}
-          className={`${KEYPAD_BUTTON_BASE} inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center ${accent.icon}`}
+          className={`${KEYPAD_BUTTON_BASE} inline-flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(30,30,34,0.96),rgba(14,14,18,1))] text-white/74 hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(38,38,42,1),rgba(18,18,22,1))] hover:text-white`}
           aria-label={`Edit ${event.label} sound`}
         >
-          <FaEdit className="text-[11px]" />
+          <FaEdit className="text-[12px]" />
         </motion.button>
       </div>
     </div>
@@ -241,8 +205,8 @@ function SoundPickerSheet({
                 onClick={() => onSelect("")}
                 className={`${KEYPAD_BUTTON_BASE} flex w-full items-center justify-between border px-4 py-4 text-left ${
                   !selectedId
-                    ? "border-sky-300/30 bg-[linear-gradient(180deg,#0284c7,#0369a1)] text-white"
-                    : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
+                    ? "border-white/16 bg-[linear-gradient(180deg,rgba(56,56,62,0.98),rgba(30,30,34,1))] text-white ring-1 ring-white/10"
+                    : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
                 }`}
               >
                 <p className="text-sm uppercase tracking-[0.16em]">None</p>
@@ -255,8 +219,8 @@ function SoundPickerSheet({
                 onClick={() => onSelect(RANDOM_SCORE_EFFECT_ID)}
                 className={`${KEYPAD_BUTTON_BASE} flex w-full items-center justify-between border px-4 py-4 text-left ${
                   selectedId === RANDOM_SCORE_EFFECT_ID
-                    ? "border-fuchsia-300/30 bg-[linear-gradient(180deg,#c026d3,#7c3aed)] text-white"
-                    : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
+                    ? "border-white/16 bg-[linear-gradient(180deg,rgba(56,56,62,0.98),rgba(30,30,34,1))] text-white ring-1 ring-white/10"
+                    : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
                 }`}
               >
                 <div className="min-w-0">
@@ -284,11 +248,11 @@ function SoundPickerSheet({
                       whileTap={{ scale: 0.95, y: 2 }}
                       onClick={() => onPreview(option)}
                       className={`${KEYPAD_BUTTON_BASE} inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center border ${
-                        isPreviewing ? "ring-2 ring-emerald-400/35" : ""
+                        isPreviewing ? "ring-2 ring-white/18" : ""
                       } ${
                         isPreviewing
-                          ? "border-emerald-300/30 bg-[linear-gradient(180deg,#16a34a,#15803d)] text-white"
-                          : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
+                          ? "border-white/16 bg-[linear-gradient(180deg,rgba(56,56,62,0.98),rgba(30,30,34,1))] text-white"
+                          : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
                       }`}
                       aria-label={`${isPreviewing ? "Pause" : "Preview"} ${option.label}`}
                     >
@@ -304,8 +268,8 @@ function SoundPickerSheet({
                       onClick={() => onSelect(option.id)}
                       className={`${KEYPAD_BUTTON_BASE} flex min-w-0 items-center justify-between gap-3 border px-4 py-4 text-left ${
                         isSelected
-                          ? "border-emerald-300/30 bg-[linear-gradient(180deg,#16a34a,#15803d)] text-white"
-                          : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
+                          ? "border-white/16 bg-[linear-gradient(180deg,rgba(56,56,62,0.98),rgba(30,30,34,1))] text-white ring-1 ring-white/10"
+                          : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
                       }`}
                     >
                       <div className="min-w-0">
@@ -376,10 +340,10 @@ export default function ScoreSoundEffectsEditor({
     [settings.scoreSoundEffectMap],
   );
   const editingEvent =
-    SCORE_EFFECT_EVENTS.find((event) => event.key === editingEventKey) || null;
+    SCORE_SOUND_EFFECT_EVENTS.find((event) => event.key === editingEventKey) || null;
   const activeSoundAssignments = useMemo(
     () =>
-      SCORE_EFFECT_EVENTS.map((event) => {
+      SCORE_SOUND_EFFECT_EVENTS.map((event) => {
         const selectedId = String(scoreEffectMap?.[event.key] || "").trim();
         if (selectedId === RANDOM_SCORE_EFFECT_ID) {
           return {
@@ -403,6 +367,10 @@ export default function ScoreSoundEffectsEditor({
       }),
     [scoreEffectMap, soundEffectOptions],
   );
+  const showCompactToggleCards =
+    showScoreSoundEffectsToggle &&
+    showSpectatorBroadcastToggle &&
+    !showBroadcastStatus;
 
   if (
     !showScoreSoundEffectsToggle &&
@@ -420,31 +388,77 @@ export default function ScoreSoundEffectsEditor({
 
   return (
     <div className={`${surfaceClassName} ${className}`.trim()}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white">
-            Score Sounds
-          </p>
-          <p className="mt-1 text-xs text-white/72">
-            {scoreSoundsDescription}
-          </p>
-        </div>
-        <div className="shrink-0 pt-0.5">
-          {showScoreSoundEffectsToggle ? (
+      {showCompactToggleCards ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3 rounded-[18px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.025))] px-3.5 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-white">Umpire</p>
+              <p className="mt-1 text-xs text-white/70">
+                This phone only.
+              </p>
+            </div>
             <IosSwitch
               checked={settings.playScoreSoundEffects !== false}
               label={
                 settings.playScoreSoundEffects !== false
-                  ? "Turn score sound effects off"
-                  : "Turn score sound effects on"
+                  ? "Turn umpire score sounds off"
+                  : "Turn umpire score sounds on"
               }
-              onChange={(checked) => updateSetting?.("playScoreSoundEffects", checked)}
+              onChange={(checked) =>
+                updateSetting?.("playScoreSoundEffects", checked)
+              }
             />
-          ) : null}
-        </div>
-      </div>
+          </div>
 
-      {showSpectatorBroadcastToggle ? (
+          <div className="flex items-center justify-between gap-3 rounded-[18px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.025))] px-3.5 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-white">Spectators</p>
+              <p className="mt-1 text-xs text-white/70">
+                Live for viewers.
+              </p>
+            </div>
+            <IosSwitch
+              checked={settings.broadcastScoreSoundEffects !== false}
+              label={
+                settings.broadcastScoreSoundEffects !== false
+                  ? "Turn spectator score sounds off"
+                  : "Turn spectator score sounds on"
+              }
+              onChange={(checked) =>
+                updateSetting?.("broadcastScoreSoundEffects", checked)
+              }
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white">
+              Score Sounds
+            </p>
+            <p className="mt-1 text-xs text-white/72">
+              {scoreSoundsDescription}
+            </p>
+          </div>
+          <div className="shrink-0 pt-0.5">
+            {showScoreSoundEffectsToggle ? (
+              <IosSwitch
+                checked={settings.playScoreSoundEffects !== false}
+                label={
+                  settings.playScoreSoundEffects !== false
+                    ? "Turn score sound effects off"
+                    : "Turn score sound effects on"
+                }
+                onChange={(checked) =>
+                  updateSetting?.("playScoreSoundEffects", checked)
+                }
+              />
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {showSpectatorBroadcastToggle && !showCompactToggleCards ? (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.025))] px-3.5 py-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-white">Spectators</p>

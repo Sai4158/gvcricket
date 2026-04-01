@@ -283,6 +283,14 @@ export default function MatchSoundEffectsPanel({
     }
   }, []);
 
+  useEffect(() => {
+    if (!isScoreSoundSettingsOpen) {
+      return;
+    }
+
+    onOpenScoreSoundSettings?.();
+  }, [isScoreSoundSettingsOpen, onOpenScoreSoundSettings]);
+
   const handleEffectTap = useCallback((file, isActive) => {
     if (isDisabled) {
       return;
@@ -358,15 +366,9 @@ export default function MatchSoundEffectsPanel({
           {hasScoreSoundSettings ? (
             <button
               type="button"
-              onClick={() => {
-                setIsScoreSoundSettingsOpen((current) => {
-                  const nextOpen = !current;
-                  if (nextOpen) {
-                    onOpenScoreSoundSettings?.();
-                  }
-                  return nextOpen;
-                });
-              }}
+              onClick={() =>
+                setIsScoreSoundSettingsOpen((current) => !current)
+              }
               className={`inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition ${
                 isScoreSoundSettingsOpen
                   ? "border-emerald-300/18 bg-emerald-500/12 text-emerald-100"
@@ -402,7 +404,7 @@ export default function MatchSoundEffectsPanel({
                 Sound Setup
               </p>
               <p className="mt-1 text-sm text-white/72">
-                Set sounds for out, 2, 3, 4, and 6.
+                Pick score sounds.
               </p>
             </div>
             <button
