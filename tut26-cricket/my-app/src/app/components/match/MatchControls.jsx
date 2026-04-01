@@ -1,7 +1,13 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { Rajdhani } from "next/font/google";
 import { FaInfoCircle } from "react-icons/fa";
+
+const matchControlsFont = Rajdhani({
+  subsets: ["latin"],
+  weight: ["600", "700"],
+});
 
 function ScoreButton({ onClick, disabled, className, children }) {
   return (
@@ -63,7 +69,7 @@ export function Controls({
   disabled,
 }) {
   const baseBtn =
-    "py-6 text-xl font-bold rounded-2xl transition-transform active:scale-95 shadow-lg w-full disabled:opacity-50 disabled:cursor-not-allowed";
+    `${matchControlsFont.className} py-6 text-xl font-bold rounded-2xl transition-transform active:scale-95 shadow-lg w-full disabled:opacity-50 disabled:cursor-not-allowed`;
 
   return (
     <div className="grid grid-cols-4 gap-3">

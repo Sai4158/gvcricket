@@ -1,6 +1,12 @@
 "use client";
 
 import { memo, useLayoutEffect, useMemo, useRef } from "react";
+import { Rajdhani } from "next/font/google";
+
+const matchControlsFont = Rajdhani({
+  subsets: ["latin"],
+  weight: ["600", "700"],
+});
 
 function getBallKey(ballNumber, overNumber) {
   return ["over", overNumber, "slot", ballNumber].join(":");
@@ -51,11 +57,13 @@ export const Ball = memo(function Ball({ ball, ballNumber }) {
   return (
     <div className="flex flex-col items-center gap-2 w-10">
       <div
-        className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center font-bold text-sm text-white tabular-nums ${style}`}
+        className={`${matchControlsFont.className} h-10 w-10 shrink-0 rounded-full flex items-center justify-center font-bold text-sm text-white tabular-nums ${style}`}
       >
         {label}
       </div>
-      <span className="text-xs font-semibold text-white/92 tabular-nums">
+      <span
+        className={`${matchControlsFont.className} text-xs font-semibold text-white/92 tabular-nums`}
+      >
         {ballNumber}
       </span>
     </div>
@@ -114,7 +122,9 @@ export function BallTracker({ history }) {
 
   return (
     <div className="bg-zinc-900/50 p-4 rounded-2xl ring-1 ring-white/10 mb-6">
-      <h3 className="font-bold text-white text-center mb-4">
+      <h3
+        className={`${matchControlsFont.className} font-bold text-white text-center mb-4`}
+      >
         Over {currentOver.overNumber}
       </h3>
       <div
