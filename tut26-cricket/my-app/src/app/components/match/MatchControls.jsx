@@ -17,7 +17,11 @@ function ScoreButton({ onClick, disabled, className, children }) {
       disabled={disabled}
       className={`press-feedback ${className}`}
     >
-      {children}
+      <span
+        className={`${matchControlsFont.className} inline-flex origin-center scale-[1.08] items-center justify-center whitespace-nowrap text-[1.45rem] font-bold leading-none`}
+      >
+        {children}
+      </span>
     </motion.button>
   );
 }
@@ -38,7 +42,11 @@ function ButtonWithInfo({
         disabled={disabled}
         className={`press-feedback pr-12 ${className}`}
       >
-        {children}
+        <span
+          className={`${matchControlsFont.className} inline-flex origin-center scale-[1.08] items-center justify-center whitespace-nowrap text-[1.45rem] font-bold leading-none`}
+        >
+          {children}
+        </span>
       </motion.button>
       <button
         type="button"
@@ -69,7 +77,7 @@ export function Controls({
   disabled,
 }) {
   const baseBtn =
-    `${matchControlsFont.className} py-6 text-xl font-bold rounded-2xl transition-transform active:scale-95 shadow-lg w-full disabled:opacity-50 disabled:cursor-not-allowed`;
+    "py-6 rounded-2xl transition-transform active:scale-95 shadow-lg w-full disabled:opacity-50 disabled:cursor-not-allowed";
 
   return (
     <div className="grid grid-cols-4 gap-3">
