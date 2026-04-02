@@ -223,13 +223,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const [activePanel, setActivePanel] = useState(null);
   const [localWalkieNotice, setLocalWalkieNotice] = useState("");
   const [streamError, setStreamError] = useState("");
-  const [spectatorWalkieEnabled, setSpectatorWalkieEnabled] = useState(() =>
-    readWalkieDevicePreference({
-      role: "spectator",
-      scopeId: initialWalkiePreferenceScope,
-      fallback: false,
-    }),
-  );
+  const [spectatorWalkieEnabled, setSpectatorWalkieEnabled] = useState(false);
   const [quickWalkieTalking, setQuickWalkieTalking] = useState(false);
   const [quickSpeakerTalking, setQuickSpeakerTalking] = useState(false);
   const lastAnnouncedEventRef = useRef("");
@@ -246,6 +240,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const previousEnabledRef = useRef(false);
   const previousWalkieEnabledRef = useRef(false);
   const previousWalkieRequestStateRef = useRef("idle");
+  const lastWalkieSpeakerAnnouncementRef = useRef("");
   const walkiePreferenceScopeRef = useRef(initialWalkiePreferenceScope);
   const walkiePreferenceHydratingRef = useRef(false);
   const initialWalkieStateResolvedRef = useRef(false);
@@ -1198,6 +1193,57 @@ export default function SessionViewClient({ sessionId, initialData }) {
     walkie.requestState,
   ]);
 
+  const walkieCardTalking = quickWalkieTalking || walkie.isSelfTalking;
+  const walkieRemoteSpeakerState = getWalkieRemoteSpeakerState({
+    snapshot: walkie.snapshot,
+    participantId: walkie.participantId,
+    isSelfTalking: walkieCardTalking,
+  });
+
+  useEffect(() => {
+    const transmissionId = String(walkie.snapshot?.transmissionId || "");
+    const isRemoteUmpireTalking = Boolean(
+      spectatorWalkieEnabled &&
+        walkie.snapshot?.enabled &&
+        walkieRemoteSpeakerState.isRemoteTalking &&
+        walkie.snapshot?.activeSpeakerRole === "umpire" &&
+        transmissionId,
+    );
+
+    if (!isRemoteUmpireTalking) {
+      return;
+    }
+
+    if (lastWalkieSpeakerAnnouncementRef.current === transmissionId) {
+      return;
+    }
+
+    lastWalkieSpeakerAnnouncementRef.current = transmissionId;
+    speakSequenceWithDuck(
+      [
+        {
+          text: "Umpire wants to talk.",
+          pauseAfterMs: 0,
+          rate: 0.9,
+        },
+      ],
+      {
+        key: `spectator-walkie-speaker-${transmissionId}`,
+        priority: 5,
+        interrupt: true,
+        ignoreEnabled: true,
+      },
+      900,
+    );
+  }, [
+    speakSequenceWithDuck,
+    spectatorWalkieEnabled,
+    walkie.snapshot?.enabled,
+    walkie.snapshot?.activeSpeakerRole,
+    walkie.snapshot?.transmissionId,
+    walkieRemoteSpeakerState.isRemoteTalking,
+  ]);
+
   useEffect(() => {
     if (match?.result) {
       router.push(`/result/${match._id}`);
@@ -1606,7 +1652,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
             : "Turn it on to hear live score updates.";
   const showWalkieLauncher = Boolean(match?._id && isLiveMatch);
   const speakerMicOn = Boolean(micMonitor.isActive || micMonitor.isPaused);
-  const walkieCardTalking = quickWalkieTalking || walkie.isSelfTalking;
   const walkieCardFinishing = walkie.isFinishing;
   const walkieSwitchOn = spectatorWalkieEnabled;
   const walkieUi =
@@ -1627,11 +1672,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
     walkie.recoveringAudio ||
     walkie.recoveringSignaling,
   );
-  const walkieRemoteSpeakerState = getWalkieRemoteSpeakerState({
-    snapshot: walkie.snapshot,
-    participantId: walkie.participantId,
-    isSelfTalking: walkieCardTalking,
-  });
   const speakerCardTalking = quickSpeakerTalking || micMonitor.isActive;
   const speakerSwitchOn = Boolean(speakerMicOn || activePanel === "mic");
   const announceSwitchOn = Boolean(settings.enabled);

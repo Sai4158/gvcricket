@@ -1832,11 +1832,7 @@ export default function MatchPageClient({
     }
 
     if (!walkie.snapshot?.enabled) {
-      if (!walkie.canEnable) {
-        return;
-      }
-
-      await walkie.toggleEnabled(true);
+      return;
     }
 
     if (!hasWalkieAudience) {
@@ -1847,6 +1843,24 @@ export default function MatchPageClient({
       await walkie.startTalking();
     }
   };
+
+  const handleMicHoldStart = useCallback(async () => {
+    if (!isLiveMatch) {
+      return;
+    }
+
+    if (micMonitor.isPaused) {
+      await micMonitor.resume({ pauseMedia: true });
+    }
+  }, [isLiveMatch, micMonitor]);
+
+  const handleMicHoldEnd = useCallback(async () => {
+    if (!micMonitor.isActive || micMonitor.isPaused) {
+      return;
+    }
+
+    await micMonitor.pause({ resumeMedia: true });
+  }, [micMonitor]);
 
   useEffect(() => {
     if (authStatus !== "granted" || !match?._id) {
@@ -1984,6 +1998,15 @@ export default function MatchPageClient({
         walkie.recoveringAudio ||
         walkie.recoveringSignaling
       )
+  );
+  const canGridHoldWalkie = Boolean(
+    isLiveMatch &&
+      walkie.snapshot?.enabled &&
+      hasWalkieAudience &&
+      !umpireRemoteSpeakerState.isRemoteTalking
+  );
+  const canGridHoldMic = Boolean(
+    isLiveMatch && (micMonitor.isActive || micMonitor.isPaused)
   );
 
   return (
@@ -2190,20 +2213,15 @@ export default function MatchPageClient({
             onWalkie={() => setModal({ type: "walkie" })}
             onMic={() => setModal({ type: "mic" })}
             onShare={handleCopyShareLink}
-            onWalkiePressStart={
-              umpireRemoteSpeakerState.isRemoteTalking || !hasWalkieAudience
-                ? undefined
-                : walkie.prepareToTalk
-            }
-            onWalkieHoldStart={
-              umpireRemoteSpeakerState.isRemoteTalking ? undefined : handleWalkieHoldStart
-            }
-            onWalkieHoldEnd={() => walkie.stopTalking()}
-            onMicHoldStart={
-              isLiveMatch ? () => micMonitor.start({ pauseMedia: true }) : undefined
-            }
-            onMicHoldEnd={() => micMonitor.stop({ resumeMedia: true })}
+            onWalkiePressStart={canGridHoldWalkie ? walkie.prepareToTalk : undefined}
+            onWalkieHoldStart={canGridHoldWalkie ? handleWalkieHoldStart : undefined}
+            onWalkieHoldEnd={canGridHoldWalkie ? () => walkie.stopTalking() : undefined}
+            onMicHoldStart={canGridHoldMic ? handleMicHoldStart : undefined}
+            onMicHoldEnd={canGridHoldMic ? handleMicHoldEnd : undefined}
             onPressFeedback={handleUmpirePressFeedback}
+            showLiveControls={Boolean(isLiveMatch)}
+            canHoldWalkie={canGridHoldWalkie}
+            canHoldMic={canGridHoldMic}
             isWalkieActive={Boolean(walkie.snapshot?.enabled)}
             isWalkieTalking={Boolean(walkie.isSelfTalking)}
             isWalkieFinishing={Boolean(walkie.isFinishing)}
@@ -2217,7 +2235,7 @@ export default function MatchPageClient({
             isWalkieBusyByOther={Boolean(umpireRemoteSpeakerState.isRemoteTalking)}
             walkieBusyLabel={umpireRemoteSpeakerState.roleLabel}
             isCommentaryActive={micMonitor.isActive || micMonitor.isPaused}
-            isCommentaryTalking={Boolean(micMonitor.isActive)}
+            isCommentaryTalking={Boolean(micMonitor.isActive && !micMonitor.isPaused)}
             isAnnounceActive={Boolean(umpireSettings.enabled)}
           />
           <audio ref={soundEffectsAudioRef} hidden />

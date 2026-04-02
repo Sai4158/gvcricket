@@ -42,6 +42,7 @@ export default function LiveMicModal({
   const fallbackMonitor = useLocalMicMonitor();
   const {
     isActive,
+    isPaused,
     isStarting,
     error,
     start,
@@ -49,14 +50,20 @@ export default function LiveMicModal({
     prepare = async () => true,
   } = monitor ?? fallbackMonitor;
 
-  const statusLabel = isStarting ? "STARTING" : isActive ? "LIVE" : "OFF";
+  const statusLabel = isStarting
+    ? "STARTING"
+    : isActive && isPaused
+      ? "READY"
+      : isActive
+        ? "LIVE"
+        : "OFF";
 
   const handleToggle = () => {
     if (isStarting) {
       return;
     }
 
-    if (isActive) {
+    if (isActive || isPaused) {
       void stop({ resumeMedia: true });
       return;
     }
@@ -67,7 +74,11 @@ export default function LiveMicModal({
         return;
       }
 
-      await start({ pauseMedia: false });
+      await start({
+        pauseMedia: false,
+        startPaused: true,
+        playStartCue: false,
+      });
     })();
   };
 
@@ -140,6 +151,10 @@ export default function LiveMicModal({
               {isStarting ? (
                 <p className="text-sm text-zinc-400">
                   Starting microphone. Please wait a moment.
+                </p>
+              ) : isActive && isPaused ? (
+                <p className="text-sm text-zinc-400">
+                  Mic is ready. Hold the loudspeaker button on the main screen to talk.
                 </p>
               ) : null}
             </div>

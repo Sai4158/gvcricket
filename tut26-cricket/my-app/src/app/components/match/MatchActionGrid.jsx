@@ -341,6 +341,9 @@ export default function MatchActionGrid({
   onMicHoldStart,
   onMicHoldEnd,
   onPressFeedback,
+  showLiveControls = false,
+  canHoldWalkie = false,
+  canHoldMic = false,
   isWalkieActive = false,
   isWalkieTalking = false,
   isWalkieFinishing = false,
@@ -360,7 +363,7 @@ export default function MatchActionGrid({
         <div className="space-y-5">
           <div className="flex items-center justify-center gap-2">
             <p className="text-center text-[12px] text-white">
-              Hold to talk or read. Tap to open.
+              Enable live controls first. Hold enabled controls to talk or read.
             </p>
             <button
               type="button"
@@ -375,45 +378,49 @@ export default function MatchActionGrid({
             </button>
           </div>
         <div className="grid grid-cols-3 gap-x-4 gap-y-6">
-          <ActionIconButton
-            onClick={onWalkie}
-            onPressStart={onWalkiePressStart}
-            onHoldStart={onWalkieHoldStart}
-            onHoldEnd={onWalkieHoldEnd}
-            onPressFeedback={onPressFeedback}
-            icon={<WalkieIcon />}
-            label="Walkie-Talkie"
-            colorClass="text-emerald-300"
-            active={isWalkieActive}
-            talking={isWalkieTalking}
-            statusText={
-              isWalkieTalking
-                ? "Live on"
-                : isWalkieBusyByOther
-                ? walkieBusyLabel || "Live"
-                : isWalkieLoading
-                ? "Connecting"
-                : isWalkieFinishing
-                ? "Connected"
-                : isWalkieActive
-                ? "Hold to talk"
-                : ""
-            }
-            statusClass={
-              isWalkieTalking
-                ? "text-cyan-100"
-                : isWalkieBusyByOther
-                ? "text-amber-100"
-                : isWalkieLoading
-                ? "text-sky-100"
-                : isWalkieFinishing
-                ? "text-emerald-100"
-                : isWalkieActive
-                ? "text-emerald-200"
-                : "text-zinc-500"
-            }
-            holdStatusText="Trying"
-          />
+          {showLiveControls ? (
+            <ActionIconButton
+              onClick={onWalkie}
+              onPressStart={onWalkiePressStart}
+              onHoldStart={onWalkieHoldStart}
+              onHoldEnd={onWalkieHoldEnd}
+              onPressFeedback={onPressFeedback}
+              icon={<WalkieIcon />}
+              label="Walkie-Talkie"
+              colorClass="text-emerald-300"
+              active={isWalkieActive}
+              talking={isWalkieTalking}
+              statusText={
+                isWalkieTalking
+                  ? "Live on"
+                  : isWalkieBusyByOther
+                  ? walkieBusyLabel || "Live"
+                  : isWalkieLoading
+                  ? "Connecting"
+                  : isWalkieFinishing
+                  ? "Connected"
+                  : isWalkieActive && canHoldWalkie
+                  ? "Hold to talk"
+                  : isWalkieActive
+                  ? "Open panel"
+                  : "Enable first"
+              }
+              statusClass={
+                isWalkieTalking
+                  ? "text-cyan-100"
+                  : isWalkieBusyByOther
+                  ? "text-amber-100"
+                  : isWalkieLoading
+                  ? "text-sky-100"
+                  : isWalkieFinishing
+                  ? "text-emerald-100"
+                  : isWalkieActive && canHoldWalkie
+                  ? "text-emerald-200"
+                  : "text-zinc-400"
+              }
+              holdStatusText={canHoldWalkie ? "Trying" : ""}
+            />
+          ) : null}
           <ActionIconButton
             onClick={onCommentary}
             onHoldStart={onCommentaryHoldStart}
@@ -438,25 +445,41 @@ export default function MatchActionGrid({
             disabled={isUpdating || historyStackLength === 0}
             compact
           />
-          <ActionIconButton
-            onClick={onMic}
-            onHoldStart={onMicHoldStart}
-            onHoldEnd={onMicHoldEnd}
-            onPressFeedback={onPressFeedback}
-            icon={<CommentaryIcon />}
-            label="Loudspeaker"
-            colorClass="text-amber-300"
-            active={isCommentaryActive}
-            talking={isCommentaryTalking}
-            badge={isCommentaryTalking ? "Live" : isCommentaryActive ? "On" : "Off"}
-            badgeClass={
-              isCommentaryTalking
-                ? "border-cyan-400/30 bg-cyan-500/15 text-cyan-100"
-                : isCommentaryActive
-                ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
-                : "border-rose-400/20 bg-rose-500/10 text-rose-200"
-            }
-          />
+          {showLiveControls ? (
+            <ActionIconButton
+              onClick={onMic}
+              onHoldStart={onMicHoldStart}
+              onHoldEnd={onMicHoldEnd}
+              onPressFeedback={onPressFeedback}
+              icon={<CommentaryIcon />}
+              label="Loudspeaker"
+              colorClass="text-amber-300"
+              active={isCommentaryActive}
+              talking={isCommentaryTalking}
+              badge={isCommentaryTalking ? "Live" : isCommentaryActive ? "On" : "Off"}
+              badgeClass={
+                isCommentaryTalking
+                  ? "border-cyan-400/30 bg-cyan-500/15 text-cyan-100"
+                  : isCommentaryActive
+                  ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
+                  : "border-rose-400/20 bg-rose-500/10 text-rose-200"
+              }
+              statusText={
+                isCommentaryTalking
+                  ? "Live on"
+                  : isCommentaryActive && canHoldMic
+                  ? "Hold to talk"
+                  : "Enable first"
+              }
+              statusClass={
+                isCommentaryTalking
+                  ? "text-cyan-100"
+                  : isCommentaryActive && canHoldMic
+                  ? "text-amber-200"
+                  : "text-zinc-400"
+              }
+            />
+          ) : null}
           <ActionIconButton
             onClick={onEditTeams}
             onPressFeedback={onPressFeedback}
@@ -568,16 +591,18 @@ export default function MatchActionGrid({
                   overscrollBehavior: "contain",
                 }}
               >
-                <ActionHelpItem
-                  icon={<WalkieIcon />}
-                  title="Walkie-Talkie"
-                  description={[
-                    "Talk live with the umpire team.",
-                    "Hold to speak when walkie is on.",
-                    "See live status while it connects or stays busy.",
-                  ]}
-                  colorClass="text-emerald-300"
-                />
+                {showLiveControls ? (
+                  <ActionHelpItem
+                    icon={<WalkieIcon />}
+                    title="Walkie-Talkie"
+                    description={[
+                      "Open the walkie panel.",
+                      "Turn it on first, then hold to speak.",
+                      "See live status while it connects or stays busy.",
+                    ]}
+                    colorClass="text-emerald-300"
+                  />
+                ) : null}
                 <ActionHelpItem
                   icon={<AnnounceIcon />}
                   title="Announcer / Effects"
@@ -598,16 +623,18 @@ export default function MatchActionGrid({
                   ]}
                   colorClass="text-zinc-300"
                 />
-                <ActionHelpItem
-                  icon={<CommentaryIcon />}
-                  title="Loudspeaker"
-                  description={[
-                    "Use the speaker mic live.",
-                    "Hold to talk on loudspeaker.",
-                    "Good for voice updates on the ground.",
-                  ]}
-                  colorClass="text-amber-300"
-                />
+                {showLiveControls ? (
+                  <ActionHelpItem
+                    icon={<CommentaryIcon />}
+                    title="Loudspeaker"
+                    description={[
+                      "Open the loudspeaker mic.",
+                      "Turn it on first, then hold to talk.",
+                      "Good for voice updates on the ground.",
+                    ]}
+                    colorClass="text-amber-300"
+                  />
+                ) : null}
                 <ActionHelpItem
                   icon={<FaUserEdit />}
                   title="Edit Teams"
