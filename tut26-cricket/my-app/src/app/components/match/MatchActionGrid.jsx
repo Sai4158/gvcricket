@@ -15,7 +15,12 @@ import { LuUndo2 } from "react-icons/lu";
 
 function WalkieIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-9 w-9 sm:h-10 sm:w-10"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M5.75 8.5H10m-3 3H9m-1.75-6 3-1.5M5 6.5h5a1.5 1.5 0 0 1 1.5 1.5V17a2.5 2.5 0 0 1-2.5 2.5H6.5A2.5 2.5 0 0 1 4 17V8a1.5 1.5 0 0 1 1-1.42Z"
         stroke="currentColor"
@@ -38,7 +43,12 @@ function WalkieIcon() {
 
 function CommentaryIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-9 w-9 sm:h-10 sm:w-10"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M4.5 13.5H7l5 3.5V7L7 10.5H4.5A1.5 1.5 0 0 0 3 12v0a1.5 1.5 0 0 0 1.5 1.5Z"
         stroke="currentColor"
@@ -65,7 +75,12 @@ function CommentaryIcon() {
 
 function AnnounceIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-9 w-9 sm:h-10 sm:w-10"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M9.5 6.25a2.25 2.25 0 1 1 0 4.5a2.25 2.25 0 0 1 0-4.5Z"
         stroke="currentColor"
@@ -333,7 +348,7 @@ function ActionIconButton({
         </span>
       ) : null}
       <div
-        className={`relative ${compact ? "text-4xl" : "text-[2.35rem]"} ${colorClass} ${
+        className={`relative ${compact ? "text-[2.7rem]" : "text-[2.7rem] sm:text-[2.85rem]"} ${colorClass} ${
           active ? "drop-shadow-[0_0_16px_currentColor]" : ""
         } ${talking ? "animate-pulse drop-shadow-[0_0_22px_currentColor]" : ""}`}
         style={{
