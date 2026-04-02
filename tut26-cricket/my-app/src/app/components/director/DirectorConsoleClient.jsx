@@ -1965,62 +1965,13 @@ export default function DirectorConsoleClient({
     if (cachedFiles.length) {
       setLibraryFiles(cachedFiles);
     }
-
-    let cancelled = false;
-
-    const loadLibraryOnce = async () => {
-      try {
-        const nextFiles = await fetchAudioLibrary({
-          force: true,
-        });
-        if (!cancelled) {
-          setLibraryFiles(nextFiles);
-        }
-      } catch {
-        if (!cancelled) {
-          setLibraryFiles((current) => current);
-        }
-      }
-    };
-
-    void loadLibraryOnce();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchAudioLibrary]);
+  }, []);
 
   useEffect(() => {
     return subscribeSoundEffectsLibrarySync(() => {
       syncLibraryStateFromCache();
     });
   }, [syncLibraryStateFromCache]);
-
-  useEffect(() => {
-    const handleFocus = () => {
-      void fetchAudioLibrary({
-        force: true,
-      });
-    };
-
-    const handleVisibility = () => {
-      if (document.visibilityState !== "visible") {
-        return;
-      }
-
-      void fetchAudioLibrary({
-        force: true,
-      });
-    };
-
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibility);
-
-    return () => {
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibility);
-    };
-  }, [fetchAudioLibrary]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -4727,7 +4678,7 @@ export default function DirectorConsoleClient({
                     onClick={() =>
                       setLibraryPanelOpen((current) => {
                         const nextOpen = !current;
-                        if (nextOpen) {
+                        if (nextOpen && !libraryFiles.length) {
                           void fetchAudioLibrary({
                             force: true,
                           });
@@ -4779,7 +4730,7 @@ export default function DirectorConsoleClient({
                     onClick={() =>
                       setLibraryPanelOpen((current) => {
                         const nextOpen = !current;
-                        if (nextOpen) {
+                        if (nextOpen && !libraryFiles.length) {
                           void fetchAudioLibrary({
                             force: true,
                           });
@@ -4989,14 +4940,18 @@ export default function DirectorConsoleClient({
                 ) : libraryPanelOpen ? (
                   <button
                     type="button"
-                    disabled
+                    onClick={() => {
+                      void fetchAudioLibrary({
+                        force: true,
+                      });
+                    }}
                     className="w-full rounded-[22px] border border-white/10 bg-black/20 px-4 py-5 text-left text-sm text-zinc-400"
                   >
-                    Drop audio files into{" "}
+                    Load audio files from{" "}
                     <span className="font-semibold text-zinc-200">
                       public/audio/effects
                     </span>{" "}
-                    and they will appear here.
+                    when you want to refresh this deck.
                   </button>
                 ) : null}
               </div>

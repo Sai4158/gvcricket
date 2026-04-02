@@ -1187,46 +1187,6 @@ export default function MatchPageClient({
     });
   }, []);
 
-  useEffect(() => {
-    if (!isLiveMatch) {
-      return undefined;
-    }
-
-    const refreshTimer = window.setTimeout(() => {
-      void loadSoundEffectsLibrary({
-        force: true,
-        silent: soundEffectFiles.length > 0,
-      });
-    }, 0);
-
-    const handleFocus = () => {
-      void loadSoundEffectsLibrary({
-        force: true,
-        silent: true,
-      });
-    };
-
-    const handleVisibility = () => {
-      if (document.visibilityState !== "visible") {
-        return;
-      }
-
-      void loadSoundEffectsLibrary({
-        force: true,
-        silent: true,
-      });
-    };
-
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibility);
-
-    return () => {
-      window.clearTimeout(refreshTimer);
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibility);
-    };
-  }, [isLiveMatch, loadSoundEffectsLibrary, soundEffectFiles.length]);
-
   const resolveConfiguredScoreSoundEffect = useCallback(
     async (runs, isOut = false, extraType = null) => {
       let nextEffect = findConfiguredScoreSoundEffect(runs, isOut, extraType);
@@ -1247,9 +1207,6 @@ export default function MatchPageClient({
       }
 
       if (configuredEffectId === RANDOM_SCORE_EFFECT_ID) {
-        if (!soundEffectFiles.length && soundEffectLibraryStatus === "idle") {
-          await loadSoundEffectsLibrary();
-        }
         return findConfiguredScoreSoundEffect(runs, isOut, extraType);
       }
 
@@ -1257,18 +1214,10 @@ export default function MatchPageClient({
         return IPL_HORN_EFFECT;
       }
 
-      if (!soundEffectFiles.length && soundEffectLibraryStatus === "idle") {
-        await loadSoundEffectsLibrary();
-        nextEffect = findConfiguredScoreSoundEffect(runs, isOut, extraType);
-      }
-
       return nextEffect;
     },
     [
       findConfiguredScoreSoundEffect,
-      loadSoundEffectsLibrary,
-      soundEffectFiles.length,
-      soundEffectLibraryStatus,
       umpireSettings.scoreSoundEffectMap,
     ],
   );
@@ -1284,11 +1233,8 @@ export default function MatchPageClient({
   const toggleSoundEffectsPanel = useCallback(() => {
     setSoundEffectsOpen((current) => {
       const nextOpen = !current;
-      if (nextOpen) {
-        void loadSoundEffectsLibrary({
-          force: true,
-          silent: soundEffectFiles.length > 0,
-        });
+      if (nextOpen && !soundEffectFiles.length) {
+        void loadSoundEffectsLibrary();
       }
       return nextOpen;
     });
@@ -2210,10 +2156,9 @@ export default function MatchPageClient({
                 onPreviewSoundEffect: handlePreviewCommentarySoundEffect,
               }}
               onOpenScoreSoundSettings={() => {
-                void loadSoundEffectsLibrary({
-                  force: true,
-                  silent: soundEffectFiles.length > 0,
-                });
+                if (!soundEffectFiles.length) {
+                  void loadSoundEffectsLibrary();
+                }
               }}
             />
           ) : null}
