@@ -1216,37 +1216,24 @@ button:disabled,
 
     .home-desktop-lite-card {
       background:
-        linear-gradient(
-          120deg,
-          rgba(255, 255, 255, 0.22) 0%,
-          rgba(255, 255, 255, 0.12) 18%,
-          rgba(255, 255, 255, 0.05) 42%,
-          rgba(255, 255, 255, 0.11) 66%,
-          rgba(255, 255, 255, 0.08) 100%
-        ),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.06) 100%) !important;
+        linear-gradient(180deg, rgba(18, 18, 24, 0.94), rgba(10, 10, 14, 0.96)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01)) !important;
       box-shadow:
-        0 14px 30px rgba(0, 0, 0, 0.12),
-        inset 0 1px 0 rgba(255, 255, 255, 0.22),
-        inset 0 -1px 0 rgba(255, 255, 255, 0.06) !important;
+        0 10px 24px rgba(0, 0, 0, 0.14),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.04) !important;
       backdrop-filter: none !important;
       -webkit-backdrop-filter: none !important;
     }
 
     .home-desktop-lite-panel {
       background:
-        linear-gradient(
-          122deg,
-          rgba(255, 255, 255, 0.18) 0%,
-          rgba(255, 255, 255, 0.1) 24%,
-          rgba(255, 255, 255, 0.04) 52%,
-          rgba(255, 255, 255, 0.1) 100%
-        ),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.05) 100%) !important;
+        linear-gradient(180deg, rgba(18, 18, 24, 0.92), rgba(10, 10, 14, 0.94)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)) !important;
       box-shadow:
-        0 16px 34px rgba(0, 0, 0, 0.14),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2),
-        inset 0 -1px 0 rgba(255, 255, 255, 0.05) !important;
+        0 10px 24px rgba(0, 0, 0, 0.14),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.04) !important;
       backdrop-filter: none !important;
       -webkit-backdrop-filter: none !important;
     }
@@ -1254,17 +1241,11 @@ button:disabled,
     .home-desktop-lite-subpanel,
     .home-desktop-preview-surface {
       background:
-        linear-gradient(
-          120deg,
-          rgba(255, 255, 255, 0.14) 0%,
-          rgba(255, 255, 255, 0.08) 28%,
-          rgba(255, 255, 255, 0.03) 100%
-        ),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03) 100%) !important;
+        linear-gradient(180deg, rgba(16, 18, 24, 0.96), rgba(8, 10, 14, 0.98)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)) !important;
       box-shadow:
-        0 12px 24px rgba(0, 0, 0, 0.1),
-        inset 0 1px 0 rgba(255, 255, 255, 0.16),
-        inset 0 -1px 0 rgba(255, 255, 255, 0.04) !important;
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 6px 14px rgba(0, 0, 0, 0.08) !important;
       backdrop-filter: none !important;
       -webkit-backdrop-filter: none !important;
     }
