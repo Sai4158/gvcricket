@@ -62,7 +62,7 @@ export const Ball = memo(function Ball({ ball, ballNumber }) {
         {label}
       </div>
       <span
-        className={`${matchControlsFont.className} text-xs font-semibold text-white/92 tabular-nums`}
+        className={`${matchControlsFont.className} text-sm font-bold text-white/92 tabular-nums`}
       >
         {ballNumber}
       </span>
@@ -74,7 +74,7 @@ export function BallTracker({ history }) {
   const trackerRef = useRef(null);
   const currentOver = useMemo(
     () => history.at(-1) ?? { overNumber: 1, balls: [] },
-    [history]
+    [history],
   );
   const currentBalls = useMemo(
     () => (Array.isArray(currentOver.balls) ? currentOver.balls : []),
