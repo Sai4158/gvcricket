@@ -73,6 +73,7 @@ const IPL_HORN_EFFECT = {
 };
 const SCORE_PRE_EFFECT_RATE = 0.8;
 const SCORE_PRE_EFFECT_GAP_MS = 1000;
+const WIDE_PLUS_ONE_EXTRA_DELAY_MS = 1000;
 
 function estimateSpeechLeadDelayMs(text, rate = 1) {
   const words = String(text || "")
@@ -86,6 +87,24 @@ function estimateSpeechLeadDelayMs(text, rate = 1) {
 
 function estimateBoundaryLeadDelayMs(text, rate = 1) {
   return estimateSpeechLeadDelayMs(text, rate) + SCORE_PRE_EFFECT_GAP_MS;
+}
+
+function getConfiguredScoreEffectDelayMs(
+  runs,
+  isOut = false,
+  extraType = null,
+  leadText = "",
+  leadRate = SCORE_PRE_EFFECT_RATE,
+) {
+  const baseDelayMs = leadText
+    ? estimateBoundaryLeadDelayMs(leadText, leadRate)
+    : 0;
+  const effectKey = getScoreSoundEffectEventKey(runs, isOut, extraType);
+  if (effectKey === "wide_plus_one") {
+    return baseDelayMs + WIDE_PLUS_ONE_EXTRA_DELAY_MS;
+  }
+
+  return baseDelayMs;
 }
 
 const SOUND_EFFECT_DURATION_CACHE_KEY = "gv-sound-effect-durations-v1";
@@ -1002,12 +1021,13 @@ export default function MatchPageClient({
               resumeAnnouncements: false,
               trigger: "score_boundary",
               preAnnouncementText: String(scorePreview.leadItem?.text || "").trim(),
-              preAnnouncementDelayMs: String(scorePreview.leadItem?.text || "").trim()
-                ? estimateBoundaryLeadDelayMs(
-                    String(scorePreview.leadItem?.text || "").trim(),
-                    Number(scorePreview.leadItem?.rate || SCORE_PRE_EFFECT_RATE),
-                  )
-                : 0,
+              preAnnouncementDelayMs: getConfiguredScoreEffectDelayMs(
+                runs,
+                isOut,
+                extraType,
+                String(scorePreview.leadItem?.text || "").trim(),
+                Number(scorePreview.leadItem?.rate || SCORE_PRE_EFFECT_RATE),
+              ),
             }),
           });
         } catch {
@@ -1021,9 +1041,13 @@ export default function MatchPageClient({
       const boundarySequenceVersion = boundarySequenceVersionRef.current + 1;
       const leadText = String(scorePreview.leadItem?.text || "").trim();
       const leadRate = Number(scorePreview.leadItem?.rate || SCORE_PRE_EFFECT_RATE);
-      const leadDelayMs = leadText
-        ? estimateBoundaryLeadDelayMs(leadText, leadRate)
-        : 0;
+      const leadDelayMs = getConfiguredScoreEffectDelayMs(
+        runs,
+        isOut,
+        extraType,
+        leadText,
+        leadRate,
+      );
       const clientRequestId = createSoundEffectRequestId();
       boundarySequenceVersionRef.current = boundarySequenceVersion;
       activeBoundarySequenceRef.current = true;

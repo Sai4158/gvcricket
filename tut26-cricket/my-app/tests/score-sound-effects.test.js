@@ -38,8 +38,12 @@ test("score sound effect mapping covers every supported scoring control", () => 
       input: { runs: 0, isOut: true, extraType: null },
     },
     {
-      key: "wide",
+      key: "wide_zero",
       input: { runs: 0, isOut: false, extraType: "wide" },
+    },
+    {
+      key: "wide_plus_one",
+      input: { runs: 1, isOut: false, extraType: "wide" },
     },
     {
       key: "noball",

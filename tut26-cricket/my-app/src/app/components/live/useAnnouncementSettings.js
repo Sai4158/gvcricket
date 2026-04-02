@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { EMPTY_SCORE_SOUND_EFFECT_MAP } from "../../lib/score-sound-effects";
 
-const SETTINGS_VERSION = 10;
+const SETTINGS_VERSION = 11;
 
 const DEFAULTS = {
   spectator: {
@@ -41,14 +41,27 @@ function mergeSettings(role, parsed = {}) {
     parsed?.scoreSoundEffectMap && typeof parsed.scoreSoundEffectMap === "object"
       ? parsed.scoreSoundEffectMap
       : {};
+  const legacyWideValue = String(parsedMap.wide || "").trim();
+  const normalizedScoreSoundEffectMap = {
+    ...(base.scoreSoundEffectMap || {}),
+    ...parsedMap,
+  };
+
+  if (legacyWideValue) {
+    if (!String(normalizedScoreSoundEffectMap.wide_zero || "").trim()) {
+      normalizedScoreSoundEffectMap.wide_zero = legacyWideValue;
+    }
+    if (!String(normalizedScoreSoundEffectMap.wide_plus_one || "").trim()) {
+      normalizedScoreSoundEffectMap.wide_plus_one = legacyWideValue;
+    }
+  }
+
+  delete normalizedScoreSoundEffectMap.wide;
 
   return {
     ...base,
     ...parsed,
-    scoreSoundEffectMap: {
-      ...(base.scoreSoundEffectMap || {}),
-      ...parsedMap,
-    },
+    scoreSoundEffectMap: normalizedScoreSoundEffectMap,
   };
 }
 

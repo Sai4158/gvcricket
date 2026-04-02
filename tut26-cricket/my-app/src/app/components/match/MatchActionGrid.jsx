@@ -665,13 +665,13 @@ export default function MatchActionGrid({
                 ) : null}
                 <ActionHelpItem
                   icon={<AnnounceIcon />}
-                  title="Announcer / Effects"
-                  description={[
-                    "Open score voice settings.",
-                    "Pick sounds for dot, 1, 2, 3, 4, 6, out, wide, and no ball.",
-                    "Test the announcer and effect flow.",
-                  ]}
-                  colorClass="text-cyan-300"
+                    title="Announcer / Effects"
+                    description={[
+                      "Open score voice settings.",
+                      "Pick sounds for dot, 1, 2, 3, 4, 6, out, wide 0, wide +1, and no ball.",
+                      "Test the announcer and effect flow.",
+                    ]}
+                    colorClass="text-cyan-300"
                 />
                 <ActionHelpItem
                   icon={<LuUndo2 />}

@@ -72,9 +72,7 @@ export default function LiveNowBanner({ liveMatch }) {
   const prefersReducedMotion = useReducedMotion();
   const useDesktopLiteMotion = useHomeDesktopLiteMotion();
   const shouldReduceMotion = prefersReducedMotion || useDesktopLiteMotion;
-  const [fetchedLiveMatch, setFetchedLiveMatch] = useState(() =>
-    liveMatch ? null : readCachedLiveBanner()
-  );
+  const [fetchedLiveMatch, setFetchedLiveMatch] = useState(null);
   const currentLiveMatch = liveMatch || fetchedLiveMatch;
 
   useEffect(() => {
@@ -150,11 +148,11 @@ export default function LiveNowBanner({ liveMatch }) {
           pendingLabel="Opening live score..."
           pendingClassName="pending-shimmer"
           primeAudioOnClick
-          className="liquid-glass home-md-no-glass pointer-events-auto flex w-full max-w-[calc(100vw-5rem)] items-center justify-between gap-3 rounded-[26px] px-3.5 py-2.5 text-white shadow-[0_18px_34px_rgba(0,0,0,0.2)] transition hover:border-white/28 md:max-w-md md:gap-4 md:px-4 md:py-3"
+          className="liquid-glass home-desktop-lite-card pointer-events-auto flex w-full max-w-[calc(100vw-5rem)] items-center justify-between gap-3 rounded-[26px] px-3.5 py-2.5 text-white shadow-[0_18px_34px_rgba(0,0,0,0.2)] transition hover:border-white/28 md:max-w-md md:gap-4 md:px-4 md:py-3"
         >
           {({ pending, spinner }) => (
             <>
-              <div className="absolute inset-0 rounded-[26px] bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.1),transparent_40%)]" />
+              <div className="absolute inset-0 rounded-[26px] bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.1),transparent_40%)] md:bg-[radial-gradient(circle_at_top_left,rgba(250,204,21,0.12),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_30%)]" />
               <div className="relative z-10 flex min-w-0 items-center gap-2.5 md:gap-3">
                 <div className="relative h-[3.35rem] w-[3.35rem] shrink-0 overflow-hidden rounded-[18px] md:h-[4rem] md:w-[4rem]">
                   <SafeMatchImage
@@ -167,7 +165,7 @@ export default function LiveNowBanner({ liveMatch }) {
                   />
                 </div>
                 <div className="min-w-0 text-left">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300 md:text-[11px] md:tracking-[0.34em]">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300 md:text-[11px] md:tracking-[0.34em] md:text-amber-100">
                     Live Now
                   </div>
                   <div className="truncate text-[14px] font-semibold leading-tight text-white md:text-[15px]">
@@ -180,7 +178,7 @@ export default function LiveNowBanner({ liveMatch }) {
                   </div>
                 </div>
               </div>
-              <div className="liquid-pill home-md-no-glass relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] text-white md:h-12 md:w-12">
+              <div className="liquid-pill relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] text-white md:h-12 md:w-12">
                 {pending ? spinner : <FaArrowRight className="h-4 w-4" />}
               </div>
             </>
@@ -212,11 +210,11 @@ export default function LiveNowBanner({ liveMatch }) {
         pendingLabel="Opening live score..."
         pendingClassName="pending-shimmer"
         primeAudioOnClick
-        className="liquid-glass home-md-no-glass pointer-events-auto flex w-full max-w-[calc(100vw-5rem)] items-center justify-between gap-3 rounded-[26px] px-3.5 py-2.5 text-white shadow-[0_18px_34px_rgba(0,0,0,0.2)] transition hover:border-white/28 md:max-w-md md:gap-4 md:px-4 md:py-3"
+        className="liquid-glass home-desktop-lite-card pointer-events-auto flex w-full max-w-[calc(100vw-5rem)] items-center justify-between gap-3 rounded-[26px] px-3.5 py-2.5 text-white shadow-[0_18px_34px_rgba(0,0,0,0.2)] transition hover:border-white/28 md:max-w-md md:gap-4 md:px-4 md:py-3"
       >
         {({ pending, spinner }) => (
           <>
-            <div className="absolute inset-0 rounded-[26px] bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.1),transparent_40%)]" />
+            <div className="absolute inset-0 rounded-[26px] bg-[radial-gradient(circle_at_top_left,rgba(52,211,153,0.1),transparent_40%)] md:bg-[radial-gradient(circle_at_top_left,rgba(250,204,21,0.12),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_30%)]" />
             <div className="relative z-10 flex min-w-0 items-center gap-2.5 md:gap-3">
               <div className="relative h-[3.35rem] w-[3.35rem] shrink-0 overflow-hidden rounded-[18px] md:h-[4rem] md:w-[4rem]">
                 <SafeMatchImage
@@ -229,7 +227,7 @@ export default function LiveNowBanner({ liveMatch }) {
                 />
               </div>
               <div className="min-w-0 text-left">
-                <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300 md:text-[11px] md:tracking-[0.34em]">
+                <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300 md:text-[11px] md:tracking-[0.34em] md:text-amber-100">
                   Live Now
                 </div>
                 <div className="truncate text-[14px] font-semibold leading-tight text-white md:text-[15px]">
@@ -242,7 +240,7 @@ export default function LiveNowBanner({ liveMatch }) {
                 </div>
               </div>
             </div>
-            <div className="liquid-pill home-md-no-glass relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] text-white md:h-12 md:w-12">
+            <div className="liquid-pill relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] text-white md:h-12 md:w-12">
               {pending ? spinner : <FaArrowRight className="h-4 w-4" />}
             </div>
           </>

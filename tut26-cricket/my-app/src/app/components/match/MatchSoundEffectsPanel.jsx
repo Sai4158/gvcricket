@@ -385,7 +385,7 @@ export default function MatchSoundEffectsPanel({
               onClick={() =>
                 setIsScoreSoundSettingsOpen((current) => !current)
               }
-              className={`inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition ${
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-full border shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition ${
                 isScoreSoundSettingsOpen
                   ? "border-emerald-300/18 bg-emerald-500/12 text-emerald-100"
                   : "border-white/8 bg-white/[0.045] text-zinc-300 hover:bg-white/[0.08]"
@@ -393,18 +393,18 @@ export default function MatchSoundEffectsPanel({
               aria-label="Edit score sound assignments"
               aria-pressed={isScoreSoundSettingsOpen}
             >
-              <FaEdit className="text-[12px]" />
+              <FaEdit className="text-[15px]" />
             </button>
           ) : null}
           <button
             type="button"
             onClick={onToggle}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/8 bg-white/[0.045] text-zinc-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/8 bg-white/[0.045] text-zinc-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
             aria-expanded={isOpen}
             aria-label={isOpen ? "Collapse sound effects" : "Expand sound effects"}
           >
             <FaChevronDown
-              className={`text-sm transition-transform ${
+              className={`text-base transition-transform ${
                 isOpen ? "rotate-180" : ""
               }`}
             />

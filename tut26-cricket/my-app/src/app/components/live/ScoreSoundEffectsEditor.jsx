@@ -97,7 +97,7 @@ function SoundAssignmentRow({
 
   return (
     <div className="rounded-[22px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.022))] p-2.5 shadow-[0_14px_36px_rgba(0,0,0,0.22)]">
-      <div className="grid grid-cols-[minmax(112px,132px)_1fr_48px] items-center gap-2.5">
+      <div className="grid grid-cols-[minmax(120px,144px)_1fr_56px] items-center gap-2.5">
         <motion.button
           type="button"
           whileTap={{ scale: 0.95, y: 2 }}
@@ -135,11 +135,11 @@ function SoundAssignmentRow({
               active={isPreviewing}
             />
           </div>
-          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/82">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/82">
             {isPreviewing ? (
-              <FaPause className="text-xs" />
+              <FaPause className="text-sm" />
             ) : (
-              <FaPlay className="text-xs" />
+              <FaPlay className="text-sm" />
             )}
           </span>
         </motion.button>
@@ -147,10 +147,10 @@ function SoundAssignmentRow({
           type="button"
           onClick={onEdit}
           whileTap={{ scale: 0.95, y: 2 }}
-          className={`${KEYPAD_BUTTON_BASE} inline-flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(30,30,34,0.96),rgba(14,14,18,1))] text-white/74 hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(38,38,42,1),rgba(18,18,22,1))] hover:text-white`}
+          className={`${KEYPAD_BUTTON_BASE} inline-flex h-[56px] w-[56px] shrink-0 items-center justify-center rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(30,30,34,0.96),rgba(14,14,18,1))] text-white/74 hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(38,38,42,1),rgba(18,18,22,1))] hover:text-white`}
           aria-label={`Edit ${event.label} sound`}
         >
-          <FaEdit className="text-[12px]" />
+          <FaEdit className="text-[15px]" />
         </motion.button>
       </div>
     </div>

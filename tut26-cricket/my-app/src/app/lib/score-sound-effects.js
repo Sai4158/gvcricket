@@ -72,12 +72,22 @@ export const SCORE_SOUND_EFFECT_EVENTS = [
     extraType: null,
   },
   {
-    key: "wide",
-    label: "Wide",
-    buttonLabel: "WIDE",
+    key: "wide_zero",
+    label: "Wide 0",
+    buttonLabel: "WIDE 0",
     buttonTone: "wide",
-    buttonTextClassName: "text-[1.04rem]",
+    buttonTextClassName: "text-[0.92rem]",
     runs: 0,
+    isOut: false,
+    extraType: "wide",
+  },
+  {
+    key: "wide_plus_one",
+    label: "Wide +1",
+    buttonLabel: "WIDE +1",
+    buttonTone: "wide",
+    buttonTextClassName: "text-[0.84rem]",
+    runs: 1,
     isOut: false,
     extraType: "wide",
   },
@@ -111,7 +121,7 @@ export function getScoreSoundEffectEventKey(
   extraType = null,
 ) {
   if (extraType === "wide") {
-    return "wide";
+    return Number(runs) > 0 ? "wide_plus_one" : "wide_zero";
   }
 
   if (extraType === "noball") {
