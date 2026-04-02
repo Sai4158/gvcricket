@@ -93,6 +93,48 @@ function formatCompletedProgress(match) {
   } bowled.`;
 }
 
+function getBallsLeftInCurrentOver(match) {
+  const ballsRemaining = getBallsRemaining(match);
+  if (ballsRemaining <= 0) {
+    return 0;
+  }
+
+  const ballsIntoCurrentOver = getCompletedLegalBalls(match) % 6;
+  const ballsLeftInCurrentOver =
+    ballsIntoCurrentOver === 0 ? 6 : 6 - ballsIntoCurrentOver;
+
+  return Math.min(ballsLeftInCurrentOver, ballsRemaining);
+}
+
+function formatBallsLeftInCurrentOver(match) {
+  const ballsLeftInCurrentOver = getBallsLeftInCurrentOver(match);
+  return `${ballsLeftInCurrentOver} ball${
+    ballsLeftInCurrentOver === 1 ? "" : "s"
+  } left in this over.`;
+}
+
+function formatOversLeftAfterCurrentOver(match) {
+  const ballsRemaining = getBallsRemaining(match);
+  if (ballsRemaining <= 0) {
+    return "No overs left.";
+  }
+
+  const ballsLeftInCurrentOver = getBallsLeftInCurrentOver(match);
+  const ballsRemainingAfterCurrentOver = Math.max(
+    0,
+    ballsRemaining - ballsLeftInCurrentOver,
+  );
+  const oversLeftAfterCurrentOver = Math.floor(ballsRemainingAfterCurrentOver / 6);
+
+  if (oversLeftAfterCurrentOver <= 0) {
+    return "Final over.";
+  }
+
+  return `${oversLeftAfterCurrentOver} over${
+    oversLeftAfterCurrentOver === 1 ? "" : "s"
+  } left.`;
+}
+
 function isLegalBall(ball) {
   return ball?.extraType !== "wide" && ball?.extraType !== "noball";
 }
@@ -673,22 +715,14 @@ export function buildLiveScoreAnnouncementSequence(
 export function buildCurrentScoreAnnouncement(match) {
   if (!match) return "";
 
-  const parts = [
-    buildScoreSentence(match.score, match.outs),
-    formatCompletedProgress(match),
-  ];
-
-  const remainingProgress = formatRemainingOvers(match);
-  if (remainingProgress !== "0 balls") {
-    parts.push(`${remainingProgress} left.`);
-  }
+  const parts = [buildScoreSentence(match.score, match.outs)];
 
   if (match?.innings === "second") {
-    const chaseLine = buildChaseEquationLine(match);
-    if (chaseLine) {
-      parts.push(chaseLine);
-    }
+    parts.push(`Target is ${safeNumber(match?.innings1?.score) + 1}.`);
   }
+
+  parts.push(formatBallsLeftInCurrentOver(match));
+  parts.push(formatOversLeftAfterCurrentOver(match));
 
   return parts.join(" ");
 }
