@@ -1,5 +1,4 @@
 import { cookies } from "next/headers";
-import { connectDB } from "../../../../lib/db";
 import {
   getDirectorAccessCookieName,
   hasValidDirectorAccess,
@@ -21,8 +20,8 @@ import {
   heartbeatPersistentWalkieParticipant,
   takePersistentWalkieMessages,
 } from "../../../../lib/walkie-store";
+import { getCachedWalkieMatch } from "../../../../lib/walkie-match-cache";
 import { sanitizePlainText } from "../../../../lib/validators";
-import Match from "../../../../../models/Match";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,8 +30,6 @@ export const preferredRegion = ["iad1"];
 
 const WALKIE_HEARTBEAT_INTERVAL_MS = 8000;
 const WALKIE_HEARTBEAT_START_DELAY_MS = 4000;
-const WALKIE_FALLBACK_POLL_INTERVAL_MS = 2000;
-const WALKIE_STARTUP_POLL_WINDOW_MS = 10_000;
 const WALKIE_BOOT_PAD = ".".repeat(8192);
 const WALKIE_PING_PAD = ".".repeat(1024);
 
@@ -65,10 +62,7 @@ export async function GET(request, { params }) {
     return new Response("Invalid participant role.", { status: 400 });
   }
 
-  await connectDB();
-  const match = await Match.findById(id).select(
-    "_id isOngoing result adminAccessVersion"
-  );
+  const match = await getCachedWalkieMatch(id);
 
   if (!match) {
     return new Response("Match not found.", { status: 404 });
@@ -119,18 +113,14 @@ export async function GET(request, { params }) {
   const stream = readable;
   void (async () => {
     let heartbeat = null;
-    let pollTimer = null;
     let closed = false;
     let lastVersion = -1;
     let lastNotificationId = "";
     let cleanupState = () => {};
     let cleanupMessages = () => {};
-    let hasChangeStreamUpdates = false;
     let didCleanup = false;
     let pendingStateReplays = 0;
     let startupReplayTimers = [];
-    let startupPolling = true;
-    let startupPollWindowTimer = null;
 
     const buildStatePayload = (snapshot, notification, extra = {}) => ({
       snapshot,
@@ -152,19 +142,11 @@ export async function GET(request, { params }) {
         clearTimeout(heartbeat);
         heartbeat = null;
       }
-      if (pollTimer) {
-        clearTimeout(pollTimer);
-        pollTimer = null;
-      }
       if (startupReplayTimers.length) {
         for (const timerId of startupReplayTimers) {
           clearTimeout(timerId);
         }
         startupReplayTimers = [];
-      }
-      if (startupPollWindowTimer) {
-        clearTimeout(startupPollWindowTimer);
-        startupPollWindowTimer = null;
       }
     };
 
@@ -209,18 +191,6 @@ export async function GET(request, { params }) {
       }
       heartbeat = setTimeout(() => {
         void heartbeatLoop();
-      }, delay);
-    };
-
-    const schedulePoll = (delay = WALKIE_FALLBACK_POLL_INTERVAL_MS) => {
-      if (closed || (hasChangeStreamUpdates && !startupPolling)) {
-        return;
-      }
-      if (pollTimer) {
-        clearTimeout(pollTimer);
-      }
-      pollTimer = setTimeout(() => {
-        void pollLoop();
       }, delay);
     };
 
@@ -314,21 +284,6 @@ export async function GET(request, { params }) {
       }, WALKIE_HEARTBEAT_INTERVAL_MS);
     };
 
-    const pollLoop = async () => {
-      if (closed || (hasChangeStreamUpdates && !startupPolling)) {
-        return;
-      }
-
-      try {
-        await drainMessages();
-        await pushState();
-      } catch (error) {
-        console.error("Walkie SSE fallback poll failed:", error);
-      }
-
-      schedulePoll();
-    };
-
     const scheduleStartupReplay = (delay, payload) => {
       const timerId = setTimeout(() => {
         if (closed) {
@@ -390,17 +345,23 @@ export async function GET(request, { params }) {
       pendingStateReplays = 2;
       scheduleStartupReplay(400, initialStatePayload);
       scheduleStartupReplay(1400, initialStatePayload);
-      startupPollWindowTimer = setTimeout(() => {
-        startupPolling = false;
-        if (hasChangeStreamUpdates && pollTimer) {
-          clearTimeout(pollTimer);
-          pollTimer = null;
-        }
-      }, WALKIE_STARTUP_POLL_WINDOW_MS);
 
       void drainMessages().catch((error) => {
         console.error("Walkie initial message drain failed:", error);
         void stopStream();
+      });
+
+      cleanupState = subscribeToWalkieState(id, () => {
+        void pushState().catch((error) => {
+          console.error("Walkie state push failed:", error);
+          void stopStream();
+        });
+      });
+      cleanupMessages = subscribeToWalkieMessages(id, participantId, () => {
+        void drainMessages().catch((error) => {
+          console.error("Walkie message drain failed:", error);
+          void stopStream();
+        });
       });
 
       void (async () => {
@@ -409,19 +370,6 @@ export async function GET(request, { params }) {
           if (closed) {
             return;
           }
-          cleanupState = subscribeToWalkieState(id, () => {
-            void pushState().catch((error) => {
-              console.error("Walkie state push failed:", error);
-              void stopStream();
-            });
-          });
-          cleanupMessages = subscribeToWalkieMessages(id, participantId, () => {
-            void drainMessages().catch((error) => {
-              console.error("Walkie message drain failed:", error);
-              void stopStream();
-            });
-          });
-          hasChangeStreamUpdates = true;
           await drainMessages();
           await pushState();
           if (closed) {
@@ -430,12 +378,9 @@ export async function GET(request, { params }) {
           scheduleHeartbeat(WALKIE_HEARTBEAT_START_DELAY_MS);
         } catch (error) {
           console.error("Walkie change streams unavailable.", error);
-          hasChangeStreamUpdates = false;
-          schedulePoll();
         }
       })();
 
-      schedulePoll(600);
       scheduleHeartbeat(WALKIE_HEARTBEAT_START_DELAY_MS);
     } catch (error) {
       console.error("Walkie SSE setup failed:", error);

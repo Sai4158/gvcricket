@@ -15,6 +15,12 @@ import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
 
 const ACTION_QUEUE_RETRY_DELAY_MS = 2500;
 
+function wait(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 function triggerHapticFeedback() {
   if (
     typeof window !== "undefined" &&
@@ -35,6 +41,55 @@ function createActionId(prefix) {
 
 export function triggerMatchHapticFeedback() {
   triggerHapticFeedback();
+}
+
+export function isMatchNetworkError(error) {
+  if (!error) {
+    return false;
+  }
+
+  const name = String(error?.name || "");
+  const message = String(error?.message || "");
+  return (
+    name === "TypeError" &&
+    (
+      /Failed to fetch/i.test(message) ||
+      /NetworkError/i.test(message) ||
+      /Load failed/i.test(message)
+    )
+  );
+}
+
+function buildMatchNetworkRetryError() {
+  const error = new Error("Live match connection dropped. Saved locally and retrying.");
+  error.network = true;
+  return error;
+}
+
+async function fetchWithNetworkRetry(url, init, retryDelays = [0, 180, 520]) {
+  let lastError = null;
+
+  for (const delayMs of retryDelays) {
+    if (delayMs > 0) {
+      await wait(delayMs);
+    }
+
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      lastError = error;
+      if (!isMatchNetworkError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  if (lastError) {
+    lastError.network = true;
+    throw lastError;
+  }
+
+  throw new Error("Failed to update match.");
 }
 
 function normalizeOptimisticMatch(nextMatch) {
@@ -310,7 +365,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     }
 
     try {
-      const response = await fetch(`/api/matches/${matchId}`, {
+      const response = await fetchWithNetworkRetry(`/api/matches/${matchId}`, {
         cache: "no-store",
       });
       const body = await response
@@ -461,7 +516,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       setIsUpdating(true);
 
       try {
-        const response = await fetch(`/api/matches/${matchId}/actions`, {
+        const response = await fetchWithNetworkRetry(`/api/matches/${matchId}/actions`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(currentEntry.action),
@@ -547,8 +602,13 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
         setError(null);
       } catch (caughtError) {
-        console.error("Failed to update match:", caughtError);
-        setError(caughtError);
+        if (isMatchNetworkError(caughtError) || caughtError?.network) {
+          console.warn("Live match update delayed:", caughtError);
+          setError(buildMatchNetworkRetryError());
+        } else {
+          console.error("Failed to update match:", caughtError);
+          setError(caughtError);
+        }
         scheduleQueuedActionRetry();
         break;
       }
@@ -614,7 +674,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     setIsUpdating(true);
 
     try {
-      const response = await fetch(`/api/matches/${matchId}`, {
+      const response = await fetchWithNetworkRetry(`/api/matches/${matchId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -645,8 +705,13 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       setError(null);
       return body;
     } catch (caughtError) {
-      console.error("Failed to update match:", caughtError);
-      setError(caughtError);
+      if (isMatchNetworkError(caughtError) || caughtError?.network) {
+        console.warn("Live match update delayed:", caughtError);
+        setError(new Error("Live match connection dropped. Try again."));
+      } else {
+        console.error("Failed to update match:", caughtError);
+        setError(caughtError);
+      }
       return null;
     } finally {
       setIsUpdating(false);

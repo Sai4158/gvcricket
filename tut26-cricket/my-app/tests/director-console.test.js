@@ -283,3 +283,31 @@ test("disabling walkie clears active speaker state safely", () => {
     umpire.cleanup();
   }
 });
+
+test("walkie stays enabled when the last listener disconnects", async () => {
+  const matchId = `director-listener-disconnect-${Date.now()}`;
+  hydrateWalkieEnabled(matchId, true);
+
+  const umpire = registerWalkieParticipant(matchId, {
+    id: "umpire:listener-disconnect",
+    role: "umpire",
+    name: "Lead Umpire",
+  });
+  const spectator = registerWalkieParticipant(matchId, {
+    id: "spectator:listener-disconnect",
+    role: "spectator",
+    name: "Spectator One",
+  });
+
+  try {
+    spectator.cleanup();
+    await new Promise((resolve) => setTimeout(resolve, 5200));
+
+    const snapshot = getWalkieSnapshot(matchId);
+    assert.equal(snapshot.enabled, true);
+    assert.equal(snapshot.spectatorCount, 0);
+    assert.equal(snapshot.directorCount, 0);
+  } finally {
+    umpire.cleanup();
+  }
+});

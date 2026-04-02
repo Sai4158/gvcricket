@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { jsonError } from "../../../lib/api-response";
 import { createAgoraRtcToken } from "../../../lib/agora";
-import { connectDB } from "../../../lib/db";
 import {
   getDirectorAccessCookieName,
   hasValidDirectorAccess,
@@ -12,7 +11,7 @@ import {
   hasValidMatchAccess,
 } from "../../../lib/match-access";
 import { parseJsonRequest } from "../../../lib/request-security";
-import Match from "../../../../models/Match";
+import { getCachedWalkieMatch } from "../../../lib/walkie-match-cache";
 
 const schema = z
   .object({
@@ -53,10 +52,7 @@ export async function POST(req) {
     return jsonError(parsedRequest.message, parsedRequest.status);
   }
 
-  await connectDB();
-  const match = await Match.findById(parsedRequest.value.matchId).select(
-    "_id isOngoing result adminAccessVersion"
-  );
+  const match = await getCachedWalkieMatch(parsedRequest.value.matchId);
 
   if (!match) {
     return jsonError("Match not found.", 404);

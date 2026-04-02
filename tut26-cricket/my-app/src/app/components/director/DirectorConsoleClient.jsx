@@ -44,11 +44,13 @@ import { WalkieNotice, WalkieTalkButton } from "../live/WalkiePanel";
 import { buildCurrentScoreAnnouncement } from "../../lib/live-announcements";
 import { getBattingTeamBundle } from "../../lib/team-utils";
 import {
+  readWalkieDevicePreference,
   didSharedWalkieDisable,
   didSharedWalkieEnable,
   getNonUmpireWalkieUiState,
   getNonUmpireWalkieToggleAction,
   NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT,
+  writeWalkieDevicePreference,
 } from "../../lib/walkie-device-state";
 import { getWalkieRemoteSpeakerState } from "../../lib/walkie-ui";
 import {
@@ -1067,6 +1069,17 @@ export default function DirectorConsoleClient({
     initialSessions,
     initialPreferredSessionId,
   );
+  const initialManagedWalkieSession =
+    initialAuthorized && initialAutoManage && initialTargetSessionId
+      ? initialSessions.find(
+          (item) => item.session?._id === initialTargetSessionId,
+        ) || null
+      : null;
+  const initialDirectorWalkiePreferenceScope =
+    initialManagedWalkieSession?.match?._id ||
+    initialManagedWalkieSession?.session?._id ||
+    initialTargetSessionId ||
+    "";
   const [authorized, setAuthorized] = useState(Boolean(initialAuthorized));
   const [sessions, setSessions] = useState(initialSessions || []);
   const [pin, setPin] = useState("");
@@ -1110,7 +1123,13 @@ export default function DirectorConsoleClient({
   const [musicMessage, setMusicMessage] = useState("");
   const [directorHoldLive, setDirectorHoldLive] = useState(false);
   const [directorSpeakerOn, setDirectorSpeakerOn] = useState(false);
-  const [directorWalkieOn, setDirectorWalkieOn] = useState(false);
+  const [directorWalkieOn, setDirectorWalkieOn] = useState(() =>
+    readWalkieDevicePreference({
+      role: "director",
+      scopeId: initialDirectorWalkiePreferenceScope,
+      fallback: false,
+    }),
+  );
   const [directorWalkieNotice, setDirectorWalkieNotice] = useState("");
   const [libraryFiles, setLibraryFiles] = useState([]);
   const [libraryOrder, setLibraryOrder] = useState([]);
@@ -1139,6 +1158,10 @@ export default function DirectorConsoleClient({
   const directorMicHoldingRef = useRef(false);
   const previousDirectorWalkieEnabledRef = useRef(false);
   const previousDirectorWalkieRequestStateRef = useRef("idle");
+  const directorWalkiePreferenceScopeRef = useRef(
+    initialDirectorWalkiePreferenceScope,
+  );
+  const directorWalkiePreferenceHydratingRef = useRef(false);
   const previousManagedMatchIdRef = useRef("");
   const directorWalkieNoticeTimerRef = useRef(null);
   const effectPlayRequestRef = useRef(0);
@@ -2368,6 +2391,52 @@ export default function DirectorConsoleClient({
     managedSession?.match?._id &&
     (directorWalkieMatch?.isOngoing ?? managedSession?.isLive),
   );
+  const directorWalkiePreferenceScope =
+    managedSession?.match?._id || managedSession?.session?._id || managedSessionId || "";
+
+  useEffect(() => {
+    if (!directorWalkiePreferenceScope) {
+      directorWalkiePreferenceScopeRef.current = "";
+      directorWalkiePreferenceHydratingRef.current = false;
+      return;
+    }
+
+    if (directorWalkiePreferenceScopeRef.current === directorWalkiePreferenceScope) {
+      return;
+    }
+
+    directorWalkiePreferenceHydratingRef.current = true;
+    directorWalkiePreferenceScopeRef.current = directorWalkiePreferenceScope;
+    const savedPreference = readWalkieDevicePreference({
+      role: "director",
+      scopeId: directorWalkiePreferenceScope,
+      fallback: false,
+    });
+    queueMicrotask(() => {
+      if (
+        directorWalkiePreferenceScopeRef.current === directorWalkiePreferenceScope
+      ) {
+        setDirectorWalkieOn(savedPreference);
+        directorWalkiePreferenceHydratingRef.current = false;
+      }
+    });
+  }, [directorWalkiePreferenceScope]);
+
+  useEffect(() => {
+    if (
+      !directorWalkiePreferenceScope ||
+      directorWalkiePreferenceScopeRef.current !== directorWalkiePreferenceScope ||
+      directorWalkiePreferenceHydratingRef.current
+    ) {
+      return;
+    }
+
+    writeWalkieDevicePreference({
+      role: "director",
+      scopeId: directorWalkiePreferenceScope,
+      enabled: directorWalkieOn,
+    });
+  }, [directorWalkieOn, directorWalkiePreferenceScope]);
 
   const walkie = useWalkieTalkie({
     matchId: managedSession?.match?._id || "",
@@ -2381,7 +2450,6 @@ export default function DirectorConsoleClient({
   });
   const directorWalkieSharedEnabled = Boolean(walkie.snapshot?.enabled);
   const directorWalkieRequestState = walkie.requestState || "idle";
-  const deactivateDirectorWalkieAudio = walkie.deactivateAudio;
 
   const handleDirectorWalkieSwitchChange = useCallback(
     async (nextChecked) => {
@@ -2475,13 +2543,11 @@ export default function DirectorConsoleClient({
         sharedEnabled: directorWalkieSharedEnabled,
       })
     ) {
-      setDirectorWalkieOn(false);
-      void deactivateDirectorWalkieAudio();
+      setDirectorHoldLive(false);
     }
 
     previousDirectorWalkieEnabledRef.current = directorWalkieSharedEnabled;
   }, [
-    deactivateDirectorWalkieAudio,
     directorWalkieSharedEnabled,
     managedSession?.match?._id,
     managedSession?.session?._id,
@@ -4047,7 +4113,9 @@ export default function DirectorConsoleClient({
       : directorWalkiePending
         ? "Requested"
         : !directorWalkieChannelEnabled
-          ? "Off"
+          ? directorWalkieOn
+            ? "Standing By"
+            : "Off"
           : !directorWalkieOn
             ? "Off"
             : walkie.isFinishing

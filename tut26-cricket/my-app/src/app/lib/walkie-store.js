@@ -141,31 +141,6 @@ async function touchAndCleanState(matchId, attempt = 0) {
     }
   }
 
-  if (doc.enabled) {
-    const listenerCount = doc.participants.filter(
-      (item) => item.role === "spectator" || item.role === "director"
-    ).length;
-    if (listenerCount === 0) {
-      doc.enabled = false;
-      doc.version += 1;
-      doc.lastNotification = newNotification("walkie_disabled", "Walkie-talkie is off.");
-      touchIdleExpiry(doc);
-      try {
-        await doc.save();
-      } catch (error) {
-        if (
-          isRetryableWalkieStateError(error) &&
-          attempt < WALKIE_STATE_RETRY_LIMIT - 1
-        ) {
-          return touchAndCleanState(matchId, attempt + 1);
-        }
-        throw error;
-      }
-      publishWalkieStateUpdate(matchId);
-      return touchAndCleanState(matchId, attempt + 1);
-    }
-  }
-
   return doc;
 }
 

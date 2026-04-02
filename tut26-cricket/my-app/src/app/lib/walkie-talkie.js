@@ -190,27 +190,6 @@ function clearActiveLock(matchId, reason = "ended") {
   }
 }
 
-function disableForNoListeners(matchId) {
-  const matchState = getMatchState(matchId);
-  if (!matchState.enabled) {
-    return;
-  }
-
-  const listenerCount =
-    listParticipants(matchState, "spectator").length +
-    listParticipants(matchState, "director").length;
-  if (listenerCount > 0) {
-    return;
-  }
-
-  matchState.enabled = false;
-  clearActiveLock(matchId, "disabled");
-  notifyMatch(matchId, {
-    type: "state",
-    snapshot: buildSnapshot(matchId),
-  });
-}
-
 function scheduleTransmissionTimeout(matchId, transmissionId) {
   const matchState = getMatchState(matchId);
   if (matchState.timeoutId) {
@@ -305,12 +284,6 @@ export function registerWalkieParticipant(matchId, participant) {
           snapshot: buildSnapshot(matchId),
         });
 
-        if (
-          listParticipants(settledState, "spectator").length === 0 &&
-          listParticipants(settledState, "director").length === 0
-        ) {
-          disableForNoListeners(matchId);
-        }
       }, DISCONNECT_GRACE_MS);
 
       latestState.disconnectTimers.set(nextParticipant.id, timer);

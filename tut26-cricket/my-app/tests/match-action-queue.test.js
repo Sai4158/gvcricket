@@ -4,6 +4,7 @@ import test from "node:test";
 import { applyMatchAction } from "../src/app/lib/match-engine.js";
 import {
   filterQueuedActionsAlreadyApplied,
+  isMatchNetworkError,
   removeQueuedActionById,
   replayQueuedMatchActions,
   updateQueuedActionRetryFlag,
@@ -45,6 +46,12 @@ function buildStartedMatch() {
     actionId: actionId("toss"),
   });
 }
+
+test("match network classifier catches transient browser fetch failures", () => {
+  assert.equal(isMatchNetworkError(new TypeError("Failed to fetch")), true);
+  assert.equal(isMatchNetworkError(new TypeError("Load failed")), true);
+  assert.equal(isMatchNetworkError(new Error("Failed to update match.")), false);
+});
 
 test("queued scoring actions can be replayed on top of a fresh server snapshot", () => {
   const startedMatch = buildStartedMatch();

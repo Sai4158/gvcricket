@@ -271,7 +271,11 @@ export function WalkieRequestQueue({
               </p>
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          <div
+            className={`mt-4 grid gap-3 ${
+              request.role === "spectator" ? "grid-cols-1" : "grid-cols-2"
+            }`}
+          >
             <button
               type="button"
               onClick={() => onAccept?.(request.requestId)}
@@ -279,13 +283,15 @@ export function WalkieRequestQueue({
             >
               Accept
             </button>
-            <button
-              type="button"
-              onClick={() => onDismiss?.(request.requestId)}
-              className="flex w-full items-center justify-center rounded-2xl border border-white/12 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
-            >
-              Dismiss
-            </button>
+            {request.role !== "spectator" ? (
+              <button
+                type="button"
+                onClick={() => onDismiss?.(request.requestId)}
+                className="flex w-full items-center justify-center rounded-2xl border border-white/12 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
+              >
+                Dismiss
+              </button>
+            ) : null}
           </div>
         </div>
       ))}
@@ -581,6 +587,25 @@ export default function WalkiePanel({
     ? getWalkieRoleLabel(snapshot.activeSpeakerRole)
     : "";
 
+  const safeActiveSpeakerLabel = snapshot?.activeSpeakerName
+    ? `${snapshot.activeSpeakerName}${
+        snapshot?.activeSpeakerRole && !isSelfTalking
+          ? ` - ${roleLabel(snapshot.activeSpeakerRole)}`
+          : ""
+      }`
+    : snapshot?.activeSpeakerRole
+    ? roleLabel(snapshot.activeSpeakerRole)
+    : "";
+  const safeActiveSpeakerLabelText = snapshot?.activeSpeakerName
+    ? `${snapshot.activeSpeakerName}${
+        snapshot?.activeSpeakerRole && !isSelfTalking
+          ? ` - ${getWalkieRoleLabel(snapshot.activeSpeakerRole)}`
+          : ""
+      }`
+    : snapshot?.activeSpeakerRole
+    ? getWalkieRoleLabel(snapshot.activeSpeakerRole)
+    : "";
+
   const handleToggle = (checked) => {
     if (isUmpire) {
       onToggleEnabled?.(checked);
@@ -627,10 +652,15 @@ export default function WalkiePanel({
                 {isUmpire ? "Walkie-Talkie" : "Push to Talk"}
               </h3>
               <p className="mt-1 text-sm text-zinc-400">{statusText}</p>
-              {snapshot?.enabled && activeSpeakerLabelText && !isSelfTalking ? (
-                <p className="mt-1 text-xs font-medium text-emerald-200" title={activeSpeakerLabel}>
+              {snapshot?.enabled && safeActiveSpeakerLabelText && !isSelfTalking ? (
+                <>
+                <p className="sr-only" title={safeActiveSpeakerLabel}>
                   Live now: {activeSpeakerLabelText.replace("â€¢", "•")}
                 </p>
+                <p className="mt-1 text-xs font-medium text-emerald-200" title={safeActiveSpeakerLabel}>
+                  Live now: {safeActiveSpeakerLabelText}
+                </p>
+                </>
               ) : null}
               <p className="mt-1 text-xs text-zinc-500">
                 {isUmpire

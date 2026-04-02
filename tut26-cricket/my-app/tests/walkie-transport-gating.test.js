@@ -3,10 +3,13 @@ import assert from "node:assert/strict";
 
 import {
   classifyWalkieSignalingSetupError,
+  isWalkieNetworkError,
+  mergeWalkieSnapshots,
   shouldMaintainWalkieAudioTransport,
   shouldMaintainWalkieSignaling,
 } from "../src/app/components/live/useWalkieTalkie.js";
 import {
+  buildWalkieDevicePreferenceKey,
   didSharedWalkieDisable,
   didSharedWalkieEnable,
   getNonUmpireWalkieUiState,
@@ -14,7 +17,25 @@ import {
   NON_UMPIRE_WALKIE_ACCEPTED_ANNOUNCEMENT,
   NON_UMPIRE_WALKIE_LOCAL_ENABLE_NOTICE,
   NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT,
+  readWalkieDevicePreference,
+  writeWalkieDevicePreference,
 } from "../src/app/lib/walkie-device-state.js";
+
+function createLocalStorageMock() {
+  const store = new Map();
+
+  return {
+    getItem(key) {
+      return store.has(key) ? store.get(key) : null;
+    },
+    setItem(key, value) {
+      store.set(key, String(value));
+    },
+    removeItem(key) {
+      store.delete(key);
+    },
+  };
+}
 
 test("walkie audio transport stays off when device walkie is off", () => {
   const result = shouldMaintainWalkieAudioTransport({
@@ -32,6 +53,76 @@ test("walkie audio transport stays off when device walkie is off", () => {
   });
 
   assert.equal(result, false);
+});
+
+test("walkie network classifier catches transient browser fetch failures", () => {
+  assert.equal(isWalkieNetworkError(new TypeError("Failed to fetch")), true);
+  assert.equal(isWalkieNetworkError(new TypeError("Load failed")), true);
+  assert.equal(isWalkieNetworkError(new Error("Request failed")), false);
+});
+
+test("walkie device preference keeps explicit local on and off memory per scope", () => {
+  const previousWindow = global.window;
+  global.window = {
+    localStorage: createLocalStorageMock(),
+  };
+
+  try {
+    const spectatorKey = buildWalkieDevicePreferenceKey({
+      role: "spectator",
+      scopeId: "match-1",
+    });
+
+    assert.equal(spectatorKey, "gv-walkie-device-preference-v1:spectator:match-1");
+    assert.equal(
+      readWalkieDevicePreference({
+        role: "spectator",
+        scopeId: "match-1",
+        fallback: false,
+      }),
+      false,
+    );
+
+    writeWalkieDevicePreference({
+      role: "spectator",
+      scopeId: "match-1",
+      enabled: true,
+    });
+
+    assert.equal(
+      readWalkieDevicePreference({
+        role: "spectator",
+        scopeId: "match-1",
+        fallback: false,
+      }),
+      true,
+    );
+
+    writeWalkieDevicePreference({
+      role: "spectator",
+      scopeId: "match-1",
+      enabled: false,
+    });
+
+    assert.equal(
+      readWalkieDevicePreference({
+        role: "spectator",
+        scopeId: "match-1",
+        fallback: true,
+      }),
+      false,
+    );
+    assert.equal(
+      readWalkieDevicePreference({
+        role: "director",
+        scopeId: "match-1",
+        fallback: false,
+      }),
+      false,
+    );
+  } finally {
+    global.window = previousWindow;
+  }
 });
 
 test("walkie audio transport stays off when match walkie is disabled", () => {
@@ -124,6 +215,64 @@ test("walkie audio transport stays on only when audio is actually needed", () =>
   );
 });
 
+test("walkie audio transport stays ready in background only when local walkie listening is enabled", () => {
+  assert.equal(
+    shouldMaintainWalkieAudioTransport({
+      enabled: true,
+      snapshot: {
+        enabled: true,
+        activeSpeakerId: "",
+      },
+      participantId: "self-user",
+      hasWalkieToken: true,
+      pageVisible: false,
+      autoConnectAudio: true,
+      manualAudioReady: false,
+      isSelfTalking: false,
+      isFinishing: false,
+    }),
+    true
+  );
+
+  assert.equal(
+    shouldMaintainWalkieAudioTransport({
+      enabled: true,
+      snapshot: {
+        enabled: true,
+        activeSpeakerId: "remote-user",
+      },
+      participantId: "self-user",
+      hasWalkieToken: true,
+      pageVisible: false,
+      autoConnectAudio: false,
+      manualAudioReady: false,
+      isSelfTalking: false,
+      isFinishing: false,
+    }),
+    false
+  );
+});
+
+test("walkie audio transport stays warm for instant push-to-talk when local talk path is armed", () => {
+  assert.equal(
+    shouldMaintainWalkieAudioTransport({
+      enabled: true,
+      snapshot: {
+        enabled: true,
+        activeSpeakerId: "",
+      },
+      participantId: "self-user",
+      hasWalkieToken: true,
+      autoConnectAudio: true,
+      keepReadyForTalk: true,
+      manualAudioReady: false,
+      isSelfTalking: false,
+      isFinishing: false,
+    }),
+    true
+  );
+});
+
 test("walkie signaling stays off unless the session truly needs a live signaling state", () => {
   assert.equal(
     shouldMaintainWalkieSignaling({
@@ -155,7 +304,7 @@ test("walkie signaling stays off unless the session truly needs a live signaling
       signalingActive: true,
       manualSignalingActive: true,
     }),
-    false
+    true
   );
 
   assert.equal(
@@ -168,6 +317,59 @@ test("walkie signaling stays off unless the session truly needs a live signaling
     }),
     true
   );
+});
+
+test("walkie snapshot stays live through transient signaling reconnect cleanup", () => {
+  const result = mergeWalkieSnapshots({
+    authoritativeSnapshot: {
+      enabled: true,
+      spectatorCount: 3,
+      directorCount: 1,
+      umpireCount: 1,
+      busy: true,
+      activeSpeakerRole: "umpire",
+      activeSpeakerId: "umpire-1",
+      activeSpeakerName: "Umpire",
+      lockStartedAt: "2026-04-01T12:00:00.000Z",
+      expiresAt: "2026-04-01T12:00:08.000Z",
+      transmissionId: "tx-1",
+      pendingRequests: [
+        {
+          requestId: "req-1",
+          participantId: "spectator-1",
+          role: "spectator",
+          name: "Spectator",
+          signalingUserId: "spectator-signal-1",
+          requestedAt: "2099-04-01T12:00:00.000Z",
+          expiresAt: "2099-04-01T12:00:30.000Z",
+        },
+      ],
+    },
+    runtimeSnapshot: {
+      enabled: false,
+      spectatorCount: 0,
+      directorCount: 0,
+      umpireCount: 0,
+      busy: false,
+      activeSpeakerRole: "",
+      activeSpeakerId: "",
+      activeSpeakerName: "",
+      lockStartedAt: "",
+      expiresAt: "",
+      transmissionId: "",
+      pendingRequests: [],
+      updatedAt: "",
+      version: 0,
+    },
+    runtimeSubscribed: false,
+    runtimePresenceAvailable: false,
+    activeSpeakerSource: "runtime",
+  });
+
+  assert.equal(result.enabled, true);
+  assert.equal(result.activeSpeakerId, "umpire-1");
+  assert.equal(result.pendingRequests.length, 1);
+  assert.equal(result.spectatorCount, 3);
 });
 
 test("non-umpire walkie UI state keeps the local-off notice persistent while shared walkie stays live", () => {

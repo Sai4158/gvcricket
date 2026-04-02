@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   FaBookOpen,
@@ -96,6 +96,8 @@ function AnnounceIcon() {
   );
 }
 
+const ACTION_HOLD_DELAY_MS = 60;
+
 function ActionHelpItem({ icon, title, description, colorClass }) {
   return (
     <div className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/[0.04] p-3">
@@ -157,12 +159,12 @@ function ActionIconButton({
     setHoldPreviewActive(true);
     onPressFeedback?.();
     feedbackTriggeredRef.current = true;
+    void onPressStart?.();
     clearHoldTimer();
     holdTimerRef.current = window.setTimeout(() => {
       holdStartedRef.current = true;
-      void onPressStart?.();
       void onHoldStart();
-    }, 140);
+    }, ACTION_HOLD_DELAY_MS);
   };
 
   const endPress = () => {
@@ -178,6 +180,29 @@ function ActionIconButton({
       suppressClickRef.current = false;
     }, 180);
   };
+
+  useEffect(() => {
+    const handlePointerRelease = (event) => {
+      if (
+        pointerIdRef.current !== null &&
+        event.pointerId !== undefined &&
+        event.pointerId !== pointerIdRef.current
+      ) {
+        return;
+      }
+
+      pointerIdRef.current = null;
+      endPress();
+    };
+
+    window.addEventListener("pointerup", handlePointerRelease);
+    window.addEventListener("pointercancel", handlePointerRelease);
+
+    return () => {
+      window.removeEventListener("pointerup", handlePointerRelease);
+      window.removeEventListener("pointercancel", handlePointerRelease);
+    };
+  });
 
   return (
     <motion.button
@@ -210,19 +235,7 @@ function ActionIconButton({
         ) {
           return;
         }
-        pointerIdRef.current = null;
         event.currentTarget.releasePointerCapture?.(event.pointerId);
-        endPress();
-      }}
-      onPointerLeave={(event) => {
-        if (
-          pointerIdRef.current !== null &&
-          event.pointerId !== undefined &&
-          event.pointerId !== pointerIdRef.current
-        ) {
-          return;
-        }
-        endPress();
       }}
       onPointerCancel={(event) => {
         if (
@@ -232,9 +245,7 @@ function ActionIconButton({
         ) {
           return;
         }
-        pointerIdRef.current = null;
         event.currentTarget.releasePointerCapture?.(event.pointerId);
-        endPress();
       }}
       onContextMenu={(event) => {
         event.preventDefault();

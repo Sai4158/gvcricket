@@ -40,12 +40,13 @@ import {
 } from "../../lib/live-announcements";
 import { addBallToHistory } from "../../lib/match-scoring";
 import {
+  readWalkieDevicePreference,
   didSharedWalkieDisable,
   didSharedWalkieEnable,
   getNonUmpireWalkieUiState,
   getNonUmpireWalkieToggleAction,
-  NON_UMPIRE_WALKIE_ACCEPTED_ANNOUNCEMENT,
   NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT,
+  writeWalkieDevicePreference,
 } from "../../lib/walkie-device-state";
 import { getWalkieRemoteSpeakerState } from "../../lib/walkie-ui";
 import { getTeamBundle } from "../../lib/team-utils";
@@ -215,13 +216,20 @@ function isSixBoundaryScoreEvent(event) {
 }
 
 export default function SessionViewClient({ sessionId, initialData }) {
+  const initialWalkiePreferenceScope = initialData?.match?._id || sessionId || "";
   const [copied, setCopied] = useState(false);
   const [isLeavingToSessions, setIsLeavingToSessions] = useState(false);
   const [data, setData] = useState(initialData || null);
   const [activePanel, setActivePanel] = useState(null);
   const [localWalkieNotice, setLocalWalkieNotice] = useState("");
   const [streamError, setStreamError] = useState("");
-  const [spectatorWalkieEnabled, setSpectatorWalkieEnabled] = useState(false);
+  const [spectatorWalkieEnabled, setSpectatorWalkieEnabled] = useState(() =>
+    readWalkieDevicePreference({
+      role: "spectator",
+      scopeId: initialWalkiePreferenceScope,
+      fallback: false,
+    }),
+  );
   const [quickWalkieTalking, setQuickWalkieTalking] = useState(false);
   const [quickSpeakerTalking, setQuickSpeakerTalking] = useState(false);
   const lastAnnouncedEventRef = useRef("");
@@ -238,6 +246,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const previousEnabledRef = useRef(false);
   const previousWalkieEnabledRef = useRef(false);
   const previousWalkieRequestStateRef = useRef("idle");
+  const walkiePreferenceScopeRef = useRef(initialWalkiePreferenceScope);
+  const walkiePreferenceHydratingRef = useRef(false);
   const initialWalkieStateResolvedRef = useRef(false);
   const micPrepareRequestedRef = useRef(false);
   const lastStreamUpdateRef = useRef(initialData?.updatedAt || "");
@@ -300,14 +310,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
       }
 
       lastStreamUpdateRef.current = payload.updatedAt || "";
-      const liveEventType = String(payload?.match?.lastLiveEvent?.type || "");
 
       startTransition(() => {
         setData(payload);
         setStreamError("");
-        if (liveEventType === "walkie_disabled") {
-          setSpectatorWalkieEnabled(false);
-        }
       });
     },
     onError: () => {
@@ -321,6 +327,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const currentAnnouncementEventId =
     match?.lastLiveEvent?.type === "sound_effect" ? "" : currentLiveEventId;
   const isLiveMatch = Boolean(match?.isOngoing && !match?.result);
+  const walkiePreferenceScope = match?._id || sessionId || "";
   const spectatorWalkieSignalActive = Boolean(
     isLiveMatch && (spectatorWalkieEnabled || quickWalkieTalking),
   );
@@ -579,6 +586,48 @@ export default function SessionViewClient({ sessionId, initialData }) {
   }, []);
 
   useEffect(() => {
+    if (!walkiePreferenceScope) {
+      walkiePreferenceScopeRef.current = "";
+      walkiePreferenceHydratingRef.current = false;
+      return;
+    }
+
+    if (walkiePreferenceScopeRef.current === walkiePreferenceScope) {
+      return;
+    }
+
+    walkiePreferenceHydratingRef.current = true;
+    walkiePreferenceScopeRef.current = walkiePreferenceScope;
+    const savedPreference = readWalkieDevicePreference({
+      role: "spectator",
+      scopeId: walkiePreferenceScope,
+      fallback: false,
+    });
+    queueMicrotask(() => {
+      if (walkiePreferenceScopeRef.current === walkiePreferenceScope) {
+        setSpectatorWalkieEnabled(savedPreference);
+        walkiePreferenceHydratingRef.current = false;
+      }
+    });
+  }, [walkiePreferenceScope]);
+
+  useEffect(() => {
+    if (
+      !walkiePreferenceScope ||
+      walkiePreferenceScopeRef.current !== walkiePreferenceScope ||
+      walkiePreferenceHydratingRef.current
+    ) {
+      return;
+    }
+
+    writeWalkieDevicePreference({
+      role: "spectator",
+      scopeId: walkiePreferenceScope,
+      enabled: spectatorWalkieEnabled,
+    });
+  }, [spectatorWalkieEnabled, walkiePreferenceScope]);
+
+  useEffect(() => {
     if (announcerAutoReadTimerRef.current) {
       window.clearTimeout(announcerAutoReadTimerRef.current);
       announcerAutoReadTimerRef.current = null;
@@ -598,7 +647,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
     announcerInitialSummaryRef.current = "";
     announcerGestureReplayRef.current = "";
     queueMicrotask(() => {
-      setSpectatorWalkieEnabled(false);
       setLocalWalkieNotice("");
       setQuickWalkieTalking(false);
     });
@@ -623,9 +671,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
   useEffect(() => {
     if (!match?._id || !isLiveMatch) {
       initialWalkieStateResolvedRef.current = false;
-      queueMicrotask(() => {
-        setSpectatorWalkieEnabled(false);
-      });
       return;
     }
 
@@ -1107,7 +1152,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
       queueMicrotask(() => {
         setQuickWalkieTalking(false);
         setActivePanel((current) => (current === "walkie" ? null : current));
-        setSpectatorWalkieEnabled(false);
       });
       walkieHeldRef.current = false;
     }
@@ -1136,22 +1180,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
         setSpectatorWalkieEnabled(true);
         setLocalWalkieNotice("");
       });
-      speakSequenceWithDuck(
-        [
-          {
-            text: NON_UMPIRE_WALKIE_ACCEPTED_ANNOUNCEMENT,
-            pauseAfterMs: 0,
-            rate: 0.84,
-          },
-        ],
-        {
-          key: `spectator-walkie-accepted-${match?._id || sessionId || "session"}`,
-          priority: 4,
-          interrupt: true,
-          ignoreEnabled: true,
-        },
-        1800,
-      );
       return;
     }
 
@@ -1630,6 +1658,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
           ? "You are live."
           : walkiePendingRequest
             ? "Waiting for umpire approval."
+            : !walkie.snapshot?.enabled && walkieSwitchOn
+              ? "Walkie is standing by for the umpire."
             : walkie.snapshot?.enabled && walkieSwitchOn
               ? "Tap and hold to talk."
               : walkie.snapshot?.enabled

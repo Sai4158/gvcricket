@@ -144,6 +144,7 @@ export default function MatchPageClient({
   const interruptedUmpireAnnouncementQueueRef = useRef([]);
   const soundEffectPlayingRef = useRef(false);
   const shouldResumeAfterSoundEffectRef = useRef(false);
+  const walkieAnnouncementPauseActiveRef = useRef(false);
   const pendingManualScoreAnnouncementRef = useRef(null);
   const previousSoundEffectMatchIdRef = useRef(initialMatch?._id || "");
   const lastSoundEffectTriggerRef = useRef({ effectId: "", at: 0 });
@@ -207,9 +208,49 @@ export default function MatchPageClient({
     interruptAndCapture,
   } =
     useSpeechAnnouncer(umpireSettings);
+  const queueDeferredUmpireAnnouncement = useCallback((entry) => {
+    if (!entry?.items?.length) {
+      return;
+    }
+
+    const nextItems = entry.items.map((item) => ({ ...item }));
+    const nextOptions = {
+      ...(entry.options || {}),
+      priority: Number(entry.options?.priority || entry.priority || 2),
+    };
+    const existing = deferredUmpireAnnouncementRef.current;
+
+    if (!existing?.items?.length) {
+      deferredUmpireAnnouncementRef.current = {
+        items: nextItems,
+        options: nextOptions,
+      };
+      return;
+    }
+
+    deferredUmpireAnnouncementRef.current = {
+      items: [...existing.items, ...nextItems],
+      options: {
+        ...(existing.options || {}),
+        key:
+          existing.options?.key ||
+          nextOptions.key ||
+          `umpire-deferred-${Date.now()}`,
+        priority: Math.max(
+          Number(existing.options?.priority || 1),
+          Number(nextOptions.priority || 1),
+        ),
+        interrupt: true,
+        minGapMs: 0,
+      },
+    };
+  }, []);
   const resumeUmpireAnnouncementsAfterSoundEffect = useCallback(() => {
     soundEffectPlayingRef.current = false;
     activeBoundarySequenceRef.current = false;
+    if (walkieAnnouncementPauseActiveRef.current) {
+      return;
+    }
     const pendingManualScore = pendingManualScoreAnnouncementRef.current;
     const deferredAnnouncement = deferredUmpireAnnouncementRef.current;
     pendingManualScoreAnnouncementRef.current = null;
@@ -316,7 +357,7 @@ export default function MatchPageClient({
         umpireAnnouncementTimerRef.current = null;
       }
       if (pendingUmpireAnnouncementRef.current) {
-        deferredUmpireAnnouncementRef.current = pendingUmpireAnnouncementRef.current;
+        queueDeferredUmpireAnnouncement(pendingUmpireAnnouncementRef.current);
         pendingUmpireAnnouncementRef.current = null;
       }
       const interruptedQueue = interruptAndCapture();
@@ -386,6 +427,7 @@ export default function MatchPageClient({
     hasUmpireAccess: authStatus === "granted",
     displayName: "Umpire",
     autoConnectAudio: Boolean(authStatus === "granted" && isLiveMatch),
+    signalingActive: Boolean(authStatus === "granted" && isLiveMatch && match?.walkieTalkieEnabled),
   });
   const hasPendingWalkieRequests = Boolean(isLiveMatch && walkie.pendingRequests?.length);
   const umpireRemoteSpeakerState = getWalkieRemoteSpeakerState({
@@ -393,6 +435,21 @@ export default function MatchPageClient({
     participantId: walkie.participantId,
     isSelfTalking: walkie.isSelfTalking,
   });
+  const isLocalWalkieInteractionActive = Boolean(
+    walkie.claiming ||
+      walkie.preparingToTalk ||
+      walkie.updatingEnabled ||
+      walkie.isSelfTalking ||
+      walkie.isFinishing
+  );
+  const hasWalkieAudience = Boolean(
+    Number(walkie.snapshot?.spectatorCount || 0) +
+      Number(walkie.snapshot?.directorCount || 0) >
+      0
+  );
+  const isWalkieConversationActive = Boolean(
+    isLocalWalkieInteractionActive || umpireRemoteSpeakerState.isRemoteTalking
+  );
 
   useEffect(() => {
     soundEffectPlaybackCutoffRef.current = Date.now();
@@ -456,6 +513,7 @@ export default function MatchPageClient({
       activeBoundarySequenceRef.current = false;
       soundEffectPlayingRef.current = false;
       shouldResumeAfterSoundEffectRef.current = false;
+      walkieAnnouncementPauseActiveRef.current = false;
     };
   }, []);
 
@@ -480,6 +538,7 @@ export default function MatchPageClient({
       deferredUmpireAnnouncementRef.current = null;
       pendingManualScoreAnnouncementRef.current = null;
       interruptedUmpireAnnouncementQueueRef.current = [];
+      walkieAnnouncementPauseActiveRef.current = false;
       stop();
 
       if (stopEffect) {
@@ -524,8 +583,8 @@ export default function MatchPageClient({
     if (!next) return;
 
     pendingUmpireAnnouncementRef.current = null;
-    if (soundEffectPlayingRef.current) {
-      deferredUmpireAnnouncementRef.current = next;
+    if (soundEffectPlayingRef.current || walkieAnnouncementPauseActiveRef.current) {
+      queueDeferredUmpireAnnouncement(next);
       return;
     }
     if (!umpireSettings.enabled || umpireSettings.mode === "silent") {
@@ -546,14 +605,14 @@ export default function MatchPageClient({
       return;
     }
 
-    if (soundEffectPlayingRef.current) {
-      deferredUmpireAnnouncementRef.current = {
+    if (soundEffectPlayingRef.current || walkieAnnouncementPauseActiveRef.current) {
+      queueDeferredUmpireAnnouncement({
         items: sequence.items,
         options: {
           key: keyPrefix,
           priority: sequence.priority || 2,
         },
-      };
+      });
       return;
     }
 
@@ -565,7 +624,12 @@ export default function MatchPageClient({
       userGesture: true,
       interrupt: true,
     });
-  }, [speakSequence, umpireSettings.enabled, umpireSettings.mode]);
+  }, [
+    queueDeferredUmpireAnnouncement,
+    speakSequence,
+    umpireSettings.enabled,
+    umpireSettings.mode,
+  ]);
 
   const buildUmpireScorePreview = useCallback((runs, isOut = false, extraType = null) => {
     if (!match) {
@@ -890,7 +954,10 @@ export default function MatchPageClient({
       return;
     }
 
-    if (soundEffectPlayingRef.current) {
+    if (
+      soundEffectPlayingRef.current ||
+      walkieAnnouncementPauseActiveRef.current
+    ) {
       pendingManualScoreAnnouncementRef.current = {
         items: [
           {
@@ -917,6 +984,111 @@ export default function MatchPageClient({
       interrupt: true,
     });
   }, [match, soundEffectPlayingRef, speak]);
+  const pauseUmpireAnnouncementsForWalkie = useCallback(() => {
+    if (walkieAnnouncementPauseActiveRef.current) {
+      return;
+    }
+
+    walkieAnnouncementPauseActiveRef.current = true;
+    boundarySequenceVersionRef.current += 1;
+    activeBoundarySequenceRef.current = false;
+    shouldResumeAfterSoundEffectRef.current = false;
+
+    if (boundarySequenceTimerRef.current) {
+      window.clearTimeout(boundarySequenceTimerRef.current);
+      boundarySequenceTimerRef.current = null;
+    }
+
+    if (umpireAnnouncementTimerRef.current) {
+      window.clearTimeout(umpireAnnouncementTimerRef.current);
+      umpireAnnouncementTimerRef.current = null;
+    }
+
+    if (pendingUmpireAnnouncementRef.current) {
+      queueDeferredUmpireAnnouncement(pendingUmpireAnnouncementRef.current);
+      pendingUmpireAnnouncementRef.current = null;
+    }
+
+    const interruptedQueue = interruptAndCapture();
+    if (interruptedQueue?.length) {
+      interruptedUmpireAnnouncementQueueRef.current = [
+        ...interruptedUmpireAnnouncementQueueRef.current,
+        ...interruptedQueue,
+      ];
+    }
+
+    if (
+      soundEffectPlayingRef.current ||
+      activeSoundEffectStatus === "loading" ||
+      activeSoundEffectStatus === "playing"
+    ) {
+      soundEffectPlayingRef.current = false;
+      stopActiveSoundEffect();
+    }
+  }, [
+    activeSoundEffectStatus,
+    interruptAndCapture,
+    queueDeferredUmpireAnnouncement,
+    stopActiveSoundEffect,
+  ]);
+  const resumeUmpireAnnouncementsAfterWalkie = useCallback(() => {
+    if (!walkieAnnouncementPauseActiveRef.current || soundEffectPlayingRef.current) {
+      return;
+    }
+
+    walkieAnnouncementPauseActiveRef.current = false;
+    const pendingManualScore = pendingManualScoreAnnouncementRef.current;
+    pendingManualScoreAnnouncementRef.current = null;
+
+    if (!umpireSettings.enabled || umpireSettings.mode === "silent") {
+      interruptedUmpireAnnouncementQueueRef.current = [];
+      deferredUmpireAnnouncementRef.current = null;
+      return;
+    }
+
+    const resumeQueue = [
+      ...interruptedUmpireAnnouncementQueueRef.current,
+      ...(deferredUmpireAnnouncementRef.current
+        ? [deferredUmpireAnnouncementRef.current]
+        : []),
+    ];
+    interruptedUmpireAnnouncementQueueRef.current = [];
+    deferredUmpireAnnouncementRef.current = null;
+
+    if (!resumeQueue.length && !pendingManualScore?.items?.length) {
+      return;
+    }
+
+    localAnnouncementIdRef.current += 1;
+    speakSequence(
+      [
+        ...resumeQueue.flatMap((entry) => entry.items || []),
+        ...(pendingManualScore?.items || []),
+      ],
+      {
+        key: `umpire-walkie-resume-${localAnnouncementIdRef.current}`,
+        priority: Math.max(
+          ...resumeQueue.map((entry) => Number(entry.options?.priority || 1)),
+          pendingManualScore ? 4 : 1,
+        ),
+        interrupt: true,
+        minGapMs: 0,
+        userGesture: true,
+      }
+    );
+  }, [speakSequence, umpireSettings.enabled, umpireSettings.mode]);
+  useEffect(() => {
+    if (!isWalkieConversationActive) {
+      resumeUmpireAnnouncementsAfterWalkie();
+      return;
+    }
+
+    pauseUmpireAnnouncementsForWalkie();
+  }, [
+    isWalkieConversationActive,
+    pauseUmpireAnnouncementsForWalkie,
+    resumeUmpireAnnouncementsAfterWalkie,
+  ]);
 
   const stopCommentaryPlayback = useCallback(() => {
     cancelBoundarySequence({ stopEffect: true });
@@ -1663,11 +1835,11 @@ export default function MatchPageClient({
       await walkie.toggleEnabled(true);
     }
 
-    if (walkie.canTalk || walkie.snapshot?.enabled) {
-      const prepared = await walkie.prepareToTalk?.();
-      if (prepared === false) {
-        return;
-      }
+    if (!hasWalkieAudience) {
+      return;
+    }
+
+    if (walkie.canTalk) {
       await walkie.startTalking();
     }
   };
@@ -1799,7 +1971,15 @@ export default function MatchPageClient({
   const controlsDisabled =
     isUpdating || showInningsEnd || Boolean(match.result) || tossPending;
   const showCompactUmpireWalkie = Boolean(
-    !hasPendingWalkieRequests && isLiveMatch && walkie.snapshot?.enabled
+    !hasPendingWalkieRequests &&
+      isLiveMatch &&
+      (
+        walkie.snapshot?.enabled ||
+        isLocalWalkieInteractionActive ||
+        umpireRemoteSpeakerState.isRemoteTalking ||
+        walkie.recoveringAudio ||
+        walkie.recoveringSignaling
+      )
   );
 
   return (
@@ -1862,11 +2042,21 @@ export default function MatchPageClient({
                       : walkie.notice
                   }
                   onDismiss={walkie.dismissNotice}
-                  quickTalkEnabled={!umpireRemoteSpeakerState.isRemoteTalking}
+                  quickTalkEnabled={Boolean(
+                    !umpireRemoteSpeakerState.isRemoteTalking &&
+                      (
+                        hasWalkieAudience ||
+                        walkie.claiming ||
+                        walkie.preparingToTalk ||
+                        walkie.isSelfTalking ||
+                        walkie.isFinishing
+                      )
+                  )}
                   quickTalkActive={walkie.isSelfTalking}
                   quickTalkPending={Boolean(
                     walkie.claiming ||
                       walkie.preparingToTalk ||
+                      walkie.updatingEnabled ||
                       walkie.recoveringAudio ||
                       walkie.recoveringSignaling
                   )}
@@ -1878,7 +2068,9 @@ export default function MatchPageClient({
                   onQuickTalkStop={walkie.stopTalking}
                 />
               </div>
-            ) : !hasPendingWalkieRequests && walkie.notice && walkie.snapshot?.enabled ? (
+            ) : !hasPendingWalkieRequests &&
+              walkie.notice &&
+              walkie.snapshot?.enabled ? (
               <section className="mb-4 rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.98),rgba(10,10,14,0.98))] p-4 shadow-[0_20px_70px_rgba(0,0,0,0.35)]">
                 <div className="mb-3 flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3">
@@ -1993,7 +2185,9 @@ export default function MatchPageClient({
             onMic={() => setModal({ type: "mic" })}
             onShare={handleCopyShareLink}
             onWalkiePressStart={
-              umpireRemoteSpeakerState.isRemoteTalking ? undefined : walkie.prepareToTalk
+              umpireRemoteSpeakerState.isRemoteTalking || !hasWalkieAudience
+                ? undefined
+                : walkie.prepareToTalk
             }
             onWalkieHoldStart={
               umpireRemoteSpeakerState.isRemoteTalking ? undefined : handleWalkieHoldStart
