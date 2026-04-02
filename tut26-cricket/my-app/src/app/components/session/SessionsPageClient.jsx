@@ -26,6 +26,7 @@ import InfoModal from "./InfoModal";
 import PinModal from "./PinModal";
 import LoadingButton from "../shared/LoadingButton";
 import PendingLink from "../shared/PendingLink";
+import SiteFooter from "../shared/SiteFooter";
 import SessionCard from "./SessionCard";
 import LiquidSportText from "../home/LiquidSportText";
 import ImagePinModal from "../shared/ImagePinModal";
@@ -848,7 +849,7 @@ export default function SessionsPageClient({
 
   if (!sessions.length) {
     return (
-      <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_22%),radial-gradient(circle_at_82%_14%,rgba(14,165,233,0.1),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.08),transparent_20%),linear-gradient(180deg,#16181d_0%,#090a0f_100%)] px-5 py-8 text-zinc-100">
+      <main id="top" className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_22%),radial-gradient(circle_at_82%_14%,rgba(14,165,233,0.1),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.08),transparent_20%),linear-gradient(180deg,#16181d_0%,#090a0f_100%)] px-5 py-8 text-zinc-100">
         <div className="mx-auto flex min-h-[80vh] max-w-4xl items-center justify-center">
           <EmptyState
             title="No sessions yet"
@@ -857,12 +858,14 @@ export default function SessionsPageClient({
             label="Create session"
           />
         </div>
+        <SiteFooter />
       </main>
     );
   }
 
   return (
     <main
+      id="top"
       className={`min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_20%),radial-gradient(circle_at_86%_10%,rgba(14,165,233,0.1),transparent_20%),radial-gradient(circle_at_16%_88%,rgba(16,185,129,0.08),transparent_20%),linear-gradient(180deg,#1b1d23_0%,#09090d_100%)] px-4 pb-10 text-zinc-100 sm:px-6 lg:px-8 ${
         selectionMode ? "pt-28 sm:pt-32" : "pt-6"
       }`}
@@ -1416,6 +1419,7 @@ export default function SessionsPageClient({
           />
         ) : null}
       </AnimatePresence>
+      <SiteFooter className="mt-16" />
     </main>
   );
 }

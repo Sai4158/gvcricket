@@ -20,6 +20,7 @@ import EnhancedScorecard from "./EnhancedScorecard";
 import PlayerLists from "./PlayerLists";
 import ResultInsightsSections from "./ResultInsightsSections";
 import PlayerStatsSection from "./PlayerStatsSection";
+import SiteFooter from "../shared/SiteFooter";
 
 const RunsPerOverChart = dynamic(() => import("./RunsPerOverChart"), {
   ssr: false,
@@ -89,7 +90,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
 
   if (streamError) {
     return (
-      <main className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <main id="top" className="min-h-screen bg-zinc-950 flex items-center justify-center">
         <div className="text-center text-red-400">{streamError}</div>
       </main>
     );
@@ -97,7 +98,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
 
   if (!match) {
     return (
-      <main className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <main id="top" className="min-h-screen bg-zinc-950 flex items-center justify-center">
         <div className="text-lg font-medium">Loading Match Results...</div>
       </main>
     );
@@ -113,7 +114,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-950 p-4 sm:p-8 text-zinc-300 font-sans">
+    <main id="top" className="min-h-screen bg-zinc-950 p-4 sm:p-8 text-zinc-300 font-sans">
       <div className="max-w-5xl mx-auto space-y-12 py-10">
         <div className="flex justify-start">
           <LoadingButton
@@ -273,7 +274,9 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           />
         </section>
 
-        <footer className="text-center pt-8 border-t border-white/10">
+      </div>
+      <SiteFooter
+        action={
           <LoadingButton
             onClick={handleOpenSessions}
             loading={isLeavingToSessions}
@@ -282,8 +285,8 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           >
             View All Match History
           </LoadingButton>
-        </footer>
-      </div>
+        }
+      />
       <AnimatePresence>
         {isImageManagerOpen ? (
           <ModalBase

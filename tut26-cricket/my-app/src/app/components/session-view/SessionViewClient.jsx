@@ -55,6 +55,7 @@ import { buildShareUrl } from "../../lib/site-metadata";
 import { ModalBase } from "../match/MatchBaseModals";
 import LoadingButton from "../shared/LoadingButton";
 import OptionalFeatureBoundary from "../shared/OptionalFeatureBoundary";
+import SiteFooter from "../shared/SiteFooter";
 import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
 
 function DualWalkieIcon() {
@@ -1833,7 +1834,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         ];
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white font-sans p-4 pb-10 flex flex-col items-center">
+    <main id="top" className="min-h-screen bg-zinc-950 text-white font-sans p-4 pb-10 flex flex-col items-center">
       <div className="w-full max-w-4xl mt-4 mb-2 grid grid-cols-[auto_1fr_auto] items-center gap-3 px-1">
         <LoadingButton
           onClick={handleBackToSessions}
@@ -2386,6 +2387,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         </OptionalFeatureBoundary>
       ) : null}
       <audio ref={soundEffectsAudioRef} hidden />
+      <SiteFooter className="mt-16" />
     </main>
   );
 }

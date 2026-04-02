@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import LiquidSportText from "./components/home/LiquidSportText";
+import SiteFooter from "./components/shared/SiteFooter";
 
 // Define animation variants for staggered appearance
 const containerVariants = {
@@ -31,7 +32,10 @@ const MotionLink = motion.create(Link);
 
 export default function NotFound() {
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,rgba(127,29,29,0.22),transparent_24%),linear-gradient(180deg,#09090b_0%,#000000_100%)] p-4 text-center">
+    <div
+      id="top"
+      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,rgba(127,29,29,0.22),transparent_24%),linear-gradient(180deg,#09090b_0%,#000000_100%)] p-4 text-center"
+    >
       <div
         className="absolute inset-0 z-0 opacity-10"
         style={{
@@ -104,6 +108,7 @@ export default function NotFound() {
           404
         </motion.p>
       </motion.div>
+      <SiteFooter showBackToTop={false} className="relative z-10 mt-14" />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import SiteFooter from "../shared/SiteFooter";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FaBroadcastTower, FaEllipsisV } from "react-icons/fa";
@@ -2163,7 +2164,7 @@ export default function MatchPageClient({
 
   return (
     <>
-      <main className="min-h-screen font-sans bg-zinc-950 text-white p-4">
+      <main id="top" className="min-h-screen font-sans bg-zinc-950 text-white p-4">
         <div className="max-w-md mx-auto pt-8 pb-24">
           <MatchHeroBackdrop match={match} className="mb-5">
             <div className="relative px-5 pt-6 pb-5">
@@ -2396,6 +2397,7 @@ export default function MatchPageClient({
             data-gv-umpire-effects-player="true"
           />
         </div>
+        <SiteFooter />
       </main>
       <OptionalFeatureBoundary label="Optional match tools unavailable right now.">
         <MatchModalLayer
