@@ -8,12 +8,14 @@ import {
   FaEdit,
   FaPause,
   FaPlay,
+  FaSearch,
   FaTimes,
 } from "react-icons/fa";
 import {
   RANDOM_SCORE_EFFECT_ID,
   SCORE_SOUND_EFFECT_EVENTS,
 } from "../../lib/score-sound-effects";
+import { filterSoundEffectsByQuery } from "../../lib/sound-effects-client";
 import {
   getScoreControlToneClasses,
   scoreControlFont,
@@ -167,6 +169,13 @@ function SoundPickerSheet({
   onPreview,
   onSelect,
 }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const visibleOptions = useMemo(
+    () => filterSoundEffectsByQuery(options, searchQuery),
+    [options, searchQuery],
+  );
+  const hasSearchQuery = Boolean(String(searchQuery || "").trim());
+
   return (
     <AnimatePresence>
       {isOpen ? (
@@ -195,10 +204,41 @@ function SoundPickerSheet({
               </button>
             </div>
 
-            <div
-              className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1"
-              style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
-            >
+            <div className="mt-4 min-h-0 flex-1 space-y-3">
+              {options.length ? (
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/45">
+                    <FaSearch className="text-xs" />
+                  </span>
+                  <input
+                    type="search"
+                    inputMode="search"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Search sounds"
+                    className="w-full rounded-[20px] border border-white/10 bg-[rgba(18,18,24,0.96)] py-3 pl-10 pr-11 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-emerald-300/24 focus:bg-white/[0.05]"
+                    aria-label={`Search ${eventLabel} sounds`}
+                  />
+                  {hasSearchQuery ? (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-300 transition hover:bg-white/[0.1]"
+                      aria-label="Clear sound search"
+                    >
+                      <FaTimes className="text-xs" />
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div
+                className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1"
+                style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
+              >
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.95, y: 2 }}
@@ -234,7 +274,7 @@ function SoundPickerSheet({
                 ) : null}
               </motion.button>
 
-              {options.map((option) => {
+              {visibleOptions.map((option) => {
                 const isSelected = selectedId === option.id;
                 const isPreviewing = previewingId === option.id;
 
@@ -296,6 +336,12 @@ function SoundPickerSheet({
                   </div>
                 );
               })}
+              {!visibleOptions.length && hasSearchQuery ? (
+                <div className="rounded-[20px] border border-white/8 bg-[rgba(18,18,24,0.96)] px-4 py-4 text-sm text-white/68">
+                  No sounds match &quot;{searchQuery.trim()}&quot;.
+                </div>
+              ) : null}
+              </div>
             </div>
           </div>
         </motion.div>
@@ -530,6 +576,7 @@ export default function ScoreSoundEffectsEditor({
       ) : null}
 
       <SoundPickerSheet
+        key={`${editingEvent?.key || "closed"}:${Boolean(editingEvent)}`}
         isOpen={Boolean(editingEvent)}
         eventLabel={editingEvent?.label || "Sound"}
         options={soundEffectOptions}
