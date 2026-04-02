@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { EMPTY_SCORE_SOUND_EFFECT_MAP } from "../../lib/score-sound-effects";
 
 const SETTINGS_VERSION = 11;
@@ -223,39 +223,42 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
     }
   }, [rawValue, role, settings]);
 
-  const updateSetting = (key, value) => {
-    if (typeof window === "undefined") {
-      return;
-    }
+  const updateSetting = useCallback(
+    (key, value) => {
+      if (typeof window === "undefined") {
+        return;
+      }
 
-    try {
-      if (key === "enabled") {
-        window.sessionStorage.setItem(
-          getEnabledStorageKey(role, scopeKey),
-          value ? "true" : "false"
-        );
+      try {
+        if (key === "enabled") {
+          window.sessionStorage.setItem(
+            getEnabledStorageKey(role, scopeKey),
+            value ? "true" : "false"
+          );
+          window.dispatchEvent(
+            new CustomEvent("gv-announcer-change", {
+              detail: { role, scopeKey },
+            })
+          );
+          return;
+        }
+
+        const nextSettings = {
+          ...persistedSettings,
+          [key]: value,
+        };
+        persistSettings(role, nextSettings);
         window.dispatchEvent(
           new CustomEvent("gv-announcer-change", {
             detail: { role, scopeKey },
           })
         );
-        return;
+      } catch (error) {
+        console.error("Failed to save announcer settings:", error);
       }
-
-      const nextSettings = {
-        ...persistedSettings,
-        [key]: value,
-      };
-      persistSettings(role, nextSettings);
-      window.dispatchEvent(
-        new CustomEvent("gv-announcer-change", {
-          detail: { role, scopeKey },
-        })
-      );
-    } catch (error) {
-      console.error("Failed to save announcer settings:", error);
-    }
-  };
+    },
+    [persistedSettings, role, scopeKey]
+  );
 
   return {
     settings,

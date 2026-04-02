@@ -217,6 +217,7 @@ export default function MatchPageClient({
   const lastPersistedAnnouncerSettingsRef = useRef("");
   const lastPersistedScoreSoundEffectMapRef = useRef("");
   const scoreSoundEffectMapSyncReadyRef = useRef(false);
+  const currentScoreSoundEffectMapSignatureRef = useRef("");
   const contentStartRef = useRef(null);
   const announcementDuckRef = useRef([]);
   const announcementRestoreTimerRef = useRef(null);
@@ -622,6 +623,10 @@ export default function MatchPageClient({
       ),
     [umpireSettings.scoreSoundEffectMap]
   );
+
+  useEffect(() => {
+    currentScoreSoundEffectMapSignatureRef.current = scoreSoundEffectMapSignature;
+  }, [scoreSoundEffectMapSignature]);
   const liveUpdatedLabel = useLiveRelativeTime(lastUpdatedAt);
   const isLiveMatch = Boolean(match?.isOngoing && !match?.result);
   const tossPending = Boolean(match && !match.tossReady);
@@ -2168,7 +2173,7 @@ export default function MatchPageClient({
         lastPersistedScoreSoundEffectMapRef.current = remoteSignature;
         if (
           hasAssignedScoreSoundEffectMap(remoteScoreSoundEffectMap) &&
-          remoteSignature !== scoreSoundEffectMapSignature
+          remoteSignature !== currentScoreSoundEffectMapSignatureRef.current
         ) {
           updateUmpireSetting("scoreSoundEffectMap", remoteScoreSoundEffectMap);
         }
@@ -2188,7 +2193,6 @@ export default function MatchPageClient({
     authStatus,
     match?._id,
     matchId,
-    scoreSoundEffectMapSignature,
     updateUmpireSetting,
   ]);
 
