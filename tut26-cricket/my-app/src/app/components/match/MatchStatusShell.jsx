@@ -212,6 +212,8 @@ export function Scoreboard({ match, history }) {
   const battingTeam = getBattingTeamBundle(match);
   const ballsLeft = Math.max(Number(match?.overs || 0) * 6 - legalBalls, 0);
   const stripClasses = getBattingStripClasses(battingTeam);
+  const statNumberWrapClassName =
+    "flex min-h-[5.75rem] items-end justify-center sm:min-h-[6.5rem]";
 
   return (
     <div className="relative grid grid-cols-2 gap-4 text-center bg-zinc-900/50 p-4 rounded-2xl ring-1 ring-white/10">
@@ -220,7 +222,7 @@ export function Scoreboard({ match, history }) {
       />
       <div className="flex flex-col items-center justify-center">
         <div
-          className={`${scoreboardDisplayFont.className} font-bold tabular-nums [font-variant-numeric:tabular-nums]`}
+          className={`${scoreboardDisplayFont.className} ${statNumberWrapClassName} font-bold tabular-nums [font-variant-numeric:tabular-nums]`}
         >
           <span className="inline-flex items-baseline justify-center">
             <span className="text-8xl text-emerald-400 sm:text-9xl">
@@ -233,17 +235,22 @@ export function Scoreboard({ match, history }) {
           </span>
         </div>
         <div className="text-zinc-100 text-sm uppercase tracking-wider">
-          Score / Wickets <strong>({battingTeam.players.length})</strong>
+          <span className="block">Score / Wickets</span>
+          <strong className="block">({battingTeam.players.length})</strong>
         </div>
       </div>
       <div className="flex flex-col items-center justify-center">
         <div
-          className={`${scoreboardDisplayFont.className} text-7xl font-bold text-white tabular-nums [font-variant-numeric:tabular-nums] sm:text-8xl`}
+          className={`${scoreboardDisplayFont.className} ${statNumberWrapClassName} text-7xl font-bold leading-none text-white tabular-nums [font-variant-numeric:tabular-nums] sm:text-8xl`}
         >
-          <span>{oversDisplay}</span>
+          <span className="inline-flex items-baseline justify-center">
+            {oversDisplay}
+          </span>
         </div>
         <div className="text-zinc-100 text-sm uppercase tracking-wider">
-          Overs <strong>({match.overs})</strong>
+          <span>
+            Overs <strong>({match.overs})</strong>
+          </span>
           <strong className="block">({ballsLeft})</strong>
         </div>
       </div>
