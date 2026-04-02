@@ -414,8 +414,8 @@ export default function MatchActionGrid({
       <div className="mt-8 flex justify-center border-t border-zinc-700 pt-6">
         <div className="space-y-5">
           <div className="flex items-center justify-center gap-2">
-            <p className="text-center text-[12px] text-white">
-              Enable live controls first. Hold enabled controls to talk or read.
+            <p className="max-w-[16rem] text-center text-[12px] font-medium leading-5 text-zinc-200">
+              Turn live tools on, then hold to talk or read.
             </p>
             <button
               type="button"
@@ -442,6 +442,14 @@ export default function MatchActionGrid({
               colorClass="text-emerald-300"
               active={isWalkieActive}
               talking={isWalkieTalking}
+              badge={isWalkieTalking ? "Live" : isWalkieActive ? "On" : "Off"}
+              badgeClass={
+                isWalkieTalking
+                  ? "border-cyan-400/30 bg-cyan-500/15 text-cyan-100"
+                  : isWalkieActive
+                  ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
+                  : "border-rose-400/20 bg-rose-500/10 text-rose-200"
+              }
               statusText={
                 isWalkieTalking
                   ? "Live on"
@@ -455,7 +463,7 @@ export default function MatchActionGrid({
                   ? "Hold to talk"
                   : isWalkieActive
                   ? "Open panel"
-                  : "Enable first"
+                  : ""
               }
               statusClass={
                 isWalkieTalking
@@ -521,7 +529,7 @@ export default function MatchActionGrid({
                   ? "Live on"
                   : isCommentaryActive && canHoldMic
                   ? "Hold to talk"
-                  : "Enable first"
+                  : ""
               }
               statusClass={
                 isCommentaryTalking
