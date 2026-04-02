@@ -11,6 +11,7 @@ import {
   FaVolumeUp,
 } from "react-icons/fa";
 import DarkSelect from "../shared/DarkSelect";
+import ModalGradientTitle from "../shared/ModalGradientTitle";
 import ScoreSoundEffectsEditor from "./ScoreSoundEffectsEditor";
 
 const MODES = [
@@ -140,9 +141,11 @@ export default function AnnouncementControls({
                 <FaCompactDisc />
               </div>
               <div className="min-w-0">
-                <h3 className="text-[1.65rem] font-black tracking-[-0.03em] text-white">
-                  {title}
-                </h3>
+                <ModalGradientTitle
+                  as="h3"
+                  text={title}
+                  className="text-[1.65rem]"
+                />
                 <p className="mt-1 text-sm text-zinc-400">
                   Clean score commentary and sound controls.
                 </p>
@@ -305,9 +308,7 @@ export default function AnnouncementControls({
             {headerIcon}
           </div>
           <div>
-            <h3 className="text-xl font-black tracking-[-0.02em] text-white">
-              {title}
-            </h3>
+            <ModalGradientTitle as="h3" text={title} className="text-xl" />
           </div>
         </div>
         {isModal ? (

@@ -8,6 +8,7 @@ import {
   FaVolumeUp,
 } from "react-icons/fa";
 import { ModalBase } from "../match/MatchBaseModals";
+import ModalGradientTitle from "../shared/ModalGradientTitle";
 import useLocalMicMonitor from "./useLocalMicMonitor";
 
 function IosSwitch({ checked, onChange, disabled = false, label }) {
@@ -86,9 +87,11 @@ export default function LiveMicModal({
     <ModalBase title="" onExit={onClose} hideHeader>
       <div className="space-y-4 text-left">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-[1.7rem] font-black tracking-[-0.03em] text-white">
-            Live Commentary
-          </h2>
+          <ModalGradientTitle
+            as="h2"
+            text="Live Commentary"
+            className="text-[1.7rem]"
+          />
           <div className="flex items-center gap-3">
             <IosSwitch
               checked={isActive}

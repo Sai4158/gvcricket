@@ -20,6 +20,7 @@ import {
   getScoreControlToneClasses,
   scoreControlFont,
 } from "../match/score-control-theme";
+import ModalGradientTitle from "../shared/ModalGradientTitle";
 const KEYPAD_BUTTON_BASE =
   "press-feedback rounded-2xl font-bold shadow-[0_16px_28px_rgba(0,0,0,0.28)] transition active:scale-[0.97]";
 
@@ -245,7 +246,11 @@ function SoundPickerSheet({
           >
             <div className="flex items-start justify-between gap-3 border-b border-white/8 pb-3">
               <div className="min-w-0">
-                <h4 className="text-lg font-black text-white">{eventLabel}</h4>
+                <ModalGradientTitle
+                  as="h4"
+                  text={eventLabel}
+                  className="text-lg"
+                />
                 <p className="mt-1 text-xs text-white/70">
                   Select a sound
                 </p>

@@ -10,6 +10,7 @@ import {
 } from "react-icons/fa";
 import { getWalkieRemoteSpeakerState, getWalkieRoleLabel } from "../../lib/walkie-ui";
 import LiquidLoader from "../shared/LiquidLoader";
+import ModalGradientTitle from "../shared/ModalGradientTitle";
 
 function WalkieInlineTalkButton({
   active = false,
@@ -648,9 +649,11 @@ export default function WalkiePanel({
               <FaPhoneVolume />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">
-                {isUmpire ? "Walkie-Talkie" : "Push to Talk"}
-              </h3>
+              <ModalGradientTitle
+                as="h3"
+                text={isUmpire ? "Walkie-Talkie" : "Push to Talk"}
+                className="text-lg"
+              />
               <p className="mt-1 text-sm text-zinc-400">{statusText}</p>
               {snapshot?.enabled && safeActiveSpeakerLabelText && !isSelfTalking ? (
                 <>

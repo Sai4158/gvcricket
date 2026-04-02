@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { FaTimes } from "react-icons/fa";
 import LiquidSportText from "../home/LiquidSportText";
 import LoadingButton from "../shared/LoadingButton";
+import ModalGradientTitle from "../shared/ModalGradientTitle";
 import { Ball, buildBallSlotLabels } from "./MatchBallHistory";
 import MatchImageUploader from "./MatchImageUploader";
 import { countLegalBalls } from "../../lib/match-scoring";
@@ -56,11 +57,9 @@ export function ModalBase({
       >
         {!hideHeader ? (
           <div className="sticky top-0 z-10 border-b border-white/6 bg-zinc-900/95 px-5 pb-3 pt-5 backdrop-blur">
-            <LiquidSportText
+            <ModalGradientTitle
               as="h2"
               text={String(title || "").toUpperCase()}
-              variant="hero-bright"
-              simplifyMotion
               className="text-center text-2xl font-bold"
             />
           </div>

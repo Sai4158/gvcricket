@@ -12,6 +12,7 @@ import {
   FaUserEdit,
 } from "react-icons/fa";
 import { LuUndo2 } from "react-icons/lu";
+import ModalGradientTitle from "../shared/ModalGradientTitle";
 
 function WalkieIcon() {
   return (
@@ -648,9 +649,11 @@ export default function MatchActionGrid({
               </motion.div>
               <div className="flex items-start justify-between gap-4 border-b border-white/8 px-4 py-4 sm:px-5">
                 <div>
-                  <h3 className="text-lg font-black tracking-[-0.02em] text-white">
-                    Action Icons
-                  </h3>
+                  <ModalGradientTitle
+                    as="h3"
+                    text="Action Icons"
+                    className="text-lg"
+                  />
                   <p className="mt-1 text-xs text-zinc-400">
                     Ranked by common umpire use.
                   </p>

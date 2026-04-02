@@ -12,6 +12,7 @@ import {
   FaTrash,
 } from "react-icons/fa";
 import LoadingButton from "../shared/LoadingButton";
+import ModalGradientTitle from "../shared/ModalGradientTitle";
 import { verifyImageActionPin } from "../../lib/image-pin-client";
 import { getImagePinPromptConfig } from "../../lib/image-pin-policy";
 import {
@@ -284,9 +285,7 @@ function DiscardChangesPrompt({
             <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500/12 text-lg text-rose-200">
               <FaTrash />
             </div>
-            <h3 className="text-xl font-black tracking-tight text-white">
-              {title}
-            </h3>
+            <ModalGradientTitle as="h3" text={title} className="text-xl" />
             <p className="mt-2 text-sm leading-6 text-zinc-400">
               {description}
             </p>
@@ -342,9 +341,11 @@ function DeleteImagePrompt({
             <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500/12 text-lg text-rose-200">
               <FaTrash />
             </div>
-            <h3 className="text-xl font-black tracking-tight text-white">
-              Delete this image?
-            </h3>
+            <ModalGradientTitle
+              as="h3"
+              text="Delete this image?"
+              className="text-xl"
+            />
             <p className="mt-2 text-sm leading-6 text-zinc-400">
               Image {imageIndex > 0 ? `#${imageIndex}` : ""} will be removed from
               the gallery.
@@ -1049,7 +1050,7 @@ export default function MatchImageUploader({
             <FaImage />
           </div>
           <div className="min-w-0">
-            <h3 className="text-lg font-semibold text-white">{title}</h3>
+            <ModalGradientTitle as="h3" text={title} className="text-lg" />
           </div>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
@@ -1254,9 +1255,11 @@ export default function MatchImageUploader({
                 <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-400/12 text-xl text-amber-300 shadow-[0_12px_24px_rgba(245,158,11,0.12)]">
                   <FaShieldAlt />
                 </div>
-                <h3 className="text-2xl font-black tracking-tight text-white">
-                  {protectedPinConfig.title}
-                </h3>
+                <ModalGradientTitle
+                  as="h3"
+                  text={protectedPinConfig.title}
+                  className="text-2xl"
+                />
                 <p className="mt-2 max-w-xs text-sm leading-6 text-zinc-400">
                   {protectedPinConfig.description}
                 </p>
