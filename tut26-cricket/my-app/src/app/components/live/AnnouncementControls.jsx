@@ -246,7 +246,7 @@ export default function AnnouncementControls({
                     <FaVolumeUp className="text-xs" />
                   )}
                 </span>
-                <span>{announceIsActive ? "Pause Score" : announceLabel}</span>
+                <span>{announceIsActive ? "Stop Audio" : announceLabel}</span>
               </button>
             ) : null}
             <button

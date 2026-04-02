@@ -188,7 +188,7 @@ export function MatchHeader({
         <button
           type="button"
           onClick={onAnnounceScore}
-          aria-label={announceIsActive ? "Stop score announcement" : "Announce current score"}
+          aria-label={announceIsActive ? "Stop current audio" : "Announce current score"}
           className={`absolute bottom-0 right-0 inline-flex h-11 w-11 items-center justify-center rounded-[18px] border text-white transition-all active:scale-[0.94] ${
             announceIsActive
               ? "border-white/50 bg-[linear-gradient(145deg,rgba(20,24,34,0.98),rgba(8,12,18,0.98))] text-white shadow-[0_0_0_1px_rgba(255,255,255,0.26),0_0_22px_rgba(255,255,255,0.34),0_0_42px_rgba(255,255,255,0.16),inset_0_1px_0_rgba(255,255,255,0.16)]"

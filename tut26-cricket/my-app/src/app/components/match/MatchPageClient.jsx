@@ -1562,10 +1562,7 @@ export default function MatchPageClient({
   );
 
   const handleCommentaryReadScoreAction = useCallback(() => {
-    if (
-      activeCommentaryAction === "read-score" &&
-      (status === "speaking" || isAnySoundEffectActive)
-    ) {
+    if (status === "speaking" || isAnySoundEffectActive) {
       stopCommentaryPlayback();
       return;
     }
@@ -1573,7 +1570,6 @@ export default function MatchPageClient({
     setActiveCommentaryAction("read-score");
     handleManualScoreAnnouncement();
   }, [
-    activeCommentaryAction,
     handleManualScoreAnnouncement,
     isAnySoundEffectActive,
     status,
@@ -1598,30 +1594,28 @@ export default function MatchPageClient({
     stopCommentaryPlayback,
   ]);
   const handleHeroReadScoreAction = useCallback(() => {
+    const isPlaybackActive = status === "speaking" || isAnySoundEffectActive;
+
+    if (isPlaybackActive) {
+      stopCommentaryPlayback();
+      return;
+    }
+
     ensureUmpireScoreFeedbackEnabled();
     void prime({ userGesture: true });
-
-    const isStoppingCurrentRead =
-      activeCommentaryAction === "read-score" &&
-      (status === "speaking" || isAnySoundEffectActive);
-
     handleCommentaryReadScoreAction();
-
-    if (!isStoppingCurrentRead) {
-      void broadcastManualScoreAnnouncement();
-    }
+    void broadcastManualScoreAnnouncement();
   }, [
-    activeCommentaryAction,
     broadcastManualScoreAnnouncement,
     ensureUmpireScoreFeedbackEnabled,
     handleCommentaryReadScoreAction,
     isAnySoundEffectActive,
     prime,
     status,
+    stopCommentaryPlayback,
   ]);
   const isReadScoreActionActive =
-    activeCommentaryAction === "read-score" &&
-    (status === "speaking" || isAnySoundEffectActive);
+    status === "speaking" || isAnySoundEffectActive;
   const isTestSequenceActionActive =
     activeCommentaryAction === "test-sequence" &&
     (status === "speaking" || isAnySoundEffectActive);
