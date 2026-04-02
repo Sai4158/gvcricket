@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FaCheck,
   FaChevronRight,
@@ -176,6 +176,48 @@ function SoundPickerSheet({
   );
   const hasSearchQuery = Boolean(String(searchQuery || "").trim());
 
+  useEffect(() => {
+    if (
+      !isOpen ||
+      typeof window === "undefined" ||
+      typeof document === "undefined"
+    ) {
+      return undefined;
+    }
+
+    const scrollY = window.scrollY;
+    const htmlStyle = document.documentElement.style;
+    const bodyStyle = document.body.style;
+    const previousStyles = {
+      htmlOverflow: htmlStyle.overflow,
+      htmlOverscrollBehavior: htmlStyle.overscrollBehavior,
+      bodyOverflow: bodyStyle.overflow,
+      bodyPosition: bodyStyle.position,
+      bodyTop: bodyStyle.top,
+      bodyWidth: bodyStyle.width,
+      bodyOverscrollBehavior: bodyStyle.overscrollBehavior,
+    };
+
+    htmlStyle.overflow = "hidden";
+    htmlStyle.overscrollBehavior = "none";
+    bodyStyle.overflow = "hidden";
+    bodyStyle.position = "fixed";
+    bodyStyle.top = `-${scrollY}px`;
+    bodyStyle.width = "100%";
+    bodyStyle.overscrollBehavior = "none";
+
+    return () => {
+      htmlStyle.overflow = previousStyles.htmlOverflow;
+      htmlStyle.overscrollBehavior = previousStyles.htmlOverscrollBehavior;
+      bodyStyle.overflow = previousStyles.bodyOverflow;
+      bodyStyle.position = previousStyles.bodyPosition;
+      bodyStyle.top = previousStyles.bodyTop;
+      bodyStyle.width = previousStyles.bodyWidth;
+      bodyStyle.overscrollBehavior = previousStyles.bodyOverscrollBehavior;
+      window.scrollTo(0, scrollY);
+    };
+  }, [isOpen]);
+
   return (
     <AnimatePresence>
       {isOpen ? (
@@ -183,10 +225,24 @@ function SoundPickerSheet({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="absolute inset-0 z-20 rounded-[28px] bg-[linear-gradient(180deg,rgba(10,10,14,0.96),rgba(4,4,8,0.98))] p-4 backdrop-blur-md"
+          className="fixed inset-0 z-[160] flex items-center justify-center bg-black/72 p-4 backdrop-blur-sm sm:p-6"
           style={{ touchAction: "pan-y" }}
+          onClick={onClose}
         >
-          <div className="flex h-full min-h-0 flex-col rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,15,20,0.98),rgba(6,6,10,1))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <motion.div
+            initial={{ opacity: 0, y: 18, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="flex max-h-[calc(100dvh-12rem)] w-full max-w-[700px] min-h-0 flex-col overflow-y-auto overscroll-contain rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,15,20,0.98),rgba(6,6,10,1))] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.04)] sm:max-h-[64vh] sm:p-5"
+            style={{
+              touchAction: "pan-y",
+              overscrollBehavior: "contain",
+              scrollbarGutter: "stable",
+              WebkitOverflowScrolling: "touch",
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-start justify-between gap-3 border-b border-white/8 pb-3">
               <div className="min-w-0">
                 <h4 className="text-lg font-black text-white">{eventLabel}</h4>
@@ -235,115 +291,112 @@ function SoundPickerSheet({
                 </div>
               ) : null}
 
-              <div
-                className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1"
-                style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
-              >
-              <motion.button
-                type="button"
-                whileTap={{ scale: 0.95, y: 2 }}
-                onClick={() => onSelect("")}
-                className={`${KEYPAD_BUTTON_BASE} flex w-full items-center justify-between border px-4 py-4 text-left ${
-                  !selectedId
-                    ? "border-white/16 bg-[linear-gradient(180deg,rgba(56,56,62,0.98),rgba(30,30,34,1))] text-white ring-1 ring-white/10"
-                    : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
-                }`}
-              >
-                <p className="text-sm uppercase tracking-[0.16em]">None</p>
-                {!selectedId ? <FaCheck className="text-white" /> : null}
-              </motion.button>
+              <div className="space-y-2 pr-1">
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.95, y: 2 }}
+                  onClick={() => onSelect("")}
+                  className={`${KEYPAD_BUTTON_BASE} flex w-full items-center justify-between border px-4 py-4 text-left ${
+                    !selectedId
+                      ? "border-white/16 bg-[linear-gradient(180deg,rgba(56,56,62,0.98),rgba(30,30,34,1))] text-white ring-1 ring-white/10"
+                      : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
+                  }`}
+                >
+                  <p className="text-sm uppercase tracking-[0.16em]">None</p>
+                  {!selectedId ? <FaCheck className="text-white" /> : null}
+                </motion.button>
 
-              <motion.button
-                type="button"
-                whileTap={{ scale: 0.95, y: 2 }}
-                onClick={() => onSelect(RANDOM_SCORE_EFFECT_ID)}
-                className={`${KEYPAD_BUTTON_BASE} flex w-full items-center justify-between border px-4 py-4 text-left ${
-                  selectedId === RANDOM_SCORE_EFFECT_ID
-                    ? "border-white/16 bg-[linear-gradient(180deg,rgba(56,56,62,0.98),rgba(30,30,34,1))] text-white ring-1 ring-white/10"
-                    : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
-                }`}
-              >
-                <div className="min-w-0">
-                  <p className="text-sm uppercase tracking-[0.16em]">Random</p>
-                  <p className="mt-1 text-xs text-white/75">
-                    Use a random sound
-                  </p>
-                </div>
-                {selectedId === RANDOM_SCORE_EFFECT_ID ? (
-                  <FaCheck className="text-white" />
-                ) : null}
-              </motion.button>
-
-              {visibleOptions.map((option) => {
-                const isSelected = selectedId === option.id;
-                const isPreviewing = previewingId === option.id;
-
-                return (
-                  <div
-                    key={option.id}
-                    className="grid grid-cols-[52px_1fr] items-center gap-3"
-                  >
-                    <motion.button
-                      type="button"
-                      whileTap={{ scale: 0.95, y: 2 }}
-                      onClick={() => onPreview(option)}
-                      className={`${KEYPAD_BUTTON_BASE} inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center border ${
-                        isPreviewing ? "ring-2 ring-white/18" : ""
-                      } ${
-                        isPreviewing
-                          ? "border-white/16 bg-[linear-gradient(180deg,rgba(56,56,62,0.98),rgba(30,30,34,1))] text-white"
-                          : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
-                      }`}
-                      aria-label={`${isPreviewing ? "Pause" : "Preview"} ${option.label}`}
-                    >
-                      {isPreviewing ? (
-                        <FaPause className="text-xs" />
-                      ) : (
-                        <FaPlay className="text-xs" />
-                      )}
-                    </motion.button>
-                    <motion.button
-                      type="button"
-                      whileTap={{ scale: 0.97, y: 2 }}
-                      onClick={() => onSelect(option.id)}
-                      className={`${KEYPAD_BUTTON_BASE} flex min-w-0 items-center justify-between gap-3 border px-4 py-4 text-left ${
-                        isSelected
-                          ? "border-white/16 bg-[linear-gradient(180deg,rgba(56,56,62,0.98),rgba(30,30,34,1))] text-white ring-1 ring-white/10"
-                          : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-white">
-                          {option.label}
-                        </p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.18em] text-white/65">
-                          {option.fileName || option.id}
-                        </p>
-                      </div>
-                      <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/85">
-                        {Number(option.durationSeconds) > 0 ? (
-                          <span className="text-[11px] tracking-[0.14em] text-white/65">
-                            {formatEffectDuration(option.durationSeconds)}
-                          </span>
-                        ) : null}
-                        {isSelected ? (
-                          <FaCheck className="text-white" />
-                        ) : (
-                          <FaChevronRight />
-                        )}
-                      </div>
-                    </motion.button>
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.95, y: 2 }}
+                  onClick={() => onSelect(RANDOM_SCORE_EFFECT_ID)}
+                  className={`${KEYPAD_BUTTON_BASE} flex w-full items-center justify-between border px-4 py-4 text-left ${
+                    selectedId === RANDOM_SCORE_EFFECT_ID
+                      ? "border-white/16 bg-[linear-gradient(180deg,rgba(56,56,62,0.98),rgba(30,30,34,1))] text-white ring-1 ring-white/10"
+                      : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm uppercase tracking-[0.16em]">Random</p>
+                    <p className="mt-1 text-xs text-white/75">
+                      Use a random sound
+                    </p>
                   </div>
-                );
-              })}
-              {!visibleOptions.length && hasSearchQuery ? (
-                <div className="rounded-[20px] border border-white/8 bg-[rgba(18,18,24,0.96)] px-4 py-4 text-sm text-white/68">
-                  No sounds match &quot;{searchQuery.trim()}&quot;.
-                </div>
-              ) : null}
+                  {selectedId === RANDOM_SCORE_EFFECT_ID ? (
+                    <FaCheck className="text-white" />
+                  ) : null}
+                </motion.button>
+
+                {visibleOptions.map((option) => {
+                  const isSelected = selectedId === option.id;
+                  const isPreviewing = previewingId === option.id;
+
+                  return (
+                    <div
+                      key={option.id}
+                      className="grid grid-cols-[48px_minmax(0,1fr)] items-center gap-3 sm:grid-cols-[52px_minmax(0,1fr)]"
+                    >
+                      <motion.button
+                        type="button"
+                        whileTap={{ scale: 0.95, y: 2 }}
+                        onClick={() => onPreview(option)}
+                        className={`${KEYPAD_BUTTON_BASE} inline-flex h-[48px] w-[48px] shrink-0 items-center justify-center border sm:h-[52px] sm:w-[52px] ${
+                          isPreviewing ? "ring-2 ring-white/18" : ""
+                        } ${
+                          isPreviewing
+                            ? "border-white/16 bg-[linear-gradient(180deg,rgba(56,56,62,0.98),rgba(30,30,34,1))] text-white"
+                            : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
+                        }`}
+                        aria-label={`${isPreviewing ? "Pause" : "Preview"} ${option.label}`}
+                      >
+                        {isPreviewing ? (
+                          <FaPause className="text-xs" />
+                        ) : (
+                          <FaPlay className="text-xs" />
+                        )}
+                      </motion.button>
+                      <motion.button
+                        type="button"
+                        whileTap={{ scale: 0.97, y: 2 }}
+                        onClick={() => onSelect(option.id)}
+                        className={`${KEYPAD_BUTTON_BASE} flex min-w-0 items-center justify-between gap-3 border px-4 py-4 text-left ${
+                          isSelected
+                            ? "border-white/16 bg-[linear-gradient(180deg,rgba(56,56,62,0.98),rgba(30,30,34,1))] text-white ring-1 ring-white/10"
+                            : "border-white/10 bg-[linear-gradient(180deg,rgba(40,40,44,0.98),rgba(24,24,28,1))] text-white hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(48,48,52,1),rgba(28,28,32,1))]"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-white">
+                            {option.label}
+                          </p>
+                          <p className="mt-1 text-xs uppercase tracking-[0.18em] text-white/65">
+                            {option.fileName || option.id}
+                          </p>
+                        </div>
+                        <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/85">
+                          {Number(option.durationSeconds) > 0 ? (
+                            <span className="text-[11px] tracking-[0.14em] text-white/65">
+                              {formatEffectDuration(option.durationSeconds)}
+                            </span>
+                          ) : null}
+                          {isSelected ? (
+                            <FaCheck className="text-white" />
+                          ) : (
+                            <FaChevronRight />
+                          )}
+                        </div>
+                      </motion.button>
+                    </div>
+                  );
+                })}
+                {!visibleOptions.length && hasSearchQuery ? (
+                  <div className="rounded-[20px] border border-white/8 bg-[rgba(18,18,24,0.96)] px-4 py-4 text-sm text-white/68">
+                    No sounds match &quot;{searchQuery.trim()}&quot;.
+                  </div>
+                ) : null}
               </div>
             </div>
-          </div>
+          </motion.div>
         </motion.div>
       ) : null}
     </AnimatePresence>
