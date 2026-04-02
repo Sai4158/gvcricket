@@ -16,11 +16,13 @@ import {
   FaMicrophoneAlt,
   FaMusic,
   FaShareAlt,
+  FaTrophy,
   FaVolumeUp,
   FaYoutube,
 } from "react-icons/fa";
 import StepFlow from "../shared/StepFlow";
 import SafeMatchImage from "../shared/SafeMatchImage";
+import { SpinningCoin } from "../toss/CoinArt";
 import AnimatedSection from "./AnimatedSection";
 import LiquidSportText from "./LiquidSportText";
 import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
@@ -157,49 +159,49 @@ function DesktopLiteHeadline({
 const featureCards = [
   {
     title: "Walkie-Talkie",
-    copy: "Keep the umpire, spectators, and director on one shared live channel for faster listen-and-respond audio.",
+    copy: "One live talk channel for the umpire, director, and spectators.",
     accent: "emerald",
     previewType: "walkie",
   },
   {
     title: "Loudspeaker",
-    copy: "Turn one phone into a clean hold-to-talk PA mic for score calls, ground updates, and quick match announcements.",
+    copy: "Turn one phone into a quick PA mic for score calls and ground updates.",
     accent: "amber",
     previewType: "loudspeaker",
   },
   {
     title: "Score Announcer",
-    copy: "Queue cleaner score reads with better timing, sharper phrasing, and clearer delivery between balls.",
+    copy: "Read the score out loud with cleaner timing and clearer voice updates.",
     accent: "violet",
     previewType: "announcer",
   },
   {
     title: "Share The Match",
-    copy: "Share one live match link so spectators can open the scoreboard on any phone, tablet, or big screen in seconds.",
+    copy: "Share one live link so anyone can follow the match on any screen.",
     accent: "orange",
     previewType: "share",
   },
   {
     title: "Match Images",
-    copy: "Upload one match image and carry it across the live scoreboard, spectator page, and final result screen.",
+    copy: "Use one match image across the live, spectator, and result screens.",
     accent: "rose",
     previewType: "cover",
   },
   {
     title: "Result Insights",
-    copy: "Finish with a cleaner result screen, stronger winner context, and a better closing summary of the match.",
+    copy: "Finish with a clear result screen and a better winner summary.",
     accent: "yellow",
     previewType: "insights",
   },
   {
     title: "Director Console",
-    copy: "Run effects, YouTube music, walkie, loudspeaker, and score audio from one sharper live control deck.",
+    copy: "Control music, effects, walkie, and live audio from one screen.",
     accent: "cyan",
     previewType: "director",
   },
   {
     title: "Live Match Banner",
-    copy: "Bring the newest live match to the home page so anyone can jump into the scoreboard in one tap.",
+    copy: "Bring the newest live match to the home page for one-tap viewing.",
     accent: "emerald",
     previewType: "livebanner",
   },
@@ -207,60 +209,74 @@ const featureCards = [
 
 const journeyCards = [
   {
-    title: "Teams And Session",
-    copy: "Start the match with the session name, teams, and the first setup step ready in one place.",
+    title: "Create Teams And Session",
+    copy: "Create the match, add two teams, and start from one clean setup screen.",
     accent: "rose",
     previewType: "teams",
   },
   {
-    title: "Toss",
-    copy: "Run the toss cleanly, choose the side, and move straight into the innings decision.",
+    title: "Run The Toss",
+    copy: "Choose who starts with the bat or ball, then go live.",
     accent: "amber",
     previewType: "toss",
   },
   {
-    title: "Umpire Scoring",
-    copy: "Score every ball quickly with a focused live panel for runs, extras, wickets, and the over.",
+    title: "Control The Match In Umpire Mode",
+    copy: "One live screen lets you update the score, mark wickets and extras, read the score aloud, use walkie-talkie, and play sound effects.",
     accent: "orange",
     previewType: "umpire",
   },
   {
-    title: "In-Match Walkie",
-    copy: "Keep the umpire, director, and spectators on one quick live talk channel during the match.",
-    accent: "emerald",
-    previewType: "match-walkie",
-  },
-  {
-    title: "Ball History",
-    copy: "Track the latest over at a glance with a clean live ball history strip and current match context.",
+    title: "Track Ball History",
+    copy: "See recent balls in order so everyone knows what just happened.",
     accent: "cyan",
     previewType: "history",
   },
   {
-    title: "Loudspeaker And Announcer",
-    copy: "Use the PA mic for live calls and keep the score announcer ready for the next update.",
-    accent: "violet",
-    previewType: "match-audio",
-  },
-  {
-    title: "Spectator View",
-    copy: "Keep phones and shared screens in sync with the live score, target, over, and match situation.",
+    title: "Share The Spectator View",
+    copy: "Share one simple link so anyone can follow the match on any screen.",
     accent: "emerald",
     previewType: "spectator",
   },
   {
-    title: "Match Status",
-    copy: "See the match state clearly from live play to innings complete and final result.",
+    title: "Read Match Status Fast",
+    copy: "Show the score, target, overs left, and whether the game is live or finished. It also makes innings changes and final results easy to spot.",
     accent: "cyan",
     previewType: "status",
   },
   {
-    title: "Secure Match Access",
-    copy: "Keep umpire and director controls protected behind the right PIN without slowing the flow.",
+    title: "Talk With In-Match Walkie",
+    copy: "Let the umpire and director talk live when something needs attention.",
+    accent: "emerald",
+    previewType: "match-walkie",
+  },
+  {
+    title: "Use Loudspeaker And Announcer",
+    copy: "Play spoken updates, PA calls, and effects without leaving the match.",
+    accent: "violet",
+    previewType: "match-audio",
+  },
+  {
+    title: "Keep Match Access Secure",
+    copy: "Protect control screens with a PIN while keeping the viewer side easy to open.",
     accent: "violet",
     previewType: "access",
   },
 ];
+
+const miniCelebrationConfetti = [
+  { left: "8%", delay: "0.1s", duration: "4.3s", rotate: "12deg", color: "#facc15" },
+  { left: "18%", delay: "0.5s", duration: "4.9s", rotate: "-16deg", color: "#fde68a" },
+  { left: "31%", delay: "0.2s", duration: "4.5s", rotate: "18deg", color: "#ffffff" },
+  { left: "46%", delay: "0.7s", duration: "5.1s", rotate: "-10deg", color: "#f59e0b" },
+  { left: "61%", delay: "0.35s", duration: "4.6s", rotate: "15deg", color: "#facc15" },
+  { left: "75%", delay: "0.8s", duration: "5.3s", rotate: "-14deg", color: "#fde68a" },
+  { left: "88%", delay: "0.45s", duration: "4.8s", rotate: "11deg", color: "#ffffff" },
+];
+
+function getJourneyStepLabel(index) {
+  return `Step ${String(index + 1).padStart(2, "0")}`;
+}
 
 function getAccentRail(accent) {
   switch (accent) {
@@ -362,6 +378,94 @@ function MiniStepFlowPreview({ staticMode = false }) {
   );
 }
 
+function MiniTossSpinner() {
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <div className="flex justify-center py-1">
+      <motion.div
+        animate={reduceMotion ? undefined : { rotateY: 720 }}
+        transition={
+          reduceMotion
+            ? undefined
+            : {
+                duration: 6,
+                ease: "linear",
+                repeat: Number.POSITIVE_INFINITY,
+              }
+        }
+        className="transform-3d scale-[0.5]"
+      >
+        <SpinningCoin />
+      </motion.div>
+    </div>
+  );
+}
+
+function MiniPulseDot({ tone = "emerald" }) {
+  const toneClass =
+    tone === "amber"
+      ? "bg-amber-300 shadow-[0_0_18px_rgba(252,211,77,0.65)]"
+      : tone === "violet"
+      ? "bg-violet-300 shadow-[0_0_18px_rgba(196,181,253,0.55)]"
+      : tone === "cyan"
+      ? "bg-cyan-300 shadow-[0_0_18px_rgba(103,232,249,0.55)]"
+      : "bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.6)]";
+
+  const ringClass =
+    tone === "amber"
+      ? "bg-amber-300/32"
+      : tone === "violet"
+      ? "bg-violet-300/28"
+      : tone === "cyan"
+      ? "bg-cyan-300/28"
+      : "bg-emerald-300/30";
+
+  return (
+    <span className="relative inline-flex h-2.5 w-2.5">
+      <span className={`absolute inset-0 rounded-full ${ringClass} animate-ping`} />
+      <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${toneClass}`} />
+    </span>
+  );
+}
+
+function MiniAudioBars({ tone = "emerald" }) {
+  const reduceMotion = useReducedMotion();
+  const barClass =
+    tone === "amber"
+      ? "bg-amber-300/90"
+      : tone === "violet"
+      ? "bg-violet-300/90"
+      : tone === "cyan"
+      ? "bg-cyan-300/90"
+      : "bg-emerald-300/90";
+  const barPatterns = [
+    [8, 16, 10],
+    [14, 7, 15],
+    [10, 18, 8],
+    [16, 9, 14],
+  ];
+
+  return (
+    <div className="flex h-5 items-end gap-1">
+      {barPatterns.map((pattern, index) => (
+        <motion.span
+          key={`${tone}-${index}`}
+          className={`block w-1 rounded-full ${barClass}`}
+          style={{ height: `${pattern[0]}px` }}
+          animate={reduceMotion ? undefined : { height: pattern.map((value) => `${value}px`) }}
+          transition={{
+            duration: 1.2 + index * 0.08,
+            ease: "easeInOut",
+            repeat: Number.POSITIVE_INFINITY,
+            delay: index * 0.08,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function renderJourneyPreview(card, staticMode = false) {
   const { Div, Span, P, withVariants } = getPreviewNodeSet(staticMode);
 
@@ -403,6 +507,12 @@ function renderJourneyPreview(card, staticMode = false) {
       return (
         <PreviewSurface accent={card.accent} heading="Toss" staticMode={staticMode}>
           <div className="space-y-3">
+            <Div
+              {...withVariants(previewItemVariants)}
+              className="rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-3 py-2"
+            >
+              <MiniTossSpinner />
+            </Div>
             <Div {...withVariants(previewStaggerVariants)} className="grid grid-cols-2 gap-3">
               <Div
                 {...withVariants(previewItemVariants)}
@@ -443,23 +553,46 @@ function renderJourneyPreview(card, staticMode = false) {
       );
     case "umpire":
       return (
-        <PreviewSurface accent={card.accent} heading="Umpire Mode" staticMode={staticMode}>
+        <PreviewSurface accent={card.accent} heading="Umpire Screen" staticMode={staticMode}>
           <div className="space-y-3">
             <Div
               {...withVariants(previewItemVariants)}
-              className="flex items-start justify-between gap-3"
+              className="rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-3"
             >
-              <div>
-                <P className="text-lg font-semibold text-white">52/3</P>
-                <P className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Over 8.2</P>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <P className="text-[10px] font-semibold uppercase tracking-[0.24em] text-zinc-500">
+                    Target
+                  </P>
+                  <P className="mt-1 text-lg font-semibold text-amber-300">39</P>
+                </div>
+                <Span
+                  {...withVariants(previewItemVariants)}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white"
+                >
+                  <FaVolumeUp className="text-sm" />
+                </Span>
               </div>
-              <div className="text-right">
-                <P className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">This over</P>
-                <div className="mt-2 flex gap-1.5">
-                  <MiniBall label="1" staticMode={staticMode} />
-                  <MiniBall label="4" tone="amber" staticMode={staticMode} />
-                  <MiniBall label="Wd" tone="amber" staticMode={staticMode} />
-                  <MiniBall label="W" tone="rose" staticMode={staticMode} />
+              <div className="mt-3 rounded-[20px] border border-cyan-300/18 bg-[linear-gradient(180deg,rgba(16,18,24,0.98),rgba(10,12,16,0.98))] px-4 py-4 shadow-[0_16px_34px_rgba(0,0,0,0.24)]">
+                <div className="flex items-end justify-between gap-4">
+                  <div>
+                    <P className="text-[2.8rem] font-black leading-none tracking-[-0.06em] text-emerald-300">
+                      20/0
+                    </P>
+                    <P className="mt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-300">
+                      Score / Wickets
+                    </P>
+                    <P className="mt-1 text-[12px] font-semibold text-zinc-500">(3)</P>
+                  </div>
+                  <div className="text-right">
+                    <P className="text-[2.4rem] font-black leading-none tracking-[-0.05em] text-white">
+                      2.1
+                    </P>
+                    <P className="mt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-300">
+                      Overs (6)
+                    </P>
+                    <P className="mt-1 text-[12px] font-semibold text-zinc-500">(23)</P>
+                  </div>
                 </div>
               </div>
             </Div>
@@ -479,6 +612,27 @@ function renderJourneyPreview(card, staticMode = false) {
                 </Div>
               ))}
             </Div>
+            <Div {...withVariants(previewStaggerVariants)} className="grid grid-cols-3 gap-2">
+              {[
+                { icon: FaVolumeUp, label: "Read score" },
+                { icon: FaMusic, label: "Sound FX" },
+                { icon: FaBroadcastTower, label: "Walkie" },
+              ].map((tool) => {
+                const Icon = tool.icon;
+                return (
+                  <Div
+                    key={tool.label}
+                    {...withVariants(previewItemVariants)}
+                    className="rounded-[16px] border border-white/10 bg-white/[0.03] px-3 py-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Icon className="text-sm text-cyan-200" />
+                      <P className="text-[11px] font-semibold text-white">{tool.label}</P>
+                    </div>
+                  </Div>
+                );
+              })}
+            </Div>
           </div>
         </PreviewSurface>
       );
@@ -491,8 +645,11 @@ function renderJourneyPreview(card, staticMode = false) {
               className="flex items-center justify-between gap-3 rounded-[18px] border border-emerald-400/18 bg-[linear-gradient(180deg,rgba(8,28,22,0.94),rgba(8,12,16,0.98))] px-4 py-3"
             >
               <div>
-                <P className="text-sm font-semibold text-white">Walkie live</P>
-                <P className="mt-1 text-[11px] text-zinc-400">Tap and hold to answer fast.</P>
+                <div className="flex items-center gap-2">
+                  <MiniPulseDot tone="emerald" />
+                  <P className="text-sm font-semibold text-white">Walkie live</P>
+                </div>
+                <P className="mt-1 text-[11px] text-zinc-400">Press and hold to answer fast.</P>
               </div>
               <div className="inline-flex h-6 w-11 rounded-full border border-emerald-300/30 bg-emerald-400/18">
                 <span className="mt-0.5 inline-flex h-5 w-5 translate-x-5 rounded-full bg-white" />
@@ -589,6 +746,9 @@ function renderJourneyPreview(card, staticMode = false) {
                 <P className="mt-1 text-[10px] uppercase tracking-[0.2em] text-zinc-500">
                   Hold live
                 </P>
+                <div className="mt-3">
+                  <MiniAudioBars tone="amber" />
+                </div>
               </Div>
               <Div
                 {...withVariants(previewItemVariants)}
@@ -604,6 +764,9 @@ function renderJourneyPreview(card, staticMode = false) {
                 <P className="mt-1 text-[10px] uppercase tracking-[0.2em] text-zinc-500">
                   Ready
                 </P>
+                <div className="mt-3">
+                  <MiniAudioBars tone="violet" />
+                </div>
               </Div>
             </Div>
             <Div
@@ -614,6 +777,9 @@ function renderJourneyPreview(card, staticMode = false) {
               <P className="mt-2 text-[12px] text-zinc-400">
                 Team A 52 for 3 after 8.2 overs.
               </P>
+              <div className="mt-3">
+                <MiniAudioBars tone="violet" />
+              </div>
             </Div>
           </div>
         </PreviewSurface>
@@ -627,7 +793,10 @@ function renderJourneyPreview(card, staticMode = false) {
           >
             <Div {...withVariants(previewItemVariants)} className="flex items-start justify-between gap-3">
               <div>
-                <P className="text-xl font-semibold uppercase tracking-tight text-white">Team B</P>
+                <div className="flex items-center gap-2">
+                  <MiniPulseDot tone="emerald" />
+                  <P className="text-xl font-semibold uppercase tracking-tight text-white">Team B</P>
+                </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <div className="relative overflow-hidden rounded-[16px] border border-amber-300/18 bg-[linear-gradient(180deg,rgba(245,158,11,0.12),rgba(120,53,15,0.12))] px-3 py-2 shadow-[0_10px_24px_rgba(120,53,15,0.18)]">
                     <div className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/44 to-transparent" />
@@ -675,7 +844,6 @@ function renderJourneyPreview(card, staticMode = false) {
             {[
               ["Live", "Scoring in progress"],
               ["Innings Complete", "Target locked in"],
-              ["Final Result", "Winner available"],
             ].map(([title, meta], index) => (
               <Div
                 key={title}
@@ -686,14 +854,52 @@ function renderJourneyPreview(card, staticMode = false) {
                   <P className="text-sm font-semibold text-white">{title}</P>
                   <P className="mt-1 text-[11px] text-zinc-500">{meta}</P>
                 </div>
-                <Span
-                  {...withVariants(previewItemVariants)}
-                  className={`h-2.5 w-2.5 rounded-full ${
-                    index === 0 ? "bg-emerald-400" : index === 1 ? "bg-amber-300" : "bg-sky-300"
-                  }`}
-                />
+                {index === 0 ? (
+                  <MiniPulseDot tone="emerald" />
+                ) : (
+                  <Span
+                    {...withVariants(previewItemVariants)}
+                    className="h-2.5 w-2.5 rounded-full bg-amber-300"
+                  />
+                )}
               </Div>
             ))}
+            <Div
+              {...withVariants(previewItemVariants)}
+              className="relative overflow-hidden rounded-[22px] border border-amber-300/18 bg-[linear-gradient(180deg,rgba(251,191,36,0.2),rgba(217,119,6,0.14))] px-4 py-4 shadow-[0_18px_40px_rgba(120,53,15,0.22)]"
+            >
+              <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                {miniCelebrationConfetti.map((piece, index) => (
+                  <span
+                    key={`${piece.left}-${index}`}
+                    className="absolute top-[-12%] h-2.5 w-1.5 rounded-full opacity-80 animate-[result-confetti_var(--confetti-duration)_linear_infinite]"
+                    style={{
+                      left: piece.left,
+                      backgroundColor: piece.color,
+                      animationDelay: piece.delay,
+                      ["--confetti-duration"]: piece.duration,
+                      transform: `rotate(${piece.rotate})`,
+                    }}
+                  />
+                ))}
+                <div className="absolute inset-x-0 bottom-0 h-16 bg-[linear-gradient(180deg,transparent,rgba(120,53,15,0.16))]" />
+              </div>
+              <div className="relative z-10 text-center">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/16 text-white shadow-[0_10px_24px_rgba(120,53,15,0.18)]">
+                  <FaTrophy className="text-lg" />
+                </span>
+                <P className="mt-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-50/84">
+                  Final Result
+                </P>
+                <P className="mt-3 text-xl font-black uppercase leading-[1.05] tracking-[-0.04em] text-white">
+                  Congratulations
+                </P>
+                <P className="mt-2 text-base font-bold text-white">Team Blue</P>
+                <P className="mt-2 text-[12px] leading-5 text-amber-50/88">
+                  Won by 2 wickets.
+                </P>
+              </div>
+            </Div>
           </div>
         </PreviewSurface>
       );
@@ -749,8 +955,11 @@ function renderFeaturePreview(card, staticMode = false) {
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <P className="text-sm font-semibold text-white">Walkie-Talkie</P>
-                  <P className="mt-1 text-[12px] text-zinc-400">Tap and hold to talk.</P>
+                  <div className="flex items-center gap-2">
+                    <MiniPulseDot tone="emerald" />
+                    <P className="text-sm font-semibold text-white">Walkie-Talkie</P>
+                  </div>
+                  <P className="mt-1 text-[12px] text-zinc-400">Hold to talk live.</P>
                 </div>
                 <Div
                   {...withVariants(previewItemVariants)}
@@ -820,6 +1029,9 @@ function renderFeaturePreview(card, staticMode = false) {
               <P {...withVariants(previewItemVariants)} className="mt-3 text-sm font-semibold text-white">
                 Hold to talk live
               </P>
+              <div className="mt-3 flex justify-center">
+                <MiniAudioBars tone="amber" />
+              </div>
             </Div>
           </div>
         </PreviewSurface>
@@ -838,7 +1050,8 @@ function renderFeaturePreview(card, staticMode = false) {
                   Audio, YouTube music, crowd effects, and talkback in one place.
                 </P>
               </div>
-              <span className="rounded-full border border-emerald-300/18 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-100/90">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/18 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-100/90">
+                <MiniPulseDot tone="emerald" />
                 Armed
               </span>
             </Div>
@@ -956,7 +1169,8 @@ function renderFeaturePreview(card, staticMode = false) {
                 <P className="text-sm font-semibold text-white">Announcer ready</P>
                 <P className="mt-1 text-[11px] text-zinc-300">Next ball update is queued.</P>
               </div>
-              <Span {...withVariants(previewItemVariants)}>
+              <Span {...withVariants(previewItemVariants)} className="flex items-center gap-2">
+                <MiniAudioBars tone="violet" />
                 <FaVolumeUp className="text-lg text-violet-200" />
               </Span>
             </Div>
@@ -1047,7 +1261,10 @@ function renderFeaturePreview(card, staticMode = false) {
                     </div>
                     <div className="min-w-0 flex-1 text-left">
                       <div className="text-[8px] font-bold uppercase tracking-[0.28em] text-emerald-300">
-                        Live Now
+                        <span className="inline-flex items-center gap-1.5">
+                          <MiniPulseDot tone="emerald" />
+                          Live Now
+                        </span>
                       </div>
                       <div className="truncate text-[11px] font-semibold leading-tight text-white">
                         TEAM A vs TEAM B
@@ -1454,7 +1671,10 @@ function JourneyCardDesktop({ card, index }) {
       <div className="relative z-10 flex h-full flex-col home-desktop-card-sequence">
         <div>{renderJourneyPreview(card, true)}</div>
         <div className="mt-5 flex-1 home-desktop-panel-sequence">
-          <h3 className="text-[1.45rem] font-semibold leading-[1.04] tracking-[-0.04em] text-white drop-shadow-[0_10px_22px_rgba(255,255,255,0.08)] sm:text-[1.6rem] xl:text-[1.32rem] 2xl:text-[1.45rem]">
+          <span className="inline-flex w-fit items-center rounded-full border border-white/12 bg-white/[0.045] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-white/58">
+            {getJourneyStepLabel(index)}
+          </span>
+          <h3 className="mt-3 text-[1.45rem] font-semibold leading-[1.04] tracking-[-0.04em] text-white drop-shadow-[0_10px_22px_rgba(255,255,255,0.08)] sm:text-[1.6rem] xl:text-[1.32rem] 2xl:text-[1.45rem]">
             {card.title}
           </h3>
           <p className="mt-3 text-[15px] leading-7 text-white/86 drop-shadow-[0_6px_18px_rgba(0,0,0,0.18)] xl:text-[13px] xl:leading-6 2xl:text-[15px] 2xl:leading-7">
@@ -1598,9 +1818,15 @@ function JourneyCard({ card, index, prefersReducedMotion, useFlatLaptopMotion })
           style={contentStyle}
           className="mt-5 flex-1 will-change-transform"
         >
+          <motion.span
+            variants={previewItemVariants}
+            className="inline-flex w-fit items-center rounded-full border border-white/12 bg-white/[0.045] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-white/58"
+          >
+            {getJourneyStepLabel(index)}
+          </motion.span>
           <motion.h3
             variants={previewTitleVariants}
-            className="text-[1.45rem] font-semibold leading-[1.04] tracking-[-0.04em] text-white drop-shadow-[0_10px_22px_rgba(255,255,255,0.08)] sm:text-[1.6rem] xl:text-[1.32rem] 2xl:text-[1.45rem]"
+            className="mt-3 text-[1.45rem] font-semibold leading-[1.04] tracking-[-0.04em] text-white drop-shadow-[0_10px_22px_rgba(255,255,255,0.08)] sm:text-[1.6rem] xl:text-[1.32rem] 2xl:text-[1.45rem]"
           >
             {card.title}
           </motion.h3>
@@ -1755,7 +1981,7 @@ export default function HowItWorksSection() {
           <div className="mx-auto max-w-3xl text-center">
             {useDesktopLiteMotion ? (
               <DesktopLiteHeadline
-                text={["From toss to final", "result"]}
+                text={["What is", "GV Cricket?"]}
                 isVisible={journeyPanelReveal.isVisible}
                 delay={0.03}
                 className="text-4xl font-semibold tracking-[-0.04em] md:text-5xl"
@@ -1763,7 +1989,7 @@ export default function HowItWorksSection() {
               />
             ) : (
               <LiquidSportText
-                text={["From toss to final", "result"]}
+                text={["What is", "GV Cricket?"]}
                 characterTyping
                 characterStagger={0.02}
                 characterLineDelay={0.12}
@@ -1776,7 +2002,7 @@ export default function HowItWorksSection() {
               />
             )}
             <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-white/72 md:text-base">
-              A fresh live match flow with instant scoring, premium spectator view, smarter match status, and secure access from start to finish.
+              GV Cricket is a mobile-first live scoring app for local cricket matches. One person updates the game, everyone else can watch it live, and the app can speak updates, play audio, and keep the match organized from start to finish.
             </p>
           </div>
 
