@@ -99,12 +99,12 @@ function SoundAssignmentRow({
 
   return (
     <div className="rounded-[22px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.022))] p-2.5 shadow-[0_14px_36px_rgba(0,0,0,0.22)]">
-      <div className="grid grid-cols-[minmax(104px,122px)_1fr_52px] items-center gap-2">
+      <div className="grid grid-cols-[92px_minmax(0,1fr)_46px] items-center gap-1.5 sm:grid-cols-[104px_minmax(0,1fr)_52px] sm:gap-2">
         <motion.button
           type="button"
           whileTap={{ scale: 0.95, y: 2 }}
           onClick={onEdit}
-          className={`${KEYPAD_BUTTON_BASE} ${toneClass} min-h-[52px] px-2.5 py-3 text-white`}
+          className={`${KEYPAD_BUTTON_BASE} ${toneClass} min-h-[50px] px-2 py-3 text-white sm:min-h-[52px] sm:px-2.5`}
           aria-label={`Edit ${event.label} sound`}
         >
           <span
@@ -118,7 +118,7 @@ function SoundAssignmentRow({
           whileTap={hasAssignedSound ? { scale: 0.97, y: 2 } : undefined}
           onClick={onTogglePreview}
           disabled={!hasAssignedSound}
-          className={`${KEYPAD_BUTTON_BASE} flex min-w-0 items-center justify-between gap-3 border border-white/10 bg-[linear-gradient(180deg,rgba(30,30,34,0.98),rgba(15,15,19,1))] px-3.5 py-3 text-left ${
+          className={`${KEYPAD_BUTTON_BASE} flex min-w-0 items-center justify-between gap-2.5 border border-white/10 bg-[linear-gradient(180deg,rgba(30,30,34,0.98),rgba(15,15,19,1))] px-3 py-3 text-left sm:gap-3 sm:px-3.5 ${
             hasAssignedSound
               ? `text-white hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(40,40,44,1),rgba(20,20,24,1))] ${
                   isPreviewing ? "ring-2 ring-white/18" : ""
@@ -137,7 +137,7 @@ function SoundAssignmentRow({
               active={isPreviewing}
             />
           </div>
-          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/82">
+          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/82 sm:h-10 sm:w-10">
             {isPreviewing ? (
               <FaPause className="text-sm" />
             ) : (
@@ -149,7 +149,7 @@ function SoundAssignmentRow({
           type="button"
           onClick={onEdit}
           whileTap={{ scale: 0.95, y: 2 }}
-          className={`${KEYPAD_BUTTON_BASE} inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(30,30,34,0.96),rgba(14,14,18,1))] text-white/74 hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(38,38,42,1),rgba(18,18,22,1))] hover:text-white`}
+          className={`${KEYPAD_BUTTON_BASE} inline-flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[16px] border border-white/10 bg-[linear-gradient(180deg,rgba(30,30,34,0.96),rgba(14,14,18,1))] text-white/74 hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(38,38,42,1),rgba(18,18,22,1))] hover:text-white sm:h-[52px] sm:w-[52px] sm:rounded-[18px]`}
           aria-label={`Edit ${event.label} sound`}
         >
           <FaEdit className="text-[14px]" />
