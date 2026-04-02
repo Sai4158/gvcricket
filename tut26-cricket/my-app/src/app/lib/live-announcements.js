@@ -113,6 +113,21 @@ function formatBallsLeftInCurrentOver(match) {
   } left in this over.`;
 }
 
+function buildCurrentOverRemainingLine(match) {
+  const ballsLeftLine = formatBallsLeftInCurrentOver(match).replace(/\.$/, "");
+  const oversLeftLine = formatOversLeftAfterCurrentOver(match);
+
+  if (!oversLeftLine || oversLeftLine === "No overs left.") {
+    return `${ballsLeftLine}.`;
+  }
+
+  if (oversLeftLine === "Final over.") {
+    return `${ballsLeftLine}. ${oversLeftLine}`;
+  }
+
+  return `${ballsLeftLine} and ${oversLeftLine.charAt(0).toLowerCase()}${oversLeftLine.slice(1)}`;
+}
+
 function formatOversLeftAfterCurrentOver(match) {
   const ballsRemaining = getBallsRemaining(match);
   if (ballsRemaining <= 0) {
@@ -721,8 +736,7 @@ export function buildCurrentScoreAnnouncement(match) {
     parts.push(`Target is ${safeNumber(match?.innings1?.score) + 1}.`);
   }
 
-  parts.push(formatBallsLeftInCurrentOver(match));
-  parts.push(formatOversLeftAfterCurrentOver(match));
+  parts.push(buildCurrentOverRemainingLine(match));
 
   return parts.join(" ");
 }

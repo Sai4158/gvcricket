@@ -1180,8 +1180,7 @@ test("spectator commentary uses simple ball-first wording and separate score lin
   const currentScoreLine = buildCurrentScoreAnnouncement(after);
   assert.match(currentScoreLine, /Score is 8 for 1\./);
   assert.match(currentScoreLine, /Target is 11\./);
-  assert.match(currentScoreLine, /5 balls left in this over\./);
-  assert.match(currentScoreLine, /1 over left\./);
+  assert.match(currentScoreLine, /5 balls left in this over and 1 over left\./);
 });
 
 test("walkie requests support spectator and director, prevent duplicates, and require umpire response", () => {
