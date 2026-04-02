@@ -2,18 +2,52 @@
 
 import { preloadCachedAudioAssets } from "./page-audio";
 
-const SOUND_EFFECT_LIBRARY_CACHE_KEY = "gv-director-audio-library-v1";
-const SOUND_EFFECT_ORDER_STORAGE_KEY = "gv-director-audio-order:global";
+export const SOUND_EFFECT_LIBRARY_CACHE_KEY = "gv-director-audio-library-v1";
+export const SOUND_EFFECT_ORDER_STORAGE_KEY = "gv-director-audio-order:global";
+const SOUND_EFFECT_LIBRARY_SYNC_EVENT = "gv:sound-effects-library-sync";
 const SOUND_EFFECT_LIBRARY_CACHE_TTL_MS = 10 * 60 * 1000;
 const DEFAULT_SOUND_EFFECT_PRELOAD_LIMIT = 12;
 
 let soundEffectsLibraryMemoryCache = null;
 let soundEffectsLibraryPromise = null;
 
+function emitSoundEffectsLibrarySync() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(SOUND_EFFECT_LIBRARY_SYNC_EVENT));
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
 function normalizeOrder(order) {
   return Array.isArray(order)
     ? order.filter((value) => typeof value === "string" && value.trim())
     : [];
+}
+
+export function filterSoundEffectsByQuery(files, query = "") {
+  if (!Array.isArray(files) || !files.length) {
+    return [];
+  }
+
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) {
+    return [...files];
+  }
+
+  return files.filter((file) => {
+    const searchHaystack = normalizeSearchText(
+      `${file?.label || ""} ${file?.fileName || ""} ${file?.id || ""}`,
+    );
+    return searchHaystack.includes(normalizedQuery);
+  });
 }
 
 export function sortSoundEffectsByOrder(files, order = []) {
@@ -70,6 +104,7 @@ export function writeCachedSoundEffectsOrder(order) {
       SOUND_EFFECT_ORDER_STORAGE_KEY,
       JSON.stringify(normalizeOrder(order)),
     );
+    emitSoundEffectsLibrarySync();
   } catch {
     // Ignore storage failures and keep the in-memory order flow.
   }
@@ -150,6 +185,7 @@ export function writeCachedSoundEffectsLibrary(files) {
         files,
       }),
     );
+    emitSoundEffectsLibrarySync();
   } catch {
     // Ignore storage failures and keep the in-memory cache.
   }
@@ -169,7 +205,7 @@ export async function fetchCachedSoundEffectsLibrary({ force = false } = {}) {
 
   soundEffectsLibraryPromise = (async () => {
     const response = await fetch("/api/director/audio-library", {
-      cache: "default",
+      cache: force ? "no-store" : "default",
     });
     const payload = await response
       .json()
@@ -243,4 +279,34 @@ export async function warmCachedSoundEffectAssets(
 export function clearCachedSoundEffectsLibrary() {
   soundEffectsLibraryMemoryCache = null;
   soundEffectsLibraryPromise = null;
+}
+
+export function subscribeSoundEffectsLibrarySync(listener) {
+  if (typeof window === "undefined" || typeof listener !== "function") {
+    return () => {};
+  }
+
+  const handleSync = () => {
+    listener();
+  };
+
+  const handleStorage = (event) => {
+    if (
+      event?.key &&
+      event.key !== SOUND_EFFECT_LIBRARY_CACHE_KEY &&
+      event.key !== SOUND_EFFECT_ORDER_STORAGE_KEY
+    ) {
+      return;
+    }
+
+    listener();
+  };
+
+  window.addEventListener(SOUND_EFFECT_LIBRARY_SYNC_EVENT, handleSync);
+  window.addEventListener("storage", handleStorage);
+
+  return () => {
+    window.removeEventListener(SOUND_EFFECT_LIBRARY_SYNC_EVENT, handleSync);
+    window.removeEventListener("storage", handleStorage);
+  };
 }

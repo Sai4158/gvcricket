@@ -14,9 +14,10 @@ import { enforceRateLimit } from "../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../lib/request-security";
 import DirectorSettings from "../../../../models/DirectorSettings";
 
+export const dynamic = "force-dynamic";
+
 const AUDIO_DIRECTORY = path.join(process.cwd(), "public", "audio", "effects");
 const DIRECTOR_SETTINGS_KEY = "global";
-const AUDIO_LIBRARY_CACHE_TTL_MS = 60_000;
 const audioLibraryOrderSchema = z
   .object({
     order: z.array(
@@ -29,13 +30,6 @@ const audioLibraryOrderSchema = z
     ),
   })
   .strict();
-const globalAudioLibraryCache = globalThis.__gvDirectorAudioLibraryCache || {
-  files: [],
-  order: [],
-  expiresAt: 0,
-  pending: null,
-};
-globalThis.__gvDirectorAudioLibraryCache = globalAudioLibraryCache;
 
 function prettifyName(filename) {
   return filename
@@ -93,42 +87,15 @@ async function readDirectorAudioLibrarySnapshot() {
   return { files, order: audioLibraryOrder };
 }
 
-async function getCachedDirectorAudioLibrarySnapshot() {
-  if (globalAudioLibraryCache.expiresAt > Date.now()) {
-    return {
-      files: globalAudioLibraryCache.files,
-      order: globalAudioLibraryCache.order,
-    };
-  }
-
-  if (globalAudioLibraryCache.pending) {
-    return globalAudioLibraryCache.pending;
-  }
-
-  globalAudioLibraryCache.pending = (async () => {
-    try {
-      const snapshot = await readDirectorAudioLibrarySnapshot();
-      globalAudioLibraryCache.files = snapshot.files;
-      globalAudioLibraryCache.order = snapshot.order;
-      globalAudioLibraryCache.expiresAt = Date.now() + AUDIO_LIBRARY_CACHE_TTL_MS;
-      return snapshot;
-    } finally {
-      globalAudioLibraryCache.pending = null;
-    }
-  })();
-
-  return globalAudioLibraryCache.pending;
-}
-
 export async function GET() {
   try {
-    const { files, order } = await getCachedDirectorAudioLibrarySnapshot();
+    const { files, order } = await readDirectorAudioLibrarySnapshot();
 
     return NextResponse.json(
       { files, order },
       {
         headers: {
-          "Cache-Control": "public, max-age=0, s-maxage=60, stale-while-revalidate=300",
+          "Cache-Control": "no-store",
         },
       }
     );
@@ -137,7 +104,7 @@ export async function GET() {
       { files: [] },
       {
         headers: {
-          "Cache-Control": "public, max-age=0, s-maxage=60, stale-while-revalidate=300",
+          "Cache-Control": "no-store",
         },
       }
     );
@@ -175,7 +142,7 @@ export async function POST(req) {
     }
 
     const nextOrder = [...new Set(parsedRequest.value.order)];
-    const snapshot = await getCachedDirectorAudioLibrarySnapshot();
+    const snapshot = await readDirectorAudioLibrarySnapshot();
     const validIds = new Set(snapshot.files.map((file) => file.id));
     const filteredOrder = nextOrder.filter((value) => validIds.has(value));
 
@@ -185,11 +152,6 @@ export async function POST(req) {
       { $set: { audioLibraryOrder: filteredOrder } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
-
-    globalAudioLibraryCache.order = filteredOrder;
-    globalAudioLibraryCache.expiresAt = 0;
-    globalAudioLibraryCache.pending = null;
-
     return NextResponse.json({ ok: true, order: filteredOrder });
   } catch {
     return jsonError("Could not save the audio library order.", 500);

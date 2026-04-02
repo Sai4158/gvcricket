@@ -26,8 +26,10 @@ import {
   FaPause,
   FaPlay,
   FaPowerOff,
+  FaSearch,
   FaStop,
   FaTrash,
+  FaTimes,
   FaVolumeUp,
   FaWifi,
   FaYoutube,
@@ -71,11 +73,17 @@ import {
   registerClientPinFailure,
   useClientPinRateLimit,
 } from "../../lib/pin-attempt-client";
+import {
+  filterSoundEffectsByQuery,
+  readCachedSoundEffectsLibrary as readSharedSoundEffectsLibrary,
+  readCachedSoundEffectsOrder as readSharedSoundEffectsOrder,
+  subscribeSoundEffectsLibrarySync,
+  writeCachedSoundEffectsLibrary as writeSharedSoundEffectsLibrary,
+  writeCachedSoundEffectsOrder as writeSharedSoundEffectsOrder,
+} from "../../lib/sound-effects-client";
 
-const DIRECTOR_AUDIO_LIBRARY_CACHE_KEY = "gv-director-audio-library-v1";
 const DIRECTOR_AUDIO_METADATA_CACHE_KEY = "gv-director-audio-metadata-v1";
 const DIRECTOR_SESSIONS_CACHE_KEY = "gv-director-sessions-v1";
-const DIRECTOR_AUDIO_LIBRARY_CACHE_TTL_MS = 10 * 60 * 1000;
 const DIRECTOR_AUDIO_ORDER_SAVE_DELAY_MS = 20_000;
 const DIRECTOR_SESSIONS_REFRESH_MIN_GAP_MS = 1500;
 const DIRECTOR_YOUTUBE_TRACKS_CACHE_KEY = "gv-director-youtube-tracks-v1";
@@ -522,10 +530,6 @@ function serializeOrder(order) {
   return JSON.stringify(Array.isArray(order) ? order : []);
 }
 
-function getDirectorAudioOrderStorageKey(sessionId) {
-  return "gv-director-audio-order:global";
-}
-
 function readCachedDirectorSessions() {
   if (directorSessionsMemoryCache?.length) {
     return directorSessionsMemoryCache;
@@ -575,38 +579,9 @@ function writeCachedDirectorSessions(sessions) {
 }
 
 function readCachedDirectorAudioLibrary() {
-  if (directorAudioLibraryMemoryCache?.length) {
-    return directorAudioLibraryMemoryCache;
-  }
-
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    const cachedValue = window.localStorage.getItem(
-      DIRECTOR_AUDIO_LIBRARY_CACHE_KEY,
-    );
-    if (!cachedValue) {
-      return [];
-    }
-
-    const parsed = JSON.parse(cachedValue);
-    const savedAt = Number(parsed?.savedAt || 0);
-    const files = Array.isArray(parsed?.files) ? parsed.files : [];
-    if (!files.length) {
-      return [];
-    }
-
-    if (savedAt && Date.now() - savedAt > DIRECTOR_AUDIO_LIBRARY_CACHE_TTL_MS) {
-      return [];
-    }
-
-    directorAudioLibraryMemoryCache = files;
-    return files;
-  } catch {
-    return [];
-  }
+  const files = readSharedSoundEffectsLibrary();
+  directorAudioLibraryMemoryCache = files;
+  return files;
 }
 
 function writeCachedDirectorAudioLibrary(files) {
@@ -615,22 +590,7 @@ function writeCachedDirectorAudioLibrary(files) {
   }
 
   directorAudioLibraryMemoryCache = files;
-
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(
-      DIRECTOR_AUDIO_LIBRARY_CACHE_KEY,
-      JSON.stringify({
-        savedAt: Date.now(),
-        files,
-      }),
-    );
-  } catch {
-    // Ignore storage failures and keep the in-memory cache.
-  }
+  writeSharedSoundEffectsLibrary(files);
 }
 
 function createSpeechSettings() {
@@ -1210,6 +1170,7 @@ export default function DirectorConsoleClient({
   );
   const [directorWalkieNotice, setDirectorWalkieNotice] = useState("");
   const [libraryFiles, setLibraryFiles] = useState([]);
+  const [librarySearchQuery, setLibrarySearchQuery] = useState("");
   const [libraryOrder, setLibraryOrder] = useState([]);
   const [libraryDurations, setLibraryDurations] = useState({});
   const [libraryCurrentTime, setLibraryCurrentTime] = useState(0);
@@ -1665,11 +1626,6 @@ export default function DirectorConsoleClient({
     );
   }, [managedSessionId, sessions]);
 
-  const audioOrderStorageKey = useMemo(
-    () => getDirectorAudioOrderStorageKey(),
-    [],
-  );
-
   const [liveMatch, setLiveMatch] = useState(managedSession?.match || null);
   useEffect(() => {
     const nextManagedMatch = managedSession?.match || null;
@@ -1945,7 +1901,22 @@ export default function DirectorConsoleClient({
     void refreshDirectorSessions();
   }, [refreshDirectorSessions]);
 
-  const fetchAudioLibrary = useCallback(async () => {
+  const syncLibraryStateFromCache = useCallback(() => {
+    const nextFiles = readCachedDirectorAudioLibrary();
+    const nextOrder = readSharedSoundEffectsOrder();
+    setLibraryFiles(nextFiles);
+    setLibraryOrder(nextOrder);
+    lastPersistedLibraryOrderRef.current = serializeOrder(nextOrder);
+    if (
+      pendingLibraryOrderRef.current &&
+      serializeOrder(pendingLibraryOrderRef.current) ===
+        lastPersistedLibraryOrderRef.current
+    ) {
+      pendingLibraryOrderRef.current = null;
+    }
+  }, []);
+
+  const fetchAudioLibrary = useCallback(async ({ force = false } = {}) => {
     if (directorAudioLibraryPromise) {
       const nextFiles = await directorAudioLibraryPromise;
       setLibraryFiles(nextFiles);
@@ -1954,7 +1925,7 @@ export default function DirectorConsoleClient({
 
     directorAudioLibraryPromise = (async () => {
       const response = await fetch("/api/director/audio-library", {
-        cache: "default",
+        cache: force ? "no-store" : "default",
       });
       const payload = await response
         .json()
@@ -1975,16 +1946,7 @@ export default function DirectorConsoleClient({
       ) {
         pendingLibraryOrderRef.current = null;
       }
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(
-            audioOrderStorageKey,
-            JSON.stringify(nextOrder),
-          );
-        } catch {
-          // Ignore storage failures and keep the in-memory order.
-        }
-      }
+      writeSharedSoundEffectsOrder(nextOrder);
       writeCachedDirectorAudioLibrary(nextFiles);
       return nextFiles;
     })();
@@ -1996,20 +1958,21 @@ export default function DirectorConsoleClient({
     } finally {
       directorAudioLibraryPromise = null;
     }
-  }, [audioOrderStorageKey]);
+  }, []);
 
   useEffect(() => {
     const cachedFiles = readCachedDirectorAudioLibrary();
     if (cachedFiles.length) {
       setLibraryFiles(cachedFiles);
-      return;
     }
 
     let cancelled = false;
 
     const loadLibraryOnce = async () => {
       try {
-        const nextFiles = await fetchAudioLibrary();
+        const nextFiles = await fetchAudioLibrary({
+          force: true,
+        });
         if (!cancelled) {
           setLibraryFiles(nextFiles);
         }
@@ -2024,6 +1987,38 @@ export default function DirectorConsoleClient({
 
     return () => {
       cancelled = true;
+    };
+  }, [fetchAudioLibrary]);
+
+  useEffect(() => {
+    return subscribeSoundEffectsLibrarySync(() => {
+      syncLibraryStateFromCache();
+    });
+  }, [syncLibraryStateFromCache]);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      void fetchAudioLibrary({
+        force: true,
+      });
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      void fetchAudioLibrary({
+        force: true,
+      });
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [fetchAudioLibrary]);
 
@@ -2055,18 +2050,11 @@ export default function DirectorConsoleClient({
     }
 
     try {
-      const rawValue = window.localStorage.getItem(audioOrderStorageKey);
-      if (!rawValue) {
-        setLibraryOrder([]);
-        return;
-      }
-
-      const parsed = JSON.parse(rawValue);
-      setLibraryOrder(Array.isArray(parsed) ? parsed : []);
+      setLibraryOrder(readSharedSoundEffectsOrder());
     } catch {
       setLibraryOrder([]);
     }
-  }, [audioOrderStorageKey]);
+  }, []);
 
   const orderedLibraryFiles = useMemo(() => {
     if (!libraryFiles.length) {
@@ -2096,6 +2084,11 @@ export default function DirectorConsoleClient({
       return left.label.localeCompare(right.label);
     });
   }, [libraryDurations, libraryFiles, libraryOrder]);
+
+  const filteredLibraryFiles = useMemo(
+    () => filterSoundEffectsByQuery(orderedLibraryFiles, librarySearchQuery),
+    [librarySearchQuery, orderedLibraryFiles],
+  );
 
   const clearLibraryOrderSaveTimer = useCallback(() => {
     if (libraryOrderSaveTimerRef.current) {
@@ -2194,20 +2187,10 @@ export default function DirectorConsoleClient({
       setLibraryFiles(nextFiles);
       const nextOrder = nextFiles.map((file) => file.id);
       setLibraryOrder(nextOrder);
-
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(
-            audioOrderStorageKey,
-            JSON.stringify(nextOrder),
-          );
-        } catch {
-          // Ignore storage failures and keep the in-memory order.
-        }
-      }
+      writeSharedSoundEffectsOrder(nextOrder);
       scheduleLibraryOrderPersist(nextOrder);
     },
-    [audioOrderStorageKey, scheduleLibraryOrderPersist],
+    [scheduleLibraryOrderPersist],
   );
 
   useEffect(() => {
@@ -4741,7 +4724,17 @@ export default function DirectorConsoleClient({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setLibraryPanelOpen((current) => !current)}
+                    onClick={() =>
+                      setLibraryPanelOpen((current) => {
+                        const nextOpen = !current;
+                        if (nextOpen) {
+                          void fetchAudioLibrary({
+                            force: true,
+                          });
+                        }
+                        return nextOpen;
+                      })
+                    }
                     className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
                     aria-expanded={libraryPanelOpen}
                     aria-label={libraryPanelOpen ? "Collapse sound effects" : "Expand sound effects"}
@@ -4771,7 +4764,9 @@ export default function DirectorConsoleClient({
                 <div className="mb-3 flex items-center justify-between gap-3 rounded-[22px] border border-white/10 bg-white/4 px-4 py-3 text-sm text-zinc-300">
                   <div className="min-w-0">
                     <p className="font-semibold text-white">
-                      {orderedLibraryFiles.length} effects ready
+                      {String(librarySearchQuery || "").trim()
+                        ? `${filteredLibraryFiles.length} of ${orderedLibraryFiles.length} effects`
+                        : `${orderedLibraryFiles.length} effects ready`}
                     </p>
                     <p className="mt-1 text-xs text-zinc-400">
                       {libraryLiveId
@@ -4781,7 +4776,17 @@ export default function DirectorConsoleClient({
                   </div>
                   <button
                     type="button"
-                    onClick={() => setLibraryPanelOpen((current) => !current)}
+                    onClick={() =>
+                      setLibraryPanelOpen((current) => {
+                        const nextOpen = !current;
+                        if (nextOpen) {
+                          void fetchAudioLibrary({
+                            force: true,
+                          });
+                        }
+                        return nextOpen;
+                      })
+                    }
                     className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-200 transition hover:bg-white/10"
                   >
                     {libraryPanelOpen ? "Hide" : "Open"}
@@ -4819,8 +4824,38 @@ export default function DirectorConsoleClient({
                   Turn off silent mode to hear sound effects
                 </div>
                 {libraryPanelOpen && orderedLibraryFiles.length ? (
+                  <>
+                    <div className="relative mb-3">
+                      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
+                        <FaSearch className="text-xs" />
+                      </span>
+                      <input
+                        type="search"
+                        inputMode="search"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        value={librarySearchQuery}
+                        onChange={(event) =>
+                          setLibrarySearchQuery(event.target.value)
+                        }
+                        placeholder="Search sound effects"
+                        className="w-full rounded-[22px] border border-white/10 bg-white/[0.04] py-3 pl-10 pr-11 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-violet-300/24 focus:bg-white/[0.06]"
+                        aria-label="Search director sound effects"
+                      />
+                      {String(librarySearchQuery || "").trim() ? (
+                        <button
+                          type="button"
+                          onClick={() => setLibrarySearchQuery("")}
+                          className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-300 transition hover:bg-white/[0.1]"
+                          aria-label="Clear sound effect search"
+                        >
+                          <FaTimes className="text-xs" />
+                        </button>
+                      ) : null}
+                    </div>
                   <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
-                    {orderedLibraryFiles.map((file) => (
+                    {filteredLibraryFiles.map((file) => (
                       <div
                         key={file.id}
                         data-library-effect-id={file.id}
@@ -4945,6 +4980,12 @@ export default function DirectorConsoleClient({
                       </div>
                     ))}
                   </div>
+                    {!filteredLibraryFiles.length ? (
+                      <div className="mt-3 rounded-[22px] border border-white/10 bg-black/20 px-4 py-5 text-left text-sm text-zinc-400">
+                        No sound effects match &quot;{librarySearchQuery.trim()}&quot;.
+                      </div>
+                    ) : null}
+                  </>
                 ) : libraryPanelOpen ? (
                   <button
                     type="button"

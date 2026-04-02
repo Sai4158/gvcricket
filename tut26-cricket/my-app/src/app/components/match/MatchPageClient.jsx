@@ -49,6 +49,7 @@ import {
   readCachedSoundEffectsLibrary,
   readCachedSoundEffectsOrder,
   sortSoundEffectsByOrder,
+  subscribeSoundEffectsLibrarySync,
   warmCachedSoundEffectAssets,
   writeCachedSoundEffectsLibrary,
   writeCachedSoundEffectsOrder,
@@ -1139,22 +1140,24 @@ export default function MatchPageClient({
     void broadcastManualScoreAnnouncement();
   };
 
-  const loadSoundEffectsLibrary = useCallback(async () => {
-    if (soundEffectLibraryStatus === "loading") {
+  const loadSoundEffectsLibrary = useCallback(async ({ force = false, silent = false } = {}) => {
+    if (soundEffectLibraryStatus === "loading" && !force) {
       return;
     }
 
-    if (soundEffectFiles.length) {
+    if (!force && soundEffectFiles.length) {
       setSoundEffectLibraryStatus("ready");
       warmKnownSoundEffects(soundEffectFiles);
       return;
     }
 
-    setSoundEffectLibraryStatus("loading");
+    if (!silent || !soundEffectFiles.length) {
+      setSoundEffectLibraryStatus("loading");
+    }
     setSoundEffectError("");
 
     try {
-      const nextFiles = await fetchCachedSoundEffectsLibrary();
+      const nextFiles = await fetchCachedSoundEffectsLibrary({ force });
       setSoundEffectFiles(nextFiles);
       setSoundEffectLibraryStatus("ready");
       warmKnownSoundEffects(nextFiles);
@@ -1171,6 +1174,58 @@ export default function MatchPageClient({
     soundEffectLibraryStatus,
     warmKnownSoundEffects,
   ]);
+
+  useEffect(() => {
+    return subscribeSoundEffectsLibrarySync(() => {
+      const nextFiles = sortSoundEffectsByOrder(
+        readCachedSoundEffectsLibrary(),
+        readCachedSoundEffectsOrder(),
+      );
+
+      setSoundEffectFiles(nextFiles);
+      setSoundEffectLibraryStatus(nextFiles.length ? "ready" : "idle");
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isLiveMatch) {
+      return undefined;
+    }
+
+    const refreshTimer = window.setTimeout(() => {
+      void loadSoundEffectsLibrary({
+        force: true,
+        silent: soundEffectFiles.length > 0,
+      });
+    }, 0);
+
+    const handleFocus = () => {
+      void loadSoundEffectsLibrary({
+        force: true,
+        silent: true,
+      });
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      void loadSoundEffectsLibrary({
+        force: true,
+        silent: true,
+      });
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.clearTimeout(refreshTimer);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [isLiveMatch, loadSoundEffectsLibrary, soundEffectFiles.length]);
 
   const resolveConfiguredScoreSoundEffect = useCallback(
     async (runs, isOut = false, extraType = null) => {
@@ -1230,11 +1285,14 @@ export default function MatchPageClient({
     setSoundEffectsOpen((current) => {
       const nextOpen = !current;
       if (nextOpen) {
-        void loadSoundEffectsLibrary();
+        void loadSoundEffectsLibrary({
+          force: true,
+          silent: soundEffectFiles.length > 0,
+        });
       }
       return nextOpen;
     });
-  }, [loadSoundEffectsLibrary]);
+  }, [loadSoundEffectsLibrary, soundEffectFiles.length]);
 
   const handlePlaySoundEffect = useCallback(
     async (file) => {
@@ -2152,7 +2210,10 @@ export default function MatchPageClient({
                 onPreviewSoundEffect: handlePreviewCommentarySoundEffect,
               }}
               onOpenScoreSoundSettings={() => {
-                void loadSoundEffectsLibrary();
+                void loadSoundEffectsLibrary({
+                  force: true,
+                  silent: soundEffectFiles.length > 0,
+                });
               }}
             />
           ) : null}

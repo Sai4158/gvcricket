@@ -8,10 +8,12 @@ import {
   FaMusic,
   FaPause,
   FaPlay,
+  FaSearch,
   FaTimes,
   FaVolumeUp,
 } from "react-icons/fa";
 import ScoreSoundEffectsEditor from "../live/ScoreSoundEffectsEditor";
+import { filterSoundEffectsByQuery } from "../../lib/sound-effects-client";
 
 function formatAudioTime(seconds) {
   const safeSeconds = Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
@@ -45,6 +47,7 @@ export default function MatchSoundEffectsPanel({
   const [dropTargetId, setDropTargetId] = useState("");
   const [pendingEffectId, setPendingEffectId] = useState("");
   const [isScoreSoundSettingsOpen, setIsScoreSoundSettingsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const pointerDragRef = useRef({
     pointerId: null,
     activeId: "",
@@ -323,6 +326,12 @@ export default function MatchSoundEffectsPanel({
   }, [isDisabled, onPlayEffect, onStopEffect]);
 
   const hasScoreSoundSettings = Boolean(scoreSoundSettings);
+  const visibleFiles = useMemo(
+    () => filterSoundEffectsByQuery(files, searchQuery),
+    [files, searchQuery],
+  );
+  const visibleEffectCount = visibleFiles.length;
+  const hasSearchQuery = Boolean(String(searchQuery || "").trim());
 
   return (
     <section
@@ -362,7 +371,9 @@ export default function MatchSoundEffectsPanel({
               {isLoading
                 ? "Loading..."
                 : effectCount
-                  ? `${effectCount} ready to tap`
+                  ? hasSearchQuery
+                    ? `${visibleEffectCount} of ${effectCount} ready`
+                    : `${effectCount} ready to tap`
                   : "Tap to load"}
             </span>
           </span>
@@ -430,6 +441,35 @@ export default function MatchSoundEffectsPanel({
 
       {isOpen && !isScoreSoundSettingsOpen ? (
         <div className="mt-4 space-y-3">
+          {effectCount ? (
+            <div className="relative">
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
+                <FaSearch className="text-xs" />
+              </span>
+              <input
+                type="search"
+                inputMode="search"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search sound effects"
+                className="w-full rounded-[22px] border border-white/10 bg-white/[0.04] py-3 pl-10 pr-11 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-emerald-300/24 focus:bg-white/[0.06]"
+                aria-label="Search sound effects"
+              />
+              {hasSearchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-300 transition hover:bg-white/[0.1]"
+                  aria-label="Clear sound effect search"
+                >
+                  <FaTimes className="text-xs" />
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           {needsUnlock ? (
             <div className="rounded-[22px] border border-amber-300/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
               Tap a sound once to enable audio on this phone.
@@ -444,9 +484,9 @@ export default function MatchSoundEffectsPanel({
             <div className="rounded-[22px] border border-white/8 bg-white/[0.03] px-4 py-4 text-sm text-zinc-400">
               Loading sound effects...
             </div>
-          ) : effectCount ? (
+          ) : effectCount && visibleEffectCount ? (
             <div className="grid grid-cols-2 gap-3">
-              {files.map((file) => {
+              {visibleFiles.map((file) => {
                 const isPlayingActive =
                   activeEffectId === file.id &&
                   (activeEffectStatus === "loading" ||
@@ -589,6 +629,10 @@ export default function MatchSoundEffectsPanel({
                   </div>
                 );
               })}
+            </div>
+          ) : effectCount && hasSearchQuery ? (
+            <div className="rounded-[22px] border border-white/8 bg-white/[0.03] px-4 py-4 text-sm text-zinc-400">
+              No sound effects match &quot;{searchQuery.trim()}&quot;.
             </div>
           ) : (
             <div className="rounded-[22px] border border-white/8 bg-white/[0.03] px-4 py-4 text-sm text-zinc-400">
