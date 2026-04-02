@@ -98,12 +98,19 @@ function AnnounceIcon() {
 
 const ACTION_HOLD_DELAY_MS = 60;
 
-function ActionHelpItem({ icon, title, description, colorClass }) {
+function ActionHelpItem({ icon, title, description, colorClass, rank }) {
   return (
     <div className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/[0.04] p-3">
       <div className={`mt-0.5 text-2xl ${colorClass}`}>{icon}</div>
       <div className="min-w-0">
-        <h4 className="text-sm font-semibold text-white">{title}</h4>
+        <div className="flex items-center gap-2">
+          {typeof rank === "number" ? (
+            <span className="inline-flex shrink-0 rounded-full border border-white/12 bg-white/[0.06] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-200">
+              #{rank}
+            </span>
+          ) : null}
+          <h4 className="text-sm font-semibold text-white">{title}</h4>
+        </div>
         <ul className="mt-1 space-y-1 text-xs leading-5 text-zinc-400">
           {description.map((item) => (
             <li key={item} className="flex items-start gap-2">
@@ -630,7 +637,7 @@ export default function MatchActionGrid({
                     Action Icons
                   </h3>
                   <p className="mt-1 text-xs text-zinc-400">
-                    Quick guide for each button.
+                    Ranked by common umpire use.
                   </p>
                 </div>
                 <button
@@ -653,97 +660,108 @@ export default function MatchActionGrid({
               >
                 {showLiveControls ? (
                   <ActionHelpItem
-                    icon={<WalkieIcon />}
-                    title="Walkie-Talkie"
+                    rank={1}
+                    icon={<AnnounceIcon />}
+                    title="Announcer / Effects"
                     description={[
-                      "Open the walkie panel.",
-                      "Turn it on first, then hold to speak.",
-                      "See live status while it connects or stays busy.",
+                      "Read score, test voice, and play sound effects from one panel.",
+                      "Search sounds and set dot, 1, 2, 3, 4, 6, out, wide 0, wide +1, and no ball.",
+                      "Your score sound choices stay saved until you change them.",
                     ]}
-                    colorClass="text-emerald-300"
+                    colorClass="text-cyan-300"
                   />
                 ) : null}
                 <ActionHelpItem
-                  icon={<AnnounceIcon />}
-                    title="Announcer / Effects"
-                    description={[
-                      "Open score voice settings.",
-                      "Pick sounds for dot, 1, 2, 3, 4, 6, out, wide 0, wide +1, and no ball.",
-                      "Test the announcer and effect flow.",
-                    ]}
-                    colorClass="text-cyan-300"
-                />
-                <ActionHelpItem
+                  rank={showLiveControls ? 2 : 1}
                   icon={<LuUndo2 />}
                   title="Undo"
                   description={[
-                    "Remove the last ball.",
-                    "Fix a wrong score tap quickly.",
-                    "Replay the ball after undo.",
+                    "Remove the last ball instantly.",
+                    "Fix a wrong score tap and replay that ball cleanly.",
+                    "Keeps the over flow correct after the undo.",
                   ]}
                   colorClass="text-zinc-300"
                 />
                 {showLiveControls ? (
                   <ActionHelpItem
+                    rank={3}
+                    icon={<WalkieIcon />}
+                    title="Walkie-Talkie"
+                    description={[
+                      "Turn it on, then hold to talk live.",
+                      "Only one person can speak at a time, so live and busy states stay clear.",
+                      "Works live with umpire, director, and spectators.",
+                    ]}
+                    colorClass="text-emerald-300"
+                  />
+                ) : null}
+                {showLiveControls ? (
+                  <ActionHelpItem
+                    rank={4}
                     icon={<CommentaryIcon />}
                     title="Loudspeaker"
                     description={[
-                      "Open the loudspeaker mic.",
-                      "Turn it on first, then hold to talk.",
-                      "Good for voice updates on the ground.",
+                      "Turn it on first, then hold to talk on the ground.",
+                      "Best for quick PA calls and live voice updates.",
+                      "The mic bars react while you speak.",
                     ]}
                     colorClass="text-amber-300"
                   />
                 ) : null}
                 <ActionHelpItem
-                  icon={<FaUserEdit />}
-                  title="Edit Teams"
-                  description={[
-                    "Change team names.",
-                    "Fix team details if needed.",
-                    "Update the match setup view.",
-                  ]}
-                  colorClass="text-sky-400"
-                />
-                <ActionHelpItem
-                  icon={<FaRegClock />}
-                  title="Edit Overs / Innings"
-                  description={[
-                    "Update over count.",
-                    "Fix innings progress.",
-                    "Adjust match settings if needed.",
-                  ]}
-                  colorClass="text-amber-400"
-                />
-                <ActionHelpItem
+                  rank={showLiveControls ? 5 : 2}
                   icon={<FaBookOpen />}
                   title="History"
                   description={[
-                    "See over-by-over history.",
-                    "Check past balls quickly.",
-                    "Review what was scored earlier.",
+                    "See recent balls over by over.",
+                    "Check what was scored before using undo or edits.",
+                    "Helpful when confirming the latest over.",
                   ]}
                   colorClass="text-violet-400"
                 />
                 <ActionHelpItem
+                  rank={showLiveControls ? 6 : 3}
+                  icon={<FaShareAlt />}
+                  title="Share"
+                  description={[
+                    "Copy the live spectator link fast.",
+                    "Open the score page on another phone right away.",
+                    "Useful for players, crowd, and scorer support.",
+                  ]}
+                  colorClass="text-green-400"
+                />
+                <ActionHelpItem
+                  rank={showLiveControls ? 7 : 4}
                   icon={<FaImage />}
                   title="Image"
                   description={[
-                    "Add match images.",
-                    "Manage uploaded photos.",
-                    "Update the match image section.",
+                    "Add match photos for live, spectator, and result screens.",
+                    "Manage uploaded pictures in one place.",
+                    "Keeps the match pages looking complete.",
                   ]}
                   colorClass="text-zinc-200"
                 />
                 <ActionHelpItem
-                  icon={<FaShareAlt />}
-                  title="Share"
+                  rank={showLiveControls ? 8 : 5}
+                  icon={<FaUserEdit />}
+                  title="Edit Teams"
                   description={[
-                    "Copy the live match link.",
-                    "Share it with others fast.",
-                    "Open the live view on another device.",
+                    "Fix team names or labels if something changes.",
+                    "Update setup details without leaving the match view.",
+                    "Best for admin corrections during setup or live play.",
                   ]}
-                  colorClass="text-green-400"
+                  colorClass="text-sky-400"
+                />
+                <ActionHelpItem
+                  rank={showLiveControls ? 9 : 6}
+                  icon={<FaRegClock />}
+                  title="Edit Overs / Innings"
+                  description={[
+                    "Fix total overs or innings state.",
+                    "Correct setup mistakes before or during the match.",
+                    "Use this for match admin changes, not normal scoring.",
+                  ]}
+                  colorClass="text-amber-400"
                 />
               </div>
             </motion.div>

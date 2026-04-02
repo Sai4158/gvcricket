@@ -493,7 +493,7 @@ export default function ScoreSoundEffectsEditor({
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-white">Umpire</p>
               <p className="mt-1 text-xs text-white/70">
-                Play sounds for umpire.
+                Play effects for umpire.
               </p>
             </div>
             <IosSwitch
@@ -513,7 +513,7 @@ export default function ScoreSoundEffectsEditor({
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-white">Spectators</p>
               <p className="mt-1 text-xs text-white/70">
-                Play sounds for spectators.
+                Play effects for spectators.
               </p>
             </div>
             <IosSwitch
