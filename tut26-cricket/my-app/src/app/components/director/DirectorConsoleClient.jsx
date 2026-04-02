@@ -79,6 +79,7 @@ const DIRECTOR_AUDIO_LIBRARY_CACHE_TTL_MS = 10 * 60 * 1000;
 const DIRECTOR_AUDIO_ORDER_SAVE_DELAY_MS = 20_000;
 const DIRECTOR_SESSIONS_REFRESH_MIN_GAP_MS = 1500;
 const DIRECTOR_YOUTUBE_TRACKS_CACHE_KEY = "gv-director-youtube-tracks-v1";
+const DIRECTOR_PREFERRED_SESSION_STORAGE_KEY = "gv-director-preferred-session-v1";
 const DIRECTOR_YOUTUBE_PLAYLIST_IMPORT_LIMIT = 40;
 let directorAudioLibraryMemoryCache = null;
 let directorAudioLibraryPromise = null;
@@ -205,6 +206,42 @@ function readCachedDirectorYouTubeTracks() {
       .filter(Boolean);
   } catch {
     return [];
+  }
+}
+
+function readStoredDirectorPreferredSessionId() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  try {
+    return String(
+      window.localStorage.getItem(DIRECTOR_PREFERRED_SESSION_STORAGE_KEY) || "",
+    ).trim();
+  } catch {
+    return "";
+  }
+}
+
+function writeStoredDirectorPreferredSessionId(sessionId) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const normalizedSessionId = String(sessionId || "").trim();
+
+  try {
+    if (!normalizedSessionId) {
+      window.localStorage.removeItem(DIRECTOR_PREFERRED_SESSION_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(
+      DIRECTOR_PREFERRED_SESSION_STORAGE_KEY,
+      normalizedSessionId,
+    );
+  } catch {
+    // Ignore storage failures.
   }
 }
 
@@ -717,6 +754,45 @@ function getPreferredLiveSessionId(sessions, preferredSessionId = "") {
   return preferredLive?.session?._id || firstLive?.session?._id || "";
 }
 
+export function resolveDirectorAutoManageSessionId(
+  sessions,
+  {
+    preferredSessionId = "",
+    selectedSessionId = "",
+    autoManageRequested = false,
+  } = {},
+) {
+  const liveSessions = (Array.isArray(sessions) ? sessions : []).filter(
+    (item) => item?.isLive && item?.session?._id,
+  );
+
+  if (!liveSessions.length) {
+    return "";
+  }
+
+  const preferredLive = preferredSessionId
+    ? liveSessions.find((item) => item.session?._id === preferredSessionId)
+    : null;
+  if (preferredLive?.session?._id) {
+    return preferredLive.session._id;
+  }
+
+  if (autoManageRequested && selectedSessionId) {
+    const selectedLive = liveSessions.find(
+      (item) => item.session?._id === selectedSessionId,
+    );
+    if (selectedLive?.session?._id) {
+      return selectedLive.session._id;
+    }
+  }
+
+  if (liveSessions.length === 1) {
+    return liveSessions[0].session._id;
+  }
+
+  return "";
+}
+
 function formatAudioTime(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) {
     return "--:--";
@@ -1065,9 +1141,11 @@ export default function DirectorConsoleClient({
   initialAutoManage = false,
 }) {
   const router = useRouter();
+  const rememberedPreferredSessionId =
+    initialPreferredSessionId || readStoredDirectorPreferredSessionId();
   const initialTargetSessionId = getPreferredLiveSessionId(
     initialSessions,
-    initialPreferredSessionId,
+    rememberedPreferredSessionId,
   );
   const initialManagedWalkieSession =
     initialAuthorized && initialAutoManage && initialTargetSessionId
@@ -1142,7 +1220,7 @@ export default function DirectorConsoleClient({
   const [audioUnlocked, setAudioUnlocked] = useState(() => isUiAudioUnlocked());
   const [draggingLibraryId, setDraggingLibraryId] = useState("");
   const [libraryDropTargetId, setLibraryDropTargetId] = useState("");
-  const preferredSessionIdRef = useRef(initialPreferredSessionId || "");
+  const preferredSessionIdRef = useRef(rememberedPreferredSessionId || "");
   const pendingInitialManageRef = useRef(Boolean(initialAutoManage));
   const pendingLibraryOrderRef = useRef(null);
   const libraryOrderSaveTimerRef = useRef(null);
@@ -1651,13 +1729,21 @@ export default function DirectorConsoleClient({
       setSelectedSessionId(preferredSessionId);
     }
 
-    if (authorized && pendingInitialManageRef.current) {
-      setManagedSessionId(preferredSessionId);
+    const autoManageSessionId = resolveDirectorAutoManageSessionId(sessions, {
+      preferredSessionId,
+      selectedSessionId,
+      autoManageRequested: pendingInitialManageRef.current,
+    });
+
+    if (authorized && !managedSessionId && !showPicker && autoManageSessionId) {
+      preferredSessionIdRef.current = autoManageSessionId;
+      writeStoredDirectorPreferredSessionId(autoManageSessionId);
+      setManagedSessionId(autoManageSessionId);
       setShowPicker(false);
       setAuthError("");
       pendingInitialManageRef.current = false;
     }
-  }, [authorized, selectedSessionId, sessions]);
+  }, [authorized, managedSessionId, selectedSessionId, sessions, showPicker]);
 
   useEffect(() => {
     if (!iOSSafari) {
@@ -1767,6 +1853,44 @@ export default function DirectorConsoleClient({
 
     return directorSessionsRefreshPromiseRef.current;
   }, [authorized, managedSessionId, sessions]);
+
+  const openDirectorSession = useCallback((sessionId) => {
+    const normalizedSessionId = String(sessionId || "").trim();
+    if (!normalizedSessionId) {
+      return;
+    }
+
+    preferredSessionIdRef.current = normalizedSessionId;
+    writeStoredDirectorPreferredSessionId(normalizedSessionId);
+    setSelectedSessionId(normalizedSessionId);
+    setManagedSessionId(normalizedSessionId);
+    setShowPicker(false);
+    setAuthError("");
+  }, []);
+
+  const loadAuthorizedDirectorSessions = useCallback(async () => {
+    try {
+      const response = await fetch("/api/director/sessions", {
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => ({ sessions: [] }));
+
+      if (!response.ok) {
+        return [];
+      }
+
+      const nextSessions = Array.isArray(payload.sessions)
+        ? payload.sessions
+        : [];
+      if (nextSessions.length) {
+        writeCachedDirectorSessions(nextSessions);
+      }
+      lastDirectorSessionsRefreshAtRef.current = Date.now();
+      return nextSessions;
+    } catch {
+      return [];
+    }
+  }, []);
 
   useEffect(() => {
     if (!authorized) {
@@ -2846,28 +2970,39 @@ export default function DirectorConsoleClient({
       setConsoleError("");
       setAuthorized(true);
       setPin("");
-      const nextSessions = sessions.length
-        ? sessions
-        : readCachedDirectorSessions();
+      const fetchedSessions = await loadAuthorizedDirectorSessions();
+      const nextSessions = fetchedSessions.length
+        ? fetchedSessions
+        : sessions.length
+          ? sessions
+          : readCachedDirectorSessions();
       if (nextSessions.length) {
         writeCachedDirectorSessions(nextSessions);
         setSessions(nextSessions);
-        const preferredLive = preferredSessionIdRef.current
-          ? nextSessions.find(
-              (item) =>
-                item.session?._id === preferredSessionIdRef.current &&
-                item.isLive,
-            )
-          : null;
         const nextLive = nextSessions.find((item) => item.isLive);
-        setSelectedSessionId(
-          preferredLive?.session?._id ||
-            nextLive?.session?._id ||
-            nextSessions?.[0]?.session?._id ||
-            "",
+        const autoManageSessionId = resolveDirectorAutoManageSessionId(
+          nextSessions,
+          {
+            preferredSessionId: preferredSessionIdRef.current,
+            selectedSessionId,
+            autoManageRequested: pendingInitialManageRef.current,
+          },
         );
-        if (pendingInitialManageRef.current && preferredLive?.session?._id) {
-          setManagedSessionId(preferredLive.session._id);
+        const nextSelectedSessionId =
+          autoManageSessionId ||
+          getPreferredLiveSessionId(
+            nextSessions,
+            preferredSessionIdRef.current || selectedSessionId,
+          ) ||
+          nextLive?.session?._id ||
+          nextSessions?.[0]?.session?._id ||
+          "";
+        setSelectedSessionId(nextSelectedSessionId);
+        if (autoManageSessionId) {
+          preferredSessionIdRef.current = autoManageSessionId;
+          writeStoredDirectorPreferredSessionId(autoManageSessionId);
+          setManagedSessionId(autoManageSessionId);
+          setShowPicker(false);
           pendingInitialManageRef.current = false;
         } else {
           setManagedSessionId("");
@@ -4275,10 +4410,10 @@ export default function DirectorConsoleClient({
                         pin.length !== 4 || directorPinRateLimit.isBlocked
                       }
                       loading={isSubmittingPin}
-                      pendingLabel="Checking..."
+                      pendingLabel="Opening..."
                       className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(90deg,#10b981_0%,#22c55e_58%,#34d399_100%)] px-5 py-3.5 font-bold text-black shadow-[0_16px_36px_rgba(16,185,129,0.2)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Continue to Match Picker
+                      Open Director Mode
                     </LoadingButton>
                     {!isSubmittingPin && pin.length !== 4 ? (
                       <p className="mt-3 text-center text-xs text-zinc-500">
@@ -4302,16 +4437,10 @@ export default function DirectorConsoleClient({
                 <DirectorSessionPicker
                   sessions={sessions}
                   onSelect={(item) => {
-                    setSelectedSessionId(item.session._id);
-                    setManagedSessionId(item.session._id);
-                    setShowPicker(false);
-                    setAuthError("");
+                    openDirectorSession(item.session._id);
                   }}
                   onQuickStart={(item) => {
-                    setSelectedSessionId(item.session._id);
-                    setManagedSessionId(item.session._id);
-                    setShowPicker(false);
-                    setAuthError("");
+                    openDirectorSession(item.session._id);
                   }}
                 />
               </div>

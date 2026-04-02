@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { resolveDirectorAutoManageSessionId } from "../src/app/components/director/DirectorConsoleClient.jsx";
 import {
   shouldPlayWalkieRemoteAudio,
   shouldReceiveWalkieAudio,
@@ -48,6 +49,54 @@ test("director PIN validation trims spaces and rejects invalid characters", () =
     if (previousSecret === undefined) delete process.env.MATCH_ACCESS_SECRET;
     else process.env.MATCH_ACCESS_SECRET = previousSecret;
   }
+});
+
+test("director auto-manage picks the requested or remembered live session after auth", () => {
+  const sessions = [
+    {
+      isLive: true,
+      session: { _id: "session-a" },
+    },
+    {
+      isLive: true,
+      session: { _id: "session-b" },
+    },
+  ];
+
+  assert.equal(
+    resolveDirectorAutoManageSessionId(sessions, {
+      preferredSessionId: "session-b",
+      selectedSessionId: "session-a",
+      autoManageRequested: true,
+    }),
+    "session-b",
+  );
+
+  assert.equal(
+    resolveDirectorAutoManageSessionId(
+      [
+        {
+          isLive: true,
+          session: { _id: "only-live" },
+        },
+      ],
+      {
+        preferredSessionId: "",
+        selectedSessionId: "",
+        autoManageRequested: false,
+      },
+    ),
+    "only-live",
+  );
+
+  assert.equal(
+    resolveDirectorAutoManageSessionId(sessions, {
+      preferredSessionId: "",
+      selectedSessionId: "",
+      autoManageRequested: false,
+    }),
+    "",
+  );
 });
 
 test("shared walkie audio lets every non-speaker listen to the active speaker", () => {
