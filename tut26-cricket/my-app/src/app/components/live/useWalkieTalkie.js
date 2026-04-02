@@ -2061,12 +2061,7 @@ export default function useWalkieTalkie({
               metadataStateRef.current.pendingRequests.length > 0 ||
               role === "umpire"
             ) {
-              void (async () => {
-                const nextState =
-                  (await syncPersistentWalkieState().catch(() => null)) ||
-                  metadataStateRef.current;
-                await broadcastMetadataState(client, nextState);
-              })();
+              void broadcastMetadataState(client, metadataStateRef.current);
             }
             return;
           }
@@ -2218,16 +2213,18 @@ export default function useWalkieTalkie({
       });
 
       await refreshRuntimeState(client);
-      try {
-        await syncPersistentWalkieState();
-      } catch (syncError) {
-        walkieConsole("warn", "Walkie persistent state sync skipped", {
-          stage: "persistent-sync",
-          message: messageFor(
-            syncError,
-            "Walkie persistent state could not be loaded."
-          ),
-        });
+      if (Number(authoritativeSnapshotRef.current?.version || 0) <= 0) {
+        try {
+          await syncPersistentWalkieState();
+        } catch (syncError) {
+          walkieConsole("warn", "Walkie persistent state sync skipped", {
+            stage: "persistent-sync",
+            message: messageFor(
+              syncError,
+              "Walkie persistent state could not be loaded."
+            ),
+          });
+        }
       }
       const now = Date.now();
       const shouldRequestSync =

@@ -143,6 +143,43 @@ function ActionIconButton({
   const pointerIdRef = useRef(null);
   const [holdPreviewActive, setHoldPreviewActive] = useState(false);
 
+  const safeSetPointerCapture = (target, pointerId) => {
+    if (
+      pointerId === undefined ||
+      !target ||
+      typeof target.setPointerCapture !== "function"
+    ) {
+      return;
+    }
+
+    try {
+      target.setPointerCapture(pointerId);
+    } catch {
+      // Some mobile/browser edge cases surface a pointerdown without an active capture target.
+    }
+  };
+
+  const safeReleasePointerCapture = (target, pointerId) => {
+    if (
+      pointerId === undefined ||
+      !target ||
+      typeof target.releasePointerCapture !== "function"
+    ) {
+      return;
+    }
+
+    try {
+      if (
+        typeof target.hasPointerCapture !== "function" ||
+        target.hasPointerCapture(pointerId)
+      ) {
+        target.releasePointerCapture(pointerId);
+      }
+    } catch {
+      // Ignore stale or already-released capture handles.
+    }
+  };
+
   const clearHoldTimer = () => {
     if (holdTimerRef.current) {
       window.clearTimeout(holdTimerRef.current);
@@ -224,7 +261,7 @@ function ActionIconButton({
         if (!event.isPrimary) return;
         if (event.pointerType === "mouse" && event.button !== 0) return;
         pointerIdRef.current = event.pointerId;
-        event.currentTarget.setPointerCapture?.(event.pointerId);
+        safeSetPointerCapture(event.currentTarget, event.pointerId);
         beginPress();
       }}
       onPointerUp={(event) => {
@@ -235,7 +272,9 @@ function ActionIconButton({
         ) {
           return;
         }
-        event.currentTarget.releasePointerCapture?.(event.pointerId);
+        safeReleasePointerCapture(event.currentTarget, event.pointerId);
+        pointerIdRef.current = null;
+        endPress();
       }}
       onPointerCancel={(event) => {
         if (
@@ -245,7 +284,20 @@ function ActionIconButton({
         ) {
           return;
         }
-        event.currentTarget.releasePointerCapture?.(event.pointerId);
+        safeReleasePointerCapture(event.currentTarget, event.pointerId);
+        pointerIdRef.current = null;
+        endPress();
+      }}
+      onLostPointerCapture={(event) => {
+        if (
+          pointerIdRef.current !== null &&
+          event.pointerId !== undefined &&
+          event.pointerId !== pointerIdRef.current
+        ) {
+          return;
+        }
+        pointerIdRef.current = null;
+        endPress();
       }}
       onContextMenu={(event) => {
         event.preventDefault();
