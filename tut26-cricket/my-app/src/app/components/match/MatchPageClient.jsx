@@ -128,13 +128,24 @@ export default function MatchPageClient({
   initialMatch,
 }) {
   const router = useRouter();
+  const cachedInitialSoundEffectFiles = sortSoundEffectsByOrder(
+    readCachedSoundEffectsLibrary(),
+    readCachedSoundEffectsOrder(),
+  );
+  const cachedInitialSoundEffectDurations = readCachedSoundEffectDurations();
   const [modal, setModal] = useState({ type: null });
   const [infoText, setInfoText] = useState(null);
   const [soundEffectsOpen, setSoundEffectsOpen] = useState(false);
-  const [soundEffectFiles, setSoundEffectFiles] = useState([]);
-  const [soundEffectLibraryStatus, setSoundEffectLibraryStatus] = useState("idle");
+  const [soundEffectFiles, setSoundEffectFiles] = useState(
+    cachedInitialSoundEffectFiles,
+  );
+  const [soundEffectLibraryStatus, setSoundEffectLibraryStatus] = useState(
+    cachedInitialSoundEffectFiles.length ? "ready" : "idle",
+  );
   const [soundEffectError, setSoundEffectError] = useState("");
-  const [soundEffectDurations, setSoundEffectDurations] = useState({});
+  const [soundEffectDurations, setSoundEffectDurations] = useState(
+    cachedInitialSoundEffectDurations,
+  );
   const [activeCommentaryAction, setActiveCommentaryAction] = useState("");
   const [activeCommentaryPreviewId, setActiveCommentaryPreviewId] = useState("");
   const localAnnouncementIdRef = useRef(0);
@@ -162,34 +173,16 @@ export default function MatchPageClient({
   const boundarySequenceTimerRef = useRef(null);
   const lastPersistedAnnouncerSettingsRef = useRef("");
   const contentStartRef = useRef(null);
+  const announcementDuckRef = useRef([]);
+  const announcementRestoreTimerRef = useRef(null);
+  const micMonitorDuckingRef = useRef(false);
+  const speechPlaybackActiveRef = useRef(false);
+  const soundEffectPlaybackActiveRef = useRef(false);
   const handleHeroMenuScroll = useCallback(() => {
     contentStartRef.current?.scrollIntoView({
       behavior: "smooth",
       block: "start",
     });
-  }, []);
-
-  useEffect(() => {
-    const restoreTimer = window.setTimeout(() => {
-      const cachedFiles = sortSoundEffectsByOrder(
-        readCachedSoundEffectsLibrary(),
-        readCachedSoundEffectsOrder(),
-      );
-      const cachedDurations = readCachedSoundEffectDurations();
-
-      if (cachedFiles.length) {
-        setSoundEffectFiles(cachedFiles);
-        setSoundEffectLibraryStatus("ready");
-      }
-
-      if (Object.keys(cachedDurations).length) {
-        setSoundEffectDurations(cachedDurations);
-      }
-    }, 0);
-
-    return () => {
-      window.clearTimeout(restoreTimer);
-    };
   }, []);
 
   const { authStatus, authError, authSubmitting, submitPin } = useMatchAccess(
@@ -209,6 +202,128 @@ export default function MatchPageClient({
     interruptAndCapture,
   } =
     useSpeechAnnouncer(umpireSettings);
+
+  useEffect(() => {
+    micMonitorDuckingRef.current = Boolean(
+      micMonitor.isActive || micMonitor.isPaused || micMonitor.isStarting,
+    );
+  }, [micMonitor.isActive, micMonitor.isPaused, micMonitor.isStarting]);
+
+  useEffect(() => {
+    speechPlaybackActiveRef.current = status === "speaking";
+  }, [status]);
+
+  const clearAnnouncementDuck = useCallback(() => {
+    if (announcementRestoreTimerRef.current) {
+      window.clearTimeout(announcementRestoreTimerRef.current);
+      announcementRestoreTimerRef.current = null;
+    }
+
+    if (!Array.isArray(announcementDuckRef.current) || !announcementDuckRef.current.length) {
+      return;
+    }
+
+    for (const item of announcementDuckRef.current) {
+      try {
+        item.element.muted = item.muted;
+        item.element.volume = item.volume;
+      } catch {
+        // Ignore stale media elements removed from the page.
+      }
+    }
+
+    announcementDuckRef.current = [];
+  }, []);
+
+  const scheduleAnnouncementDuckRestore = useCallback(
+    (delayMs = 220) => {
+      if (announcementRestoreTimerRef.current) {
+        window.clearTimeout(announcementRestoreTimerRef.current);
+        announcementRestoreTimerRef.current = null;
+      }
+
+      announcementRestoreTimerRef.current = window.setTimeout(() => {
+        announcementRestoreTimerRef.current = null;
+        if (
+          micMonitorDuckingRef.current ||
+          speechPlaybackActiveRef.current ||
+          soundEffectPlaybackActiveRef.current
+        ) {
+          return;
+        }
+        clearAnnouncementDuck();
+      }, Math.max(0, delayMs));
+    },
+    [clearAnnouncementDuck],
+  );
+
+  const duckAnnouncementMedia = useCallback(() => {
+    if (typeof document === "undefined" || micMonitorDuckingRef.current) {
+      return false;
+    }
+
+    if (announcementRestoreTimerRef.current) {
+      window.clearTimeout(announcementRestoreTimerRef.current);
+      announcementRestoreTimerRef.current = null;
+    }
+
+    if (Array.isArray(announcementDuckRef.current) && announcementDuckRef.current.length) {
+      return true;
+    }
+
+    const excludedElements = new Set(
+      document.querySelectorAll('[data-gv-umpire-effects-player="true"]'),
+    );
+    const tracked = [];
+    const mediaElements = document.querySelectorAll("audio, video");
+
+    mediaElements.forEach((element) => {
+      if (excludedElements.has(element)) {
+        return;
+      }
+
+      try {
+        tracked.push({
+          element,
+          volume: typeof element.volume === "number" ? element.volume : 1,
+          muted: Boolean(element.muted),
+        });
+
+        if (!element.muted) {
+          element.volume = Math.min(element.volume, 0.18);
+        }
+      } catch {
+        // Ignore media elements the browser refuses to adjust.
+      }
+    });
+
+    announcementDuckRef.current = tracked;
+    return true;
+  }, []);
+
+  const speakWithAnnouncementDuck = useCallback(
+    (text, options = {}) => {
+      duckAnnouncementMedia();
+      const spoke = speak(text, options);
+      if (!spoke) {
+        scheduleAnnouncementDuckRestore(120);
+      }
+      return spoke;
+    },
+    [duckAnnouncementMedia, scheduleAnnouncementDuckRestore, speak],
+  );
+
+  const speakSequenceWithAnnouncementDuck = useCallback(
+    (items, options = {}) => {
+      duckAnnouncementMedia();
+      const spoke = speakSequence(items, options);
+      if (!spoke) {
+        scheduleAnnouncementDuckRestore(120);
+      }
+      return spoke;
+    },
+    [duckAnnouncementMedia, scheduleAnnouncementDuckRestore, speakSequence],
+  );
   const queueDeferredUmpireAnnouncement = useCallback((entry) => {
     if (!entry?.items?.length) {
       return;
@@ -266,7 +381,7 @@ export default function MatchPageClient({
         umpireSettings.mode !== "silent"
       ) {
         localAnnouncementIdRef.current += 1;
-        speakSequence(deferredAnnouncement.items, {
+        speakSequenceWithAnnouncementDuck(deferredAnnouncement.items, {
           key: `umpire-post-effect-${localAnnouncementIdRef.current}`,
           priority: Number(deferredAnnouncement.options?.priority || 2),
           interrupt: true,
@@ -280,7 +395,7 @@ export default function MatchPageClient({
         umpireSettings.mode !== "silent"
       ) {
         localAnnouncementIdRef.current += 1;
-        speakSequence(pendingManualScore.items, {
+        speakSequenceWithAnnouncementDuck(pendingManualScore.items, {
           key: `umpire-manual-score-${localAnnouncementIdRef.current}`,
           priority: 4,
           interrupt: true,
@@ -311,7 +426,7 @@ export default function MatchPageClient({
     if (!resumeQueue.length) {
       if (pendingManualScore) {
         localAnnouncementIdRef.current += 1;
-        speakSequence(pendingManualScore.items, {
+        speakSequenceWithAnnouncementDuck(pendingManualScore.items, {
           key: `umpire-manual-score-${localAnnouncementIdRef.current}`,
           priority: 4,
           interrupt: true,
@@ -324,7 +439,7 @@ export default function MatchPageClient({
     }
 
     localAnnouncementIdRef.current += 1;
-    speakSequence(
+    speakSequenceWithAnnouncementDuck(
       [
         ...resumeQueue.flatMap((entry) => entry.items || []),
         ...(pendingManualScore?.items || []),
@@ -340,7 +455,11 @@ export default function MatchPageClient({
         userGesture: true,
       }
     );
-  }, [speakSequence, umpireSettings.enabled, umpireSettings.mode]);
+  }, [
+    speakSequenceWithAnnouncementDuck,
+    umpireSettings.enabled,
+    umpireSettings.mode,
+  ]);
   const {
     audioRef: soundEffectsAudioRef,
     activeEffectId: activeSoundEffectId,
@@ -352,6 +471,7 @@ export default function MatchPageClient({
   } = useLiveSoundEffectsPlayer({
     volume: 1,
     onBeforePlay: () => {
+      duckAnnouncementMedia();
       soundEffectPlayingRef.current = true;
       if (umpireAnnouncementTimerRef.current) {
         window.clearTimeout(umpireAnnouncementTimerRef.current);
@@ -367,7 +487,10 @@ export default function MatchPageClient({
       }
       stop();
     },
-    onAfterEnd: resumeUmpireAnnouncementsAfterSoundEffect,
+    onAfterEnd: () => {
+      scheduleAnnouncementDuckRestore(220);
+      resumeUmpireAnnouncementsAfterSoundEffect();
+    },
     onDuration: (effect, duration) => {
       if (!effect?.id || !Number.isFinite(duration) || duration <= 0) {
         return;
@@ -389,6 +512,35 @@ export default function MatchPageClient({
   });
   const isAnySoundEffectActive =
     activeSoundEffectStatus === "loading" || activeSoundEffectStatus === "playing";
+
+  useEffect(() => {
+    soundEffectPlaybackActiveRef.current = isAnySoundEffectActive;
+  }, [isAnySoundEffectActive]);
+
+  useEffect(() => {
+    if (micMonitor.isActive || micMonitor.isPaused || micMonitor.isStarting) {
+      if (announcementRestoreTimerRef.current) {
+        window.clearTimeout(announcementRestoreTimerRef.current);
+        announcementRestoreTimerRef.current = null;
+      }
+      return;
+    }
+
+    if (status === "speaking" || isAnySoundEffectActive) {
+      duckAnnouncementMedia();
+      return;
+    }
+
+    scheduleAnnouncementDuckRestore(220);
+  }, [
+    duckAnnouncementMedia,
+    isAnySoundEffectActive,
+    micMonitor.isActive,
+    micMonitor.isPaused,
+    micMonitor.isStarting,
+    scheduleAnnouncementDuckRestore,
+    status,
+  ]);
   const {
     match,
     error,
@@ -515,8 +667,9 @@ export default function MatchPageClient({
       soundEffectPlayingRef.current = false;
       shouldResumeAfterSoundEffectRef.current = false;
       walkieAnnouncementPauseActiveRef.current = false;
+      clearAnnouncementDuck();
     };
-  }, []);
+  }, [clearAnnouncementDuck]);
 
   const cancelBoundarySequence = useCallback(
     ({ stopEffect = false } = {}) => {
@@ -568,7 +721,7 @@ export default function MatchPageClient({
       latestRequest?.role === "director" ? "Director" : "Spectator";
 
     try {
-      speak(`${requestRole} requested walkie-talkie.`, {
+      speakWithAnnouncementDuck(`${requestRole} requested walkie-talkie.`, {
         key: `umpire-walkie-request-${latestRequest?.requestId || nextSignature}`,
         rate: 0.9,
         interrupt: true,
@@ -577,7 +730,7 @@ export default function MatchPageClient({
     } catch (error) {
       console.error("Walkie request speech failed:", error);
     }
-  }, [isLiveMatch, speak, walkie.pendingRequests]);
+  }, [isLiveMatch, speakWithAnnouncementDuck, walkie.pendingRequests]);
 
   const flushPendingUmpireAnnouncement = () => {
     const next = pendingUmpireAnnouncementRef.current;
@@ -592,7 +745,7 @@ export default function MatchPageClient({
       return;
     }
     localAnnouncementIdRef.current += 1;
-    speakSequence(next.items, {
+    speakSequenceWithAnnouncementDuck(next.items, {
       key: `umpire-${localAnnouncementIdRef.current}`,
       priority: next.priority || 2,
       minGapMs: 0,
@@ -618,7 +771,7 @@ export default function MatchPageClient({
     }
 
     localAnnouncementIdRef.current += 1;
-    speakSequence(sequence.items, {
+    speakSequenceWithAnnouncementDuck(sequence.items, {
       key: `${keyPrefix}-${localAnnouncementIdRef.current}`,
       priority: sequence.priority || 2,
       minGapMs: 0,
@@ -627,7 +780,7 @@ export default function MatchPageClient({
     });
   }, [
     queueDeferredUmpireAnnouncement,
-    speakSequence,
+    speakSequenceWithAnnouncementDuck,
     umpireSettings.enabled,
     umpireSettings.mode,
   ]);
@@ -898,7 +1051,7 @@ export default function MatchPageClient({
       handleScoreEvent(runs, isOut, extraType);
 
       if (leadText && umpireSettings.enabled && umpireSettings.mode !== "silent") {
-        speak(leadText, {
+        speakWithAnnouncementDuck(leadText, {
           key: `umpire-score-pre-${configuredScoreEffect.id}`,
           rate: leadRate,
           interrupt: true,
@@ -976,7 +1129,7 @@ export default function MatchPageClient({
     }
 
     localAnnouncementIdRef.current += 1;
-    speak(text, {
+    speakWithAnnouncementDuck(text, {
       key: `umpire-current-score-${localAnnouncementIdRef.current}`,
       rate: 0.9,
       minGapMs: 0,
@@ -984,7 +1137,7 @@ export default function MatchPageClient({
       ignoreEnabled: true,
       interrupt: true,
     });
-  }, [match, soundEffectPlayingRef, speak]);
+  }, [match, soundEffectPlayingRef, speakWithAnnouncementDuck]);
   const pauseUmpireAnnouncementsForWalkie = useCallback(() => {
     if (walkieAnnouncementPauseActiveRef.current) {
       return;
@@ -1061,7 +1214,7 @@ export default function MatchPageClient({
     }
 
     localAnnouncementIdRef.current += 1;
-    speakSequence(
+    speakSequenceWithAnnouncementDuck(
       [
         ...resumeQueue.flatMap((entry) => entry.items || []),
         ...(pendingManualScore?.items || []),
@@ -1077,7 +1230,11 @@ export default function MatchPageClient({
         userGesture: true,
       }
     );
-  }, [speakSequence, umpireSettings.enabled, umpireSettings.mode]);
+  }, [
+    speakSequenceWithAnnouncementDuck,
+    umpireSettings.enabled,
+    umpireSettings.mode,
+  ]);
   useEffect(() => {
     if (!isWalkieConversationActive) {
       resumeUmpireAnnouncementsAfterWalkie();
@@ -1094,9 +1251,10 @@ export default function MatchPageClient({
   const stopCommentaryPlayback = useCallback(() => {
     cancelBoundarySequence({ stopEffect: true });
     stop();
+    scheduleAnnouncementDuckRestore(120);
     setActiveCommentaryPreviewId("");
     setActiveCommentaryAction("");
-  }, [cancelBoundarySequence, stop]);
+  }, [cancelBoundarySequence, scheduleAnnouncementDuckRestore, stop]);
 
   const ensureUmpireScoreFeedbackEnabled = useCallback(() => {
     if (!umpireSettings.enabled) {
@@ -1493,7 +1651,7 @@ export default function MatchPageClient({
 
       if (umpireSettings.enabled && umpireSettings.mode !== "silent") {
         if (leadText) {
-          speak(leadText, {
+          speakWithAnnouncementDuck(leadText, {
             key: `umpire-sequence-test-${normalizedKey}`,
             rate: SCORE_PRE_EFFECT_RATE,
             interrupt: true,
@@ -1534,7 +1692,7 @@ export default function MatchPageClient({
                 rate: 0.8,
               },
             ];
-        speakSequence(
+        speakSequenceWithAnnouncementDuck(
           followUpItems,
           {
             key: `umpire-sequence-score-${normalizedKey}-${Date.now()}`,
@@ -1553,8 +1711,8 @@ export default function MatchPageClient({
       handlePreviewCommentarySoundEffect,
       resolveConfiguredScoreSoundEffect,
       soundEffectDurations,
-      speak,
-      speakSequence,
+      speakSequenceWithAnnouncementDuck,
+      speakWithAnnouncementDuck,
       umpireSettings.enabled,
       umpireSettings.mode,
       umpireSettings.playScoreSoundEffects,
@@ -2232,7 +2390,11 @@ export default function MatchPageClient({
             isCommentaryTalking={Boolean(micMonitor.isActive && !micMonitor.isPaused)}
             isAnnounceActive={Boolean(umpireSettings.enabled)}
           />
-          <audio ref={soundEffectsAudioRef} hidden />
+          <audio
+            ref={soundEffectsAudioRef}
+            hidden
+            data-gv-umpire-effects-player="true"
+          />
         </div>
       </main>
       <OptionalFeatureBoundary label="Optional match tools unavailable right now.">
@@ -2266,7 +2428,7 @@ export default function MatchPageClient({
                       }
                       try {
                         prime({ userGesture: true });
-                        speak("Umpire voice on.", {
+                        speakWithAnnouncementDuck("Umpire voice on.", {
                           key: "umpire-voice-enabled",
                           rate: 0.9,
                           interrupt: false,
