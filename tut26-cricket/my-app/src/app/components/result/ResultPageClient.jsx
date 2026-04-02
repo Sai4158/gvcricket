@@ -83,6 +83,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   });
 
   const matchImages = Array.isArray(match?.matchImages) ? match.matchImages : [];
+  const hasGalleryImages = matchImages.length > 0;
   const activeGalleryImage =
     matchImages.find((image) => image.id === activeGalleryImageId) ||
     matchImages[0] ||
@@ -112,6 +113,51 @@ export default function ResultPageClient({ matchId, initialMatch }) {
     startNavigation("Opening sessions...");
     router.push("/session");
   };
+
+  const gallerySection = (
+    <section id="match-image" className="scroll-mt-24 space-y-4">
+      <div
+        className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.94),rgba(10,10,14,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.35)]"
+        onContextMenu={(event) => event.preventDefault()}
+        style={{ WebkitUserSelect: "none", userSelect: "none" }}
+      >
+        <MatchImageCarousel
+          images={matchImages.length ? matchImages : [{ id: "fallback", url: "" }]}
+          alt={match.name || "Match cover"}
+          showFallback
+          imageClassName="object-contain object-center bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))]"
+          fallbackClassName="object-contain object-center bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))] p-10 sm:p-14"
+          className="bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))]"
+          onActiveImageChange={(image) => {
+            setActiveGalleryImageId(image?.url ? image.id || "" : "");
+          }}
+          onImageTap={(image) => {
+            setZoomedImage(image || null);
+          }}
+          onImageHold={(image, _index, event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setActiveGalleryImageId(image?.url ? image.id || "" : "");
+            setIsImageManagerOpen(true);
+          }}
+        />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
+          {matchImages.length
+            ? `${matchImages.length} image${matchImages.length === 1 ? "" : "s"} in gallery`
+            : "No gallery yet"}
+        </p>
+        <button
+          type="button"
+          onClick={() => setIsImageManagerOpen(true)}
+          className="rounded-full border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(10,16,26,0.96),rgba(8,47,73,0.78))] px-4 py-2 text-sm font-semibold text-cyan-50 transition hover:brightness-110"
+        >
+          Manage Images
+        </button>
+      </div>
+    </section>
+  );
 
   return (
     <main id="top" className="min-h-screen bg-zinc-950 p-4 sm:p-8 text-zinc-300 font-sans">
@@ -191,6 +237,8 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           </div>
         </MatchHeroBackdrop>
 
+        {hasGalleryImages ? gallerySection : null}
+
         <section className="space-y-8">
           <EnhancedScorecard
             match={match}
@@ -199,48 +247,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           />
         </section>
 
-        <section id="match-image" className="scroll-mt-24 space-y-4">
-          <div
-            className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.94),rgba(10,10,14,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.35)]"
-            onContextMenu={(event) => event.preventDefault()}
-            style={{ WebkitUserSelect: "none", userSelect: "none" }}
-          >
-            <MatchImageCarousel
-              images={matchImages.length ? matchImages : [{ id: "fallback", url: "" }]}
-              alt={match.name || "Match cover"}
-              showFallback
-              imageClassName="object-contain object-center bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))]"
-              fallbackClassName="object-contain object-center bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))] p-10 sm:p-14"
-              className="bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))]"
-              onActiveImageChange={(image) => {
-                setActiveGalleryImageId(image?.url ? image.id || "" : "");
-              }}
-              onImageTap={(image) => {
-                setZoomedImage(image || null);
-              }}
-              onImageHold={(image, _index, event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setActiveGalleryImageId(image?.url ? image.id || "" : "");
-                setIsImageManagerOpen(true);
-              }}
-            />
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
-              {matchImages.length
-                ? `${matchImages.length} image${matchImages.length === 1 ? "" : "s"} in gallery`
-                : "No gallery yet"}
-            </p>
-            <button
-              type="button"
-              onClick={() => setIsImageManagerOpen(true)}
-              className="rounded-full border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(10,16,26,0.96),rgba(8,47,73,0.78))] px-4 py-2 text-sm font-semibold text-cyan-50 transition hover:brightness-110"
-            >
-              Manage Images
-            </button>
-          </div>
-        </section>
+        {!hasGalleryImages ? gallerySection : null}
 
         <section className="space-y-8">
           <h2 className="text-3xl font-bold text-white text-center pt-8 border-t border-white/10">
