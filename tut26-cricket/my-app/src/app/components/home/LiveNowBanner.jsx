@@ -68,12 +68,34 @@ function writeCachedLiveBanner(liveMatch) {
   }
 }
 
+function getBannerTimestamp(liveMatch) {
+  return new Date(liveMatch?.updatedAt || 0).getTime();
+}
+
+function pickPreferredLiveBanner(currentBanner, nextBanner) {
+  if (!currentBanner) {
+    return nextBanner || null;
+  }
+
+  if (!nextBanner) {
+    return null;
+  }
+
+  if (currentBanner.isLive !== nextBanner.isLive) {
+    return nextBanner.isLive ? nextBanner : currentBanner;
+  }
+
+  return getBannerTimestamp(nextBanner) >= getBannerTimestamp(currentBanner)
+    ? nextBanner
+    : currentBanner;
+}
+
 export default function LiveNowBanner({ liveMatch }) {
   const prefersReducedMotion = useReducedMotion();
   const useDesktopLiteMotion = useHomeDesktopLiteMotion();
   const shouldReduceMotion = prefersReducedMotion || useDesktopLiteMotion;
   const [fetchedLiveMatch, setFetchedLiveMatch] = useState(null);
-  const currentLiveMatch = liveMatch || fetchedLiveMatch;
+  const currentLiveMatch = pickPreferredLiveBanner(liveMatch || null, fetchedLiveMatch);
   const bannerHref = currentLiveMatch
     ? currentLiveMatch.isLive === false
       ? `/result/${currentLiveMatch.matchId}`
@@ -104,12 +126,11 @@ export default function LiveNowBanner({ liveMatch }) {
         if (!cancelled) {
           setFetchedLiveMatch(cachedLiveMatch);
         }
-        return;
       }
 
       try {
         const response = await fetch("/api/home/live-banner", {
-          cache: "default",
+          cache: "no-store",
           headers: {
             Accept: "application/json",
           },
@@ -130,9 +151,7 @@ export default function LiveNowBanner({ liveMatch }) {
       }
     };
 
-    if (!liveMatch) {
-      void loadLiveMatch();
-    }
+    void loadLiveMatch();
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -146,7 +165,7 @@ export default function LiveNowBanner({ liveMatch }) {
       cancelled = true;
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [liveMatch]);
+  }, []);
 
   if (!currentLiveMatch) {
     return null;
