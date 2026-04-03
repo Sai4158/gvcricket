@@ -363,6 +363,17 @@ export default function MatchPageClient({
     },
     [duckAnnouncementMedia, scheduleAnnouncementDuckRestore, speakSequence],
   );
+  const beginAnnouncementSoundEffectDuck = useCallback(() => {
+    duckAnnouncementMedia();
+    soundEffectPlaybackActiveRef.current = true;
+  }, [duckAnnouncementMedia]);
+  const failAnnouncementSoundEffectDuck = useCallback(
+    (delayMs = 120) => {
+      soundEffectPlaybackActiveRef.current = false;
+      scheduleAnnouncementDuckRestore(delayMs);
+    },
+    [scheduleAnnouncementDuckRestore],
+  );
   const queueDeferredUmpireAnnouncement = useCallback((entry) => {
     if (!entry?.items?.length) {
       return;
@@ -1527,12 +1538,14 @@ export default function MatchPageClient({
       triggerMatchHapticFeedback();
       setSoundEffectError("");
       shouldResumeAfterSoundEffectRef.current = false;
+      beginAnnouncementSoundEffectDuck();
 
       const clientRequestId = createSoundEffectRequestId();
       const playedLocally = await playLocalSoundEffect(file, {
         userGesture: true,
       });
       if (!playedLocally) {
+        failAnnouncementSoundEffectDuck();
         resumeUmpireAnnouncementsAfterSoundEffect();
         return;
       }
@@ -1559,6 +1572,8 @@ export default function MatchPageClient({
     [
       activeSoundEffectId,
       activeSoundEffectStatus,
+      beginAnnouncementSoundEffectDuck,
+      failAnnouncementSoundEffectDuck,
       isLiveMatch,
       match?._id,
       matchId,
@@ -1685,8 +1700,10 @@ export default function MatchPageClient({
       shouldResumeAfterSoundEffectRef.current = false;
       setActiveCommentaryPreviewId(file.id);
       setActiveCommentaryAction("event-preview");
+      beginAnnouncementSoundEffectDuck();
       const played = await playLocalSoundEffect(file, { userGesture: true });
       if (!played) {
+        failAnnouncementSoundEffectDuck();
         setActiveCommentaryPreviewId("");
         setActiveCommentaryAction((current) =>
           current === "event-preview" ? "" : current
@@ -1698,7 +1715,9 @@ export default function MatchPageClient({
       activeCommentaryAction,
       activeCommentaryPreviewId,
       activeSoundEffectId,
+      beginAnnouncementSoundEffectDuck,
       cancelBoundarySequence,
+      failAnnouncementSoundEffectDuck,
       isAnySoundEffectActive,
       playLocalSoundEffect,
       stopCommentaryPlayback,
