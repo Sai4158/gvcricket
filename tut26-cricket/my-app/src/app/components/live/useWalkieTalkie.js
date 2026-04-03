@@ -1289,6 +1289,9 @@ export default function useWalkieTalkie({
       remoteAudioTracksRef.current.delete(uid);
     });
     client.on("connection-state-change", (state) => {
+      if (rtcClientRef.current !== client) {
+        return;
+      }
       if (state === "CONNECTED") {
         setRecoveringAudio(false);
         clearTimer(audioRetryTimerRef);
@@ -1300,6 +1303,9 @@ export default function useWalkieTalkie({
         setRecoveringAudio(true);
       }
       if (state === "DISCONNECTED" && snapshotRef.current.enabled) {
+        rtcJoinedRef.current = false;
+        rtcPublishedRef.current = false;
+        publishPromiseRef.current = null;
         setRecoveringAudio(true);
         updateNotice("Retrying audio...");
         setAudioReconnectTick((current) => current + 1);
@@ -1413,6 +1419,25 @@ export default function useWalkieTalkie({
     }
   }, []);
 
+  const resetRtcRuntimeState = useCallback(async (client = null) => {
+    const targetClient = client || rtcClientRef.current || null;
+    rtcJoinedRef.current = false;
+    rtcPublishedRef.current = false;
+    rtcJoinPromiseRef.current = null;
+    publishPromiseRef.current = null;
+
+    if (targetClient && rtcClientRef.current === targetClient) {
+      rtcClientRef.current = null;
+    }
+
+    if (targetClient) {
+      try {
+        await targetClient.leave?.();
+      } catch {
+      }
+    }
+  }, []);
+
   const ensurePublishedTrack = useCallback(async () => {
     if (!rtcPublishedRef.current) {
       if (!publishPromiseRef.current) {
@@ -1428,15 +1453,30 @@ export default function useWalkieTalkie({
             throw new Error("Walkie audio is still connecting.");
           }
 
-          await rtcClient.setClientRole("host");
-
-          if (!rtcPublishedRef.current) {
-            if (typeof track.setMuted === "function") {
-              await track.setMuted(true);
+          try {
+            await rtcClient.setClientRole("host");
+            await waitForRtcConnected(rtcClient, 600);
+            if (rtcClient.connectionState !== "CONNECTED") {
+              throw new Error("Walkie audio is still connecting.");
             }
-            await rtcClient.publish([track]);
-            rtcPublishedRef.current = true;
-            await wait(80);
+
+            if (!rtcPublishedRef.current) {
+              if (typeof track.setMuted === "function") {
+                await track.setMuted(true);
+              }
+              await rtcClient.publish([track]);
+              rtcPublishedRef.current = true;
+              await wait(80);
+            }
+          } catch (publishError) {
+            if (
+              rtcClient.connectionState !== "CONNECTED" ||
+              isExpectedWalkieTransportError(publishError)
+            ) {
+              await resetRtcRuntimeState(rtcClient);
+              throw new Error("Walkie audio is still connecting.");
+            }
+            throw publishError;
           }
 
           return { rtcClient, track };
@@ -1450,7 +1490,7 @@ export default function useWalkieTalkie({
     const trackPromise = ensureTrack();
     const [rtcClient, track] = await Promise.all([joinRtc(), trackPromise]);
     return { rtcClient, track };
-  }, [ensureTrack, joinRtc]);
+  }, [ensureTrack, joinRtc, resetRtcRuntimeState]);
 
   const unpublishRtc = useCallback(async () => {
     const client = rtcClientRef.current;
@@ -2321,9 +2361,9 @@ export default function useWalkieTalkie({
 
         await ensureParticipantToken();
         if (snapshotRef.current.enabled) {
-          await Promise.allSettled([ensurePublishedTrack()]);
+          void ensurePublishedTrack().catch(() => {});
         } else {
-          await Promise.allSettled([ensureTrack(), joinRtc()]);
+          void Promise.allSettled([ensureTrack(), joinRtc()]);
         }
         return true;
       } catch {
@@ -3488,7 +3528,7 @@ export default function useWalkieTalkie({
     if (shouldMaintainAudioTransport) {
       let cancelled = false;
       const shouldKeepPublishedTrack = Boolean(
-        snapshot.enabled && (manualAudioReady || isSelfTalking || isFinishing)
+        snapshot.enabled && (claiming || isSelfTalking || isFinishing)
       );
 
       const attemptJoin = async () => {
@@ -3555,6 +3595,7 @@ export default function useWalkieTalkie({
     audioReconnectTick,
     autoConnectAudio,
     cleanupTransport,
+    claiming,
     ensurePublishedTrack,
     isFinishing,
     isSelfTalking,
