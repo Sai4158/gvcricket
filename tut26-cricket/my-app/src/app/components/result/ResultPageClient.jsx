@@ -111,7 +111,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   const handleOpenSessions = () => {
     setIsLeavingToSessions(true);
     startNavigation("Opening sessions...");
-    router.push("/session");
+    router.push(`/session?refresh=${Date.now()}`);
   };
 
   const gallerySection = (

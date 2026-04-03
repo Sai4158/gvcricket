@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import {
   FaArrowLeft,
@@ -242,10 +242,33 @@ export default function SessionsPageClient({
   const [page, setPage] = useState(1);
   const [isGoingHome, setIsGoingHome] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { startNavigation } = useRouteFeedback();
   const deferredSearchQuery = useDeferredValue(normalizeSearchValue(searchInput));
   const secretHoldTimerRef = useRef(null);
   const suppressCardOpenUntilRef = useRef(0);
+
+  const setSecretHoldSelectionLock = useCallback((locked) => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    [document.body, document.documentElement].forEach((node) => {
+      if (!node) {
+        return;
+      }
+
+      if (locked) {
+        node.style.setProperty("user-select", "none");
+        node.style.setProperty("-webkit-user-select", "none");
+        node.style.setProperty("-webkit-touch-callout", "none");
+      } else {
+        node.style.removeProperty("user-select");
+        node.style.removeProperty("-webkit-user-select");
+        node.style.removeProperty("-webkit-touch-callout");
+      }
+    });
+  }, []);
 
   useEffect(() => {
     setSessions(initialSessions ?? []);
@@ -278,8 +301,9 @@ export default function SessionsPageClient({
         window.clearTimeout(secretHoldTimerRef.current);
         secretHoldTimerRef.current = null;
       }
+      setSecretHoldSelectionLock(false);
     };
-  }, []);
+  }, [setSecretHoldSelectionLock]);
 
   const indexedSessions = useMemo(
     () =>
@@ -412,7 +436,8 @@ export default function SessionsPageClient({
       window.clearTimeout(secretHoldTimerRef.current);
       secretHoldTimerRef.current = null;
     }
-  }, []);
+    setSecretHoldSelectionLock(false);
+  }, [setSecretHoldSelectionLock]);
 
   const clearSelectionMode = useCallback(() => {
     setSelectionMode(false);
@@ -467,14 +492,20 @@ export default function SessionsPageClient({
       }
 
       clearSecretHoldTimer();
+      if (event.pointerType && event.pointerType !== "mouse") {
+        event.preventDefault();
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        setSecretHoldSelectionLock(true);
+      }
       secretHoldTimerRef.current = window.setTimeout(() => {
+        setSecretHoldSelectionLock(false);
         setManagePinPrompt({
           mode: "select",
           session,
         });
       }, SESSION_SELECTION_HOLD_MS);
     },
-    [clearSecretHoldTimer]
+    [clearSecretHoldTimer, setSecretHoldSelectionLock]
   );
 
   const handleSecretManageHoldEnd = useCallback(() => {
@@ -520,6 +551,15 @@ export default function SessionsPageClient({
     setTotalCount(Number.isFinite(nextTotalCount) ? nextTotalCount : payload.length);
     return payload;
   }, []);
+
+  useEffect(() => {
+    const refreshToken = String(searchParams?.get("refresh") || "").trim();
+    if (!refreshToken) {
+      return;
+    }
+
+    void reloadSessionsFromServer();
+  }, [reloadSessionsFromServer, searchParams]);
 
   const openSessionManager = useCallback((session, pin) => {
     setManageSessionContext({ sessionId: session._id, pin });
@@ -999,7 +1039,8 @@ export default function SessionsPageClient({
                 {paginatedSessions.map((session) => (
                   <div
                     key={session._id}
-                    className="h-full"
+                    className="h-full select-none [touch-action:pan-y]"
+                    style={{ WebkitTouchCallout: "none" }}
                     onPointerDown={(event) =>
                       handleSecretManageHoldStart(session, event)
                     }

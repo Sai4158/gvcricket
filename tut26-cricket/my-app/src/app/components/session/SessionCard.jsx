@@ -211,7 +211,7 @@ function SessionCard({
           handleCardOpen();
         }
       }}
-      className={`group relative overflow-hidden rounded-[24px] border p-6 shadow-[0_22px_70px_rgba(0,0,0,0.28)] transition-all hover:-translate-y-1 hover:border-white/18 ${
+      className={`group relative overflow-hidden rounded-[24px] border p-6 shadow-[0_22px_70px_rgba(0,0,0,0.28)] transition-all select-none [touch-action:pan-y] hover:-translate-y-1 hover:border-white/18 ${
         isLive
           ? "border-rose-300/18 bg-[radial-gradient(circle_at_top_left,rgba(244,63,94,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(190,24,93,0.08),transparent_34%),linear-gradient(180deg,rgba(24,12,16,0.98),rgba(7,10,12,0.98))]"
           : "border-emerald-300/14 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.1),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(34,197,94,0.08),transparent_28%),linear-gradient(180deg,rgba(12,20,16,0.98),rgba(10,10,14,0.98))]"
@@ -225,6 +225,7 @@ function SessionCard({
       style={{
         contentVisibility: "auto",
         containIntrinsicSize: "320px",
+        WebkitTouchCallout: "none",
       }}
     >
       <div
