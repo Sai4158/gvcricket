@@ -113,6 +113,27 @@ function getConfiguredScoreEffectDelayMs(
 
 const SOUND_EFFECT_DURATION_CACHE_KEY = "gv-sound-effect-durations-v1";
 
+function buildFallbackSoundEffectFromId(effectId = "") {
+  const safeId = String(effectId || "").trim();
+  if (!safeId) {
+    return null;
+  }
+
+  const normalizedFileName = safeId.split("/").pop() || safeId;
+  const label = normalizedFileName
+    .replace(/\.[^.]+$/, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return {
+    id: safeId,
+    fileName: normalizedFileName,
+    label: label || normalizedFileName,
+    src: `/audio/effects/${encodeURIComponent(normalizedFileName)}`,
+  };
+}
+
 function readCachedSoundEffectDurations() {
   if (typeof window === "undefined") {
     return {};
@@ -266,6 +287,12 @@ export default function MatchPageClient({
       try {
         item.element.muted = item.muted;
         item.element.volume = item.volume;
+        if (item.wasPlaying && item.element.paused && !item.element.ended) {
+          const resumePromise = item.element.play?.();
+          if (resumePromise && typeof resumePromise.catch === "function") {
+            resumePromise.catch(() => {});
+          }
+        }
       } catch {
         // Ignore stale media elements removed from the page.
       }
@@ -326,6 +353,11 @@ export default function MatchPageClient({
           element,
           volume: typeof element.volume === "number" ? element.volume : 1,
           muted: Boolean(element.muted),
+          wasPlaying: Boolean(
+            !element.paused &&
+              !element.ended &&
+              Number(element.readyState || 0) >= 2,
+          ),
         });
 
         if (!element.muted) {
@@ -516,6 +548,7 @@ export default function MatchPageClient({
     currentTime: activeSoundEffectCurrentTime,
     needsUnlock: soundEffectsNeedsUnlock,
     playEffect: playLocalSoundEffect,
+    prime: primeLocalSoundEffects,
     status: activeSoundEffectStatus,
     stop: stopActiveSoundEffect,
   } = useLiveSoundEffectsPlayer({
@@ -991,7 +1024,9 @@ export default function MatchPageClient({
       : readCachedSoundEffectsLibrary();
     return (
       availableEffects.find((effect) => effect?.id === effectId) ||
-      (effectId === IPL_HORN_EFFECT.id ? IPL_HORN_EFFECT : null)
+      (effectId === IPL_HORN_EFFECT.id
+        ? IPL_HORN_EFFECT
+        : buildFallbackSoundEffectFromId(effectId))
     );
   }, [pickRandomScoreSoundEffect, soundEffectFiles, umpireSettings.scoreSoundEffectMap]);
 
@@ -1077,6 +1112,10 @@ export default function MatchPageClient({
     const scorePreview = buildUmpireScorePreview(runs, isOut, extraType);
 
     if (configuredScoreEffect) {
+      if (shouldPlayLocalScoreEffect) {
+        void primeLocalSoundEffects({ userGesture: true });
+      }
+
       if (!shouldPlayLocalScoreEffect && shouldBroadcastScoreEffect) {
         try {
           await fetch(`/api/matches/${matchId}/sound-effects`, {

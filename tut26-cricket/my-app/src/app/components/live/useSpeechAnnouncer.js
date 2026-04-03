@@ -143,6 +143,56 @@ function getSamanthaVoiceRank(voice) {
   return score;
 }
 
+function getAppleNaturalVoiceRank(voice) {
+  const searchableValue = [
+    String(voice?.name || "").toLowerCase(),
+    String(voice?.voiceURI || "").toLowerCase(),
+  ].join(" ");
+
+  let score = 0;
+
+  if (normalizeVoiceLang(voice) === "en-us") {
+    score += 240;
+  } else if (normalizeVoiceLang(voice).startsWith("en")) {
+    score += 120;
+  }
+
+  if (searchableValue.includes("siri voice 4")) {
+    score += 460;
+  } else if (searchableValue.includes("siri")) {
+    score += 300;
+  } else if (searchableValue.includes("samantha")) {
+    score += 240;
+  } else if (searchableValue.includes("ava")) {
+    score += 220;
+  } else if (searchableValue.includes("allison")) {
+    score += 210;
+  } else if (searchableValue.includes("nicky")) {
+    score += 180;
+  }
+
+  if (searchableValue.includes("enhanced")) {
+    score += 420;
+  }
+  if (searchableValue.includes("premium")) {
+    score += 280;
+  }
+  if (searchableValue.includes("natural")) {
+    score += 220;
+  }
+  if (voice?.localService) {
+    score += 40;
+  }
+  if (voice?.default) {
+    score += 16;
+  }
+  if (searchableValue.includes("compact")) {
+    score -= 180;
+  }
+
+  return score;
+}
+
 function pickPreferredVoiceByName(voices, preferredNames) {
   for (const preferredName of preferredNames) {
     const found = voices.find((voice) =>
@@ -232,6 +282,33 @@ function selectBestSamanthaVoice(voices) {
   )[0];
 }
 
+function selectBestAppleNaturalVoice(voices) {
+  const matchingVoices = voices.filter((voice) => {
+    const searchableValue = [
+      String(voice?.name || "").toLowerCase(),
+      String(voice?.voiceURI || "").toLowerCase(),
+    ].join(" ");
+
+    return (
+      normalizeVoiceLang(voice).startsWith("en") &&
+      (searchableValue.includes("siri") ||
+        searchableValue.includes("samantha") ||
+        searchableValue.includes("ava") ||
+        searchableValue.includes("allison") ||
+        searchableValue.includes("nicky"))
+    );
+  });
+
+  if (!matchingVoices.length) {
+    return null;
+  }
+
+  return [...matchingVoices].sort(
+    (left, right) =>
+      getAppleNaturalVoiceRank(right) - getAppleNaturalVoiceRank(left),
+  )[0];
+}
+
 function selectBestNaturalFemaleVoice(voices, langPrefix = "en-us") {
   const matchingVoices = voices.filter((voice) =>
     normalizeVoiceLang(voice).startsWith(langPrefix),
@@ -269,6 +346,26 @@ function selectPreferredVoice(voices, options = {}) {
 
   if (platform.isIOS && platform.isSafari) {
     const samanthaVoice = selectBestSamanthaVoice(availableVoices);
+    const samanthaSearchValue = [
+      String(samanthaVoice?.name || "").toLowerCase(),
+      String(samanthaVoice?.voiceURI || "").toLowerCase(),
+    ].join(" ");
+    const hasEnhancedSamantha = Boolean(
+      samanthaVoice &&
+        (samanthaSearchValue.includes("enhanced") ||
+          samanthaSearchValue.includes("premium") ||
+          samanthaSearchValue.includes("natural")),
+    );
+
+    if (hasEnhancedSamantha) {
+      return samanthaVoice;
+    }
+
+    const bestAppleNaturalVoice = selectBestAppleNaturalVoice(availableVoices);
+    if (bestAppleNaturalVoice) {
+      return bestAppleNaturalVoice;
+    }
+
     if (samanthaVoice) {
       return samanthaVoice;
     }
@@ -461,7 +558,9 @@ function getSpeechProfile(voice, options, platform) {
     voiceName.includes("zira") || voiceName.includes("david");
 
   const defaultRate = isIOSSafari
-    ? 0.92
+    ? isAppleNatural
+      ? 0.88
+      : 0.87
     : isAppleNatural
       ? 0.9
       : isGoogleNatural
@@ -483,9 +582,19 @@ function getSpeechProfile(voice, options, platform) {
         : isLegacyVoice
           ? 0.94
           : 0.98;
+  const requestedRate = Number(options.rate);
+  const safeRequestedRate = Number.isFinite(requestedRate)
+    ? requestedRate
+    : null;
+  const effectiveRate =
+    safeRequestedRate === null
+      ? defaultRate
+      : isIOSSafari
+        ? Math.min(safeRequestedRate, 0.88)
+        : safeRequestedRate;
 
   return {
-    rate: Number(options.rate ?? defaultRate) || defaultRate,
+    rate: effectiveRate || defaultRate,
     pitch: Number(options.pitch ?? defaultPitch) || defaultPitch,
     volume: Number(options.volume ?? 1) || 1,
     preDelayMs: options.preDelayMs ?? (isIOSSafari ? 60 : 0),

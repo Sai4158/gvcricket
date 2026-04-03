@@ -533,10 +533,16 @@ export function duckPageMedia(stateRef, duckVolume = 0.18) {
 
   mediaElements.forEach((element) => {
     try {
+      const wasPlaying = Boolean(
+        !element.paused &&
+          !element.ended &&
+          Number(element.readyState || 0) >= 2,
+      );
       tracked.push({
         element,
         volume: typeof element.volume === "number" ? element.volume : 1,
         muted: Boolean(element.muted),
+        wasPlaying,
       });
 
       if (!element.muted) {
@@ -559,6 +565,12 @@ export function restorePageMedia(stateRef) {
     try {
       item.element.muted = item.muted;
       item.element.volume = item.volume;
+      if (item.wasPlaying && item.element.paused && !item.element.ended) {
+        const resumePromise = item.element.play?.();
+        if (resumePromise && typeof resumePromise.catch === "function") {
+          resumePromise.catch(() => {});
+        }
+      }
     } catch {
       // Ignore stale media elements removed from the page.
     }
