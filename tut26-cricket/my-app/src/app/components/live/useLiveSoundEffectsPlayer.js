@@ -8,7 +8,7 @@ import {
   playBufferedUiAudio,
   primeUiAudio,
   restorePreferredAudioSessionType,
-  setPreferredAudioSessionType,
+  setPlaybackFriendlyAudioSessionType,
   subscribeUiAudioUnlock,
 } from "../../lib/page-audio";
 
@@ -50,6 +50,10 @@ export default function useLiveSoundEffectsPlayer({
   const finishPlayback = useCallback(
     ({ notifyAfterEnd = false } = {}) => {
       bufferedPlaybackRef.current = null;
+      if (audioSessionTypeRef.current) {
+        restorePreferredAudioSessionType(audioSessionTypeRef.current);
+        audioSessionTypeRef.current = "";
+      }
       resetPlaybackState();
       if (notifyAfterEnd) {
         onAfterEnd?.();
@@ -149,22 +153,22 @@ export default function useLiveSoundEffectsPlayer({
       return;
     }
 
-    const previousType = setPreferredAudioSessionType("playback") || "";
+    const previousType = setPlaybackFriendlyAudioSessionType({
+      preferMixing: true,
+    }) || "";
     if (!audioSessionTypeRef.current) {
       audioSessionTypeRef.current = previousType;
     }
   }, [isIosSafari]);
 
   useEffect(() => {
-    ensurePlaybackAudioSession();
-
     return () => {
       if (audioSessionTypeRef.current) {
         restorePreferredAudioSessionType(audioSessionTypeRef.current);
         audioSessionTypeRef.current = "";
       }
     };
-  }, [ensurePlaybackAudioSession]);
+  }, []);
 
   const stop = useCallback(
     ({ clearSource = true, preserveRequest = false } = {}) => {
@@ -190,6 +194,11 @@ export default function useLiveSoundEffectsPlayer({
           audio.removeAttribute("src");
           audio.load();
         }
+      }
+
+      if (audioSessionTypeRef.current) {
+        restorePreferredAudioSessionType(audioSessionTypeRef.current);
+        audioSessionTypeRef.current = "";
       }
 
       resetPlaybackState();
@@ -237,8 +246,8 @@ export default function useLiveSoundEffectsPlayer({
         return false;
       }
 
-      ensurePlaybackAudioSession();
       onBeforePlay?.(effect);
+      ensurePlaybackAudioSession();
 
       try {
         const bufferedPlayback = await playBufferedUiAudio(effect.src, {
@@ -272,7 +281,12 @@ export default function useLiveSoundEffectsPlayer({
 
       const audio = audioRef.current;
       if (!audio) {
+        if (audioSessionTypeRef.current) {
+          restorePreferredAudioSessionType(audioSessionTypeRef.current);
+          audioSessionTypeRef.current = "";
+        }
         resetPlaybackState();
+        onAfterEnd?.();
         return false;
       }
 
@@ -316,7 +330,12 @@ export default function useLiveSoundEffectsPlayer({
         setCurrentTime(audio.currentTime || 0);
         return true;
       } catch {
+        if (audioSessionTypeRef.current) {
+          restorePreferredAudioSessionType(audioSessionTypeRef.current);
+          audioSessionTypeRef.current = "";
+        }
         resetPlaybackState();
+        onAfterEnd?.();
         return false;
       }
     },
@@ -324,6 +343,7 @@ export default function useLiveSoundEffectsPlayer({
       finishPlayback,
       ensurePlaybackAudioSession,
       isIosSafari,
+      onAfterEnd,
       onBeforePlay,
       onDuration,
       prime,

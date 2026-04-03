@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   isUiAudioUnlocked,
   restorePreferredAudioSessionType,
-  setPreferredAudioSessionType,
+  setPlaybackFriendlyAudioSessionType,
   subscribeUiAudioUnlock,
 } from "../../lib/page-audio";
 
@@ -653,7 +653,10 @@ export default function useSpeechAnnouncer(settings) {
   }, []);
 
   const ensureSpeechAudioSession = useCallback(() => {
-    const previousType = setPreferredAudioSessionType("playback") || "";
+    const previousType =
+      setPlaybackFriendlyAudioSessionType({
+        preferMixing: true,
+      }) || "";
     if (!audioSessionTypeRef.current) {
       audioSessionTypeRef.current = previousType;
     }

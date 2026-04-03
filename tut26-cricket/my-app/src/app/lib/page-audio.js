@@ -476,6 +476,31 @@ export function getPreferredAudioSessionType() {
   return session?.type || "";
 }
 
+function hasActivePageMediaPlayback() {
+  if (typeof document === "undefined") {
+    return false;
+  }
+
+  const mediaElements = document.querySelectorAll("audio, video");
+  for (const element of mediaElements) {
+    try {
+      if (
+        !element.paused &&
+        !element.ended &&
+        Number(element.readyState || 0) >= 2 &&
+        !element.muted &&
+        Number(element.volume || 0) > 0
+      ) {
+        return true;
+      }
+    } catch {
+      // Ignore stale or inaccessible media elements.
+    }
+  }
+
+  return false;
+}
+
 export function setPreferredAudioSessionType(nextType) {
   const session = getNavigatorAudioSession();
   if (!session || !SUPPORTED_AUDIO_SESSION_TYPES.has(nextType)) {
@@ -494,6 +519,14 @@ export function setPreferredAudioSessionType(nextType) {
   }
 
   return previousType;
+}
+
+export function setPlaybackFriendlyAudioSessionType({
+  preferMixing = true,
+} = {}) {
+  const nextType =
+    preferMixing && hasActivePageMediaPlayback() ? "ambient" : "playback";
+  return setPreferredAudioSessionType(nextType);
 }
 
 export function restorePreferredAudioSessionType(previousType) {
