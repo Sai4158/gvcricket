@@ -110,20 +110,27 @@ export default function MatchModalLayer({
       {modalType === "editOvers" && (
         <EditOversModal
           currentOvers={match.overs}
-          currentLegalBalls={countLegalBalls(match[match.innings === "second" ? "innings2" : "innings1"]?.history || [])}
+          currentLegalBalls={countLegalBalls(
+            match[match.innings === "second" ? "innings2" : "innings1"]
+              ?.history || [],
+          )}
           currentOverNumber={currentOverNumber}
           innings={match.innings}
           firstInningsOversPlayed={firstInningsOversPlayed}
           currentFirstInningsScore={Number(match?.innings1?.score || 0)}
           firstInningsTeamName={match?.innings1?.team || ""}
-          currentSecondInningsScore={Number(match?.innings2?.score || match?.score || 0)}
+          currentSecondInningsScore={Number(
+            match?.innings2?.score || match?.score || 0,
+          )}
           onUpdate={onUpdate}
           onClose={onClose}
           isUpdating={isUpdating}
         />
       )}
       {modalType === "image" && (
-        <OptionalFeatureBoundary fallback={modalFallback("Image unavailable right now.")}>
+        <OptionalFeatureBoundary
+          fallback={modalFallback("Image unavailable right now.")}
+        >
           <MatchImageModal
             match={match}
             onUploaded={onImageUploaded}
@@ -132,21 +139,27 @@ export default function MatchModalLayer({
         </OptionalFeatureBoundary>
       )}
       {modalType === "commentary" && commentaryProps ? (
-        <OptionalFeatureBoundary fallback={modalFallback("Commentary controls unavailable right now.")}>
+        <OptionalFeatureBoundary
+          fallback={modalFallback("Commentary controls unavailable right now.")}
+        >
           <ModalBase title="" onExit={onClose} hideHeader>
             <AnnouncementControls {...commentaryProps} />
           </ModalBase>
         </OptionalFeatureBoundary>
       ) : null}
       {modalType === "walkie" && walkieProps ? (
-        <OptionalFeatureBoundary fallback={modalFallback("Walkie unavailable right now.")}>
+        <OptionalFeatureBoundary
+          fallback={modalFallback("Walkie unavailable right now.")}
+        >
           <ModalBase title="Walkie-Talkie" onExit={onClose}>
             <WalkiePanel {...walkieProps} />
           </ModalBase>
         </OptionalFeatureBoundary>
       ) : null}
       {modalType === "mic" && (
-        <OptionalFeatureBoundary fallback={modalFallback("Live mic unavailable right now.")}>
+        <OptionalFeatureBoundary
+          fallback={modalFallback("Live mic unavailable right now.")}
+        >
           <LiveMicModal
             title="Live Commentary Mic"
             monitor={micMonitor}
@@ -156,38 +169,44 @@ export default function MatchModalLayer({
       )}
       {modalType === "rules" && <RulesModal onClose={onClose} />}
       {modalType === "entryScoreSoundEffects" && entryScoreSoundPromptProps ? (
-        <ModalBase title="" onExit={() => {}} hideHeader panelClassName="max-w-md">
+        <ModalBase
+          title=""
+          onExit={() => {}}
+          hideHeader
+          panelClassName="max-w-md"
+        >
           <div className="space-y-5 text-center">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-300/80">
                 Umpire Mode
               </p>
               <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-                Score Tap Sound Effects
+                Score Tap Sounds
               </h2>
               <p className="mt-3 text-sm leading-6 text-zinc-300">
-                Keep this on to play the selected sound effect on each score tap.
-                Turn it off if you are already playing music on this device.
+                Turn this off only when playing music.
               </p>
             </div>
 
             <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4 text-left">
-              <div className="flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white">
-                    Enable score tap sounds
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 pr-2">
+                  <p className="text-base font-semibold text-white">
+                    Score tap sound effects
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-zinc-400">
-                    Applies only to this umpire device and stays on by default.
+                  <p className="mt-2 text-sm leading-5 text-zinc-400">
+                    Play a sound effect whenever you tap a score.
                   </p>
                 </div>
-                {renderPromptSwitch(
-                  entryScoreSoundPromptProps.enabled,
-                  entryScoreSoundPromptProps.onChange,
-                  entryScoreSoundPromptProps.enabled
-                    ? "Turn score tap sounds off"
-                    : "Turn score tap sounds on",
-                )}
+                <div className="shrink-0 pt-1">
+                  {renderPromptSwitch(
+                    entryScoreSoundPromptProps.enabled,
+                    entryScoreSoundPromptProps.onChange,
+                    entryScoreSoundPromptProps.enabled
+                      ? "Turn score tap sounds off"
+                      : "Turn score tap sounds on",
+                  )}
+                </div>
               </div>
             </div>
 
