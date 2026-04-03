@@ -323,7 +323,6 @@ export default function MatchPageClient({
     }
 
     return duckPageMedia(announcementDuckRef, 0.12, {
-      debugLabel: "umpire-announcement",
       excludedElements: Array.from(
         document.querySelectorAll('[data-gv-umpire-effects-player="true"]'),
       ),
@@ -1496,7 +1495,7 @@ export default function MatchPageClient({
       ) {
         const stopRequestId =
           localSoundEffectRequestIdRef.current || createSoundEffectRequestId();
-        stopActiveSoundEffect({ notifyAfterEnd: true });
+        stopActiveSoundEffect();
         localSoundEffectRequestIdRef.current = "";
         try {
           await fetch(`/api/matches/${matchId}/sound-effects`, {
@@ -1584,7 +1583,7 @@ export default function MatchPageClient({
 
     const stopRequestId =
       localSoundEffectRequestIdRef.current || createSoundEffectRequestId();
-    stopActiveSoundEffect({ notifyAfterEnd: true });
+    stopActiveSoundEffect();
     localSoundEffectRequestIdRef.current = "";
 
     try {

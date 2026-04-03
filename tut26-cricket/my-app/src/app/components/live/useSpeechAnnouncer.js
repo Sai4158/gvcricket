@@ -354,9 +354,9 @@ function selectPreferredVoice(voices, options = {}) {
     ].join(" ");
     const hasEnhancedSamantha = Boolean(
       samanthaVoice &&
-        (samanthaSearchValue.includes("enhanced") ||
-          samanthaSearchValue.includes("premium") ||
-          samanthaSearchValue.includes("natural")),
+      (samanthaSearchValue.includes("enhanced") ||
+        samanthaSearchValue.includes("premium") ||
+        samanthaSearchValue.includes("natural")),
     );
 
     if (hasEnhancedSamantha) {
@@ -653,16 +653,13 @@ export default function useSpeechAnnouncer(settings) {
   }, []);
 
   const ensureSpeechAudioSession = useCallback(() => {
-    if (audioSessionTypeRef.current) {
-      return;
-    }
-
     const previousType =
       setPlaybackFriendlyAudioSessionType({
         preferMixing: true,
-        debugLabel: "speech",
       }) || "";
-    audioSessionTypeRef.current = previousType;
+    if (!audioSessionTypeRef.current) {
+      audioSessionTypeRef.current = previousType;
+    }
   }, []);
 
   const restoreSpeechAudioSession = useCallback(() => {
@@ -670,9 +667,7 @@ export default function useSpeechAnnouncer(settings) {
       return;
     }
 
-    restorePreferredAudioSessionType(audioSessionTypeRef.current, {
-      debugLabel: "speech",
-    });
+    restorePreferredAudioSessionType(audioSessionTypeRef.current);
     audioSessionTypeRef.current = "";
   }, []);
 
@@ -844,7 +839,6 @@ export default function useSpeechAnnouncer(settings) {
             sequenceTokenRef.current,
           );
         }
-        restoreSpeechAudioSession();
         setStatus((current) => (current === "unsupported" ? current : "ready"));
         return true;
       }
@@ -891,6 +885,7 @@ export default function useSpeechAnnouncer(settings) {
         }
 
         utteranceRef.current = null;
+        restoreSpeechAudioSession();
         const pauseAfterMs =
           nextItem.pauseAfterMs ?? sequence.pauseAfterMs ?? 0;
         const nextSequence = {
@@ -969,8 +964,6 @@ export default function useSpeechAnnouncer(settings) {
       };
 
       try {
-        ensureSpeechAudioSession();
-
         if (profile.preDelayMs > 0) {
           await new Promise((resolve) => {
             stepTimerRef.current = window.setTimeout(
@@ -986,6 +979,7 @@ export default function useSpeechAnnouncer(settings) {
         if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
           window.speechSynthesis.cancel();
         }
+        ensureSpeechAudioSession();
         window.speechSynthesis.speak(utterance);
       } catch {
         restoreSpeechAudioSession();
