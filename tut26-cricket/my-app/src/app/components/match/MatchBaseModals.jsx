@@ -353,7 +353,17 @@ export function MatchImageModal({ match, onUploaded, onClose }) {
         matchId={String(match._id)}
         existingImages={Array.isArray(match?.matchImages) ? match.matchImages : []}
         existingImageUrl={match?.matchImageUrl || ""}
-        existingImageCount={Array.isArray(match?.matchImages) ? match.matchImages.length : 0}
+        existingImageCount={
+          Array.isArray(match?.matchImages) && match.matchImages.length
+            ? match.matchImages.length
+            : match?.matchImageUrl
+              ? 1
+              : 0
+        }
+        appendOnUpload={
+          (Array.isArray(match?.matchImages) && match.matchImages.length > 0) ||
+          Boolean(match?.matchImageUrl)
+        }
         onUploaded={(updatedMatch) => {
           onUploaded(updatedMatch);
         }}

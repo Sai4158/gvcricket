@@ -306,9 +306,9 @@ export default function ResultPageClient({ matchId, initialMatch }) {
               matchId={String(match._id)}
               existingImages={matchImages}
               existingImageUrl={activeGalleryImage?.url || match?.matchImageUrl || ""}
-              existingImageCount={matchImages.length}
+              existingImageCount={matchImages.length || (match?.matchImageUrl ? 1 : 0)}
               targetImageId={activeGalleryImage?.id || ""}
-              appendOnUpload={matchImages.length > 0}
+              appendOnUpload={matchImages.length > 0 || Boolean(match?.matchImageUrl)}
               onUploaded={(updatedMatch) => {
                 startTransition(() => {
                   setMatch(updatedMatch);
