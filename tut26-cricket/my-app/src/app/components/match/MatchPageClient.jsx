@@ -259,7 +259,7 @@ export default function MatchPageClient({
   const { settings: umpireSettings, updateSetting: updateUmpireSetting } =
     useAnnouncementSettings("umpire", matchId);
   const [entryScoreSoundEffectsEnabled, setEntryScoreSoundEffectsEnabled] =
-    useState(umpireSettings.playScoreSoundEffects !== false);
+    useState(true);
   const micMonitor = useLocalMicMonitor();
   const {
     speak,
@@ -731,10 +731,8 @@ export default function MatchPageClient({
       return;
     }
 
-    setEntryScoreSoundEffectsEnabled(
-      umpireSettings.playScoreSoundEffects !== false,
-    );
-  }, [modal.type, umpireSettings.playScoreSoundEffects]);
+    setEntryScoreSoundEffectsEnabled(true);
+  }, [modal.type]);
   const [scoreSoundEffectMapSaveNonce, setScoreSoundEffectMapSaveNonce] =
     useState(0);
   const queueScoreSoundEffectMapSave = useCallback(() => {
@@ -1662,9 +1660,7 @@ export default function MatchPageClient({
     }
 
     entryScoreSoundPromptShownRef.current = true;
-    setEntryScoreSoundEffectsEnabled(
-      umpireSettings.playScoreSoundEffects !== false,
-    );
+    setEntryScoreSoundEffectsEnabled(true);
     setModal({ type: ENTRY_SCORE_SOUND_EFFECTS_MODAL });
   }, [
     authStatus,
@@ -1672,7 +1668,6 @@ export default function MatchPageClient({
     isLoading,
     match?._id,
     tossPending,
-    umpireSettings.playScoreSoundEffects,
   ]);
 
   const toggleSoundEffectsPanel = useCallback(() => {
