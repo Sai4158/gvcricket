@@ -10,7 +10,7 @@ const HowItWorksSection = nextDynamic(() => import("./components/home/HowItWorks
 const CommunityHighlightsSection = nextDynamic(() => import("./components/home/CommunityHighlightsSection"), { ssr: true });
 const LearnCricketCard = nextDynamic(() => import("./components/home/LearnCricketCard"), { ssr: true });
 
-export const revalidate = 86400;
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "GV Cricket | Live Cricket Scoring, Umpire Mode, Match Control",

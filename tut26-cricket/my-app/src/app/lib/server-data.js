@@ -484,7 +484,7 @@ export async function loadMatchAccessData(matchId) {
 }
 
 export async function loadHomeLiveBannerData() {
-  const { sessions } = await loadSessionsIndexPageData();
+  const { sessions } = await readSessionsIndexPageData();
   const visibleSessions = Array.isArray(sessions) ? sessions : [];
 
   if (!visibleSessions.length) {

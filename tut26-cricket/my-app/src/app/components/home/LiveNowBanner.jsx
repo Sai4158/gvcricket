@@ -7,67 +7,6 @@ import PendingLink from "../shared/PendingLink";
 import SafeMatchImage from "../shared/SafeMatchImage";
 import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
 
-const LIVE_NOW_BANNER_CACHE_TTL_MS = 15_000;
-const LIVE_NOW_BANNER_CACHE_KEY = "gv-home-live-banner-v1";
-const liveNowBannerMemoryCache = globalThis.__gvHomeLiveBannerClientCache || {
-  liveMatch: null,
-  expiresAt: 0,
-};
-
-if (!globalThis.__gvHomeLiveBannerClientCache) {
-  globalThis.__gvHomeLiveBannerClientCache = liveNowBannerMemoryCache;
-}
-
-function readCachedLiveBanner() {
-  const now = Date.now();
-  if (liveNowBannerMemoryCache.liveMatch && liveNowBannerMemoryCache.expiresAt > now) {
-    return liveNowBannerMemoryCache.liveMatch;
-  }
-
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    const rawValue = window.sessionStorage.getItem(LIVE_NOW_BANNER_CACHE_KEY);
-    if (!rawValue) {
-      return null;
-    }
-
-    const parsed = JSON.parse(rawValue);
-    if (Number(parsed?.expiresAt || 0) <= now) {
-      window.sessionStorage.removeItem(LIVE_NOW_BANNER_CACHE_KEY);
-      return null;
-    }
-
-    liveNowBannerMemoryCache.liveMatch = parsed?.liveMatch || null;
-    liveNowBannerMemoryCache.expiresAt = Number(parsed?.expiresAt || 0);
-    return liveNowBannerMemoryCache.liveMatch;
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedLiveBanner(liveMatch) {
-  const nextEntry = {
-    liveMatch: liveMatch || null,
-    expiresAt: Date.now() + LIVE_NOW_BANNER_CACHE_TTL_MS,
-  };
-
-  liveNowBannerMemoryCache.liveMatch = nextEntry.liveMatch;
-  liveNowBannerMemoryCache.expiresAt = nextEntry.expiresAt;
-
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.sessionStorage.setItem(LIVE_NOW_BANNER_CACHE_KEY, JSON.stringify(nextEntry));
-  } catch {
-    // Ignore cache write failures and keep the in-memory cache.
-  }
-}
-
 function getBannerTimestamp(liveMatch) {
   return new Date(liveMatch?.updatedAt || 0).getTime();
 }
@@ -121,13 +60,6 @@ export default function LiveNowBanner({ liveMatch }) {
         return;
       }
 
-      const cachedLiveMatch = readCachedLiveBanner();
-      if (cachedLiveMatch) {
-        if (!cancelled) {
-          setFetchedLiveMatch(cachedLiveMatch);
-        }
-      }
-
       try {
         const response = await fetch("/api/home/live-banner", {
           cache: "no-store",
@@ -143,7 +75,6 @@ export default function LiveNowBanner({ liveMatch }) {
         const payload = await response.json().catch(() => null);
         if (!cancelled) {
           const nextLiveMatch = payload?.liveMatch || null;
-          writeCachedLiveBanner(nextLiveMatch);
           setFetchedLiveMatch(nextLiveMatch);
         }
       } catch (_error) {

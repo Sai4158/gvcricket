@@ -1,46 +1,18 @@
 import { NextResponse } from "next/server";
 import { loadHomeLiveBannerData } from "../../../lib/server-data";
 
-const CACHE_TTL_MS = 15_000;
-const globalHomeLiveBannerCache = globalThis.__gvHomeLiveBannerCache || {
-  value: null,
-  expiresAt: 0,
-  pending: null,
-};
-globalThis.__gvHomeLiveBannerCache = globalHomeLiveBannerCache;
-
-async function getCachedHomeLiveBannerData() {
-  if (globalHomeLiveBannerCache.expiresAt > Date.now()) {
-    return globalHomeLiveBannerCache.value;
-  }
-
-  if (globalHomeLiveBannerCache.pending) {
-    return globalHomeLiveBannerCache.pending;
-  }
-
-  globalHomeLiveBannerCache.pending = (async () => {
-    try {
-      const liveMatch = await loadHomeLiveBannerData();
-      globalHomeLiveBannerCache.value = liveMatch;
-      globalHomeLiveBannerCache.expiresAt = Date.now() + CACHE_TTL_MS;
-      return liveMatch;
-    } finally {
-      globalHomeLiveBannerCache.pending = null;
-    }
-  })();
-
-  return globalHomeLiveBannerCache.pending;
-}
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET() {
   try {
-    const liveMatch = await getCachedHomeLiveBannerData();
+    const liveMatch = await loadHomeLiveBannerData();
     return NextResponse.json(
       { liveMatch },
       {
         status: 200,
         headers: {
-          "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=45",
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
         },
       }
     );
@@ -51,7 +23,7 @@ export async function GET() {
       {
         status: 200,
         headers: {
-          "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=45",
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
         },
       }
     );
