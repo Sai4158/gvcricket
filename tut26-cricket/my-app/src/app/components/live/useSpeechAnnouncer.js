@@ -559,19 +559,19 @@ function getSpeechProfile(voice, options, platform) {
 
   const defaultRate = isIOSSafari
     ? isAppleNatural
-      ? 0.88
-      : 0.87
+      ? 0.84
+      : 0.83
     : isAppleNatural
-      ? 0.9
+      ? 0.88
       : isGoogleNatural
         ? platform?.isChrome
-          ? 0.87
-          : 0.9
+          ? 0.85
+          : 0.88
         : isMicrosoftNatural
-          ? 0.9
+          ? 0.87
           : isLegacyVoice
-            ? 0.88
-            : 0.92;
+            ? 0.86
+            : 0.9;
 
   const defaultPitch = isIOSSafari
     ? 1
@@ -590,7 +590,7 @@ function getSpeechProfile(voice, options, platform) {
     safeRequestedRate === null
       ? defaultRate
       : isIOSSafari
-        ? Math.min(safeRequestedRate, 0.88)
+        ? Math.min(safeRequestedRate, 0.84)
         : safeRequestedRate;
 
   return {

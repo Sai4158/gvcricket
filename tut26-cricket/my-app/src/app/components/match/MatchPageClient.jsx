@@ -1117,31 +1117,29 @@ export default function MatchPageClient({
       }
 
       if (!shouldPlayLocalScoreEffect && shouldBroadcastScoreEffect) {
-        try {
-          await fetch(`/api/matches/${matchId}/sound-effects`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            keepalive: true,
-            body: JSON.stringify({
-              effectId: configuredScoreEffect.id,
-              clientRequestId: createSoundEffectRequestId(),
-              resumeAnnouncements: false,
-              trigger: "score_boundary",
-              preAnnouncementText: String(scorePreview.leadItem?.text || "").trim(),
-              preAnnouncementDelayMs: getConfiguredScoreEffectDelayMs(
-                runs,
-                isOut,
-                extraType,
-                String(scorePreview.leadItem?.text || "").trim(),
-                Number(scorePreview.leadItem?.rate || SCORE_PRE_EFFECT_RATE),
-              ),
-            }),
-          });
-        } catch {
-          // Spectator relay is best-effort and should not block scoring.
-        }
-        announceUmpireAction(runs, isOut, extraType);
         handleScoreEvent(runs, isOut, extraType);
+        void fetch(`/api/matches/${matchId}/sound-effects`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          keepalive: true,
+          body: JSON.stringify({
+            effectId: configuredScoreEffect.id,
+            clientRequestId: createSoundEffectRequestId(),
+            resumeAnnouncements: false,
+            trigger: "score_boundary",
+            preAnnouncementText: String(scorePreview.leadItem?.text || "").trim(),
+            preAnnouncementDelayMs: getConfiguredScoreEffectDelayMs(
+              runs,
+              isOut,
+              extraType,
+              String(scorePreview.leadItem?.text || "").trim(),
+              Number(scorePreview.leadItem?.rate || SCORE_PRE_EFFECT_RATE),
+            ),
+          }),
+        }).catch(() => {
+          // Spectator relay is best-effort and should not block scoring.
+        });
+        announceUmpireAction(runs, isOut, extraType);
         return;
       }
 
@@ -1158,29 +1156,26 @@ export default function MatchPageClient({
       const clientRequestId = createSoundEffectRequestId();
       boundarySequenceVersionRef.current = boundarySequenceVersion;
       activeBoundarySequenceRef.current = true;
+      handleScoreEvent(runs, isOut, extraType);
 
       if (shouldBroadcastScoreEffect) {
         localSoundEffectRequestIdRef.current = clientRequestId;
-        try {
-          await fetch(`/api/matches/${matchId}/sound-effects`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            keepalive: true,
-            body: JSON.stringify({
-              effectId: configuredScoreEffect.id,
-              clientRequestId,
-              resumeAnnouncements: false,
-              trigger: "score_boundary",
-              preAnnouncementText: leadText,
-              preAnnouncementDelayMs: leadDelayMs,
-            }),
-          });
-        } catch {
+        void fetch(`/api/matches/${matchId}/sound-effects`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          keepalive: true,
+          body: JSON.stringify({
+            effectId: configuredScoreEffect.id,
+            clientRequestId,
+            resumeAnnouncements: false,
+            trigger: "score_boundary",
+            preAnnouncementText: leadText,
+            preAnnouncementDelayMs: leadDelayMs,
+          }),
+        }).catch(() => {
           // Spectator relay is best-effort and should not block scoring.
-        }
+        });
       }
-
-      handleScoreEvent(runs, isOut, extraType);
 
       if (leadText && umpireSettings.enabled && umpireSettings.mode !== "silent") {
         speakWithAnnouncementDuck(leadText, {
