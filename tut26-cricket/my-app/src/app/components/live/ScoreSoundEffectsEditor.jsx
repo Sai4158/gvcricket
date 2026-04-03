@@ -69,15 +69,15 @@ function IosSwitch({ checked, onChange, disabled = false, label }) {
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange?.(!checked)}
-      className={`relative inline-flex h-8 w-[54px] items-center rounded-full border transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
+      className={`relative inline-flex h-8 w-13.5 items-center rounded-full border transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
         checked
           ? "border-emerald-300/35 bg-emerald-500 shadow-[0_10px_24px_rgba(16,185,129,0.22)]"
-          : "border-white/10 bg-white/[0.08]"
+          : "border-white/10 bg-white/8"
       } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
     >
       <span
         className={`inline-flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition-transform ${
-          checked ? "translate-x-[26px]" : "translate-x-[3px]"
+          checked ? "translate-x-6.5" : "translate-x-0.75"
         }`}
       />
     </button>
@@ -95,8 +95,7 @@ function SoundAssignmentRow({
 }) {
   const toneClass = getScoreControlToneClasses(event.buttonTone);
   const hasAssignedSound = Boolean(selectedId) && canPreview;
-  const buttonTextClassName =
-    event.buttonTextClassName || "text-[1.2rem]";
+  const buttonTextClassName = event.buttonTextClassName || "text-[1.2rem]";
 
   return (
     <div className="rounded-[22px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.022))] p-2.5 shadow-[0_14px_36px_rgba(0,0,0,0.22)]">
@@ -105,7 +104,7 @@ function SoundAssignmentRow({
           type="button"
           whileTap={{ scale: 0.95, y: 2 }}
           onClick={onEdit}
-          className={`${KEYPAD_BUTTON_BASE} ${toneClass} min-h-[50px] px-2 py-3 text-white sm:min-h-[52px] sm:px-2.5`}
+          className={`${KEYPAD_BUTTON_BASE} ${toneClass} min-h-12.5 px-2 py-3 text-white sm:min-h-13 sm:px-2.5`}
           aria-label={`Edit ${event.label} sound`}
         >
           <span
@@ -138,7 +137,7 @@ function SoundAssignmentRow({
               active={isPreviewing}
             />
           </div>
-          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/82 sm:h-10 sm:w-10">
+          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/82 sm:h-10 sm:w-10">
             {isPreviewing ? (
               <FaPause className="text-sm" />
             ) : (
@@ -150,7 +149,7 @@ function SoundAssignmentRow({
           type="button"
           onClick={onEdit}
           whileTap={{ scale: 0.95, y: 2 }}
-          className={`${KEYPAD_BUTTON_BASE} inline-flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[16px] border border-white/10 bg-[linear-gradient(180deg,rgba(30,30,34,0.96),rgba(14,14,18,1))] text-white/74 hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(38,38,42,1),rgba(18,18,22,1))] hover:text-white sm:h-[52px] sm:w-[52px] sm:rounded-[18px]`}
+          className={`${KEYPAD_BUTTON_BASE} inline-flex h-11.5 w-11.5 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(30,30,34,0.96),rgba(14,14,18,1))] text-white/74 hover:border-white/14 hover:bg-[linear-gradient(180deg,rgba(38,38,42,1),rgba(18,18,22,1))] hover:text-white sm:h-13 sm:w-13 sm:rounded-[18px]`}
           aria-label={`Edit ${event.label} sound`}
         >
           <FaEdit className="text-[14px]" />
@@ -226,7 +225,7 @@ function SoundPickerSheet({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[160] flex items-center justify-center bg-black/72 p-4 backdrop-blur-sm sm:p-6"
+          className="fixed inset-0 z-160 flex items-center justify-center bg-black/72 p-4 backdrop-blur-sm sm:p-6"
           style={{ touchAction: "pan-y" }}
           onClick={onClose}
         >
@@ -235,7 +234,7 @@ function SoundPickerSheet({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.98 }}
             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            className="flex max-h-[calc(100dvh-12rem)] w-full max-w-[700px] min-h-0 flex-col overflow-y-auto overscroll-contain rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,15,20,0.98),rgba(6,6,10,1))] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.04)] sm:max-h-[64vh] sm:p-5"
+            className="flex max-h-[calc(100dvh-12rem)] w-full max-w-175 min-h-0 flex-col overflow-y-auto overscroll-contain rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(15,15,20,0.98),rgba(6,6,10,1))] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.04)] sm:max-h-[64vh] sm:p-5"
             style={{
               touchAction: "pan-y",
               overscrollBehavior: "contain",
@@ -251,14 +250,12 @@ function SoundPickerSheet({
                   text={eventLabel}
                   className="text-lg"
                 />
-                <p className="mt-1 text-xs text-white/70">
-                  Select a sound
-                </p>
+                <p className="mt-1 text-xs text-white/70">Select a sound</p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/14 bg-[rgba(14,14,18,0.92)] text-white shadow-[0_10px_30px_rgba(0,0,0,0.32)] transition active:scale-[0.97] hover:bg-white/[0.12]"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/14 bg-[rgba(14,14,18,0.92)] text-white shadow-[0_10px_30px_rgba(0,0,0,0.32)] transition active:scale-[0.97] hover:bg-white/12"
                 aria-label="Close sound picker"
               >
                 <FaTimes />
@@ -280,14 +277,14 @@ function SoundPickerSheet({
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
                     placeholder="Search sounds"
-                    className="w-full rounded-[20px] border border-white/10 bg-[rgba(18,18,24,0.96)] py-3 pl-10 pr-11 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-emerald-300/24 focus:bg-white/[0.05]"
+                    className="w-full rounded-2xl border border-white/10 bg-[rgba(18,18,24,0.96)] py-3 pl-10 pr-11 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-emerald-300/24 focus:bg-white/5"
                     aria-label={`Search ${eventLabel} sounds`}
                   />
                   {hasSearchQuery ? (
                     <button
                       type="button"
                       onClick={() => setSearchQuery("")}
-                      className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-300 transition hover:bg-white/[0.1]"
+                      className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10"
                       aria-label="Clear sound search"
                     >
                       <FaTimes className="text-xs" />
@@ -322,7 +319,9 @@ function SoundPickerSheet({
                   }`}
                 >
                   <div className="min-w-0">
-                    <p className="text-sm uppercase tracking-[0.16em]">Random</p>
+                    <p className="text-sm uppercase tracking-[0.16em]">
+                      Random
+                    </p>
                     <p className="mt-1 text-xs text-white/75">
                       Use a random sound
                     </p>
@@ -345,7 +344,7 @@ function SoundPickerSheet({
                         type="button"
                         whileTap={{ scale: 0.95, y: 2 }}
                         onClick={() => onPreview(option)}
-                        className={`${KEYPAD_BUTTON_BASE} inline-flex h-[48px] w-[48px] shrink-0 items-center justify-center border sm:h-[52px] sm:w-[52px] ${
+                        className={`${KEYPAD_BUTTON_BASE} inline-flex h-12 w-12 shrink-0 items-center justify-center border sm:h-13 sm:w-13 ${
                           isPreviewing ? "ring-2 ring-white/18" : ""
                         } ${
                           isPreviewing
@@ -444,7 +443,8 @@ export default function ScoreSoundEffectsEditor({
     [settings.scoreSoundEffectMap],
   );
   const editingEvent =
-    SCORE_SOUND_EFFECT_EVENTS.find((event) => event.key === editingEventKey) || null;
+    SCORE_SOUND_EFFECT_EVENTS.find((event) => event.key === editingEventKey) ||
+    null;
   const activeSoundAssignments = useMemo(
     () =>
       SCORE_SOUND_EFFECT_EVENTS.map((event) => {
@@ -488,7 +488,7 @@ export default function ScoreSoundEffectsEditor({
   const surfaceClassName =
     surface === "flat"
       ? "relative"
-      : "relative rounded-[24px] border border-white/8 bg-white/[0.03] p-3 sm:p-4";
+      : "relative rounded-3xl border border-white/8 bg-white/3 p-3 sm:p-4";
 
   return (
     <div className={`${surfaceClassName} ${className}`.trim()}>
@@ -590,9 +590,7 @@ export default function ScoreSoundEffectsEditor({
             <p className="text-sm font-semibold text-white">
               {broadcastStatusLabel}
             </p>
-            <p className="mt-1 text-xs text-white/70">
-              {broadcastStatusText}
-            </p>
+            <p className="mt-1 text-xs text-white/70">{broadcastStatusText}</p>
           </div>
           <span
             className={`inline-flex shrink-0 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${
@@ -617,9 +615,9 @@ export default function ScoreSoundEffectsEditor({
               canPreview={!item.isRandom}
               isPreviewing={Boolean(
                 item.selectedEffect?.id &&
-                  previewingSoundEffectId === item.selectedEffect.id &&
-                  (previewingSoundEffectStatus === "loading" ||
-                    previewingSoundEffectStatus === "playing"),
+                previewingSoundEffectId === item.selectedEffect.id &&
+                (previewingSoundEffectStatus === "loading" ||
+                  previewingSoundEffectStatus === "playing"),
               )}
               onTogglePreview={() => {
                 if (!item.selectedEffect) {

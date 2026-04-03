@@ -47,6 +47,23 @@ function encodeEvent(event, data) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
+function readCookieValue(request, name) {
+  const rawCookie = String(request.headers.get("cookie") || "");
+  if (!rawCookie || !name) {
+    return "";
+  }
+
+  for (const part of rawCookie.split(";")) {
+    const [rawKey, ...rest] = part.split("=");
+    if (String(rawKey || "").trim() !== name) {
+      continue;
+    }
+    return rest.join("=").trim();
+  }
+
+  return "";
+}
+
 export async function GET(request, { params }) {
   const { id } = await params;
   const role = request.nextUrl.searchParams.get("role") || "spectator";
@@ -69,8 +86,10 @@ export async function GET(request, { params }) {
   }
 
   if (role === "umpire") {
+    const cookieName = getMatchAccessCookieName(id);
+    const rawToken = readCookieValue(request, cookieName);
     const cookieStore = await cookies();
-    const token = cookieStore.get(getMatchAccessCookieName(id))?.value;
+    const token = rawToken || cookieStore.get(cookieName)?.value;
     const authorized = hasValidMatchAccess(
       id,
       token,
@@ -82,8 +101,10 @@ export async function GET(request, { params }) {
   }
 
   if (role === "director") {
+    const cookieName = getDirectorAccessCookieName();
+    const rawToken = readCookieValue(request, cookieName);
     const cookieStore = await cookies();
-    const token = cookieStore.get(getDirectorAccessCookieName())?.value;
+    const token = rawToken || cookieStore.get(cookieName)?.value;
     const authorized = hasValidDirectorAccess(token);
     if (!authorized) {
       return new Response("Director access required.", { status: 403 });
@@ -91,8 +112,6 @@ export async function GET(request, { params }) {
   }
 
   const encoder = new TextEncoder();
-  const { readable, writable } = new TransformStream();
-  const writer = writable.getWriter();
   const bootstrapSnapshot = {
     enabled: false,
     spectatorCount: 0,
@@ -109,9 +128,9 @@ export async function GET(request, { params }) {
     updatedAt: new Date().toISOString(),
     version: 0,
   };
-  let stopStream = async () => {};
-  const stream = readable;
-  void (async () => {
+  let stopStream = () => {};
+  const stream = new ReadableStream({
+    async start(controller) {
     let heartbeat = null;
     let closed = false;
     let lastVersion = -1;
@@ -156,8 +175,7 @@ export async function GET(request, { params }) {
       }
 
       try {
-        await writer.ready;
-        await writer.write(encoder.encode(encodeEvent(event, data)));
+        controller.enqueue(encoder.encode(encodeEvent(event, data)));
         return true;
       } catch (error) {
         closed = true;
@@ -169,14 +187,14 @@ export async function GET(request, { params }) {
       }
     };
 
-    stopStream = async () => {
+    stopStream = () => {
       if (closed) {
         return;
       }
       closed = true;
       finalize();
       try {
-        await writer.close();
+        controller.close();
       } catch {
         // Ignore close races.
       }
@@ -275,7 +293,7 @@ export async function GET(request, { params }) {
         }
       } catch (error) {
         console.error("Walkie SSE heartbeat failed:", error);
-        await stopStream();
+        stopStream();
         return;
       }
 
@@ -384,14 +402,15 @@ export async function GET(request, { params }) {
       scheduleHeartbeat(WALKIE_HEARTBEAT_START_DELAY_MS);
     } catch (error) {
       console.error("Walkie SSE setup failed:", error);
-      await stopStream();
+      stopStream();
     }
-  })();
+    },
+  });
 
   request.signal.addEventListener(
     "abort",
     () => {
-      void stopStream();
+      stopStream();
     },
     { once: true }
   );

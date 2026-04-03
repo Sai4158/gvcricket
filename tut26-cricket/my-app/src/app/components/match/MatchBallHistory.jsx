@@ -55,9 +55,9 @@ export const Ball = memo(function Ball({ ball, ballNumber }) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-2 w-10">
+    <div className="flex w-10 flex-col items-center gap-2">
       <div
-        className={`${matchControlsFont.className} h-10 w-10 shrink-0 rounded-full flex items-center justify-center font-bold text-sm text-white tabular-nums ${style}`}
+        className={`${matchControlsFont.className} flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-bold text-sm text-white tabular-nums ${style}`}
       >
         {label}
       </div>
@@ -74,15 +74,15 @@ export function BallTracker({ history }) {
   const trackerRef = useRef(null);
   const currentOver = useMemo(
     () => history.at(-1) ?? { overNumber: 1, balls: [] },
-    [history],
+    [history]
   );
   const currentBalls = useMemo(
     () => (Array.isArray(currentOver.balls) ? currentOver.balls : []),
-    [currentOver],
+    [currentOver]
   );
   const currentBallSlotLabels = useMemo(
     () => buildBallSlotLabels(currentBalls),
-    [currentBalls],
+    [currentBalls]
   );
   const currentBallSignature = useMemo(
     () =>
@@ -93,10 +93,10 @@ export function BallTracker({ history }) {
             Number(ball?.runs || 0),
             ball?.isOut ? "out" : "in",
             ball?.extraType || "legal",
-          ].join(":"),
+          ].join(":")
         )
         .join("|"),
-    [currentBalls],
+    [currentBalls]
   );
 
   useLayoutEffect(() => {
@@ -121,17 +121,17 @@ export function BallTracker({ history }) {
   }, [currentBallSignature, currentOver.overNumber]);
 
   return (
-    <div className="bg-zinc-900/50 p-4 rounded-2xl ring-1 ring-white/10 mb-6">
+    <div className="mb-6 rounded-2xl bg-zinc-900/50 p-4 ring-1 ring-white/10">
       <h3
-        className={`${matchControlsFont.className} font-bold text-white text-center mb-4`}
+        className={`${matchControlsFont.className} mb-4 text-center font-bold text-white`}
       >
         Over {currentOver.overNumber}
       </h3>
       <div
         ref={trackerRef}
-        className="overflow-x-auto overflow-y-hidden pb-3 pr-1 [scrollbar-color:rgba(255,255,255,0.35)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/30 [&::-webkit-scrollbar-track]:bg-transparent"
+        className="overflow-x-auto overflow-y-hidden pb-3 pr-1 [scrollbar-color:rgba(255,255,255,0.35)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/30 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:h-2"
       >
-        <div className="ml-auto flex min-h-[4.5rem] min-w-max items-start gap-4">
+        <div className="ml-auto flex min-h-18 min-w-max items-start gap-4">
           {currentBalls.map((ball, index) => (
             <div key={getBallKey(index + 1, currentOver.overNumber)}>
               <Ball

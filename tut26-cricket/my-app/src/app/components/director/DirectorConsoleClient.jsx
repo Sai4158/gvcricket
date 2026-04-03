@@ -4791,14 +4791,14 @@ export default function DirectorConsoleClient({
                           setLibrarySearchQuery(event.target.value)
                         }
                         placeholder="Search sound effects"
-                        className="w-full rounded-[22px] border border-white/10 bg-white/[0.04] py-3 pl-10 pr-11 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-violet-300/24 focus:bg-white/[0.06]"
+                        className="w-full rounded-[22px] border border-white/10 bg-white/4 py-3 pl-10 pr-11 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-violet-300/24 focus:bg-white/6"
                         aria-label="Search director sound effects"
                       />
                       {String(librarySearchQuery || "").trim() ? (
                         <button
                           type="button"
                           onClick={() => setLibrarySearchQuery("")}
-                          className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-300 transition hover:bg-white/[0.1]"
+                          className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10"
                           aria-label="Clear sound effect search"
                         >
                           <FaTimes className="text-xs" />
@@ -5026,7 +5026,7 @@ export default function DirectorConsoleClient({
                           ? "https://youtube.com/playlist?list=..."
                           : "https://youtube.com/watch?v=..."
                       }
-                      className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3.5 text-[16px] text-white outline-none transition placeholder:text-zinc-500 focus:border-cyan-300/26 focus:bg-white/[0.07]"
+                      className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 text-base text-white outline-none transition placeholder:text-zinc-500 focus:border-cyan-300/26 focus:bg-white/7"
                     />
                     <LoadingButton
                       type="button"
@@ -5051,7 +5051,7 @@ export default function DirectorConsoleClient({
                       className={`rounded-[20px] px-4 py-3 text-left transition ${
                         directorAudioMode === "cut"
                           ? "bg-[linear-gradient(135deg,rgba(127,29,29,0.9),rgba(239,68,68,0.18))] text-white shadow-[0_14px_28px_rgba(127,29,29,0.18)]"
-                          : "bg-transparent text-zinc-300 hover:bg-white/[0.04]"
+                          : "bg-transparent text-zinc-300 hover:bg-white/4"
                       }`}
                     >
                       <p className="text-sm font-semibold">Cut music</p>
@@ -5066,7 +5066,7 @@ export default function DirectorConsoleClient({
                       className={`rounded-[20px] px-4 py-3 text-left transition ${
                         directorAudioMode === "duck"
                           ? "bg-[linear-gradient(135deg,rgba(8,47,73,0.92),rgba(34,211,238,0.16))] text-white shadow-[0_14px_28px_rgba(8,145,178,0.18)]"
-                          : "bg-transparent text-zinc-300 hover:bg-white/[0.04]"
+                          : "bg-transparent text-zinc-300 hover:bg-white/4"
                       }`}
                     >
                       <p className="text-sm font-semibold">Duck music</p>
@@ -5112,7 +5112,7 @@ export default function DirectorConsoleClient({
                     />
                     {!currentTrack ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-5 text-center">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-[20px] border border-white/10 bg-white/[0.06] text-zinc-300">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/6 text-zinc-300">
                           <FaMusic className="text-lg" />
                         </div>
                         <div>
@@ -5148,7 +5148,7 @@ export default function DirectorConsoleClient({
                             href={currentTrack.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/[0.12]"
+                            className="inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/8 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/12"
                           >
                             <FaExternalLinkAlt className="text-xs" />
                             Open on YouTube
@@ -5209,7 +5209,7 @@ export default function DirectorConsoleClient({
                         href={currentTrack.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-200 transition hover:bg-white/[0.1]"
+                        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
                         aria-label="Open on YouTube"
                       >
                         <FaExternalLinkAlt className="text-xs" />
@@ -5287,7 +5287,7 @@ export default function DirectorConsoleClient({
                         </div>
                       ) : null}
                     </div>
-                    <div className="max-h-[23rem] space-y-2 overflow-y-auto pr-1">
+                    <div className="max-h-92 space-y-2 overflow-y-auto pr-1">
                       {musicTracks.map((track, index) => (
                         <div
                           key={track.id}
@@ -5301,7 +5301,7 @@ export default function DirectorConsoleClient({
                           className={`flex items-center gap-3 rounded-2xl border px-3 py-2 ${
                             index === currentTrackIndex
                               ? "border-emerald-300/18 bg-emerald-500/10"
-                              : "border-white/8 bg-white/[0.03]"
+                              : "border-white/8 bg-white/3"
                           }`}
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -5319,7 +5319,7 @@ export default function DirectorConsoleClient({
                               {track.name}
                             </div>
                             <div className="mt-1 flex items-center gap-2 text-xs text-zinc-400">
-                              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
+                              <span className="rounded-full border border-white/10 bg-white/4 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
                                 #{index + 1}
                               </span>
                               {index === currentTrackIndex
@@ -5332,7 +5332,7 @@ export default function DirectorConsoleClient({
                           <button
                             type="button"
                             onClick={() => handleRemoveMusicTrack(track.id)}
-                            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-300 transition hover:bg-rose-500/18 hover:text-rose-100"
+                            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-rose-500/18 hover:text-rose-100"
                             aria-label={`Remove ${track.name}`}
                           >
                             <FaTrash className="text-sm" />
