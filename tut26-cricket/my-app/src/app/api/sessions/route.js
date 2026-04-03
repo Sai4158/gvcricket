@@ -77,9 +77,19 @@ export async function POST(req) {
   }
 }
 
-export async function GET() {
+export async function GET(req) {
   try {
-    const { sessions, totalCount } = await loadSessionsIndexPageData();
+    const requestUrl = new URL(req.url);
+    const requestCacheControl = String(
+      req.headers.get("cache-control") || "",
+    ).toLowerCase();
+    const forceFresh =
+      requestUrl.searchParams.get("fresh") === "1" ||
+      requestCacheControl.includes("no-store") ||
+      requestCacheControl.includes("no-cache");
+    const { sessions, totalCount } = await loadSessionsIndexPageData({
+      forceFresh,
+    });
 
     return Response.json(sessions, {
       headers: {

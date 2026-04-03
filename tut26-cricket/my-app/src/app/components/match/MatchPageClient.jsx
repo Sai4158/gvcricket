@@ -194,24 +194,13 @@ export default function MatchPageClient({
   initialMatch,
 }) {
   const router = useRouter();
-  const cachedInitialSoundEffectFiles = sortSoundEffectsByOrder(
-    readCachedSoundEffectsLibrary(),
-    readCachedSoundEffectsOrder(),
-  );
-  const cachedInitialSoundEffectDurations = readCachedSoundEffectDurations();
   const [modal, setModal] = useState({ type: null });
   const [infoText, setInfoText] = useState(null);
   const [soundEffectsOpen, setSoundEffectsOpen] = useState(false);
-  const [soundEffectFiles, setSoundEffectFiles] = useState(
-    cachedInitialSoundEffectFiles,
-  );
-  const [soundEffectLibraryStatus, setSoundEffectLibraryStatus] = useState(
-    cachedInitialSoundEffectFiles.length ? "ready" : "idle",
-  );
+  const [soundEffectFiles, setSoundEffectFiles] = useState([]);
+  const [soundEffectLibraryStatus, setSoundEffectLibraryStatus] = useState("idle");
   const [soundEffectError, setSoundEffectError] = useState("");
-  const [soundEffectDurations, setSoundEffectDurations] = useState(
-    cachedInitialSoundEffectDurations,
-  );
+  const [soundEffectDurations, setSoundEffectDurations] = useState({});
   const [activeCommentaryAction, setActiveCommentaryAction] = useState("");
   const [activeCommentaryPreviewId, setActiveCommentaryPreviewId] = useState("");
   const localAnnouncementIdRef = useRef(0);
@@ -822,6 +811,29 @@ export default function MatchPageClient({
     },
     [selectedScoreSoundEffectIds],
   );
+
+  useEffect(() => {
+    const cachedFiles = sortSoundEffectsByOrder(
+      readCachedSoundEffectsLibrary(),
+      readCachedSoundEffectsOrder(),
+    );
+    const cachedDurations = readCachedSoundEffectDurations();
+
+    if (cachedFiles.length) {
+      setSoundEffectFiles((current) =>
+        current.length ? current : cachedFiles,
+      );
+      setSoundEffectLibraryStatus((current) =>
+        current === "idle" ? "ready" : current,
+      );
+    }
+
+    if (Object.keys(cachedDurations).length) {
+      setSoundEffectDurations((current) =>
+        Object.keys(current).length ? current : cachedDurations,
+      );
+    }
+  }, []);
 
   useEffect(() => {
     if (authStatus === "granted" && match && tossPending) {

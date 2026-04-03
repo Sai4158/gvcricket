@@ -294,15 +294,19 @@ async function readSessionsIndexPageData() {
   };
 }
 
-export async function loadSessionsIndexPageData() {
+export async function loadSessionsIndexPageData(options = {}) {
+  if (options?.forceFresh) {
+    return readSessionsIndexPageData();
+  }
+
   return getCachedServerData(
     globalServerDataCache.sessionsIndex,
     readSessionsIndexPageData
   );
 }
 
-export async function loadSessionsIndexData() {
-  const data = await loadSessionsIndexPageData();
+export async function loadSessionsIndexData(options = {}) {
+  const data = await loadSessionsIndexPageData(options);
   return data.sessions;
 }
 

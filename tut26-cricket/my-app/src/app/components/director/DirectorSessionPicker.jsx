@@ -71,7 +71,7 @@ function SessionCard({ item, onSelect }) {
       <div className="mt-4 flex items-center justify-between gap-3 text-sm">
         <span className="inline-flex items-center gap-2 text-zinc-400">
           <FaClock className="text-xs" />
-          {formatRelativeTime(item.updatedAt)}
+          <span suppressHydrationWarning>{formatRelativeTime(item.updatedAt)}</span>
         </span>
         <span className="inline-flex items-center gap-2 text-emerald-200 transition group-hover:translate-x-0.5">
           Open
