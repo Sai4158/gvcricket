@@ -22,6 +22,7 @@ export default function MatchModalLayer({
   modalType,
   isUpdating,
   micMonitor,
+  entryScoreSoundPromptProps,
   commentaryProps,
   walkieProps,
   currentOverNumber,
@@ -34,6 +35,26 @@ export default function MatchModalLayer({
   onClose,
   onInfoClose,
 }) {
+  const renderPromptSwitch = (checked, onChange, label) => (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange?.(!checked)}
+      className={`relative inline-flex h-8 w-[54px] items-center rounded-full border transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
+        checked
+          ? "border-emerald-300/35 bg-emerald-500 shadow-[0_10px_24px_rgba(16,185,129,0.22)]"
+          : "border-white/10 bg-white/[0.08]"
+      }`}
+    >
+      <span
+        className={`inline-flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition-transform ${
+          checked ? "translate-x-[26px]" : "translate-x-[3px]"
+        }`}
+      />
+    </button>
+  );
   const modalFallback = (label) => (
     <ModalBase title="Unavailable" onExit={onClose}>
       <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-center text-sm text-zinc-400">
@@ -134,6 +155,52 @@ export default function MatchModalLayer({
         </OptionalFeatureBoundary>
       )}
       {modalType === "rules" && <RulesModal onClose={onClose} />}
+      {modalType === "entryScoreSoundEffects" && entryScoreSoundPromptProps ? (
+        <ModalBase title="" onExit={() => {}} hideHeader panelClassName="max-w-md">
+          <div className="space-y-5 text-center">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-300/80">
+                Umpire Mode
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+                Score Tap Sound Effects
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-zinc-300">
+                Keep this on to play the selected sound effect on each score tap.
+                Turn it off if you are already playing music on this device.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4 text-left">
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-white">
+                    Enable score tap sounds
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-zinc-400">
+                    Applies only to this umpire device and stays on by default.
+                  </p>
+                </div>
+                {renderPromptSwitch(
+                  entryScoreSoundPromptProps.enabled,
+                  entryScoreSoundPromptProps.onChange,
+                  entryScoreSoundPromptProps.enabled
+                    ? "Turn score tap sounds off"
+                    : "Turn score tap sounds on",
+                )}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={entryScoreSoundPromptProps.onSave}
+              className="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black transition hover:bg-emerald-400 active:scale-[0.99]"
+            >
+              Save
+            </button>
+          </div>
+        </ModalBase>
+      ) : null}
       {infoText && (
         <ModalBase title="Rule Info" onExit={onInfoClose}>
           <p className="text-center text-zinc-300">{infoText}</p>

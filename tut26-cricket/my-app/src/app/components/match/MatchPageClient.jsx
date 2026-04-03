@@ -79,6 +79,7 @@ const IPL_HORN_EFFECT = {
 const SCORE_PRE_EFFECT_RATE = 0.8;
 const SCORE_PRE_EFFECT_GAP_MS = 1000;
 const WIDE_PLUS_ONE_EXTRA_DELAY_MS = 1000;
+const ENTRY_SCORE_SOUND_EFFECTS_MODAL = "entryScoreSoundEffects";
 
 function estimateSpeechLeadDelayMs(text, rate = 1) {
   const words = String(text || "")
@@ -133,6 +134,25 @@ function buildFallbackSoundEffectFromId(effectId = "") {
     label: label || normalizedFileName,
     src: `/audio/effects/${encodeURIComponent(normalizedFileName)}`,
   };
+}
+
+function getSelectedScoreSoundEffectIds(scoreSoundEffectMap = {}) {
+  const seen = new Set();
+
+  return Object.values(normalizeScoreSoundEffectMap(scoreSoundEffectMap || {}))
+    .map((value) => String(value || "").trim())
+    .filter((value) => {
+      if (
+        !value ||
+        value === RANDOM_SCORE_EFFECT_ID ||
+        seen.has(value)
+      ) {
+        return false;
+      }
+
+      seen.add(value);
+      return true;
+    });
 }
 
 function readCachedSoundEffectDurations() {
@@ -235,6 +255,7 @@ export default function MatchPageClient({
   const micMonitorDuckingRef = useRef(false);
   const speechPlaybackActiveRef = useRef(false);
   const soundEffectPlaybackActiveRef = useRef(false);
+  const entryScoreSoundPromptShownRef = useRef(false);
   const handleHeroMenuScroll = useCallback(() => {
     contentStartRef.current?.scrollIntoView({
       behavior: "smooth",
@@ -248,6 +269,8 @@ export default function MatchPageClient({
   );
   const { settings: umpireSettings, updateSetting: updateUmpireSetting } =
     useAnnouncementSettings("umpire", matchId);
+  const [entryScoreSoundEffectsEnabled, setEntryScoreSoundEffectsEnabled] =
+    useState(umpireSettings.playScoreSoundEffects !== false);
   const micMonitor = useLocalMicMonitor();
   const {
     speak,
@@ -705,11 +728,24 @@ export default function MatchPageClient({
     () => getScoreSoundEffectMapSignature(normalizedScoreSoundEffectMap),
     [normalizedScoreSoundEffectMap],
   );
+  const selectedScoreSoundEffectIds = useMemo(
+    () => getSelectedScoreSoundEffectIds(normalizedScoreSoundEffectMap),
+    [normalizedScoreSoundEffectMap],
+  );
 
   useEffect(() => {
     currentScoreSoundEffectMapRef.current = normalizedScoreSoundEffectMap;
     currentScoreSoundEffectMapSignatureRef.current = scoreSoundEffectMapSignature;
   }, [normalizedScoreSoundEffectMap, scoreSoundEffectMapSignature]);
+  useEffect(() => {
+    if (modal.type === ENTRY_SCORE_SOUND_EFFECTS_MODAL) {
+      return;
+    }
+
+    setEntryScoreSoundEffectsEnabled(
+      umpireSettings.playScoreSoundEffects !== false,
+    );
+  }, [modal.type, umpireSettings.playScoreSoundEffects]);
   const [scoreSoundEffectMapSaveNonce, setScoreSoundEffectMapSaveNonce] =
     useState(0);
   const queueScoreSoundEffectMapSave = useCallback(() => {
@@ -775,17 +811,16 @@ export default function MatchPageClient({
 
   const warmKnownSoundEffects = useCallback(
     (files) => {
-      const preferredIds = Object.values(
-        umpireSettings.scoreSoundEffectMap || {},
-      )
-        .map((value) => String(value || "").trim())
-        .filter((value) => value && value !== RANDOM_SCORE_EFFECT_ID);
+      if (!selectedScoreSoundEffectIds.length) {
+        return;
+      }
 
       void warmCachedSoundEffectAssets(files, {
-        preferredIds,
+        preferredIds: selectedScoreSoundEffectIds,
+        limit: selectedScoreSoundEffectIds.length,
       }).catch(() => {});
     },
-    [umpireSettings.scoreSoundEffectMap],
+    [selectedScoreSoundEffectIds],
   );
 
   useEffect(() => {
@@ -1511,6 +1546,25 @@ export default function MatchPageClient({
     warmKnownSoundEffects,
   ]);
 
+  const handleEntryScoreSoundPromptSave = useCallback(() => {
+    updateUmpireScoreSoundSettings(
+      "playScoreSoundEffects",
+      entryScoreSoundEffectsEnabled,
+    );
+    if (entryScoreSoundEffectsEnabled) {
+      void loadSoundEffectsLibrary({ silent: true });
+    }
+    setModal((current) =>
+      current.type === ENTRY_SCORE_SOUND_EFFECTS_MODAL
+        ? { type: null }
+        : current,
+    );
+  }, [
+    entryScoreSoundEffectsEnabled,
+    loadSoundEffectsLibrary,
+    updateUmpireScoreSoundSettings,
+  ]);
+
   useEffect(() => {
     return subscribeSoundEffectsLibrarySync(() => {
       const nextFiles = sortSoundEffectsByOrder(
@@ -1565,6 +1619,49 @@ export default function MatchPageClient({
 
     warmKnownSoundEffects(soundEffectFiles);
   }, [soundEffectFiles, warmKnownSoundEffects]);
+
+  useEffect(() => {
+    if (
+      authStatus !== "granted" ||
+      umpireSettings.playScoreSoundEffects === false ||
+      !selectedScoreSoundEffectIds.length
+    ) {
+      return;
+    }
+
+    void loadSoundEffectsLibrary({ silent: true });
+  }, [
+    authStatus,
+    loadSoundEffectsLibrary,
+    selectedScoreSoundEffectIds,
+    umpireSettings.playScoreSoundEffects,
+  ]);
+
+  useEffect(() => {
+    if (
+      entryScoreSoundPromptShownRef.current ||
+      authStatus !== "granted" ||
+      isLoading ||
+      !match?._id ||
+      !isLiveMatch ||
+      tossPending
+    ) {
+      return;
+    }
+
+    entryScoreSoundPromptShownRef.current = true;
+    setEntryScoreSoundEffectsEnabled(
+      umpireSettings.playScoreSoundEffects !== false,
+    );
+    setModal({ type: ENTRY_SCORE_SOUND_EFFECTS_MODAL });
+  }, [
+    authStatus,
+    isLiveMatch,
+    isLoading,
+    match?._id,
+    tossPending,
+    umpireSettings.playScoreSoundEffects,
+  ]);
 
   const toggleSoundEffectsPanel = useCallback(() => {
     setSoundEffectsOpen((current) => {
@@ -2737,6 +2834,15 @@ export default function MatchPageClient({
           modalType={modal.type}
           isUpdating={isUpdating}
           micMonitor={micMonitor}
+          entryScoreSoundPromptProps={
+            modal.type === ENTRY_SCORE_SOUND_EFFECTS_MODAL
+              ? {
+                  enabled: entryScoreSoundEffectsEnabled,
+                  onChange: setEntryScoreSoundEffectsEnabled,
+                  onSave: handleEntryScoreSoundPromptSave,
+                }
+              : null
+          }
           commentaryProps={
             isLiveMatch
               ? {
