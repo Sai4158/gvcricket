@@ -2138,6 +2138,15 @@ export default function MatchPageClient({
 
     if (micMonitor.isPaused) {
       await micMonitor.resume({ pauseMedia: true });
+      return;
+    }
+
+    if (!micMonitor.isActive) {
+      await micMonitor.start({
+        pauseMedia: true,
+        startPaused: false,
+        playStartCue: false,
+      });
     }
   }, [isLiveMatch, micMonitor]);
 

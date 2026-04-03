@@ -1358,10 +1358,14 @@ export default function DirectorConsoleClient({
     }
   }, []);
 
+  const directorMicLive = Boolean(
+    directorHoldLive || (micMonitor.isActive && !micMonitor.isPaused),
+  );
+
   const getBaseMusicVolume = useCallback(() => {
-    const micDuckFactor = micMonitor.isActive ? 0.24 : 1;
+    const micDuckFactor = directorMicLive ? 0.24 : 1;
     return Math.max(0, Math.min(1, musicVolume * masterVolume * micDuckFactor));
-  }, [masterVolume, micMonitor.isActive, musicVolume]);
+  }, [directorMicLive, masterVolume, musicVolume]);
 
   const getMusicTargetVolume = useCallback(
     (duckFactor = musicEffectDuckFactorRef.current) =>
@@ -3004,12 +3008,12 @@ export default function DirectorConsoleClient({
   useEffect(() => {
     const nextVolume = Math.max(
       0,
-      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume),
+      Math.min(1, (directorMicLive ? 0.24 : 1) * masterVolume),
     );
     if (effectsAudioRef.current) {
       effectsAudioRef.current.volume = nextVolume;
     }
-  }, [masterVolume, micMonitor.isActive]);
+  }, [directorMicLive, masterVolume]);
 
   useEffect(() => {
     const audio = effectsAudioRef.current;
@@ -3345,7 +3349,7 @@ export default function DirectorConsoleClient({
         const playback = await playBufferedUiAudio(file.src, {
           volume: Math.max(
             0,
-            Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume),
+            Math.min(1, (directorMicLive ? 0.24 : 1) * masterVolume),
           ),
           onEnded: () => {
             bufferedEffectPlaybackRef.current = null;
@@ -3426,7 +3430,7 @@ export default function DirectorConsoleClient({
     audio.dataset.effectId = file.id;
     audio.volume = Math.max(
       0,
-      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume),
+      Math.min(1, (directorMicLive ? 0.24 : 1) * masterVolume),
     );
     if (sourceChanged) {
       audio.src = nextSrc;
@@ -3474,10 +3478,10 @@ export default function DirectorConsoleClient({
     }
   }, [
     applyMusicDuck,
+    directorMicLive,
     iOSSafari,
     libraryLiveId,
     masterVolume,
-    micMonitor.isActive,
     primeEffectsAudio,
     restoreMusicAfterEffects,
     stopDirectorSpeech,
@@ -3987,7 +3991,15 @@ export default function DirectorConsoleClient({
     directorMicHoldingRef.current = true;
     setDirectorHoldLive(true);
     playUiTone({ frequency: 900, durationMs: 100, type: "sine", volume: 0.04 });
-    const started = await micMonitor.start({ pauseMedia: true });
+    const started = micMonitor.isPaused
+      ? await micMonitor.resume({ pauseMedia: true })
+      : micMonitor.isActive
+        ? true
+        : await micMonitor.start({
+            pauseMedia: true,
+            startPaused: false,
+            playStartCue: false,
+          });
     if (!started) {
       directorMicHoldingRef.current = false;
       setDirectorHoldLive(false);
@@ -3997,6 +4009,11 @@ export default function DirectorConsoleClient({
   const handleDirectorMicStop = useCallback(async () => {
     directorMicHoldingRef.current = false;
     setDirectorHoldLive(false);
+    if (micMonitor.isActive && !micMonitor.isPaused) {
+      await micMonitor.pause({ resumeMedia: true });
+      return;
+    }
+
     await micMonitor.stop({ resumeMedia: true });
   }, [micMonitor]);
 
@@ -4005,6 +4022,22 @@ export default function DirectorConsoleClient({
       setDirectorSpeakerOn(nextChecked);
 
       if (nextChecked) {
+        const prepared = await micMonitor.prepare({ requestPermission: true });
+        if (!prepared) {
+          setDirectorSpeakerOn(false);
+          return;
+        }
+
+        if (!micMonitor.isActive && !micMonitor.isPaused) {
+          const primed = await micMonitor.start({
+            pauseMedia: false,
+            startPaused: true,
+            playStartCue: false,
+          });
+          if (!primed) {
+            setDirectorSpeakerOn(false);
+          }
+        }
         return;
       }
 
@@ -4395,7 +4428,7 @@ export default function DirectorConsoleClient({
             <Card
               title="Loudspeaker"
               subtitle={
-                directorHoldLive || micMonitor.isActive
+                directorMicLive
                   ? "Live on speaker"
                   : micMonitor.isStarting
                     ? "Starting loudspeaker"
@@ -4463,7 +4496,7 @@ export default function DirectorConsoleClient({
                     className={`relative inline-flex h-28 w-28 items-center justify-center rounded-full border text-3xl transition focus:outline-none focus:ring-2 focus:ring-emerald-400/40 ${
                       !directorSpeakerOn
                         ? "cursor-not-allowed border-white/8 bg-white/3 text-zinc-500"
-                        : directorHoldLive || micMonitor.isActive
+                        : directorMicLive
                           ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_40px_rgba(16,185,129,0.34)]"
                           : "border-white/10 bg-white/5 text-white"
                     }`}
@@ -4472,7 +4505,7 @@ export default function DirectorConsoleClient({
                     <span
                       className={`absolute -inset-2 rounded-full border ${
                         directorSpeakerOn &&
-                        (directorHoldLive || micMonitor.isActive)
+                        directorMicLive
                           ? "animate-pulse border-emerald-300/35"
                           : "border-transparent"
                       }`}
@@ -4491,7 +4524,7 @@ export default function DirectorConsoleClient({
                         ? "Turn on to talk"
                         : micMonitor.isStarting
                           ? "Starting..."
-                          : directorHoldLive || micMonitor.isActive
+                          : directorMicLive
                             ? "Release to stop"
                             : "Hold to talk"}
                     </p>

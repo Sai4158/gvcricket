@@ -1437,7 +1437,13 @@ export default function SessionViewClient({ sessionId, initialData }) {
     void (async () => {
       const started = micMonitor.isPaused
         ? await micMonitor.resume({ pauseMedia: true })
-        : await micMonitor.start({ pauseMedia: true });
+        : micMonitor.isActive
+          ? true
+          : await micMonitor.start({
+              pauseMedia: true,
+              startPaused: false,
+              playStartCue: false,
+            });
       if (!started) {
         speakerHeldRef.current = false;
         setQuickSpeakerTalking(false);
@@ -1453,6 +1459,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
     speakerHeldRef.current = false;
     setQuickSpeakerTalking(false);
+    if (micMonitor.isActive && !micMonitor.isPaused) {
+      await micMonitor.pause({ resumeMedia: true });
+      return;
+    }
+
     await micMonitor.stop({ resumeMedia: true });
   };
 
@@ -1673,7 +1684,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
     walkie.recoveringAudio ||
     walkie.recoveringSignaling,
   );
-  const speakerCardTalking = quickSpeakerTalking || micMonitor.isActive;
+  const speakerCardTalking =
+    quickSpeakerTalking || (micMonitor.isActive && !micMonitor.isPaused);
   const speakerSwitchOn = Boolean(speakerMicOn || activePanel === "mic");
   const announceSwitchOn = Boolean(settings.enabled);
   const umpireBroadcastScoreSoundsEnabled =
