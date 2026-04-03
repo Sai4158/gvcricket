@@ -495,18 +495,11 @@ function getCompactCardCopy(copy) {
     return text;
   }
 
-  const firstSentence = sentences[0];
-  const words = firstSentence.split(/\s+/).filter(Boolean);
-
-  if (firstSentence.length <= 96 && words.length <= 15) {
-    return firstSentence;
+  if (sentences.length === 1) {
+    return sentences[0];
   }
 
-  if (words.length <= 15) {
-    return firstSentence.slice(0, 92).trim().replace(/[,\s]+$/, "") + "...";
-  }
-
-  return words.slice(0, 14).join(" ").replace(/[,\s]+$/, "") + "...";
+  return `${sentences[0]} ${sentences[1]}`.trim();
 }
 
 function getAccentRail(accent) {
