@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  startTransition,
   useCallback,
   useEffect,
   useMemo,
@@ -379,13 +378,11 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       const nextMatch = applyQueuedFallbackState(body);
       matchRef.current = nextMatch;
       lastStreamUpdateRef.current = body.updatedAt || lastStreamUpdateRef.current;
-      startTransition(() => {
-        setMatch(nextMatch);
-        setLastUpdatedAt(
-          nextMatch?.updatedAt || body.updatedAt || new Date().toISOString(),
-        );
-        setError(null);
-      });
+      setMatch(nextMatch);
+      setLastUpdatedAt(
+        nextMatch?.updatedAt || body.updatedAt || new Date().toISOString(),
+      );
+      setError(null);
 
       return body;
     } catch {
@@ -470,12 +467,10 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       lastStreamUpdateRef.current = payload.updatedAt || "";
       const nextMatch = applyQueuedFallbackState(payload.match || null);
       matchRef.current = nextMatch;
-      startTransition(() => {
-        setMatch(nextMatch);
-        setLastUpdatedAt(nextMatch?.updatedAt || payload.updatedAt || "");
-        setError(null);
-        setIsLoading(false);
-      });
+      setMatch(nextMatch);
+      setLastUpdatedAt(nextMatch?.updatedAt || payload.updatedAt || "");
+      setError(null);
+      setIsLoading(false);
     },
     onError: () => {
       if (!match) {
@@ -585,12 +580,10 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
           matchRef.current = nextMatch;
           lastStreamUpdateRef.current =
             body.match.updatedAt || lastStreamUpdateRef.current;
-          startTransition(() => {
-            setMatch(nextMatch);
-            setLastUpdatedAt(
-              nextMatch?.updatedAt || body.match.updatedAt || new Date().toISOString(),
-            );
-          });
+          setMatch(nextMatch);
+          setLastUpdatedAt(
+            nextMatch?.updatedAt || body.match.updatedAt || new Date().toISOString(),
+          );
         } else {
           updateQueuedActions(
             removeQueuedActionById(
@@ -641,11 +634,9 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       const optimisticMatch = applyMatchAction(baseMatch, action);
       const nextOptimisticMatch = normalizeOptimisticMatch(optimisticMatch);
       matchRef.current = nextOptimisticMatch;
-      startTransition(() => {
-        setMatch(nextOptimisticMatch);
-        setLastUpdatedAt(nextOptimisticMatch.updatedAt || new Date().toISOString());
-        setError(null);
-      });
+      setMatch(nextOptimisticMatch);
+      setLastUpdatedAt(nextOptimisticMatch.updatedAt || new Date().toISOString());
+      setError(null);
     } catch (caughtError) {
       if (caughtError instanceof MatchEngineError) {
         setError(caughtError);
@@ -698,10 +689,8 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
       matchRef.current = body;
       lastStreamUpdateRef.current = body.updatedAt || lastStreamUpdateRef.current;
-      startTransition(() => {
-        setMatch(body);
-        setLastUpdatedAt(body.updatedAt || new Date().toISOString());
-      });
+      setMatch(body);
+      setLastUpdatedAt(body.updatedAt || new Date().toISOString());
       setError(null);
       return body;
     } catch (caughtError) {
@@ -835,10 +824,8 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       matchRef.current = nextMatch;
       lastStreamUpdateRef.current =
         nextMatch?.updatedAt || lastStreamUpdateRef.current;
-      startTransition(() => {
-        setMatch(nextMatch);
-        setLastUpdatedAt(nextMatch?.updatedAt || new Date().toISOString());
-      });
+      setMatch(nextMatch);
+      setLastUpdatedAt(nextMatch?.updatedAt || new Date().toISOString());
     },
     handleScoreEvent,
     handleUndo,

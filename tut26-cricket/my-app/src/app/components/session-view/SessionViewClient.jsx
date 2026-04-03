@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  startTransition,
   useCallback,
   useEffect,
   useRef,
@@ -306,11 +305,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
       }
 
       lastStreamUpdateRef.current = payload.updatedAt || "";
-
-      startTransition(() => {
-        setData(payload);
-        setStreamError("");
-      });
+      setData(payload);
+      setStreamError("");
     },
     onError: () => {
       if (!data) {

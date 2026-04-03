@@ -90,6 +90,7 @@ async function readLiveSessionSnapshot(sessionId) {
     payload,
     serialized: JSON.stringify(payload),
     matchId: match?._id ? String(match._id) : "",
+    updatedAt: getLatestIsoTimestamp(match?.updatedAt, session?.updatedAt),
   };
 }
 
@@ -130,6 +131,24 @@ function sseHeaders() {
 
 function encodeEvent(event, data) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+function getLatestIsoTimestamp(...values) {
+  let latest = 0;
+
+  for (const value of values) {
+    const timestamp =
+      value instanceof Date
+        ? value.getTime()
+        : typeof value === "number"
+          ? value
+          : Date.parse(String(value || ""));
+    if (Number.isFinite(timestamp) && timestamp > latest) {
+      latest = timestamp;
+    }
+  }
+
+  return new Date(latest || Date.now()).toISOString();
 }
 
 export async function GET(request, { params }) {
@@ -216,6 +235,7 @@ export async function GET(request, { params }) {
       payload,
       serialized: nextSerializedPayload,
       matchId: nextMatchId,
+      updatedAt: nextUpdatedAt,
     } = await getCachedLiveSessionSnapshot(id, { force });
     if (closed) {
       return null;
@@ -236,7 +256,7 @@ export async function GET(request, { params }) {
       }
     }
 
-    if (!force && nextSerializedPayload === lastSerializedPayload) {
+    if (nextSerializedPayload === lastSerializedPayload) {
       return payload;
     }
 
@@ -245,7 +265,7 @@ export async function GET(request, { params }) {
     if (
       !(await send("session", {
         ...payload,
-        updatedAt: new Date().toISOString(),
+        updatedAt: nextUpdatedAt,
       }))
     ) {
       return null;

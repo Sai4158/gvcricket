@@ -68,6 +68,7 @@ async function readLiveMatchSnapshot(matchId, { includeActionHistory = true } = 
   return {
     publicMatch,
     serialized: JSON.stringify(publicMatch),
+    updatedAt: getMatchIsoTimestamp(publicMatch),
   };
 }
 
@@ -111,6 +112,10 @@ function sseHeaders() {
 
 function encodeEvent(event, data) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+function getMatchIsoTimestamp(match) {
+  return new Date(match?.updatedAt || Date.now()).toISOString();
 }
 
 export async function GET(request, { params }) {
@@ -198,6 +203,7 @@ export async function GET(request, { params }) {
           const {
             publicMatch: nextPublicMatch,
             serialized: nextSerializedMatch,
+            updatedAt: nextUpdatedAt,
           } = await getCachedLiveMatchSnapshot(id, {
             force,
             includeActionHistory,
@@ -212,7 +218,7 @@ export async function GET(request, { params }) {
           lastSerializedMatch = nextSerializedMatch;
           send("match", {
             match: nextPublicMatch,
-            updatedAt: new Date().toISOString(),
+            updatedAt: nextUpdatedAt,
           });
         };
 

@@ -12,6 +12,7 @@ import {
 } from "../../../../lib/match-access";
 import {
   publishMatchUpdate,
+  publishSessionUpdate,
 } from "../../../../lib/live-updates";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { parseJsonRequest } from "../../../../lib/request-security";
@@ -175,6 +176,7 @@ export async function POST(req, { params }) {
     }
 
     publishMatchUpdate(updatedMatch._id);
+    publishSessionUpdate(updatedMatch.sessionId);
 
     await writeAuditLog({
       action: "match_sound_effect",
