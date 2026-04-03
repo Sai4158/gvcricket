@@ -7,6 +7,8 @@ import {
   isUiAudioUnlocked,
   playBufferedUiAudio,
   primeUiAudio,
+  restorePreferredAudioSessionType,
+  setPreferredAudioSessionType,
   subscribeUiAudioUnlock,
 } from "../../lib/page-audio";
 
@@ -19,6 +21,7 @@ export default function useLiveSoundEffectsPlayer({
   const audioRef = useRef(null);
   const bufferedPlaybackRef = useRef(null);
   const playbackTimerRef = useRef(null);
+  const audioSessionTypeRef = useRef("");
   const playRequestRef = useRef(0);
   const resolvedSrcByEffectRef = useRef(new Map());
   const activeEffectRef = useRef(null);
@@ -141,6 +144,28 @@ export default function useLiveSoundEffectsPlayer({
     audio.volume = Math.max(0, Math.min(1, volume));
   }, [volume]);
 
+  const ensurePlaybackAudioSession = useCallback(() => {
+    if (!isIosSafari) {
+      return;
+    }
+
+    const previousType = setPreferredAudioSessionType("playback") || "";
+    if (!audioSessionTypeRef.current) {
+      audioSessionTypeRef.current = previousType;
+    }
+  }, [isIosSafari]);
+
+  useEffect(() => {
+    ensurePlaybackAudioSession();
+
+    return () => {
+      if (audioSessionTypeRef.current) {
+        restorePreferredAudioSessionType(audioSessionTypeRef.current);
+        audioSessionTypeRef.current = "";
+      }
+    };
+  }, [ensurePlaybackAudioSession]);
+
   const stop = useCallback(
     ({ clearSource = true, preserveRequest = false } = {}) => {
       if (!preserveRequest) {
@@ -212,6 +237,7 @@ export default function useLiveSoundEffectsPlayer({
         return false;
       }
 
+      ensurePlaybackAudioSession();
       onBeforePlay?.(effect);
 
       try {
@@ -296,6 +322,7 @@ export default function useLiveSoundEffectsPlayer({
     },
     [
       finishPlayback,
+      ensurePlaybackAudioSession,
       isIosSafari,
       onBeforePlay,
       onDuration,
