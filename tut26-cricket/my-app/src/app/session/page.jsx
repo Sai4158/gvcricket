@@ -33,12 +33,15 @@ export const metadata = {
   },
 };
 
-export default async function SessionsPage() {
+export default async function SessionsPage({ searchParams }) {
   const { sessions, totalCount } = await loadSessionsIndexPageData();
+  const resolvedSearchParams = await searchParams;
+  const refreshToken = String(resolvedSearchParams?.refresh || "").trim();
   return (
     <SessionsPageClient
       initialSessions={sessions}
       initialTotalCount={totalCount}
+      refreshToken={refreshToken}
     />
   );
 }

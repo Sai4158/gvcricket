@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import {
   FaArrowLeft,
@@ -209,6 +209,7 @@ function describeSessionFieldChange(label, previousValue, nextValue) {
 export default function SessionsPageClient({
   initialSessions,
   initialTotalCount = 0,
+  refreshToken = "",
 }) {
   const [sessions, setSessions] = useState(initialSessions ?? []);
   const [totalCount, setTotalCount] = useState(Number(initialTotalCount || 0));
@@ -242,7 +243,6 @@ export default function SessionsPageClient({
   const [page, setPage] = useState(1);
   const [isGoingHome, setIsGoingHome] = useState(false);
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { startNavigation } = useRouteFeedback();
   const deferredSearchQuery = useDeferredValue(normalizeSearchValue(searchInput));
   const secretHoldTimerRef = useRef(null);
@@ -553,13 +553,12 @@ export default function SessionsPageClient({
   }, []);
 
   useEffect(() => {
-    const refreshToken = String(searchParams?.get("refresh") || "").trim();
-    if (!refreshToken) {
+    if (!String(refreshToken || "").trim()) {
       return;
     }
 
     void reloadSessionsFromServer();
-  }, [reloadSessionsFromServer, searchParams]);
+  }, [refreshToken, reloadSessionsFromServer]);
 
   const openSessionManager = useCallback((session, pin) => {
     setManageSessionContext({ sessionId: session._id, pin });
