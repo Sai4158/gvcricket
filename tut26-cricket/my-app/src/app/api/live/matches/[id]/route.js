@@ -10,8 +10,6 @@ export const maxDuration = 300;
 export const preferredRegion = ["iad1"];
 
 const STREAM_HEARTBEAT_INTERVAL_MS = 15_000;
-const STREAM_CATCHUP_INTERVAL_MS = 180_000;
-const STREAM_FALLBACK_POLL_INTERVAL_MS = 5_000;
 const LIVE_MATCH_SNAPSHOT_CACHE_TTL_MS = 1_000;
 const STREAM_BOOTSTRAP_PAD = "0".repeat(64);
 const LIVE_MATCH_FIELDS =
@@ -125,13 +123,14 @@ export async function GET(request, { params }) {
     async start(controller) {
       let cleanup = () => {};
       let heartbeat = null;
-      let bootstrapCatchup = null;
       let closed = false;
       let didCleanup = false;
       let lastSerializedMatch = "";
-      let liveUpdatesReady = false;
       let heartbeatLoop = async () => {};
-      let bootstrapCatchupLoop = async () => {};
+      let pushLoop = async () => {};
+      let pushPending = false;
+      let pushPendingForce = false;
+      let pushLoopPromise = null;
 
       const finalize = () => {
         if (didCleanup) {
@@ -143,10 +142,6 @@ export async function GET(request, { params }) {
         if (heartbeat) {
           clearTimeout(heartbeat);
           heartbeat = null;
-        }
-        if (bootstrapCatchup) {
-          clearTimeout(bootstrapCatchup);
-          bootstrapCatchup = null;
         }
       };
 
@@ -193,18 +188,6 @@ export async function GET(request, { params }) {
         }, delay);
       };
 
-      const scheduleBootstrapCatchup = (delay = 1200) => {
-        if (closed) {
-          return;
-        }
-        if (bootstrapCatchup) {
-          clearTimeout(bootstrapCatchup);
-        }
-        bootstrapCatchup = setTimeout(() => {
-          void bootstrapCatchupLoop();
-        }, delay);
-      };
-
       try {
         await connectDB();
 
@@ -233,6 +216,28 @@ export async function GET(request, { params }) {
           });
         };
 
+        pushLoop = async ({ force = false } = {}) => {
+          pushPending = true;
+          pushPendingForce = pushPendingForce || force;
+
+          if (pushLoopPromise) {
+            return pushLoopPromise;
+          }
+
+          pushLoopPromise = (async () => {
+            while (!closed && pushPending) {
+              const nextForce = pushPendingForce;
+              pushPending = false;
+              pushPendingForce = false;
+              await pushMatch({ force: nextForce });
+            }
+          })().finally(() => {
+            pushLoopPromise = null;
+          });
+
+          return pushLoopPromise;
+        };
+
         heartbeatLoop = async () => {
           if (closed) {
             return;
@@ -251,25 +256,15 @@ export async function GET(request, { params }) {
           scheduleHeartbeat();
         };
 
-        bootstrapCatchupLoop = async () => {
-          if (closed) {
-            return;
-          }
-
+        cleanup = subscribeToMatch(id, async () => {
           try {
-            await pushMatch();
+            await pushLoop({ force: true });
           } catch (error) {
-            console.error("Match SSE bootstrap catchup failed:", error);
+            console.error("Match SSE push failed:", error);
           }
+        });
 
-          scheduleBootstrapCatchup(
-            liveUpdatesReady
-              ? STREAM_CATCHUP_INTERVAL_MS
-              : STREAM_FALLBACK_POLL_INTERVAL_MS
-          );
-        };
-
-        await pushMatch();
+        await pushLoop();
         send("ping", {
           ok: true,
           ts: Date.now(),
@@ -277,27 +272,10 @@ export async function GET(request, { params }) {
           pad: STREAM_BOOTSTRAP_PAD,
         });
 
-        cleanup = subscribeToMatch(id, async () => {
-          try {
-            await pushMatch({ force: true });
-          } catch (error) {
-            console.error("Match SSE push failed:", error);
-          }
-        });
-
-        try {
-          await ensureLiveUpdates();
-          if (!closed) {
-            liveUpdatesReady = true;
-          }
-        } catch (error) {
-          console.error("Match change streams unavailable.", error);
-        }
-
         scheduleHeartbeat();
-        scheduleBootstrapCatchup(
-          liveUpdatesReady ? STREAM_CATCHUP_INTERVAL_MS : 1200
-        );
+        void ensureLiveUpdates().catch((error) => {
+          console.error("Match change streams unavailable.", error);
+        });
 
         request.signal.addEventListener("abort", () => {
           stopStream();
