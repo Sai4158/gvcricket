@@ -653,13 +653,16 @@ export default function useSpeechAnnouncer(settings) {
   }, []);
 
   const ensureSpeechAudioSession = useCallback(() => {
+    if (audioSessionTypeRef.current) {
+      return;
+    }
+
     const previousType =
       setPlaybackFriendlyAudioSessionType({
         preferMixing: true,
+        debugLabel: "speech",
       }) || "";
-    if (!audioSessionTypeRef.current) {
-      audioSessionTypeRef.current = previousType;
-    }
+    audioSessionTypeRef.current = previousType;
   }, []);
 
   const restoreSpeechAudioSession = useCallback(() => {
@@ -667,7 +670,9 @@ export default function useSpeechAnnouncer(settings) {
       return;
     }
 
-    restorePreferredAudioSessionType(audioSessionTypeRef.current);
+    restorePreferredAudioSessionType(audioSessionTypeRef.current, {
+      debugLabel: "speech",
+    });
     audioSessionTypeRef.current = "";
   }, []);
 
@@ -839,6 +844,7 @@ export default function useSpeechAnnouncer(settings) {
             sequenceTokenRef.current,
           );
         }
+        restoreSpeechAudioSession();
         setStatus((current) => (current === "unsupported" ? current : "ready"));
         return true;
       }
@@ -885,7 +891,6 @@ export default function useSpeechAnnouncer(settings) {
         }
 
         utteranceRef.current = null;
-        restoreSpeechAudioSession();
         const pauseAfterMs =
           nextItem.pauseAfterMs ?? sequence.pauseAfterMs ?? 0;
         const nextSequence = {
@@ -964,6 +969,8 @@ export default function useSpeechAnnouncer(settings) {
       };
 
       try {
+        ensureSpeechAudioSession();
+
         if (profile.preDelayMs > 0) {
           await new Promise((resolve) => {
             stepTimerRef.current = window.setTimeout(
@@ -979,7 +986,6 @@ export default function useSpeechAnnouncer(settings) {
         if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
           window.speechSynthesis.cancel();
         }
-        ensureSpeechAudioSession();
         window.speechSynthesis.speak(utterance);
       } catch {
         restoreSpeechAudioSession();

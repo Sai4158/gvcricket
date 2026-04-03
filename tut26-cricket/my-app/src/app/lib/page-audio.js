@@ -15,9 +15,64 @@ const SUPPORTED_AUDIO_SESSION_TYPES = new Set([
   "transient",
   "transient-solo",
 ]);
+const PAGE_AUDIO_DEBUG_PREFIX = "[GV Page Audio]";
 
 const SILENT_AUDIO_DATA_URI =
   "data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
+
+function pageAudioConsole(level, event, details = {}) {
+  const logger =
+    level === "error"
+      ? console.error
+      : level === "warn"
+        ? console.warn
+        : console.info;
+  logger(`${PAGE_AUDIO_DEBUG_PREFIX} ${event}`, details);
+}
+
+function normalizePageAudioDebugLabel(value) {
+  return String(value || "").trim();
+}
+
+function describePageMediaElement(element, extras = {}) {
+  if (!element) {
+    return {
+      tag: "",
+      src: "",
+      wasPlaying: false,
+    };
+  }
+
+  const safeNumber = (nextValue, fallback = 0) =>
+    Number.isFinite(Number(nextValue)) ? Number(nextValue) : fallback;
+  const src =
+    String(
+      element.currentSrc ||
+        element.src ||
+        element.getAttribute?.("src") ||
+        "",
+    ).trim() || "(none)";
+
+  return {
+    tag: String(element.tagName || "").toLowerCase(),
+    src,
+    paused: Boolean(element.paused),
+    ended: Boolean(element.ended),
+    readyState: safeNumber(element.readyState),
+    muted: Boolean(element.muted),
+    volume: safeNumber(element.volume, 1),
+    currentTime: safeNumber(element.currentTime),
+    wasPlaying:
+      extras.wasPlaying === undefined
+        ? Boolean(
+            !element.paused &&
+              !element.ended &&
+              safeNumber(element.readyState) >= 2,
+          )
+        : Boolean(extras.wasPlaying),
+    excluded: Boolean(extras.excluded),
+  };
+}
 
 function notifyUiAudioUnlock(nextValue) {
   if (sharedUiAudioUnlocked === nextValue) {
@@ -476,13 +531,20 @@ export function getPreferredAudioSessionType() {
   return session?.type || "";
 }
 
-function hasActivePageMediaPlayback() {
+function hasActivePageMediaPlayback(options = {}) {
   if (typeof document === "undefined") {
     return false;
   }
 
+  const excludedElements = new Set(
+    Array.isArray(options.excludedElements) ? options.excludedElements : [],
+  );
   const mediaElements = document.querySelectorAll("audio, video");
   for (const element of mediaElements) {
+    if (excludedElements.has(element)) {
+      continue;
+    }
+
     try {
       if (
         !element.paused &&
@@ -523,13 +585,25 @@ export function setPreferredAudioSessionType(nextType) {
 
 export function setPlaybackFriendlyAudioSessionType({
   preferMixing = true,
+  excludedElements = [],
+  debugLabel = "",
 } = {}) {
   const nextType =
-    preferMixing && hasActivePageMediaPlayback() ? "ambient" : "playback";
-  return setPreferredAudioSessionType(nextType);
+    preferMixing && hasActivePageMediaPlayback({ excludedElements })
+      ? "ambient"
+      : "playback";
+  const previousType = setPreferredAudioSessionType(nextType);
+  pageAudioConsole("info", "selected audio session type", {
+    debugLabel: normalizePageAudioDebugLabel(debugLabel),
+    preferMixing: Boolean(preferMixing),
+    requestedType: nextType,
+    previousType: previousType || "",
+    selectedType: getPreferredAudioSessionType() || "",
+  });
+  return previousType;
 }
 
-export function restorePreferredAudioSessionType(previousType) {
+export function restorePreferredAudioSessionType(previousType, options = {}) {
   const session = getNavigatorAudioSession();
   if (!session || !SUPPORTED_AUDIO_SESSION_TYPES.has(previousType)) {
     return false;
@@ -539,6 +613,10 @@ export function restorePreferredAudioSessionType(previousType) {
     if (session.type !== previousType) {
       session.type = previousType;
     }
+    pageAudioConsole("info", "restored audio session type", {
+      debugLabel: normalizePageAudioDebugLabel(options.debugLabel),
+      restoredType: previousType,
+    });
     return true;
   } catch {
     return false;
@@ -630,15 +708,29 @@ export function duckPageMedia(stateRef, duckVolume = 0.18, options = {}) {
     return false;
   }
 
+  const debugLabel = normalizePageAudioDebugLabel(options.debugLabel);
+  const excludedElements = new Set(
+    Array.isArray(options.excludedElements) ? options.excludedElements : [],
+  );
+  const mediaElements = Array.from(document.querySelectorAll("audio, video"));
+  pageAudioConsole("info", "duck start", {
+    debugLabel,
+    duckVolume,
+    reusingExistingDuck: Boolean(
+      Array.isArray(stateRef.current) && stateRef.current.length > 0,
+    ),
+    mediaElements: mediaElements.map((element) =>
+      describePageMediaElement(element, {
+        excluded: excludedElements.has(element),
+      }),
+    ),
+  });
+
   if (Array.isArray(stateRef.current) && stateRef.current.length > 0) {
     return true;
   }
 
-  const excludedElements = new Set(
-    Array.isArray(options.excludedElements) ? options.excludedElements : [],
-  );
   const tracked = [];
-  const mediaElements = document.querySelectorAll("audio, video");
 
   mediaElements.forEach((element) => {
     if (excludedElements.has(element)) {
@@ -651,6 +743,11 @@ export function duckPageMedia(stateRef, duckVolume = 0.18, options = {}) {
           !element.ended &&
           Number(element.readyState || 0) >= 2,
       );
+
+      if (!wasPlaying) {
+        return;
+      }
+
       tracked.push({
         element,
         volume: typeof element.volume === "number" ? element.volume : 1,
@@ -687,6 +784,7 @@ export function duckPageMedia(stateRef, duckVolume = 0.18, options = {}) {
     }
   }
 
+  tracked.debugLabel = debugLabel;
   stateRef.current = tracked;
   return tracked.length > 0;
 }
@@ -695,6 +793,15 @@ export function restorePageMedia(stateRef) {
   if (!stateRef || !Array.isArray(stateRef.current)) {
     return;
   }
+
+  pageAudioConsole("info", "duck end", {
+    debugLabel: normalizePageAudioDebugLabel(stateRef.current.debugLabel),
+    mediaElements: stateRef.current.map((item) =>
+      describePageMediaElement(item?.element, {
+        wasPlaying: item?.wasPlaying,
+      }),
+    ),
+  });
 
   for (const item of stateRef.current) {
     try {

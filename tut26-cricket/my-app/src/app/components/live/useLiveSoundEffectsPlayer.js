@@ -22,6 +22,7 @@ export default function useLiveSoundEffectsPlayer({
   const bufferedPlaybackRef = useRef(null);
   const playbackTimerRef = useRef(null);
   const audioSessionTypeRef = useRef("");
+  const playbackStartedRef = useRef(false);
   const playRequestRef = useRef(0);
   const resolvedSrcByEffectRef = useRef(new Map());
   const activeEffectRef = useRef(null);
@@ -42,6 +43,7 @@ export default function useLiveSoundEffectsPlayer({
   const resetPlaybackState = useCallback(() => {
     clearPlaybackTimer();
     activeEffectRef.current = null;
+    playbackStartedRef.current = false;
     setActiveEffectId("");
     setCurrentTime(0);
     setStatus("idle");
@@ -51,7 +53,9 @@ export default function useLiveSoundEffectsPlayer({
     ({ notifyAfterEnd = false } = {}) => {
       bufferedPlaybackRef.current = null;
       if (audioSessionTypeRef.current) {
-        restorePreferredAudioSessionType(audioSessionTypeRef.current);
+        restorePreferredAudioSessionType(audioSessionTypeRef.current, {
+          debugLabel: "sound-effect",
+        });
         audioSessionTypeRef.current = "";
       }
       resetPlaybackState();
@@ -90,15 +94,16 @@ export default function useLiveSoundEffectsPlayer({
     }
 
     const handleEnded = () => {
-      finishPlayback({ notifyAfterEnd: true });
+      finishPlayback({ notifyAfterEnd: playbackStartedRef.current });
     };
 
     const handlePlaying = () => {
+      playbackStartedRef.current = true;
       setStatus("playing");
     };
 
     const handleError = () => {
-      finishPlayback({ notifyAfterEnd: true });
+      finishPlayback({ notifyAfterEnd: playbackStartedRef.current });
     };
 
     const handlePause = () => {
@@ -149,29 +154,34 @@ export default function useLiveSoundEffectsPlayer({
   }, [volume]);
 
   const ensurePlaybackAudioSession = useCallback(() => {
-    if (!isIosSafari) {
+    if (!isIosSafari || audioSessionTypeRef.current) {
       return;
     }
 
     const previousType = setPlaybackFriendlyAudioSessionType({
       preferMixing: true,
+      debugLabel: "sound-effect",
     }) || "";
-    if (!audioSessionTypeRef.current) {
-      audioSessionTypeRef.current = previousType;
-    }
+    audioSessionTypeRef.current = previousType;
   }, [isIosSafari]);
 
   useEffect(() => {
     return () => {
       if (audioSessionTypeRef.current) {
-        restorePreferredAudioSessionType(audioSessionTypeRef.current);
+        restorePreferredAudioSessionType(audioSessionTypeRef.current, {
+          debugLabel: "sound-effect",
+        });
         audioSessionTypeRef.current = "";
       }
     };
   }, []);
 
   const stop = useCallback(
-    ({ clearSource = true, preserveRequest = false } = {}) => {
+    ({
+      clearSource = true,
+      preserveRequest = false,
+      notifyAfterEnd = false,
+    } = {}) => {
       if (!preserveRequest) {
         playRequestRef.current += 1;
       }
@@ -197,13 +207,18 @@ export default function useLiveSoundEffectsPlayer({
       }
 
       if (audioSessionTypeRef.current) {
-        restorePreferredAudioSessionType(audioSessionTypeRef.current);
+        restorePreferredAudioSessionType(audioSessionTypeRef.current, {
+          debugLabel: "sound-effect",
+        });
         audioSessionTypeRef.current = "";
       }
 
       resetPlaybackState();
+      if (notifyAfterEnd) {
+        onAfterEnd?.();
+      }
     },
-    [resetPlaybackState],
+    [onAfterEnd, resetPlaybackState],
   );
 
   const prime = useCallback(
@@ -267,6 +282,7 @@ export default function useLiveSoundEffectsPlayer({
           }
 
           bufferedPlaybackRef.current = bufferedPlayback;
+          playbackStartedRef.current = true;
           if (bufferedPlayback.duration > 0) {
             onDuration?.(effect, bufferedPlayback.duration);
           }
@@ -282,11 +298,12 @@ export default function useLiveSoundEffectsPlayer({
       const audio = audioRef.current;
       if (!audio) {
         if (audioSessionTypeRef.current) {
-          restorePreferredAudioSessionType(audioSessionTypeRef.current);
+          restorePreferredAudioSessionType(audioSessionTypeRef.current, {
+            debugLabel: "sound-effect",
+          });
           audioSessionTypeRef.current = "";
         }
         resetPlaybackState();
-        onAfterEnd?.();
         return false;
       }
 
@@ -326,16 +343,18 @@ export default function useLiveSoundEffectsPlayer({
 
       try {
         await audio.play();
+        playbackStartedRef.current = true;
         setStatus("playing");
         setCurrentTime(audio.currentTime || 0);
         return true;
       } catch {
         if (audioSessionTypeRef.current) {
-          restorePreferredAudioSessionType(audioSessionTypeRef.current);
+          restorePreferredAudioSessionType(audioSessionTypeRef.current, {
+            debugLabel: "sound-effect",
+          });
           audioSessionTypeRef.current = "";
         }
         resetPlaybackState();
-        onAfterEnd?.();
         return false;
       }
     },
@@ -343,7 +362,6 @@ export default function useLiveSoundEffectsPlayer({
       finishPlayback,
       ensurePlaybackAudioSession,
       isIosSafari,
-      onAfterEnd,
       onBeforePlay,
       onDuration,
       prime,
