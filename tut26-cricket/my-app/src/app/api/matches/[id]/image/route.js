@@ -8,31 +8,47 @@ import { publishMatchUpdate, publishSessionUpdate } from "../../../../lib/live-u
 import {
   getMatchAccessCookieName,
   hasValidMatchAccess,
+  isValidManagePin,
   isValidUmpirePin,
 } from "../../../../lib/match-access";
 import {
-  buildPublicMatchImageUrl,
   isSafeRemoteMatchImageUrl,
   normalizeMatchImageMetadata,
   validateMatchImageBuffer,
 } from "../../../../lib/match-image";
 import {
-  encryptMatchImageSourceUrl,
-  hashMatchImageSourceUrl,
-} from "../../../../lib/match-image-secure";
+  applyStoredMatchImages,
+  createStoredMatchImageEntry,
+  getStoredMatchImages,
+} from "../../../../lib/match-image-gallery";
+import { getRequiredImagePinKind, IMAGE_PIN_KIND } from "../../../../lib/image-pin-policy";
 import { moderateMatchImageBuffer } from "../../../../lib/match-image-moderation";
 import { serializePublicMatch } from "../../../../lib/public-data";
+import { enforceSmartPinRateLimit } from "../../../../lib/pin-attempt-server";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
 import {
   parseJsonRequest,
   parseMultipartRequest,
 } from "../../../../lib/request-security";
-import { pinPayloadSchema } from "../../../../lib/validators";
+import { invalidateSessionsDataCache } from "../../../../lib/server-data";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
+import { z } from "zod";
 
 export const runtime = "nodejs";
+
+const deleteImagePayloadSchema = z.object({
+  pin: z.string().trim().optional().default(""),
+  imageId: z.string().trim().max(80).optional().default(""),
+});
+
+const reorderImagePayloadSchema = z
+  .object({
+    pin: z.string().trim().optional().default(""),
+    imageIds: z.array(z.string().trim().min(1).max(80)).min(1).max(20),
+  })
+  .strict();
 
 function getMatchImageModerationMode() {
   return String(process.env.MATCH_IMAGE_MODERATION_MODE || "best-effort").trim().toLowerCase();
@@ -50,12 +66,35 @@ function getSafeUploadName(file) {
   return `match-${crypto.randomBytes(8).toString("hex")}.${safeExtension}`;
 }
 
+function getProjectedGalleryCount({
+  currentCount = 0,
+  targetImageId = "",
+  shouldAppend = false,
+  plannedTotalCount = 0,
+}) {
+  const existingCount = Math.max(0, Number(currentCount || 0));
+  const declaredTotal = Math.max(0, Number(plannedTotalCount || 0));
+
+  let projectedCount = existingCount;
+  if (shouldAppend) {
+    projectedCount = existingCount + 1;
+  } else if (targetImageId) {
+    projectedCount = Math.max(existingCount, 1);
+  } else if (existingCount > 0) {
+    projectedCount = existingCount;
+  } else {
+    projectedCount = 1;
+  }
+
+  return Math.max(projectedCount, declaredTotal);
+}
+
 export async function POST(req, { params }) {
   const { id } = await params;
   const meta = getRequestMeta(req);
   const uploadLimit = enforceRateLimit({
     key: `match-image:${id}:${meta.ip}`,
-    limit: 4,
+    limit: 12,
     windowMs: 60 * 1000,
     blockMs: 60 * 1000,
   });
@@ -84,12 +123,44 @@ export async function POST(req, { params }) {
     if (!parsedRequest.ok) {
       return jsonError(parsedRequest.message, parsedRequest.status);
     }
+    const pinValue = String(parsedRequest.value.get("pin") || "").trim();
+    if (pinValue) {
+      const pinAttemptLimit = enforceSmartPinRateLimit({
+        key: `match-image-upload-pin:${id}:${meta.ip}`,
+        longLimit: 5,
+        longWindowMs: 5 * 60 * 1000,
+        longBlockMs: 2 * 60 * 1000,
+      });
+
+      if (!pinAttemptLimit.allowed) {
+        return jsonRateLimit(
+          "Too many PIN attempts. Try again shortly.",
+          pinAttemptLimit.retryAfterMs,
+        );
+      }
+    }
 
     await connectDB();
     const match = await Match.findById(id);
     if (!match) {
       return jsonError("Match not found.", 404);
     }
+
+    const targetImageId = String(parsedRequest.value.get("imageId") || "").trim();
+    const shouldAppend =
+      String(parsedRequest.value.get("append") || "")
+        .trim()
+        .toLowerCase() === "1";
+    const plannedTotalCount = Number(
+      String(parsedRequest.value.get("plannedTotalCount") || "").trim() || 0
+    );
+    const existingImages = getStoredMatchImages(match, { matchId: id });
+    const projectedGalleryCount = getProjectedGalleryCount({
+      currentCount: existingImages.length,
+      targetImageId,
+      shouldAppend,
+      plannedTotalCount,
+    });
 
     const cookieStore = await cookies();
     const accessToken = cookieStore.get(getMatchAccessCookieName(id))?.value;
@@ -98,10 +169,21 @@ export async function POST(req, { params }) {
       accessToken,
       Number(match.adminAccessVersion || 1)
     );
-    const pinValue = String(parsedRequest.value.get("pin") || "").trim();
-    const hasPinAccess = Boolean(pinValue) && isValidUmpirePin(pinValue);
+    const hasUmpirePinAccess = Boolean(pinValue) && isValidUmpirePin(pinValue);
+    const hasManagePinAccess = Boolean(pinValue) && isValidManagePin(pinValue);
+    const uploadPinKind = getRequiredImagePinKind({
+      actionType: "upload",
+      plannedGalleryCount: projectedGalleryCount,
+    });
+    const requiresManagePinForUpload = uploadPinKind === IMAGE_PIN_KIND.MANAGE;
+    const hasRequiredUploadPinAccess = requiresManagePinForUpload
+      ? hasManagePinAccess
+      : hasUmpirePinAccess || hasManagePinAccess;
 
-    if (!hasCookieAccess && !hasPinAccess) {
+    if (
+      (requiresManagePinForUpload && !hasManagePinAccess) ||
+      (!requiresManagePinForUpload && !hasCookieAccess && !hasRequiredUploadPinAccess)
+    ) {
       await writeAuditLog({
         action: "match_media_upload_denied",
         targetType: "match",
@@ -110,8 +192,12 @@ export async function POST(req, { params }) {
         ip: meta.ip,
         userAgent: meta.userAgent,
       });
-
-      return jsonError("Umpire access required for image upload.", 401);
+      return jsonError(
+        requiresManagePinForUpload
+          ? "Manage PIN required when uploading more than one match image."
+          : "Umpire PIN required for image upload.",
+        401
+      );
     }
 
     const file = parsedRequest.value.get("image");
@@ -199,19 +285,31 @@ export async function POST(req, { params }) {
       throw new Error("Remote image URL was rejected.");
     }
 
-    match.matchImageUrl = buildPublicMatchImageUrl(
-      id,
-      imageMetadata.matchImagePublicId || imageMetadata.matchImageUploadedAt?.getTime()
-    );
-    match.matchImagePublicId = imageMetadata.matchImagePublicId;
-    match.matchImageStorageUrlEnc = encryptMatchImageSourceUrl(
-      imageMetadata.matchImageUrl
-    );
-    match.matchImageStorageUrlHash = hashMatchImageSourceUrl(
-      imageMetadata.matchImageUrl
-    );
-    match.matchImageUploadedAt = imageMetadata.matchImageUploadedAt;
-    match.matchImageUploadedBy = "admin";
+    const nextEntry = createStoredMatchImageEntry({
+      matchId: id,
+      sourceUrl: imageMetadata.matchImageUrl,
+      publicId: imageMetadata.matchImagePublicId,
+      uploadedAt: imageMetadata.matchImageUploadedAt,
+      uploadedBy: "admin",
+      id: targetImageId || "",
+    });
+    let nextImages = existingImages;
+    if (targetImageId) {
+      const hasExistingTarget = nextImages.some((entry) => entry.id === targetImageId);
+      nextImages = hasExistingTarget
+        ? nextImages.map((entry) =>
+            entry.id === targetImageId ? { ...nextEntry, id: targetImageId } : entry
+          )
+        : [...nextImages, { ...nextEntry, id: targetImageId }];
+    } else if (shouldAppend) {
+      nextImages = [...nextImages, nextEntry];
+    } else if (nextImages.length > 0) {
+      nextImages = [{ ...nextEntry, id: nextImages[0].id }, ...nextImages.slice(1)];
+    } else {
+      nextImages = [nextEntry];
+    }
+
+    applyStoredMatchImages(match, nextImages, { matchId: id });
     match.mediaUpdatedAt = new Date();
     match.lastEventType = "image_update";
     match.lastEventText = "Match image updated.";
@@ -221,11 +319,14 @@ export async function POST(req, { params }) {
       summaryText: "Match image updated.",
       createdAt: new Date().toISOString(),
     };
-    await match.save();
-
-    await Session.findByIdAndUpdate(match.sessionId, {
-      $set: buildSessionMirrorUpdate(match),
-    });
+    const sessionMirrorUpdate = buildSessionMirrorUpdate(match);
+    await Promise.all([
+      match.save(),
+      Session.findByIdAndUpdate(match.sessionId, {
+        $set: sessionMirrorUpdate,
+      }),
+    ]);
+    invalidateSessionsDataCache();
     publishMatchUpdate(match._id);
     publishSessionUpdate(match.sessionId);
 
@@ -296,14 +397,44 @@ export async function DELETE(req, { params }) {
   }
 
   try {
-    const parsedRequest = await parseJsonRequest(req, pinPayloadSchema, {
+    const parsedRequest = await parseJsonRequest(req, deleteImagePayloadSchema, {
       maxBytes: 2048,
     });
     if (!parsedRequest.ok) {
       return jsonError(parsedRequest.message, parsedRequest.status);
     }
+    const pinValue = String(parsedRequest.value.pin || "").trim();
+    if (pinValue) {
+      const pinAttemptLimit = enforceSmartPinRateLimit({
+        key: `match-image-delete-pin:${id}:${meta.ip}`,
+        longLimit: 5,
+        longWindowMs: 5 * 60 * 1000,
+        longBlockMs: 2 * 60 * 1000,
+      });
 
-    if (!isValidUmpirePin(parsedRequest.value.pin)) {
+      if (!pinAttemptLimit.allowed) {
+        return jsonRateLimit(
+          "Too many PIN attempts. Try again shortly.",
+          pinAttemptLimit.retryAfterMs,
+        );
+      }
+    }
+
+    await connectDB();
+    const match = await Match.findById(id);
+    if (!match) {
+      return jsonError("Match not found.", 404);
+    }
+
+    const hasManagePinAccess = Boolean(pinValue) && isValidManagePin(pinValue);
+    const currentImages = getStoredMatchImages(match, { matchId: id });
+    const deletePinKind = getRequiredImagePinKind({
+      actionType: "remove",
+      plannedGalleryCount: currentImages.length,
+    });
+    const requiresManagePinForDelete = deletePinKind === IMAGE_PIN_KIND.MANAGE;
+
+    if (!hasManagePinAccess) {
       await writeAuditLog({
         action: "match_media_delete_denied",
         targetType: "match",
@@ -313,21 +444,27 @@ export async function DELETE(req, { params }) {
         userAgent: meta.userAgent,
       });
 
-      return jsonError("Incorrect PIN.", 401);
+      return jsonError(
+        requiresManagePinForDelete
+          ? "Manage PIN required for image deletion."
+          : "Incorrect PIN.",
+        401,
+      );
     }
 
-    await connectDB();
-    const match = await Match.findById(id);
-    if (!match) {
-      return jsonError("Match not found.", 404);
+    const targetImageId = String(parsedRequest.value.imageId || "").trim();
+    if (!currentImages.length) {
+      return Response.json(serializePublicMatch(match), {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      });
     }
+    const nextImages = targetImageId
+      ? currentImages.filter((entry) => entry.id !== targetImageId)
+      : currentImages.slice(1);
 
-    match.matchImageUrl = "";
-    match.matchImagePublicId = "";
-    match.matchImageStorageUrlEnc = "";
-    match.matchImageStorageUrlHash = "";
-    match.matchImageUploadedAt = null;
-    match.matchImageUploadedBy = "";
+    applyStoredMatchImages(match, nextImages, { matchId: id });
     match.mediaUpdatedAt = new Date();
     match.lastEventType = "image_update";
     match.lastEventText = "Match image removed.";
@@ -337,11 +474,13 @@ export async function DELETE(req, { params }) {
       summaryText: "Match image removed.",
       createdAt: new Date().toISOString(),
     };
-    await match.save();
-
-    await Session.findByIdAndUpdate(match.sessionId, {
-      $set: buildSessionMirrorUpdate(match),
-    });
+    await Promise.all([
+      match.save(),
+      Session.findByIdAndUpdate(match.sessionId, {
+        $set: buildSessionMirrorUpdate(match),
+      }),
+    ]);
+    invalidateSessionsDataCache();
     publishMatchUpdate(match._id);
     publishSessionUpdate(match.sessionId);
 
@@ -371,5 +510,148 @@ export async function DELETE(req, { params }) {
     });
 
     return jsonError("Failed to remove the match image.", 500);
+  }
+}
+
+export async function PATCH(req, { params }) {
+  const { id } = await params;
+  const meta = getRequestMeta(req);
+  const reorderLimit = enforceRateLimit({
+    key: `match-image-reorder:${id}:${meta.ip}`,
+    limit: 20,
+    windowMs: 60 * 1000,
+    blockMs: 60 * 1000,
+  });
+
+  if (!reorderLimit.allowed) {
+    return jsonRateLimit(
+      "Too many image update attempts. Try again shortly.",
+      reorderLimit.retryAfterMs,
+    );
+  }
+
+  try {
+    const parsedRequest = await parseJsonRequest(req, reorderImagePayloadSchema, {
+      maxBytes: 8192,
+    });
+    if (!parsedRequest.ok) {
+      return jsonError(parsedRequest.message, parsedRequest.status);
+    }
+    const pinValue = String(parsedRequest.value.pin || "").trim();
+    if (pinValue) {
+      const pinAttemptLimit = enforceSmartPinRateLimit({
+        key: `match-image-reorder-pin:${id}:${meta.ip}`,
+        longLimit: 5,
+        longWindowMs: 5 * 60 * 1000,
+        longBlockMs: 2 * 60 * 1000,
+      });
+
+      if (!pinAttemptLimit.allowed) {
+        return jsonRateLimit(
+          "Too many PIN attempts. Try again shortly.",
+          pinAttemptLimit.retryAfterMs,
+        );
+      }
+    }
+
+    await connectDB();
+    const match = await Match.findById(id);
+    if (!match) {
+      return jsonError("Match not found.", 404);
+    }
+
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get(getMatchAccessCookieName(id))?.value;
+    const hasCookieAccess = hasValidMatchAccess(
+      id,
+      accessToken,
+      Number(match.adminAccessVersion || 1),
+    );
+    const currentImages = getStoredMatchImages(match, { matchId: id });
+    const hasManagePinAccess = Boolean(pinValue) && isValidManagePin(pinValue);
+    const reorderPinKind = getRequiredImagePinKind({
+      actionType: "reorder",
+      plannedGalleryCount: currentImages.length,
+    });
+    const requiresManagePinForReorder =
+      reorderPinKind === IMAGE_PIN_KIND.MANAGE;
+
+    if (
+      (requiresManagePinForReorder && !hasManagePinAccess) ||
+      (!requiresManagePinForReorder &&
+        !hasCookieAccess &&
+        !hasManagePinAccess)
+    ) {
+      return jsonError(
+        requiresManagePinForReorder
+          ? "Manage PIN required for gallery changes."
+          : "Incorrect PIN.",
+        401,
+      );
+    }
+
+    const currentIds = currentImages.map((entry) => entry.id);
+    const nextIds = parsedRequest.value.imageIds.map((value) => String(value).trim());
+
+    if (
+      currentIds.length !== nextIds.length ||
+      new Set(nextIds).size !== nextIds.length ||
+      currentIds.some((imageId) => !nextIds.includes(imageId))
+    ) {
+      return jsonError("Image order is invalid.", 400);
+    }
+
+    const byId = new Map(currentImages.map((entry) => [entry.id, entry]));
+    const nextImages = nextIds.map((imageId) => byId.get(imageId)).filter(Boolean);
+
+    applyStoredMatchImages(match, nextImages, { matchId: id });
+    match.mediaUpdatedAt = new Date();
+    match.lastEventType = "image_update";
+    match.lastEventText = "Match image order updated.";
+    match.lastLiveEvent = {
+      id: `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`,
+      type: "image_update",
+      summaryText: "Match image order updated.",
+      createdAt: new Date().toISOString(),
+    };
+
+    await Promise.all([
+      match.save(),
+      Session.findByIdAndUpdate(match.sessionId, {
+        $set: buildSessionMirrorUpdate(match),
+      }),
+    ]);
+
+    invalidateSessionsDataCache();
+    publishMatchUpdate(match._id);
+    publishSessionUpdate(match.sessionId);
+
+    await writeAuditLog({
+      action: "match_media_reorder",
+      targetType: "match",
+      targetId: id,
+      status: "success",
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      metadata: { imageIds: nextIds },
+    });
+
+    return Response.json(serializePublicMatch(match), {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (error) {
+    await writeAuditLog({
+      action: "match_media_reorder",
+      targetType: "match",
+      targetId: id,
+      status: "failure",
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      metadata: { message: error?.message || "Unknown error" },
+    });
+
+    return jsonError("Failed to reorder match images.", 500);
   }
 }

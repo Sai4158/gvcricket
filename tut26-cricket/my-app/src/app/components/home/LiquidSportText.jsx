@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import useHomeDesktopReveal from "./useHomeDesktopReveal";
 
 export default function LiquidSportText({
   as: Component = "h2",
@@ -26,12 +27,122 @@ export default function LiquidSportText({
   lineWaveRotate = 0.8,
   lineWaveDuration = 6.8,
   simplifyMotion = false,
+  lightweightCharacterReveal = false,
 }) {
   const prefersReducedMotion = useReducedMotion();
   const shouldSimplifyMotion = prefersReducedMotion || simplifyMotion;
+  const shouldUseLightweightCharacterReveal =
+    lightweightCharacterReveal && characterTyping && !prefersReducedMotion;
+  const { ref, isVisible } = useHomeDesktopReveal(
+    shouldUseLightweightCharacterReveal,
+    {
+      threshold: Math.max(0.02, Math.min(viewportAmount, 0.24)),
+      rootMargin: viewportMargin,
+      resetOnExit: true,
+    }
+  );
   const lines = Array.isArray(text) ? text : [text];
   const isDarkOutline = variant === "dark-outline";
   const isHeroBright = variant === "hero-bright";
+  const heroBrightLineClass =
+    "relative z-10 block home-gradient-text [text-rendering:geometricPrecision] drop-shadow-[0_18px_40px_rgba(0,0,0,0.48)] [text-shadow:0_2px_0_rgba(0,0,0,0.24),0_0_22px_rgba(255,255,255,0.14),0_0_30px_rgba(248,113,113,0.18)]";
+
+  if (shouldUseLightweightCharacterReveal) {
+    return (
+      <Component ref={ref} className={className}>
+        {lines.map((line, index) => {
+          const lineDelay = delay + index * characterLineDelay;
+          const lightweightWordDurationSeconds = Math.max(
+            characterDuration + 0.08,
+            0.26
+          );
+          const baseLineClass = isDarkOutline
+            ? `relative z-10 block text-[#050505] [text-rendering:geometricPrecision] [paint-order:stroke_fill] [WebkitTextStroke:1.7px_rgba(255,255,255,0.54)] drop-shadow-[0_8px_22px_rgba(0,0,0,0.42)] [text-shadow:0_0_24px_rgba(196,181,253,0.16),0_2px_0_rgba(255,255,255,0.2)] ${lineClassName}`
+            : isHeroBright
+            ? `${heroBrightLineClass} ${lineClassName}`
+            : `relative z-10 block text-white [text-rendering:geometricPrecision] drop-shadow-[0_10px_26px_rgba(0,0,0,0.48)] [text-shadow:0_2px_0_rgba(0,0,0,0.34),0_0_22px_rgba(255,255,255,0.1)] ${lineClassName}`;
+          const offsetShadowClass = isDarkOutline
+            ? `pointer-events-none absolute inset-0 z-0 block translate-x-[2px] translate-y-[2px] text-fuchsia-300/28 ${lineClassName}`
+            : isHeroBright
+            ? `pointer-events-none absolute inset-0 z-0 block text-transparent ${lineClassName}`
+            : `pointer-events-none absolute inset-0 z-0 block translate-x-[3px] translate-y-[3px] text-neutral-950/26 ${lineClassName}`;
+          const lightweightGhostClass = isDarkOutline
+            ? `pointer-events-none absolute inset-0 z-0 block text-[#050505] opacity-[0.18] [text-rendering:geometricPrecision] [paint-order:stroke_fill] [WebkitTextStroke:1.7px_rgba(255,255,255,0.28)] ${lineClassName}`
+            : isHeroBright
+            ? `pointer-events-none absolute inset-0 z-0 block home-gradient-text opacity-20 ${lineClassName}`
+            : `pointer-events-none absolute inset-0 z-0 block text-white/20 [text-rendering:geometricPrecision] ${lineClassName}`;
+          const lightweightWordTextClass = isDarkOutline
+            ? "inline-block text-[#050505] [text-rendering:geometricPrecision] [paint-order:stroke_fill] [WebkitTextStroke:1.7px_rgba(255,255,255,0.54)] drop-shadow-[0_8px_22px_rgba(0,0,0,0.42)] [text-shadow:0_0_24px_rgba(196,181,253,0.16),0_2px_0_rgba(255,255,255,0.2)]"
+            : isHeroBright
+            ? "inline-block home-gradient-text [text-rendering:geometricPrecision] drop-shadow-[0_18px_40px_rgba(0,0,0,0.48)] [text-shadow:0_2px_0_rgba(0,0,0,0.24),0_0_22px_rgba(255,255,255,0.14),0_0_30px_rgba(248,113,113,0.18)]"
+            : "inline-block text-white [text-rendering:geometricPrecision] drop-shadow-[0_10px_26px_rgba(0,0,0,0.48)] [text-shadow:0_2px_0_rgba(0,0,0,0.34),0_0_22px_rgba(255,255,255,0.1)]";
+          const lineParts = line.split(/(\s+)/);
+          let wordIndex = 0;
+          const shouldRenderLightweightOffsetShadow = !isHeroBright;
+          const shouldRenderLightweightGhost = !isHeroBright;
+
+          return (
+            <span
+              key={`${line}-${index}`}
+              className="relative block overflow-visible"
+            >
+              {shouldRenderLightweightOffsetShadow ? (
+                <span aria-hidden="true" className={offsetShadowClass}>
+                  {line}
+                </span>
+              ) : null}
+              {shouldRenderLightweightGhost ? (
+                <span aria-hidden="true" className={lightweightGhostClass}>
+                  {line}
+                </span>
+              ) : null}
+              <span
+                aria-hidden="true"
+                className={`block whitespace-pre ${lineClassName}`}
+              >
+                {lineParts.map((part, partIndex) => {
+                  if (!part) {
+                    return null;
+                  }
+
+                  if (/^\s+$/.test(part)) {
+                    return (
+                      <span key={`${line}-${index}-space-${partIndex}`}>
+                        {part}
+                      </span>
+                    );
+                  }
+
+                  const currentWordDelay =
+                    lineDelay +
+                    wordIndex * Math.max(characterStagger * 1.55, 0.04);
+                  wordIndex += 1;
+
+                    return (
+                      <span
+                        key={`${line}-${index}-word-${partIndex}`}
+                        className={`${lightweightWordTextClass} home-heading-word-reveal ${
+                          isVisible ? "is-visible" : ""
+                        }`}
+                        style={{
+                        "--home-word-delay": `${Math.round(
+                          currentWordDelay * 1000
+                        )}ms`,
+                        "--home-word-duration": `${lightweightWordDurationSeconds}s`,
+                      }}
+                    >
+                      {part}
+                    </span>
+                  );
+                })}
+              </span>
+              <span className="sr-only">{line}</span>
+            </span>
+          );
+        })}
+      </Component>
+    );
+  }
 
   return (
     <Component className={className}>
@@ -40,7 +151,7 @@ export default function LiquidSportText({
         const baseLineClass = isDarkOutline
           ? `relative z-10 block text-[#050505] [text-rendering:geometricPrecision] [paint-order:stroke_fill] [WebkitTextStroke:1.7px_rgba(255,255,255,0.54)] drop-shadow-[0_8px_22px_rgba(0,0,0,0.42)] [text-shadow:0_0_24px_rgba(196,181,253,0.16),0_2px_0_rgba(255,255,255,0.2)] ${lineClassName}`
           : isHeroBright
-          ? `relative z-10 block bg-[linear-gradient(94deg,rgba(255,255,255,0.98)_0%,rgba(255,245,245,0.98)_24%,rgba(254,202,202,0.96)_52%,rgba(251,113,133,0.96)_76%,rgba(255,255,255,0.98)_100%)] bg-clip-text text-transparent [text-rendering:geometricPrecision] drop-shadow-[0_18px_40px_rgba(0,0,0,0.48)] [text-shadow:0_2px_0_rgba(0,0,0,0.24),0_0_22px_rgba(255,255,255,0.14),0_0_30px_rgba(248,113,113,0.18)] ${lineClassName}`
+          ? `${heroBrightLineClass} ${lineClassName}`
           : `relative z-10 block text-white [text-rendering:geometricPrecision] drop-shadow-[0_10px_26px_rgba(0,0,0,0.48)] [text-shadow:0_2px_0_rgba(0,0,0,0.34),0_0_22px_rgba(255,255,255,0.1)] ${lineClassName}`;
         const revealOverlayClass = isDarkOutline
           ? `pointer-events-none absolute inset-0 z-20 block bg-[linear-gradient(108deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.1)_22%,rgba(244,114,182,0.18)_40%,rgba(196,181,253,0.2)_52%,rgba(255,255,255,0.08)_64%,rgba(255,255,255,0)_84%)] bg-clip-text text-transparent ${lineClassName}`

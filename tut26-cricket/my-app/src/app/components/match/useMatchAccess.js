@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  buildPinRateLimitMessage,
+  buildPinRequestError,
+  clearClientPinRateLimit,
+  getClientPinRateLimitState,
+} from "../../lib/pin-attempt-client";
 
 const MATCH_AUTH_CACHE_TTL_MS = 30 * 1000;
 let matchAuthStatusMemoryCache = new Map();
@@ -11,6 +17,42 @@ function getRememberKey(matchId) {
 
 function getAuthCacheKey(matchId) {
   return `gv-match-access-status-${matchId}`;
+}
+
+function readRememberedGrant(matchId) {
+  if (typeof window === "undefined" || !matchId) {
+    return false;
+  }
+
+  try {
+    return window.localStorage.getItem(getRememberKey(matchId)) === "granted";
+  } catch {
+    return false;
+  }
+}
+
+function writeRememberedGrant(matchId) {
+  if (typeof window === "undefined" || !matchId) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(getRememberKey(matchId), "granted");
+  } catch {
+    // Ignore local storage failures and rely on other caches.
+  }
+}
+
+function clearRememberedGrant(matchId) {
+  if (typeof window === "undefined" || !matchId) {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(getRememberKey(matchId));
+  } catch {
+    // Ignore local storage failures and rely on other caches.
+  }
 }
 
 function readCachedAuthStatus(matchId) {
@@ -98,13 +140,13 @@ export default function useMatchAccess(matchId, initialAuthStatus = "checking") 
     }
 
     if (authStatus === "granted") {
-      window.localStorage.setItem(getRememberKey(matchId), "granted");
+      writeRememberedGrant(matchId);
       writeCachedAuthStatus(matchId, "granted");
       return;
     }
 
     if (authStatus === "locked") {
-      window.localStorage.removeItem(getRememberKey(matchId));
+      clearRememberedGrant(matchId);
       clearCachedAuthStatus(matchId);
     }
   }, [authStatus, matchId]);
@@ -124,9 +166,7 @@ export default function useMatchAccess(matchId, initialAuthStatus = "checking") 
       return;
     }
 
-    const remembered =
-      typeof window !== "undefined" &&
-      window.localStorage.getItem(getRememberKey(matchId)) === "granted";
+    const remembered = readRememberedGrant(matchId);
     const cachedStatus = remembered ? readCachedAuthStatus(matchId) : null;
 
     if (cachedStatus === "granted") {
@@ -151,13 +191,13 @@ export default function useMatchAccess(matchId, initialAuthStatus = "checking") 
         }
 
         if (data.authorized) {
-          window.localStorage.setItem(getRememberKey(matchId), "granted");
+          writeRememberedGrant(matchId);
           writeCachedAuthStatus(matchId, "granted");
           setAuthStatus("granted");
           return;
         }
 
-        window.localStorage.removeItem(getRememberKey(matchId));
+        clearRememberedGrant(matchId);
         clearCachedAuthStatus(matchId);
         setAuthStatus("locked");
       })
@@ -172,6 +212,13 @@ export default function useMatchAccess(matchId, initialAuthStatus = "checking") 
   }, [initialAuthStatus, matchId]);
 
   const submitPin = async (pin) => {
+    const rateLimitScope = matchId ? `match-auth:${matchId}` : "match-auth";
+    const pinRateLimit = getClientPinRateLimitState(rateLimitScope);
+    if (pinRateLimit.isBlocked) {
+      setAuthError(buildPinRateLimitMessage(pinRateLimit.retryAfterMs));
+      return;
+    }
+
     setAuthSubmitting(true);
     setAuthError("");
 
@@ -186,20 +233,22 @@ export default function useMatchAccess(matchId, initialAuthStatus = "checking") 
         const body = await response
           .json()
           .catch(() => ({ message: "Incorrect PIN." }));
-        throw new Error(body.message || "Incorrect PIN.");
+        throw buildPinRequestError(response, body, "Incorrect PIN.");
       }
 
       if (typeof window !== "undefined" && matchId) {
-        window.localStorage.setItem(getRememberKey(matchId), "granted");
+        writeRememberedGrant(matchId);
       }
+      clearClientPinRateLimit(rateLimitScope);
       writeCachedAuthStatus(matchId, "granted");
       setAuthStatus("granted");
     } catch (caughtError) {
       if (typeof window !== "undefined" && matchId) {
-        window.localStorage.removeItem(getRememberKey(matchId));
+        clearRememberedGrant(matchId);
       }
       clearCachedAuthStatus(matchId);
-      setAuthError(caughtError.message);
+      setAuthError(caughtError?.message || "Incorrect PIN.");
+      throw caughtError;
     } finally {
       setAuthSubmitting(false);
     }

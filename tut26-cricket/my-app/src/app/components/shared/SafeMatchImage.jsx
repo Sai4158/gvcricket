@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { isSafeMatchImageUrl } from "../../lib/match-image";
+import {
+  isSafeMatchImageUrl,
+  isSafeRemoteMatchImageUrl,
+} from "../../lib/match-image";
 
 export const GV_MATCH_FALLBACK_IMAGE = "/gvLogo.png";
 
@@ -33,11 +36,17 @@ export default function SafeMatchImage({
     onFallbackChange?.(isFallback);
   }, [isFallback, onFallbackChange]);
 
+  const shouldBypassOptimization =
+    imageProps.unoptimized ??
+    (imageSrc !== GV_MATCH_FALLBACK_IMAGE &&
+      (isSafeRemoteMatchImageUrl(imageSrc) || isSafeMatchImageUrl(imageSrc)));
+
   return (
     <Image
       {...imageProps}
       src={imageSrc}
       alt={alt}
+      unoptimized={shouldBypassOptimization}
       className={isFallback && fallbackClassName ? fallbackClassName : className}
       onError={() => {
         if (imageSrc === GV_MATCH_FALLBACK_IMAGE) {

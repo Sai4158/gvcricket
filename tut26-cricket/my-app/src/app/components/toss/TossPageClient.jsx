@@ -11,9 +11,8 @@ import TossStatePanels from "./TossStatePanels";
 import { getTeamBundle } from "../../lib/team-utils";
 import { getStartedMatchFromPayload, getStartedMatchId } from "../../lib/match-start";
 import {
-  clearPendingSessionImage,
-  getPendingSessionImage,
-  uploadPendingSessionImageToMatch,
+  clearPendingSessionImageNotice,
+  uploadStoredPendingSessionImageToMatch,
 } from "../../lib/pending-session-image";
 import StepFlow from "../shared/StepFlow";
 import LiquidSportText from "../home/LiquidSportText";
@@ -34,8 +33,8 @@ function createActionId(prefix) {
   return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
 }
 
-async function uploadPendingSessionImage(matchId, pendingImage) {
-  if (!pendingImage?.dataUrl || !matchId || typeof window === "undefined") {
+async function uploadPendingSessionImage(matchId, sessionId) {
+  if (!matchId || typeof window === "undefined") {
     return;
   }
 
@@ -43,11 +42,13 @@ async function uploadPendingSessionImage(matchId, pendingImage) {
   const timeoutId = window.setTimeout(() => controller.abort(), 12000);
 
   try {
-    await uploadPendingSessionImageToMatch({
+    const didUpload = await uploadStoredPendingSessionImageToMatch({
       matchId,
-      pendingImage,
       signal: controller.signal,
     });
+    if (didUpload && sessionId) {
+      clearPendingSessionImageNotice(sessionId);
+    }
   } catch {
     // Optional image upload should never block match start.
   } finally {
@@ -142,26 +143,32 @@ export default function TossPageClient({
 
   useEffect(() => {
     if (status !== "choosing" || choicePromptedRef.current || !matchDetails) {
-      return;
+      return undefined;
     }
 
     const teamName = getTeamBundle(matchDetails, "teamA").name;
     const nextChoicePrompt = buildTossChoicePrompt(teamName);
-    prime();
-    choicePromptedRef.current = true;
-    speak(nextChoicePrompt, {
-      priority: 2,
-      interrupt: true,
-    });
-  }, [matchDetails, prime, speak, status]);
+    const promptTimer = window.setTimeout(() => {
+      prime();
+      choicePromptedRef.current = true;
+      speak(nextChoicePrompt, {
+        priority: 2,
+        interrupt: true,
+      });
+    }, 420);
+
+    return () => window.clearTimeout(promptTimer);
+  }, [matchDetails, prime, sessionId, speak, status]);
 
   useEffect(() => {
     if (status !== "counting" || countdown <= 0 || spokenCountdownRef.current === countdown) {
       return;
     }
 
-    spokenCountdownRef.current = countdown;
-    speak(String(countdown), { interrupt: true });
+    const didSpeak = speak(String(countdown), { interrupt: true });
+    if (didSpeak) {
+      spokenCountdownRef.current = countdown;
+    }
   }, [countdown, speak, status]);
 
   useEffect(() => {
@@ -190,9 +197,6 @@ export default function TossPageClient({
     announcedResultRef.current = "";
     choicePromptedRef.current = true;
     prime({ userGesture: true });
-    if (speak("3", { userGesture: true, interrupt: true })) {
-      spokenCountdownRef.current = 3;
-    }
     setPlayerChoice(choice);
     setCountdown(3);
     setTossResult({ side: null, winnerName: null, call: null });
@@ -262,13 +266,8 @@ export default function TossPageClient({
         window.sessionStorage.removeItem(getDraftTokenKey(sessionId));
       }
 
-      const pendingImage = getPendingSessionImage();
-      if (typeof window !== "undefined") {
-        clearPendingSessionImage();
-      }
-
-      if (pendingImage && finalMatchId) {
-        void uploadPendingSessionImage(finalMatchId, pendingImage);
+      if (finalMatchId) {
+        void uploadPendingSessionImage(finalMatchId, sessionId);
       }
 
       router.push(`/match/${finalMatchId}`);
@@ -342,6 +341,7 @@ export default function TossPageClient({
           onSubmit={submitPin}
           isSubmitting={authSubmitting}
           error={authError}
+          rateLimitScope={matchId ? `match-auth:${matchId}` : "match-auth"}
         />
       )
     ) : (

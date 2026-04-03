@@ -1,6 +1,8 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
+import useHomeDesktopReveal from "./useHomeDesktopReveal";
 
 export default function AnimatedSection({
   children,
@@ -13,33 +15,55 @@ export default function AnimatedSection({
   viewportMargin = "0px 0px 12% 0px",
 }) {
   const prefersReducedMotion = useReducedMotion();
-  const shouldReduceMotion = prefersReducedMotion;
+  const useDesktopLiteMotion = useHomeDesktopLiteMotion();
+  const shouldReduceMotion = prefersReducedMotion || useDesktopLiteMotion;
+  const { ref, isVisible } = useHomeDesktopReveal(useDesktopLiteMotion, {
+    threshold: 0.08,
+    rootMargin: "0px 0px -6% 0px",
+    resetOnExit: true,
+  });
   const hiddenMotion = shouldReduceMotion
     ? false
     : {
         opacity: 0,
-        scale: 0.994,
+        scale: 0.992,
+        filter: "blur(4px)",
         x:
           direction === "left"
-            ? -distance
+            ? -Math.min(distance, 18)
             : direction === "right"
-            ? distance
+            ? Math.min(distance, 18)
             : 0,
         y:
           direction === "up"
-            ? distance
+            ? Math.min(distance, 18)
             : direction === "down"
-            ? -distance
-            : 0,
+            ? -Math.min(distance, 18)
+            : 10,
       };
   const visibleMotion = shouldReduceMotion
     ? undefined
     : {
         opacity: 1,
         scale: 1,
+        filter: "blur(0px)",
         x: 0,
         y: 0,
       };
+
+  if (useDesktopLiteMotion) {
+    return (
+      <section
+        id={id}
+        ref={ref}
+        className={`home-desktop-reveal home-desktop-reveal-section relative ${
+          isVisible ? "is-visible" : ""
+        } ${className}`}
+      >
+        <div className="relative z-10">{children}</div>
+      </section>
+    );
+  }
 
   return (
     <motion.section
@@ -49,7 +73,7 @@ export default function AnimatedSection({
       viewport={{ once: true, amount: viewportAmount, margin: viewportMargin }}
       transition={{
         delay,
-        duration: shouldReduceMotion ? 0 : 0.66,
+        duration: shouldReduceMotion ? 0 : 0.72,
         ease: [0.22, 1, 0.36, 1],
       }}
       className={`relative ${className}`}

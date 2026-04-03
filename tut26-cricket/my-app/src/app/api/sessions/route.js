@@ -2,7 +2,7 @@ import Session from "../../../models/Session.js";
 import { jsonError, jsonRateLimit } from "../../lib/api-response";
 import { writeAuditLog } from "../../lib/audit-log";
 import { connectDB } from "../../lib/db";
-import { loadSessionsIndexData } from "../../lib/server-data";
+import { loadSessionsIndexPageData } from "../../lib/server-data";
 import { serializePublicSession } from "../../lib/public-data";
 import { getRequestMeta } from "../../lib/request-meta";
 import { enforceRateLimit } from "../../lib/rate-limit";
@@ -79,11 +79,12 @@ export async function POST(req) {
 
 export async function GET() {
   try {
-    const transformedSessions = await loadSessionsIndexData();
+    const { sessions, totalCount } = await loadSessionsIndexPageData();
 
-    return Response.json(transformedSessions, {
+    return Response.json(sessions, {
       headers: {
-        "Cache-Control": "no-store",
+        "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=45",
+        "X-Total-Count": String(Number(totalCount || 0)),
       },
     });
   } catch {

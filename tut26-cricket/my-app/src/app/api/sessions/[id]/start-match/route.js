@@ -6,11 +6,17 @@ import { publishMatchUpdate, publishSessionUpdate } from "../../../../lib/live-u
 import { jsonError, jsonRateLimit } from "../../../../lib/api-response";
 import { writeAuditLog } from "../../../../lib/audit-log";
 import { getMatchAccessCookie } from "../../../../lib/match-access";
+import {
+  applyStoredMatchImages,
+  getStoredMatchImages,
+  rebaseStoredMatchImagesForMatch,
+} from "../../../../lib/match-image-gallery";
 import { serializePublicMatch } from "../../../../lib/public-data";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../../lib/request-security";
 import { hasValidDraftToken } from "../../../../lib/session-draft";
+import { invalidateSessionsDataCache } from "../../../../lib/server-data";
 import { setupMatchSchema } from "../../../../lib/validators";
 import { z } from "zod";
 
@@ -66,6 +72,7 @@ export async function POST(req, { params }) {
           ? teamBName
           : teamAName;
     const bowlingFirst = battingFirst === teamAName ? teamBName : teamAName;
+    let sessionGalleryImages = [];
 
     let finalMatch = null;
     transactionSession = await Match.startSession();
@@ -79,6 +86,8 @@ export async function POST(req, { params }) {
       if (session.isDraft && !hasValidDraftToken(session, parsedRequest.value.draftToken)) {
         throw new Error("DRAFT_ACCESS_DENIED");
       }
+
+      sessionGalleryImages = getStoredMatchImages(session);
 
       const existingMatch = session.match
         ? await Match.findById(session.match).session(transactionSession)
@@ -113,6 +122,13 @@ export async function POST(req, { params }) {
         existingMatch.lastLiveEvent = null;
         existingMatch.lastEventType = "";
         existingMatch.lastEventText = "";
+        const existingMatchImages = rebaseStoredMatchImagesForMatch(
+          String(existingMatch._id),
+          sessionGalleryImages
+        );
+        applyStoredMatchImages(existingMatch, existingMatchImages, {
+          matchId: String(existingMatch._id),
+        });
         await existingMatch.save({ session: transactionSession });
         finalMatch = existingMatch;
       } else {
@@ -133,12 +149,7 @@ export async function POST(req, { params }) {
               outs: 0,
               result: "",
               balls: [],
-              matchImageUrl: session.matchImageUrl || "",
-              matchImagePublicId: session.matchImagePublicId || "",
-              matchImageStorageUrlEnc: session.matchImageStorageUrlEnc || "",
-              matchImageStorageUrlHash: session.matchImageStorageUrlHash || "",
-              matchImageUploadedAt: session.matchImageUploadedAt || null,
-              matchImageUploadedBy: session.matchImageUploadedBy || "",
+              matchImages: [],
               innings1: { team: battingFirst, score: 0, history: [] },
               innings2: { team: bowlingFirst, score: 0, history: [] },
             },
@@ -148,12 +159,13 @@ export async function POST(req, { params }) {
       }
 
       if (finalMatch) {
-        finalMatch.matchImageUrl = session.matchImageUrl || "";
-        finalMatch.matchImagePublicId = session.matchImagePublicId || "";
-        finalMatch.matchImageStorageUrlEnc = session.matchImageStorageUrlEnc || "";
-        finalMatch.matchImageStorageUrlHash = session.matchImageStorageUrlHash || "";
-        finalMatch.matchImageUploadedAt = session.matchImageUploadedAt || null;
-        finalMatch.matchImageUploadedBy = session.matchImageUploadedBy || "";
+        const nextMatchImages = rebaseStoredMatchImagesForMatch(
+          String(finalMatch._id),
+          sessionGalleryImages
+        );
+        applyStoredMatchImages(finalMatch, nextMatchImages, {
+          matchId: String(finalMatch._id),
+        });
         await finalMatch.save({ session: transactionSession });
       }
 
@@ -184,6 +196,7 @@ export async function POST(req, { params }) {
       Number(finalMatch.adminAccessVersion || 1)
     );
     response.cookies.set(matchCookie.name, matchCookie.value, matchCookie.options);
+    invalidateSessionsDataCache();
     publishMatchUpdate(finalMatch._id);
     publishSessionUpdate(sessionId);
 

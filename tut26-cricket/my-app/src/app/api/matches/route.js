@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { jsonError, jsonRateLimit } from "../../lib/api-response";
 import { writeAuditLog } from "../../lib/audit-log";
 import { connectDB } from "../../lib/db";
@@ -7,19 +6,8 @@ import { getRequestMeta } from "../../lib/request-meta";
 import { enforceRateLimit } from "../../lib/rate-limit";
 import { parseJsonRequest } from "../../lib/request-security";
 import { buildTeamUpdate } from "../../lib/team-utils";
-import { oversSchema } from "../../lib/validators";
+import { createMatchSchema } from "../../lib/validators";
 import Match from "../../../models/Match";
-
-const createMatchSchema = z
-  .object({
-    sessionId: z.string().regex(/^[a-f0-9]{24}$/i, "sessionId is invalid."),
-    teamAName: z.string().min(1).max(80),
-    teamBName: z.string().min(1).max(80),
-    teamA: z.array(z.string().min(1).max(48)).min(1).max(15),
-    teamB: z.array(z.string().min(1).max(48)).min(1).max(15),
-    overs: oversSchema,
-  })
-  .strict();
 
 export async function POST(req) {
   const meta = getRequestMeta(req);

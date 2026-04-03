@@ -2,6 +2,8 @@ const SAFE_IMAGE_HOSTS = new Set(["i.ibb.co", "ibb.co"]);
 const MAX_MATCH_IMAGE_BYTES = 5 * 1024 * 1024;
 const INTERNAL_MATCH_IMAGE_PATH =
   /^\/api\/matches\/[a-f0-9]{24}\/image\/file(?:\?[^#]*)?$/i;
+const INLINE_MATCH_IMAGE_DATA_URL =
+  /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=]+$/i;
 const ALLOWED_IMAGE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -72,14 +74,22 @@ export function validateMatchImageBuffer(buffer, mimeType) {
   return { ok: true };
 }
 
-export function buildPublicMatchImageUrl(matchId, version = "") {
+export function buildPublicMatchImageUrl(matchId, version = "", imageId = "") {
   const safeId = String(matchId || "").trim();
   if (!/^[a-f0-9]{24}$/i.test(safeId)) {
     return "";
   }
 
-  const versionSuffix = version ? `?v=${encodeURIComponent(String(version))}` : "";
-  return `/api/matches/${safeId}/image/file${versionSuffix}`;
+  const searchParams = new URLSearchParams();
+  if (imageId) {
+    searchParams.set("imageId", String(imageId));
+  }
+  if (version) {
+    searchParams.set("v", String(version));
+  }
+
+  const query = searchParams.toString();
+  return `/api/matches/${safeId}/image/file${query ? `?${query}` : ""}`;
 }
 
 export function isSafeRemoteMatchImageUrl(value) {
@@ -93,14 +103,39 @@ export function isSafeRemoteMatchImageUrl(value) {
   }
 }
 
+export function buildInlineMatchImageDataUrl(buffer, mimeType) {
+  const safeMimeType = String(mimeType || "").toLowerCase();
+  if (!isAllowedMatchImageMime(safeMimeType) || !buffer?.length) {
+    return "";
+  }
+
+  return `data:${safeMimeType};base64,${Buffer.from(buffer).toString("base64")}`;
+}
+
+export function isInlineMatchImageDataUrl(value) {
+  return (
+    typeof value === "string" &&
+    INLINE_MATCH_IMAGE_DATA_URL.test(value.trim())
+  );
+}
+
 export function isSafeMatchImageUrl(value) {
   if (!value) return false;
 
-  if (typeof value === "string" && INTERNAL_MATCH_IMAGE_PATH.test(value.trim())) {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const trimmedValue = value.trim();
+  if (INTERNAL_MATCH_IMAGE_PATH.test(trimmedValue)) {
     return true;
   }
 
-  return isSafeRemoteMatchImageUrl(value);
+  if (isInlineMatchImageDataUrl(trimmedValue)) {
+    return true;
+  }
+
+  return isSafeRemoteMatchImageUrl(trimmedValue);
 }
 
 export function normalizeMatchImageMetadata(uploadData, uploadedBy = "admin") {

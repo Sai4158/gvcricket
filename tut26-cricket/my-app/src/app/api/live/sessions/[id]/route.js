@@ -16,14 +16,115 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 export const preferredRegion = ["iad1"];
 
-const SESSION_PAD = "0".repeat(4096);
-const PING_PAD = "0".repeat(4096);
+const STREAM_HEARTBEAT_INTERVAL_MS = 15_000;
+const STREAM_CATCHUP_INTERVAL_MS = 180_000;
+const STREAM_FALLBACK_POLL_INTERVAL_MS = 5_000;
+const LIVE_SESSION_SNAPSHOT_CACHE_TTL_MS = 1_000;
+const STREAM_BOOTSTRAP_PAD = "0".repeat(64);
+const LIVE_SESSION_FIELDS =
+  "_id name date overs isLive isDraft match tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastEventType lastEventText createdAt updatedAt";
+const LIVE_MATCH_FIELDS =
+  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText createdAt updatedAt";
+const globalSessionSnapshotCache =
+  globalThis.__gvLiveSessionSnapshotCache || new Map();
+
+if (!globalThis.__gvLiveSessionSnapshotCache) {
+  globalThis.__gvLiveSessionSnapshotCache = globalSessionSnapshotCache;
+}
+
+function pruneSessionSnapshotCache(now = Date.now()) {
+  if (globalSessionSnapshotCache.size < 100) {
+    return;
+  }
+
+  for (const [key, entry] of globalSessionSnapshotCache.entries()) {
+    if (!entry?.pending && Number(entry?.expiresAt || 0) <= now) {
+      globalSessionSnapshotCache.delete(key);
+    }
+  }
+}
+
+function getSessionSnapshotCacheEntry(sessionId) {
+  pruneSessionSnapshotCache();
+  const key = String(sessionId || "");
+  if (!globalSessionSnapshotCache.has(key)) {
+    globalSessionSnapshotCache.set(key, {
+      value: null,
+      expiresAt: 0,
+      pending: null,
+    });
+  }
+
+  return globalSessionSnapshotCache.get(key);
+}
+
+async function resolveLatestMatch(session) {
+  if (!session) {
+    return null;
+  }
+
+  if (session.match) {
+    const linkedMatch = await Match.findById(session.match)
+      .select(LIVE_MATCH_FIELDS)
+      .lean();
+    if (linkedMatch) {
+      return linkedMatch;
+    }
+  }
+
+  return Match.findOne({ sessionId: session._id })
+    .select(LIVE_MATCH_FIELDS)
+    .sort({ updatedAt: -1 })
+    .lean();
+}
+
+async function readLiveSessionSnapshot(sessionId) {
+  const session = await Session.findById(sessionId)
+    .select(LIVE_SESSION_FIELDS)
+    .lean();
+  const match = await resolveLatestMatch(session);
+  const payload = {
+    session: serializePublicSession(session),
+    match: serializePublicMatch(match, session),
+  };
+
+  return {
+    payload,
+    serialized: JSON.stringify(payload),
+    matchId: match?._id ? String(match._id) : "",
+  };
+}
+
+async function getCachedLiveSessionSnapshot(sessionId, { force = false } = {}) {
+  const cacheEntry = getSessionSnapshotCacheEntry(sessionId);
+  const now = Date.now();
+
+  if (!force && cacheEntry.value && cacheEntry.expiresAt > now) {
+    return cacheEntry.value;
+  }
+
+  if (cacheEntry.pending) {
+    return cacheEntry.pending;
+  }
+
+  cacheEntry.pending = readLiveSessionSnapshot(sessionId)
+    .then((value) => {
+      cacheEntry.value = value;
+      cacheEntry.expiresAt = Date.now() + LIVE_SESSION_SNAPSHOT_CACHE_TTL_MS;
+      return value;
+    })
+    .finally(() => {
+      cacheEntry.pending = null;
+    });
+
+  return cacheEntry.pending;
+}
 
 function sseHeaders() {
   return {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache, no-transform",
-    Connection: "close",
+    Connection: "keep-alive",
     "X-Accel-Buffering": "no",
     "Content-Encoding": "none",
   };
@@ -75,6 +176,7 @@ export async function GET(request, { params }) {
     }
 
     try {
+      await writer.ready;
       await writer.write(encoder.encode(encodeEvent(event, data)));
       return true;
     } catch (error) {
@@ -100,7 +202,7 @@ export async function GET(request, { params }) {
     }
   };
 
-  const scheduleHeartbeat = (delay = 4000) => {
+  const scheduleHeartbeat = (delay = STREAM_HEARTBEAT_INTERVAL_MS) => {
     if (closed) {
       return;
     }
@@ -124,31 +226,18 @@ export async function GET(request, { params }) {
     }, delay);
   };
 
-  const resolveLatestMatch = async (session) => {
-    if (!session) {
-      return null;
-    }
-
-    if (session.match) {
-      const linkedMatch = await Match.findById(session.match).lean();
-      if (linkedMatch) {
-        return linkedMatch;
-      }
-    }
-
-    return Match.findOne({ sessionId: session._id }).sort({ updatedAt: -1 }).lean();
-  };
-
   const pushSessionPayload = async ({ force = false } = {}) => {
     if (closed) {
       return null;
     }
-    const session = await Session.findById(id).lean();
-    const match = await resolveLatestMatch(session);
+    const {
+      payload,
+      serialized: nextSerializedPayload,
+      matchId: nextMatchId,
+    } = await getCachedLiveSessionSnapshot(id, { force });
     if (closed) {
       return null;
     }
-    const nextMatchId = match?._id ? String(match._id) : "";
 
     if (nextMatchId !== currentMatchId) {
       cleanupMatch();
@@ -157,7 +246,7 @@ export async function GET(request, { params }) {
       if (currentMatchId) {
         cleanupMatch = subscribeToMatch(currentMatchId, async () => {
           try {
-            await pushSessionPayload();
+            await pushSessionPayload({ force: true });
           } catch (error) {
             console.error("Session SSE match push failed:", error);
           }
@@ -165,14 +254,8 @@ export async function GET(request, { params }) {
       }
     }
 
-    const payload = {
-      session: serializePublicSession(session),
-      match: serializePublicMatch(match, session),
-    };
-    const nextSerializedPayload = JSON.stringify(payload);
-
     if (!force && nextSerializedPayload === lastSerializedPayload) {
-      return { session, match };
+      return payload;
     }
 
     lastSerializedPayload = nextSerializedPayload;
@@ -181,13 +264,12 @@ export async function GET(request, { params }) {
       !(await send("session", {
         ...payload,
         updatedAt: new Date().toISOString(),
-        pad: SESSION_PAD,
       }))
     ) {
       return null;
     }
 
-    return { session, match };
+    return payload;
   };
 
   const heartbeatLoop = async () => {
@@ -196,7 +278,7 @@ export async function GET(request, { params }) {
     }
 
     try {
-      if (!(await send("ping", { ok: true, ts: Date.now(), pad: PING_PAD }))) {
+      if (!(await send("ping", { ok: true, ts: Date.now() }))) {
         return;
       }
     } catch (error) {
@@ -220,7 +302,11 @@ export async function GET(request, { params }) {
     }
 
     catchupDone = true;
-    scheduleCatchup(liveUpdatesReady ? 12000 : 1000);
+    scheduleCatchup(
+      liveUpdatesReady
+        ? STREAM_CATCHUP_INTERVAL_MS
+        : STREAM_FALLBACK_POLL_INTERVAL_MS
+    );
   };
 
   void (async () => {
@@ -231,27 +317,28 @@ export async function GET(request, { params }) {
         ok: true,
         ts: Date.now(),
         init: true,
-        pad: PING_PAD,
+        pad: STREAM_BOOTSTRAP_PAD,
+      });
+
+      cleanupSession = subscribeToSession(id, async () => {
+        try {
+          await pushSessionPayload({ force: true });
+        } catch (error) {
+          console.error("Session SSE session push failed:", error);
+        }
       });
 
       try {
         await ensureLiveUpdates();
         if (!closed) {
           liveUpdatesReady = true;
-          cleanupSession = subscribeToSession(id, async () => {
-            try {
-              await pushSessionPayload();
-            } catch (error) {
-              console.error("Session SSE session push failed:", error);
-            }
-          });
         }
       } catch (error) {
         console.error("Session change streams unavailable.", error);
       }
 
       scheduleHeartbeat();
-      scheduleCatchup(liveUpdatesReady ? 12000 : 1200);
+      scheduleCatchup(liveUpdatesReady ? STREAM_CATCHUP_INTERVAL_MS : 1200);
     } catch (error) {
       await send("error", { message: "Live updates are temporarily unavailable." });
       await stopStream();

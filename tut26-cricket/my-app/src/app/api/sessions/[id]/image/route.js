@@ -1,45 +1,25 @@
 import crypto from "node:crypto";
+import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 import { jsonError, jsonRateLimit } from "../../../../lib/api-response";
 import { writeAuditLog } from "../../../../lib/audit-log";
 import { connectDB } from "../../../../lib/db";
-import { publishSessionUpdate } from "../../../../lib/live-updates";
+import { publishMatchUpdate, publishSessionUpdate } from "../../../../lib/live-updates";
 import {
-  buildPublicMatchImageUrl,
-  isSafeRemoteMatchImageUrl,
-  normalizeMatchImageMetadata,
+  buildInlineMatchImageDataUrl,
   validateMatchImageBuffer,
 } from "../../../../lib/match-image";
 import {
-  encryptMatchImageSourceUrl,
-  hashMatchImageSourceUrl,
-} from "../../../../lib/match-image-secure";
-import { moderateMatchImageBuffer } from "../../../../lib/match-image-moderation";
-import { serializePublicSession } from "../../../../lib/public-data";
+  applyStoredMatchImages,
+  createStoredMatchImageEntry,
+} from "../../../../lib/match-image-gallery";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { parseMultipartRequest } from "../../../../lib/request-security";
 import { hasValidDraftToken } from "../../../../lib/session-draft";
+import { invalidateSessionsDataCache } from "../../../../lib/server-data";
 
 export const runtime = "nodejs";
-
-function getMatchImageModerationMode() {
-  return String(process.env.MATCH_IMAGE_MODERATION_MODE || "best-effort")
-    .trim()
-    .toLowerCase();
-}
-
-function getSafeUploadName(file) {
-  const extension = String(file?.name || "")
-    .split(".")
-    .pop()
-    ?.toLowerCase();
-  const safeExtension = ["jpg", "jpeg", "png", "webp"].includes(extension)
-    ? extension
-    : "jpg";
-
-  return `session-${crypto.randomBytes(8).toString("hex")}.${safeExtension}`;
-}
 
 export async function POST(req, { params }) {
   const { id } = await params;
@@ -108,97 +88,53 @@ export async function POST(req, { params }) {
       return jsonError(validation.message, 400);
     }
 
-    let moderation = {
-      ok: true,
-      blockedLabels: [],
-      predictions: [],
-      message: "",
-    };
-
-    try {
-      moderation = await moderateMatchImageBuffer(buffer);
-    } catch (error) {
-      if (getMatchImageModerationMode() === "strict") {
-        throw error;
-      }
-
-      await writeAuditLog({
-        action: "session_media_moderation_bypassed",
-        targetType: "session",
-        targetId: id,
-        status: "failure",
-        ip: meta.ip,
-        userAgent: meta.userAgent,
-        metadata: { reason: error?.message || "Image moderation unavailable." },
-      });
+    const imageDataUrl = buildInlineMatchImageDataUrl(buffer, file.type);
+    if (!imageDataUrl) {
+      throw new Error("Could not prepare the uploaded image.");
     }
 
-    if (!moderation.ok) {
-      await writeAuditLog({
-        action: "session_media_upload_blocked",
-        targetType: "session",
-        targetId: id,
-        status: "failure",
-        ip: meta.ip,
-        userAgent: meta.userAgent,
-        metadata: {
-          blockedLabels: moderation.blockedLabels,
-          predictions: moderation.predictions.map((prediction) => ({
-            className: prediction.className,
-            probability: Number(prediction.probability.toFixed(4)),
-          })),
-        },
-      });
-
-      return jsonError(moderation.message, 422);
-    }
-
-    const imgbbKey = process.env.IMGBB_API_KEY;
-    if (!imgbbKey) {
-      return jsonError("Image uploads are not configured.", 500);
-    }
-
-    const safeName = getSafeUploadName(file);
-    const uploadForm = new FormData();
-    uploadForm.append("image", new Blob([buffer], { type: file.type }), safeName);
-    uploadForm.append("name", safeName.replace(/\.[^.]+$/, ""));
-
-    const uploadResponse = await fetch(
-      `https://api.imgbb.com/1/upload?key=${encodeURIComponent(imgbbKey)}`,
-      {
-        method: "POST",
-        body: uploadForm,
-      }
-    );
-    const uploadJson = await uploadResponse.json().catch(() => null);
-
-    if (!uploadResponse.ok || !uploadJson?.success) {
-      throw new Error("Remote image upload failed.");
-    }
-
-    const imageMetadata = normalizeMatchImageMetadata(uploadJson.data, "draft");
-    if (!isSafeRemoteMatchImageUrl(imageMetadata.matchImageUrl)) {
-      throw new Error("Remote image URL was rejected.");
-    }
-
-    session.matchImageUrl = session.match
-      ? buildPublicMatchImageUrl(
-          session.match,
-          imageMetadata.matchImagePublicId || imageMetadata.matchImageUploadedAt?.getTime()
-        )
-      : imageMetadata.matchImageUrl;
-    session.matchImagePublicId = imageMetadata.matchImagePublicId;
-    session.matchImageStorageUrlEnc = encryptMatchImageSourceUrl(
-      imageMetadata.matchImageUrl
-    );
-    session.matchImageStorageUrlHash = hashMatchImageSourceUrl(
-      imageMetadata.matchImageUrl
-    );
-    session.matchImageUploadedAt = imageMetadata.matchImageUploadedAt;
-    session.matchImageUploadedBy = "draft";
+    const draftGalleryEntry = createStoredMatchImageEntry({
+      matchId: session.match ? String(session.match) : "",
+      sourceUrl: imageDataUrl,
+      publicId: "",
+      uploadedAt: new Date(),
+      uploadedBy: "draft",
+    });
+    applyStoredMatchImages(session, [draftGalleryEntry], {
+      matchId: session.match ? String(session.match) : "",
+    });
     session.mediaUpdatedAt = new Date();
     await session.save();
 
+    if (session.match) {
+      const linkedMatch = await Match.findById(session.match);
+      if (linkedMatch) {
+        const matchGalleryEntry = createStoredMatchImageEntry({
+          matchId: String(linkedMatch._id),
+          sourceUrl: imageDataUrl,
+          publicId: "",
+          uploadedAt: draftGalleryEntry.uploadedAt,
+          uploadedBy: "draft",
+          id: draftGalleryEntry.id,
+        });
+        applyStoredMatchImages(linkedMatch, [matchGalleryEntry], {
+          matchId: String(linkedMatch._id),
+        });
+        linkedMatch.mediaUpdatedAt = session.mediaUpdatedAt;
+        linkedMatch.lastEventType = "image_update";
+        linkedMatch.lastEventText = "Match image updated.";
+        linkedMatch.lastLiveEvent = {
+          id: `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`,
+          type: "image_update",
+          summaryText: "Match image updated.",
+          createdAt: new Date().toISOString(),
+        };
+        await linkedMatch.save();
+        publishMatchUpdate(String(session.match));
+      }
+    }
+
+    invalidateSessionsDataCache();
     publishSessionUpdate(session._id);
 
     await writeAuditLog({
@@ -215,13 +151,28 @@ export async function POST(req, { params }) {
       },
     });
 
-    return Response.json(serializePublicSession(session), {
-      headers: {
-        "Cache-Control": "no-store",
+    return Response.json(
+      {
+        ok: true,
+        sessionId: String(session._id),
+        matchId: session.match ? String(session.match) : null,
+        hasImage: true,
+        updatedAt: session.updatedAt || null,
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
   } catch (error) {
     const status = error?.message === "Image moderation unavailable." ? 503 : 500;
+    const failureMessage =
+      status === 503
+        ? "Image moderation is temporarily unavailable."
+        : process.env.NODE_ENV === "production"
+          ? "Failed to upload the session image."
+          : error?.message || "Failed to upload the session image.";
 
     await writeAuditLog({
       action: "session_media_upload",
@@ -233,11 +184,6 @@ export async function POST(req, { params }) {
       metadata: { message: error?.message || "Failed to upload the session image." },
     });
 
-    return jsonError(
-      status === 503
-        ? "Image moderation is temporarily unavailable."
-        : "Failed to upload the session image.",
-      status
-    );
+    return jsonError(failureMessage, status);
   }
 }

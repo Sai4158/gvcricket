@@ -3,9 +3,15 @@ import test from "node:test";
 import {
   applyMatchAction,
   applySafeMatchPatch,
+  buildSessionMirrorUpdate,
 } from "../src/app/lib/match-engine.js";
-import { buildPublicMatchImageUrl } from "../src/app/lib/match-image.js";
-import { serializePublicMatch } from "../src/app/lib/public-data.js";
+import {
+  applyStoredMatchImages,
+  createStoredMatchImageEntry,
+  rebaseStoredMatchImagesForMatch,
+} from "../src/app/lib/match-image-gallery.js";
+import { buildSignedMatchImageUrl } from "../src/app/lib/match-image-secure.js";
+import { serializePublicMatch, serializePublicSession } from "../src/app/lib/public-data.js";
 import {
   claimWalkieSpeaker,
   getWalkieSnapshot,
@@ -228,7 +234,7 @@ test("image serialization stays safe during scoring and fallback paths stay stab
   const protectedImagePublic = serializePublicMatch(protectedImageMatch);
   assert.equal(
     protectedImagePublic.matchImageUrl,
-    buildPublicMatchImageUrl(match._id, "public123")
+    buildSignedMatchImageUrl(match._id, "public123", "cover")
   );
   assert.equal(protectedImagePublic.score, 4);
 
@@ -242,6 +248,194 @@ test("image serialization stays safe during scoring and fallback paths stay stab
   const unsafeLegacyPublic = serializePublicMatch(unsafeLegacyImageMatch);
   assert.equal(unsafeLegacyPublic.matchImageUrl, "");
   assert.equal(unsafeLegacyPublic.score, 4);
+});
+
+test("step-one session image survives draft save, match promotion, and session mirroring", () => {
+  const session = {
+    _id: "507f1f77bcf86cd799439211",
+    match: null,
+    name: "Draft Match",
+    teamA: [],
+    teamB: [],
+    teamAName: "",
+    teamBName: "",
+    overs: 6,
+    isLive: false,
+    tossWinner: "",
+    tossDecision: "",
+    matchImages: [],
+    matchImageUrl: "",
+    matchImagePublicId: "",
+    matchImageStorageUrlEnc: "",
+    matchImageStorageUrlHash: "",
+    matchImageUploadedAt: null,
+    matchImageUploadedBy: "",
+    updatedAt: new Date("2026-03-14T12:00:00.000Z"),
+    createdAt: new Date("2026-03-14T11:00:00.000Z"),
+  };
+
+  const draftEntry = createStoredMatchImageEntry({
+    matchId: "",
+    sourceUrl: "https://i.ibb.co/demo/example.png",
+    publicId: "draft-public",
+    uploadedAt: new Date("2026-03-14T11:30:00.000Z"),
+    uploadedBy: "draft",
+    id: "draft-cover",
+  });
+
+  applyStoredMatchImages(session, [draftEntry], { matchId: "" });
+
+  const publicSession = serializePublicSession(session);
+  assert.equal(publicSession.matchImages.length, 1);
+  assert.equal(publicSession.matchImages[0].url, "https://i.ibb.co/demo/example.png");
+  assert.equal(publicSession.matchImageUrl, "https://i.ibb.co/demo/example.png");
+
+  const match = {
+    ...buildBaseMatch(),
+    _id: "507f1f77bcf86cd799439212",
+    sessionId: session._id,
+  };
+
+  const rebasedImages = rebaseStoredMatchImagesForMatch(
+    String(match._id),
+    session.matchImages
+  );
+  applyStoredMatchImages(match, rebasedImages, { matchId: String(match._id) });
+
+  const publicMatch = serializePublicMatch(match, session);
+  assert.equal(publicMatch.matchImages.length, 1);
+  assert.equal(
+    publicMatch.matchImageUrl,
+    buildSignedMatchImageUrl(match._id, "draft-public", "draft-cover")
+  );
+
+  const sessionMirror = buildSessionMirrorUpdate(match);
+  assert.equal(sessionMirror.matchImages.length, 1);
+  assert.equal(sessionMirror.matchImagePublicId, "draft-public");
+  assert.equal(
+    sessionMirror.matchImageUrl,
+    buildSignedMatchImageUrl(match._id, "draft-public", "draft-cover")
+  );
+});
+
+test("public match data falls back to the linked session image until match mirroring catches up", () => {
+  const session = {
+    _id: "507f1f77bcf86cd799439221",
+    match: "507f1f77bcf86cd799439222",
+    teamA: [],
+    teamB: [],
+    teamAName: "Falcons",
+    teamBName: "Titans",
+    tossWinner: "",
+    tossDecision: "",
+    matchImages: [],
+    matchImageUrl: "",
+    matchImagePublicId: "",
+    matchImageStorageUrlEnc: "",
+    matchImageStorageUrlHash: "",
+    matchImageUploadedAt: null,
+    matchImageUploadedBy: "",
+    updatedAt: new Date("2026-03-14T12:10:00.000Z"),
+  };
+
+  const draftEntry = createStoredMatchImageEntry({
+    matchId: String(session.match),
+    sourceUrl: "https://i.ibb.co/demo/fallback-cover.png",
+    publicId: "session-public",
+    uploadedAt: new Date("2026-03-14T12:05:00.000Z"),
+    uploadedBy: "draft",
+    id: "session-cover",
+  });
+
+  applyStoredMatchImages(session, [draftEntry], {
+    matchId: String(session.match),
+  });
+
+  const match = {
+    ...buildBaseMatch(),
+    _id: "507f1f77bcf86cd799439222",
+    sessionId: session._id,
+    matchImages: [],
+    matchImageUrl: "",
+    matchImagePublicId: "",
+    matchImageStorageUrlEnc: "",
+    matchImageStorageUrlHash: "",
+    matchImageUploadedAt: null,
+  };
+
+  const publicMatch = serializePublicMatch(match, session);
+  assert.equal(publicMatch.matchImages.length, 1);
+  assert.equal(
+    publicMatch.matchImageUrl,
+    buildSignedMatchImageUrl(match._id, "session-public", "session-cover")
+  );
+});
+
+test("inline draft session images stay visible through promotion into the live match", () => {
+  const inlineImageUrl = "data:image/jpeg;base64,Zm9vYmFy";
+  const session = {
+    _id: "507f1f77bcf86cd799439231",
+    match: null,
+    name: "Inline Draft Match",
+    teamA: [],
+    teamB: [],
+    teamAName: "",
+    teamBName: "",
+    overs: 6,
+    isLive: false,
+    tossWinner: "",
+    tossDecision: "",
+    matchImages: [],
+    matchImageUrl: "",
+    matchImagePublicId: "",
+    matchImageStorageUrlEnc: "",
+    matchImageStorageUrlHash: "",
+    matchImageUploadedAt: null,
+    matchImageUploadedBy: "",
+    updatedAt: new Date("2026-03-14T12:30:00.000Z"),
+    createdAt: new Date("2026-03-14T12:00:00.000Z"),
+  };
+
+  const inlineEntry = createStoredMatchImageEntry({
+    matchId: "",
+    sourceUrl: inlineImageUrl,
+    publicId: "",
+    uploadedAt: new Date("2026-03-14T12:20:00.000Z"),
+    uploadedBy: "draft",
+    id: "inline-cover",
+  });
+
+  applyStoredMatchImages(session, [inlineEntry], { matchId: "" });
+
+  assert.equal(session.matchImageUrl, "");
+  assert.equal(session.matchImages[0].url, inlineImageUrl);
+
+  const publicSession = serializePublicSession(session);
+  assert.equal(publicSession.matchImageUrl, inlineImageUrl);
+  assert.equal(publicSession.matchImages[0].url, inlineImageUrl);
+
+  const match = {
+    ...buildBaseMatch(),
+    _id: "507f1f77bcf86cd799439232",
+    sessionId: session._id,
+  };
+
+  const rebasedImages = rebaseStoredMatchImagesForMatch(
+    String(match._id),
+    session.matchImages
+  );
+  applyStoredMatchImages(match, rebasedImages, { matchId: String(match._id) });
+
+  assert.equal(match.matchImageUrl, "");
+  assert.equal(match.matchImages[0].url, inlineImageUrl);
+
+  const publicMatch = serializePublicMatch(match, session);
+  assert.equal(publicMatch.matchImageUrl, inlineImageUrl);
+  assert.equal(publicMatch.matchImages[0].url, inlineImageUrl);
+
+  const sessionMirror = buildSessionMirrorUpdate(match);
+  assert.equal(sessionMirror.matchImageUrl, "");
+  assert.equal(sessionMirror.matchImages[0].url, inlineImageUrl);
 });
 
 test("walkie changes stay isolated from score state and do not leak across matches", () => {

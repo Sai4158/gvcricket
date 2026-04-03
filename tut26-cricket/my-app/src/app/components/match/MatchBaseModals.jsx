@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import { FaTimes } from "react-icons/fa";
 import LiquidSportText from "../home/LiquidSportText";
 import LoadingButton from "../shared/LoadingButton";
-import { Ball } from "./MatchBallHistory";
+import ModalGradientTitle from "../shared/ModalGradientTitle";
+import { Ball, buildBallSlotLabels } from "./MatchBallHistory";
 import MatchImageUploader from "./MatchImageUploader";
 import { countLegalBalls } from "../../lib/match-scoring";
 
@@ -56,11 +57,9 @@ export function ModalBase({
       >
         {!hideHeader ? (
           <div className="sticky top-0 z-10 border-b border-white/6 bg-zinc-900/95 px-5 pb-3 pt-5 backdrop-blur">
-            <LiquidSportText
+            <ModalGradientTitle
               as="h2"
               text={String(title || "").toUpperCase()}
-              variant="hero-bright"
-              simplifyMotion
               className="text-center text-2xl font-bold"
             />
           </div>
@@ -147,19 +146,27 @@ function HistorySection({ title, history }) {
         </span>
       </div>
       <div className="space-y-4">
-        {[...history].reverse().map((over) => (
-          <div
-            key={`${title}-${over.overNumber}`}
-            className="rounded-2xl border border-white/8 bg-white/[0.03] p-4"
-          >
-            <p className="font-semibold text-zinc-100">Over {over.overNumber}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {over.balls.map((ball, index) => (
-                <Ball key={index} ball={ball} ballNumber={index + 1} />
-              ))}
+        {[...history].reverse().map((over) => {
+          const ballSlotLabels = buildBallSlotLabels(over.balls || []);
+
+          return (
+            <div
+              key={`${title}-${over.overNumber}`}
+              className="rounded-2xl border border-white/8 bg-white/[0.03] p-4"
+            >
+              <p className="font-semibold text-zinc-100">Over {over.overNumber}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(over.balls || []).map((ball, index) => (
+                  <Ball
+                    key={index}
+                    ball={ball}
+                    ballNumber={ballSlotLabels[index] || "•"}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -337,21 +344,37 @@ export function InningsEndModal({ match, onNext }) {
 export function MatchImageModal({ match, onUploaded, onClose }) {
   return (
     <ModalBase
-      title={match?.matchImageUrl ? "Replace Match Image" : "Add Match Image"}
-      onExit={onClose}
+      onExit={undefined}
+      hideHeader
       panelClassName="max-w-md"
       bodyClassName="max-h-[calc(100vh-7rem)]"
     >
       <MatchImageUploader
         matchId={String(match._id)}
+        existingImages={Array.isArray(match?.matchImages) ? match.matchImages : []}
         existingImageUrl={match?.matchImageUrl || ""}
+        existingImageCount={
+          Array.isArray(match?.matchImages) && match.matchImages.length
+            ? match.matchImages.length
+            : match?.matchImageUrl
+              ? 1
+              : 0
+        }
+        appendOnUpload={
+          (Array.isArray(match?.matchImages) && match.matchImages.length > 0) ||
+          Boolean(match?.matchImageUrl)
+        }
         onUploaded={(updatedMatch) => {
           onUploaded(updatedMatch);
-          onClose();
         }}
-        title={match?.matchImageUrl ? "Replace the current image" : "Upload a match image"}
-        description="Upload a team photo, ground photo, poster, or winning team picture. Safe raster images only."
-        primaryLabel={match?.matchImageUrl ? "Replace Image" : "Upload Image"}
+        onComplete={() => {
+          onClose?.();
+        }}
+        onRequestClose={onClose}
+        promptForUploadPin
+        title={match?.matchImageUrl ? "Replace Match Image" : "Add Match Image"}
+        description="Manage match images."
+        primaryLabel={match?.matchImageUrl ? "Save Images" : "Upload Images"}
       />
     </ModalBase>
   );

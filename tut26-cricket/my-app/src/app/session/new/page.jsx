@@ -9,21 +9,35 @@ import LoadingButton from "../../components/shared/LoadingButton";
 import PendingLink from "../../components/shared/PendingLink";
 import StepFlow from "../../components/shared/StepFlow";
 import LiquidSportText from "../../components/home/LiquidSportText";
+import { verifyImageActionPin } from "../../lib/image-pin-client";
+import {
+  clearPendingSessionImage,
+  getPendingSessionImage,
+  clearPendingSessionImageNotice,
+  setPendingSessionImageNotice,
+  PENDING_SESSION_IMAGE_KEY,
+  uploadSessionImageFileToDraftSession,
+  uploadStoredPendingSessionImageToDraftSession,
+} from "../../lib/pending-session-image";
 import {
   compressMatchImage,
   getAcceptedMatchImageTypes,
 } from "../../components/match/match-image-client";
 
-const PENDING_SESSION_IMAGE_KEY = "gv-pending-session-image";
 const getDraftTokenKey = (sessionId) => `session_${sessionId}_draftToken`;
+const IMAGE_UPLOAD_TIMEOUT_MS = 45000;
+const IMAGE_UPLOAD_FALLBACK_NOTICE =
+  "Match image could not upload yet. Match setup can continue.";
 
 export default function NewSessionPage() {
   const [name, setName] = useState("");
   const [selectedFileName, setSelectedFileName] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
   const [saving, setSaving] = useState(false);
+  const [savingLabel, setSavingLabel] = useState("Creating...");
   const [error, setError] = useState("");
   const [pendingImageFile, setPendingImageFile] = useState(null);
+  const [preparedImageFile, setPreparedImageFile] = useState(null);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const fileInputRef = useRef(null);
   const router = useRouter();
@@ -34,9 +48,8 @@ export default function NewSessionPage() {
     if (!file) {
       setSelectedFileName("");
       setPreviewUrl("");
-      if (typeof window !== "undefined") {
-        window.sessionStorage.removeItem(PENDING_SESSION_IMAGE_KEY);
-      }
+      setPreparedImageFile(null);
+      clearPendingSessionImage();
       return;
     }
 
@@ -56,16 +69,10 @@ export default function NewSessionPage() {
       throw new Error("Choose an image first.");
     }
 
-    const response = await fetch("/api/media/pin-check", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pin }),
+    await verifyImageActionPin({
+      pin,
+      usesManagePin: false,
     });
-    const payload = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(payload.message || "Incorrect PIN.");
-    }
 
     const compressedFile = await compressMatchImage(pendingImageFile);
     const dataUrl = await new Promise((resolve, reject) => {
@@ -76,18 +83,23 @@ export default function NewSessionPage() {
     });
 
     if (typeof window !== "undefined") {
-      window.sessionStorage.setItem(
-        PENDING_SESSION_IMAGE_KEY,
-        JSON.stringify({
-          fileName: compressedFile.name,
-          type: compressedFile.type,
-          dataUrl,
-        })
-      );
+      try {
+        window.sessionStorage.setItem(
+          PENDING_SESSION_IMAGE_KEY,
+          JSON.stringify({
+            fileName: compressedFile.name,
+            type: compressedFile.type,
+            dataUrl,
+          })
+        );
+      } catch {
+        // Keep the selected file in memory even if sessionStorage is full.
+      }
     }
 
     setSelectedFileName(pendingImageFile.name);
     setPreviewUrl(dataUrl);
+    setPreparedImageFile(compressedFile);
     setPendingImageFile(null);
     setIsPinModalOpen(false);
   };
@@ -96,14 +108,66 @@ export default function NewSessionPage() {
     setPendingImageFile(null);
     setSelectedFileName("");
     setPreviewUrl("");
+    setPreparedImageFile(null);
     setIsPinModalOpen(false);
     setError("");
-    if (typeof window !== "undefined") {
-      window.sessionStorage.removeItem(PENDING_SESSION_IMAGE_KEY);
-    }
+    clearPendingSessionImage();
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+  };
+
+  const uploadPendingImageBeforeContinue = async (session) => {
+    if (!session?.draftToken || !session?._id || typeof window === "undefined") {
+      return;
+    }
+
+    const storedPendingImage = getPendingSessionImage();
+    if (!(preparedImageFile instanceof File) && !storedPendingImage?.dataUrl) {
+      return;
+    }
+
+    let lastError = null;
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => {
+        controller.abort();
+      }, IMAGE_UPLOAD_TIMEOUT_MS);
+
+      try {
+        setSavingLabel(attempt === 0 ? "Saving image..." : "Retrying image...");
+        if (preparedImageFile instanceof File) {
+          await uploadSessionImageFileToDraftSession({
+            sessionId: String(session._id),
+            draftToken: String(session.draftToken),
+            file: preparedImageFile,
+            signal: controller.signal,
+          });
+          clearPendingSessionImage();
+          setPreparedImageFile(null);
+          return;
+        }
+
+        const didUpload = await uploadStoredPendingSessionImageToDraftSession({
+          sessionId: String(session._id),
+          draftToken: String(session.draftToken),
+          signal: controller.signal,
+        });
+
+        if (didUpload) {
+          return;
+        }
+      } catch (caughtError) {
+        lastError = caughtError;
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    }
+
+    throw new Error(
+      lastError?.message || "Could not save the match image. Try again."
+    );
   };
 
   const createSession = async () => {
@@ -115,6 +179,9 @@ export default function NewSessionPage() {
     }
 
     setSaving(true);
+    setSavingLabel("Creating...");
+
+    let createdSession = null;
 
     try {
       const res = await fetch("/api/sessions", {
@@ -131,17 +198,46 @@ export default function NewSessionPage() {
       }
 
       const session = await res.json();
+      createdSession = session;
       if (typeof window !== "undefined" && session?.draftToken && session?._id) {
         window.sessionStorage.setItem(
           getDraftTokenKey(session._id),
           String(session.draftToken)
         );
       }
+
+      try {
+        await uploadPendingImageBeforeContinue(session);
+        clearPendingSessionImageNotice(session._id);
+      } catch (imageUploadError) {
+        setPendingSessionImageNotice(
+          session._id,
+          imageUploadError?.message || IMAGE_UPLOAD_FALLBACK_NOTICE
+        );
+      }
+
       router.push(`/teams/${session._id}`);
     } catch (caughtError) {
+      if (
+        createdSession?._id &&
+        createdSession?.draftToken &&
+        typeof window !== "undefined"
+      ) {
+        window.sessionStorage.removeItem(getDraftTokenKey(createdSession._id));
+        clearPendingSessionImageNotice(createdSession._id);
+        void fetch(`/api/sessions/${createdSession._id}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            draftToken: String(createdSession.draftToken),
+          }),
+          keepalive: true,
+        }).catch(() => {});
+      }
       setError(caughtError.message);
     } finally {
       setSaving(false);
+      setSavingLabel("Creating...");
     }
   };
 
@@ -210,7 +306,7 @@ export default function NewSessionPage() {
                   htmlFor="session-image"
                   className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500"
                 >
-                  Team Picture
+                  Match Image
                 </label>
                 <div className="relative rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                   <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
@@ -221,12 +317,15 @@ export default function NewSessionPage() {
                       className="press-feedback inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.08]"
                     >
                       <FaImage className="text-zinc-400" />
-                      Add team picture
+                      Add match image
                     </label>
                     {selectedFileName ? (
                       <div className="w-full min-w-0">
                         <p className="truncate text-sm text-zinc-400">
                           {selectedFileName}
+                        </p>
+                        <p className="mt-1 text-xs font-medium text-emerald-300/80">
+                          Saves with this game.
                         </p>
                       </div>
                     ) : null}
@@ -261,7 +360,7 @@ export default function NewSessionPage() {
             <LoadingButton
               onClick={createSession}
               loading={saving}
-              pendingLabel="Creating..."
+              pendingLabel={savingLabel}
               trailingIcon={<FaArrowRight />}
               className="relative mt-8 inline-flex w-full items-center justify-center gap-3 rounded-[24px] border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(11,15,24,0.98),rgba(6,8,14,0.98))] px-6 py-4 text-lg font-semibold text-white shadow-[0_18px_40px_rgba(0,0,0,0.28),0_0_0_1px_rgba(34,211,238,0.06)] transition hover:border-cyan-200/24 hover:bg-[linear-gradient(180deg,rgba(12,18,28,0.98),rgba(7,10,16,0.98))]"
             >
@@ -275,10 +374,13 @@ export default function NewSessionPage() {
       </div>
       <ImagePinModal
         isOpen={isPinModalOpen}
-        title="Add team picture"
-        subtitle="Enter the 4-digit PIN before adding a session cover image."
+        title="Add Match Image"
+        subtitle="Enter the 4-digit PIN before adding this match image."
         confirmLabel="Use this image"
         showContinueWithout={true}
+        digitCount={4}
+        pinLabel="4-digit PIN"
+        placeholder="0000"
         onConfirm={handleConfirmImagePin}
         onContinueWithout={handleContinueWithoutImage}
         onClose={handleContinueWithoutImage}

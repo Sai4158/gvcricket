@@ -45,6 +45,7 @@ export default function TeamInningsDetail({
   inningsData,
   statusLabel = "",
   targetSummary = "",
+  teamSide = "",
 }) {
   if (!inningsData) return null;
 
@@ -54,8 +55,11 @@ export default function TeamInningsDetail({
     "\n"
   );
   const normalizedTitle = String(title || "").trim().toLowerCase();
-  const isBlueSide = /\bblue\b/.test(normalizedTitle);
+  const normalizedTeamSide = String(teamSide || "").trim().toLowerCase();
+  const isBlueSide =
+    normalizedTeamSide === "blue" || /\bblue\b/.test(normalizedTitle);
   const isRedSide =
+    normalizedTeamSide === "red" ||
     /\bred\b/.test(normalizedTitle) ||
     (!isBlueSide && /\bteam b\b/.test(normalizedTitle));
   const accentStripClass = isRedSide

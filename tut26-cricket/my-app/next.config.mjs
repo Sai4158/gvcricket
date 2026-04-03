@@ -1,7 +1,9 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildSecurityHeaders } from "./security-headers.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const sharedSecurityHeaders = buildSecurityHeaders();
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -9,6 +11,10 @@ const nextConfig = {
   poweredByHeader: false,
   async headers() {
     return [
+      {
+        source: "/:path*",
+        headers: sharedSecurityHeaders,
+      },
       {
         source: "/videos/:path*",
         headers: [

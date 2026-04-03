@@ -16,7 +16,7 @@ import {
 import { hydrateLegacyTossState } from "../../../../lib/match-toss";
 import { pinPayloadSchema } from "../../../../lib/validators";
 import { getRequestMeta } from "../../../../lib/request-meta";
-import { enforceRateLimit } from "../../../../lib/rate-limit";
+import { enforceSmartPinRateLimit } from "../../../../lib/pin-attempt-server";
 import { ensureSameOrigin, parseJsonRequest } from "../../../../lib/request-security";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
@@ -89,11 +89,11 @@ export async function GET(_req, { params }) {
 export async function POST(req, { params }) {
   const { id } = await params;
   const meta = getRequestMeta(req);
-  const pinAttemptLimit = enforceRateLimit({
+  const pinAttemptLimit = enforceSmartPinRateLimit({
     key: `pin-attempt:${id}:${meta.ip}`,
-    limit: 5,
-    windowMs: 5 * 60 * 1000,
-    blockMs: 2 * 60 * 1000,
+    longLimit: 5,
+    longWindowMs: 5 * 60 * 1000,
+    longBlockMs: 2 * 60 * 1000,
   });
 
   if (!pinAttemptLimit.allowed) {

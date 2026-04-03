@@ -331,7 +331,7 @@ export default function useLocalMicMonitor() {
     }
   };
 
-  const pause = async () => {
+  const pause = async ({ resumeMedia = false } = {}) => {
     if (!audioContextRef.current || !isActive || isPaused) {
       return false;
     }
@@ -339,6 +339,9 @@ export default function useLocalMicMonitor() {
     try {
       await audioContextRef.current.suspend();
       setIsPaused(true);
+      if (resumeMedia) {
+        restorePageMedia(pausedMediaRef);
+      }
       return true;
     } catch {
       setError("Could not pause the live microphone.");

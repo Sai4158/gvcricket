@@ -14,7 +14,9 @@ import {
   FaArrowLeft,
   FaBroadcastTower,
   FaBullhorn,
+  FaChevronDown,
   FaCompactDisc,
+  FaExternalLinkAlt,
   FaForward,
   FaGripVertical,
   FaHeadphones,
@@ -24,9 +26,13 @@ import {
   FaPause,
   FaPlay,
   FaPowerOff,
+  FaSearch,
   FaStop,
+  FaTrash,
+  FaTimes,
   FaVolumeUp,
   FaWifi,
+  FaYoutube,
 } from "react-icons/fa";
 import LiquidSportText from "../home/LiquidSportText";
 import SessionCoverHero from "../shared/SessionCoverHero";
@@ -40,11 +46,13 @@ import { WalkieNotice, WalkieTalkButton } from "../live/WalkiePanel";
 import { buildCurrentScoreAnnouncement } from "../../lib/live-announcements";
 import { getBattingTeamBundle } from "../../lib/team-utils";
 import {
+  readWalkieDevicePreference,
   didSharedWalkieDisable,
   didSharedWalkieEnable,
   getNonUmpireWalkieUiState,
   getNonUmpireWalkieToggleAction,
   NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT,
+  writeWalkieDevicePreference,
 } from "../../lib/walkie-device-state";
 import { getWalkieRemoteSpeakerState } from "../../lib/walkie-ui";
 import {
@@ -59,23 +67,467 @@ import {
   subscribeUiAudioUnlock,
 } from "../../lib/page-audio";
 import { countLegalBalls } from "../../lib/match-scoring";
+import {
+  buildPinRequestError,
+  clearClientPinRateLimit,
+  registerClientPinFailure,
+  useClientPinRateLimit,
+} from "../../lib/pin-attempt-client";
+import {
+  filterSoundEffectsByQuery,
+  readCachedSoundEffectsLibrary as readSharedSoundEffectsLibrary,
+  readCachedSoundEffectsOrder as readSharedSoundEffectsOrder,
+  subscribeSoundEffectsLibrarySync,
+  writeCachedSoundEffectsLibrary as writeSharedSoundEffectsLibrary,
+  writeCachedSoundEffectsOrder as writeSharedSoundEffectsOrder,
+} from "../../lib/sound-effects-client";
 
-const DIRECTOR_AUDIO_LIBRARY_CACHE_KEY = "gv-director-audio-library-v1";
 const DIRECTOR_AUDIO_METADATA_CACHE_KEY = "gv-director-audio-metadata-v1";
 const DIRECTOR_SESSIONS_CACHE_KEY = "gv-director-sessions-v1";
-const DIRECTOR_AUDIO_LIBRARY_CACHE_TTL_MS = 10 * 60 * 1000;
 const DIRECTOR_AUDIO_ORDER_SAVE_DELAY_MS = 20_000;
+const DIRECTOR_SESSIONS_REFRESH_MIN_GAP_MS = 1500;
+const DIRECTOR_YOUTUBE_TRACKS_CACHE_KEY = "gv-director-youtube-tracks-v1";
+const DIRECTOR_PREFERRED_SESSION_STORAGE_KEY = "gv-director-preferred-session-v1";
+const DIRECTOR_YOUTUBE_PLAYLIST_IMPORT_LIMIT = 40;
 let directorAudioLibraryMemoryCache = null;
 let directorAudioLibraryPromise = null;
 let directorSessionsMemoryCache = null;
 let directorAudioMetadataMemoryCache = {};
+let directorYouTubeApiPromise = null;
+
+function buildYouTubeWatchUrl(videoId) {
+  return `https://www.youtube.com/watch?v=${videoId}`;
+}
+
+function buildYouTubeThumbnailUrl(videoId) {
+  return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+}
+
+function extractYouTubePlaylistId(input) {
+  const rawValue = String(input || "").trim();
+  if (!rawValue) {
+    return "";
+  }
+
+  try {
+    const parsed = new URL(rawValue);
+    const host = parsed.hostname.replace(/^www\./, "");
+
+    if (
+      host === "youtube.com" ||
+      host === "m.youtube.com" ||
+      host === "youtu.be"
+    ) {
+      const playlistId = String(parsed.searchParams.get("list") || "").trim();
+      if (/^[a-zA-Z0-9_-]{10,}$/.test(playlistId)) {
+        return playlistId;
+      }
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function extractYouTubeVideoId(input) {
+  const rawValue = String(input || "").trim();
+  if (!rawValue) {
+    return "";
+  }
+
+  const directIdMatch = rawValue.match(/^[a-zA-Z0-9_-]{11}$/);
+  if (directIdMatch) {
+    return directIdMatch[0];
+  }
+
+  try {
+    const parsed = new URL(rawValue);
+    const host = parsed.hostname.replace(/^www\./, "");
+
+    if (host === "youtu.be") {
+      return parsed.pathname.replace(/\//g, "").slice(0, 11);
+    }
+
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      if (parsed.pathname === "/watch") {
+        return String(parsed.searchParams.get("v") || "").slice(0, 11);
+      }
+
+      if (parsed.pathname.startsWith("/embed/")) {
+        return parsed.pathname.split("/")[2]?.slice(0, 11) || "";
+      }
+
+      if (parsed.pathname.startsWith("/shorts/")) {
+        return parsed.pathname.split("/")[2]?.slice(0, 11) || "";
+      }
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function normalizeDirectorYouTubeTrack(track, index = 0) {
+  const videoId = extractYouTubeVideoId(track?.videoId || track?.url || "");
+  if (!videoId) {
+    return null;
+  }
+
+  const safeName = String(track?.name || "").trim() || `Video ${index + 1}`;
+
+  return {
+    id: String(track?.id || `yt-${videoId}`),
+    name: safeName,
+    videoId,
+    url: buildYouTubeWatchUrl(videoId),
+    playlistId: String(track?.playlistId || "").trim(),
+    playlistPosition: Number.isFinite(track?.playlistPosition)
+      ? Number(track.playlistPosition)
+      : index,
+    thumbnailUrl:
+      String(track?.thumbnailUrl || "").trim() || buildYouTubeThumbnailUrl(videoId),
+  };
+}
+
+function readCachedDirectorYouTubeTracks() {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const cachedValue = window.localStorage.getItem(
+      DIRECTOR_YOUTUBE_TRACKS_CACHE_KEY,
+    );
+    if (!cachedValue) {
+      return [];
+    }
+
+    const parsed = JSON.parse(cachedValue);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .map((track, index) => normalizeDirectorYouTubeTrack(track, index))
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function readStoredDirectorPreferredSessionId() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  try {
+    return String(
+      window.localStorage.getItem(DIRECTOR_PREFERRED_SESSION_STORAGE_KEY) || "",
+    ).trim();
+  } catch {
+    return "";
+  }
+}
+
+function writeStoredDirectorPreferredSessionId(sessionId) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const normalizedSessionId = String(sessionId || "").trim();
+
+  try {
+    if (!normalizedSessionId) {
+      window.localStorage.removeItem(DIRECTOR_PREFERRED_SESSION_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(
+      DIRECTOR_PREFERRED_SESSION_STORAGE_KEY,
+      normalizedSessionId,
+    );
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function writeCachedDirectorYouTubeTracks(tracks) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      DIRECTOR_YOUTUBE_TRACKS_CACHE_KEY,
+      JSON.stringify(Array.isArray(tracks) ? tracks : []),
+    );
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+async function resolveDirectorYouTubeTrack(input) {
+  const videoId = extractYouTubeVideoId(input);
+  if (!videoId) {
+    throw new Error("Paste a valid YouTube link.");
+  }
+
+  const track = {
+    id: `yt-${videoId}`,
+    name: `YouTube ${videoId}`,
+    videoId,
+    url: buildYouTubeWatchUrl(videoId),
+    thumbnailUrl: buildYouTubeThumbnailUrl(videoId),
+    playlistId: "",
+    playlistPosition: 0,
+  };
+
+  try {
+    const response = await fetch(
+      `https://www.youtube.com/oembed?url=${encodeURIComponent(
+        track.url,
+      )}&format=json`,
+      {
+        cache: "no-store",
+      },
+    );
+
+    if (response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      const resolvedName = String(payload?.title || "").trim();
+      const resolvedThumbnail = String(payload?.thumbnail_url || "").trim();
+      if (resolvedName) {
+        track.name = resolvedName;
+      }
+      if (resolvedThumbnail) {
+        track.thumbnailUrl = resolvedThumbnail;
+      }
+    }
+  } catch {
+    // Keep the fallback title and thumbnail.
+  }
+
+  return track;
+}
+
+async function resolveDirectorYouTubePlaylist(input) {
+  const playlistId = extractYouTubePlaylistId(input);
+  if (!playlistId) {
+    throw new Error("Paste a valid YouTube playlist link.");
+  }
+
+  const YT = await loadDirectorYouTubeIframeApi();
+  if (typeof document === "undefined") {
+    throw new Error("This browser cannot load playlists right now.");
+  }
+
+  const mountNode = document.createElement("div");
+  mountNode.style.position = "fixed";
+  mountNode.style.left = "-9999px";
+  mountNode.style.top = "0";
+  mountNode.style.width = "1px";
+  mountNode.style.height = "1px";
+  mountNode.style.opacity = "0";
+  document.body.appendChild(mountNode);
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let pollTimer = 0;
+    let timeoutTimer = 0;
+    let player = null;
+
+    const cleanup = () => {
+      if (pollTimer) {
+        window.clearInterval(pollTimer);
+      }
+      if (timeoutTimer) {
+        window.clearTimeout(timeoutTimer);
+      }
+      try {
+        player?.destroy();
+      } catch {
+        // Ignore cleanup failures.
+      }
+      mountNode.remove();
+    };
+
+    const finish = (videoIds) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      const uniqueIds = Array.from(
+        new Set(
+          (Array.isArray(videoIds) ? videoIds : []).filter((videoId) =>
+            /^[a-zA-Z0-9_-]{11}$/.test(String(videoId || "")),
+          ),
+        ),
+      );
+      const limitedIds = uniqueIds.slice(0, DIRECTOR_YOUTUBE_PLAYLIST_IMPORT_LIMIT);
+      cleanup();
+
+      if (!limitedIds.length) {
+        reject(new Error("No playable videos were found in that playlist."));
+        return;
+      }
+
+      resolve({
+        playlistId,
+        importedCount: limitedIds.length,
+        totalCount: uniqueIds.length,
+        tracks: limitedIds.map((videoId, index) => ({
+          id: `yt-${playlistId}-${videoId}`,
+          name: `Playlist track ${index + 1}`,
+          videoId,
+          url: buildYouTubeWatchUrl(videoId),
+          thumbnailUrl: buildYouTubeThumbnailUrl(videoId),
+          playlistId,
+          playlistPosition: index,
+        })),
+      });
+    };
+
+    const maybeResolvePlaylist = () => {
+      try {
+        const videoIds = player?.getPlaylist?.();
+        if (Array.isArray(videoIds) && videoIds.length) {
+          finish(videoIds);
+        }
+      } catch {
+        // Wait for the next tick while the player warms up.
+      }
+    };
+
+    timeoutTimer = window.setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      reject(new Error("This YouTube playlist took too long to load."));
+    }, 12000);
+
+    player = new YT.Player(mountNode, {
+      height: "1",
+      width: "1",
+      host: "https://www.youtube-nocookie.com",
+      playerVars: {
+        autoplay: 0,
+        controls: 0,
+        rel: 0,
+        playsinline: 1,
+        listType: "playlist",
+        list: playlistId,
+      },
+      events: {
+        onReady: (event) => {
+          try {
+            event.target.cuePlaylist({
+              listType: "playlist",
+              list: playlistId,
+              index: 0,
+            });
+          } catch {
+            try {
+              event.target.cuePlaylist(playlistId, 0, 0);
+            } catch {
+              // Fall through to polling.
+            }
+          }
+          maybeResolvePlaylist();
+          pollTimer = window.setInterval(maybeResolvePlaylist, 140);
+        },
+        onStateChange: maybeResolvePlaylist,
+        onError: () => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          cleanup();
+          reject(new Error("This YouTube playlist could not be loaded."));
+        },
+      },
+    });
+  });
+}
+
+function loadDirectorYouTubeIframeApi() {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("Window unavailable."));
+  }
+
+  if (window.YT?.Player) {
+    return Promise.resolve(window.YT);
+  }
+
+  if (directorYouTubeApiPromise) {
+    return directorYouTubeApiPromise;
+  }
+
+  directorYouTubeApiPromise = new Promise((resolve, reject) => {
+    let pollTimer = 0;
+    let timeoutTimer = 0;
+
+    const cleanup = () => {
+      if (pollTimer) {
+        window.clearInterval(pollTimer);
+      }
+      if (timeoutTimer) {
+        window.clearTimeout(timeoutTimer);
+      }
+    };
+
+    const resolveIfReady = () => {
+      if (window.YT?.Player) {
+        cleanup();
+        resolve(window.YT);
+        return true;
+      }
+      return false;
+    };
+
+    const previousReady = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      previousReady?.();
+      resolveIfReady();
+    };
+
+    const existingScript = document.querySelector(
+      'script[src="https://www.youtube.com/iframe_api"]',
+    );
+
+    pollTimer = window.setInterval(() => {
+      void resolveIfReady();
+    }, 120);
+    timeoutTimer = window.setTimeout(() => {
+      cleanup();
+      directorYouTubeApiPromise = null;
+      reject(new Error("YouTube player timed out while loading."));
+    }, 12_000);
+
+    if (existingScript) {
+      void resolveIfReady();
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    script.async = true;
+    script.onerror = () => {
+      cleanup();
+      directorYouTubeApiPromise = null;
+      reject(new Error("YouTube player script could not load."));
+    };
+    document.head.appendChild(script);
+  });
+
+  return directorYouTubeApiPromise;
+}
 
 function serializeOrder(order) {
   return JSON.stringify(Array.isArray(order) ? order : []);
-}
-
-function getDirectorAudioOrderStorageKey(sessionId) {
-  return "gv-director-audio-order:global";
 }
 
 function readCachedDirectorSessions() {
@@ -127,38 +579,9 @@ function writeCachedDirectorSessions(sessions) {
 }
 
 function readCachedDirectorAudioLibrary() {
-  if (directorAudioLibraryMemoryCache?.length) {
-    return directorAudioLibraryMemoryCache;
-  }
-
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    const cachedValue = window.localStorage.getItem(
-      DIRECTOR_AUDIO_LIBRARY_CACHE_KEY,
-    );
-    if (!cachedValue) {
-      return [];
-    }
-
-    const parsed = JSON.parse(cachedValue);
-    const savedAt = Number(parsed?.savedAt || 0);
-    const files = Array.isArray(parsed?.files) ? parsed.files : [];
-    if (!files.length) {
-      return [];
-    }
-
-    if (savedAt && Date.now() - savedAt > DIRECTOR_AUDIO_LIBRARY_CACHE_TTL_MS) {
-      return [];
-    }
-
-    directorAudioLibraryMemoryCache = files;
-    return files;
-  } catch {
-    return [];
-  }
+  const files = readSharedSoundEffectsLibrary();
+  directorAudioLibraryMemoryCache = files;
+  return files;
 }
 
 function writeCachedDirectorAudioLibrary(files) {
@@ -167,22 +590,7 @@ function writeCachedDirectorAudioLibrary(files) {
   }
 
   directorAudioLibraryMemoryCache = files;
-
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(
-      DIRECTOR_AUDIO_LIBRARY_CACHE_KEY,
-      JSON.stringify({
-        savedAt: Date.now(),
-        files,
-      }),
-    );
-  } catch {
-    // Ignore storage failures and keep the in-memory cache.
-  }
+  writeSharedSoundEffectsLibrary(files);
 }
 
 function createSpeechSettings() {
@@ -304,6 +712,45 @@ function getPreferredLiveSessionId(sessions, preferredSessionId = "") {
     : null;
   const firstLive = nextSessions.find((item) => item.isLive);
   return preferredLive?.session?._id || firstLive?.session?._id || "";
+}
+
+export function resolveDirectorAutoManageSessionId(
+  sessions,
+  {
+    preferredSessionId = "",
+    selectedSessionId = "",
+    autoManageRequested = false,
+  } = {},
+) {
+  const liveSessions = (Array.isArray(sessions) ? sessions : []).filter(
+    (item) => item?.isLive && item?.session?._id,
+  );
+
+  if (!liveSessions.length) {
+    return "";
+  }
+
+  const preferredLive = preferredSessionId
+    ? liveSessions.find((item) => item.session?._id === preferredSessionId)
+    : null;
+  if (preferredLive?.session?._id) {
+    return preferredLive.session._id;
+  }
+
+  if (autoManageRequested && selectedSessionId) {
+    const selectedLive = liveSessions.find(
+      (item) => item.session?._id === selectedSessionId,
+    );
+    if (selectedLive?.session?._id) {
+      return selectedLive.session._id;
+    }
+  }
+
+  if (liveSessions.length === 1) {
+    return liveSessions[0].session._id;
+  }
+
+  return "";
 }
 
 function formatAudioTime(seconds) {
@@ -654,15 +1101,35 @@ export default function DirectorConsoleClient({
   initialAutoManage = false,
 }) {
   const router = useRouter();
+  const rememberedPreferredSessionId =
+    initialPreferredSessionId || readStoredDirectorPreferredSessionId();
   const initialTargetSessionId = getPreferredLiveSessionId(
     initialSessions,
-    initialPreferredSessionId,
+    rememberedPreferredSessionId,
   );
+  const initialManagedWalkieSession =
+    initialAuthorized && initialAutoManage && initialTargetSessionId
+      ? initialSessions.find(
+          (item) => item.session?._id === initialTargetSessionId,
+        ) || null
+      : null;
+  const initialDirectorWalkiePreferenceScope =
+    initialManagedWalkieSession?.match?._id ||
+    initialManagedWalkieSession?.session?._id ||
+    initialTargetSessionId ||
+    "";
   const [authorized, setAuthorized] = useState(Boolean(initialAuthorized));
   const [sessions, setSessions] = useState(initialSessions || []);
   const [pin, setPin] = useState("");
   const [authError, setAuthError] = useState("");
   const [isSubmittingPin, setIsSubmittingPin] = useState(false);
+  const directorPinRateLimit = useClientPinRateLimit(
+    "director-auth",
+    !authorized,
+  );
+  const directorPinError = directorPinRateLimit.isBlocked
+    ? directorPinRateLimit.message
+    : authError;
   const [showDirectorPinStep, setShowDirectorPinStep] = useState(
     Boolean(initialAutoManage && initialTargetSessionId && !initialAuthorized),
   );
@@ -678,7 +1145,14 @@ export default function DirectorConsoleClient({
   const [musicTracks, setMusicTracks] = useState([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [musicState, setMusicState] = useState("idle");
+  const [directorAudioMode, setDirectorAudioMode] = useState("cut");
   const [musicVolume, setMusicVolume] = useState(0.8);
+  const [musicInput, setMusicInput] = useState("");
+  const [isAddingMusicTrack, setIsAddingMusicTrack] = useState(false);
+  const [hasLoadedMusicTracks, setHasLoadedMusicTracks] = useState(false);
+  const [musicPlayerReady, setMusicPlayerReady] = useState(false);
+  const [musicPlayerError, setMusicPlayerError] = useState("");
+  const [musicPlayerBootNonce, setMusicPlayerBootNonce] = useState(0);
   const [masterVolume, setMasterVolume] = useState(1);
   const [speakerDeviceId, setSpeakerDeviceId] = useState("default");
   const [speakerDevices, setSpeakerDevices] = useState([]);
@@ -687,24 +1161,35 @@ export default function DirectorConsoleClient({
   const [musicMessage, setMusicMessage] = useState("");
   const [directorHoldLive, setDirectorHoldLive] = useState(false);
   const [directorSpeakerOn, setDirectorSpeakerOn] = useState(false);
-  const [directorWalkieOn, setDirectorWalkieOn] = useState(false);
+  const [directorWalkieOn, setDirectorWalkieOn] = useState(() =>
+    readWalkieDevicePreference({
+      role: "director",
+      scopeId: initialDirectorWalkiePreferenceScope,
+      fallback: false,
+    }),
+  );
   const [directorWalkieNotice, setDirectorWalkieNotice] = useState("");
   const [libraryFiles, setLibraryFiles] = useState([]);
+  const [librarySearchQuery, setLibrarySearchQuery] = useState("");
   const [libraryOrder, setLibraryOrder] = useState([]);
   const [libraryDurations, setLibraryDurations] = useState({});
   const [libraryCurrentTime, setLibraryCurrentTime] = useState(0);
   const [libraryLiveId, setLibraryLiveId] = useState("");
   const [libraryState, setLibraryState] = useState("idle");
+  const [libraryPanelOpen, setLibraryPanelOpen] = useState(true);
   const [effectsNeedsUnlock, setEffectsNeedsUnlock] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(() => isUiAudioUnlocked());
   const [draggingLibraryId, setDraggingLibraryId] = useState("");
   const [libraryDropTargetId, setLibraryDropTargetId] = useState("");
-  const preferredSessionIdRef = useRef(initialPreferredSessionId || "");
+  const preferredSessionIdRef = useRef(rememberedPreferredSessionId || "");
   const pendingInitialManageRef = useRef(Boolean(initialAutoManage));
   const pendingLibraryOrderRef = useRef(null);
   const libraryOrderSaveTimerRef = useRef(null);
   const lastPersistedLibraryOrderRef = useRef(serializeOrder([]));
+  const musicTrackRowRefs = useRef(new Map());
   const audioRef = useRef(null);
+  const youtubePlayerHostRef = useRef(null);
+  const youtubePlayerRef = useRef(null);
   const effectsAudioRef = useRef(null);
   const bufferedEffectPlaybackRef = useRef(null);
   const bufferedEffectTimerRef = useRef(null);
@@ -712,23 +1197,43 @@ export default function DirectorConsoleClient({
   const directorMicHoldingRef = useRef(false);
   const previousDirectorWalkieEnabledRef = useRef(false);
   const previousDirectorWalkieRequestStateRef = useRef("idle");
+  const directorWalkiePreferenceScopeRef = useRef(
+    initialDirectorWalkiePreferenceScope,
+  );
+  const directorWalkiePreferenceHydratingRef = useRef(false);
   const previousManagedMatchIdRef = useRef("");
   const directorWalkieNoticeTimerRef = useRef(null);
   const effectPlayRequestRef = useRef(0);
+  const effectPrimeRequestRef = useRef(null);
+  const playEffectRef = useRef(null);
+  const musicResumeTimerRef = useRef(null);
   const musicUrlsRef = useRef([]);
+  const musicTracksRef = useRef([]);
+  const currentTrackIndexRef = useRef(0);
+  const loadedMusicVideoIdRef = useRef("");
+  const pendingMusicAutoplayRef = useRef(false);
   const cachedEffectUrlRef = useRef(new Map());
   const musicEffectDuckFactorRef = useRef(1);
   const musicDuckAnimationFrameRef = useRef(0);
+  const sharedBoundaryDuckTimerRef = useRef(null);
+  const sharedBoundaryEffectActiveRef = useRef(false);
   const ambientAudioSessionTypeRef = useRef("");
   const lastDirectorAnnouncedLiveEventRef = useRef("");
+  const lastHandledSharedSoundEffectEventRef = useRef("");
+  const lastHandledBoundarySoundEffectEventRef = useRef("");
+  const soundEffectPlaybackCutoffRef = useRef(0);
+  const directorSessionsRefreshPromiseRef = useRef(null);
+  const lastDirectorSessionsRefreshAtRef = useRef(0);
   const pendingDirectorAnnouncementRef = useRef(null);
   const libraryPointerDragRef = useRef({
     pointerId: null,
     activeId: "",
     targetId: "",
   });
+  const libraryLoadTimeoutRef = useRef(null);
   const [speechSettings, setSpeechSettings] = useState(createSpeechSettings);
   const speech = useSpeechAnnouncer(speechSettings);
+  const stopDirectorSpeech = speech.stop;
   const micMonitor = useLocalMicMonitor();
   const iOSSafari = useMemo(() => isIOSSafari(), []);
   const usePointerLibraryReorder = useMemo(() => {
@@ -741,6 +1246,110 @@ export default function DirectorConsoleClient({
         window.navigator?.maxTouchPoints > 0,
     );
   }, []);
+  const currentTrack = musicTracks[currentTrackIndex];
+  const isPlaylistInput = useMemo(
+    () => Boolean(extractYouTubePlaylistId(musicInput)),
+    [musicInput],
+  );
+
+  const getDirectorBoundaryDuckWindowMs = useCallback(
+    (liveEvent) => {
+      const preDelayMs = Math.max(
+        0,
+        Number(liveEvent?.preAnnouncementDelayMs || 0),
+      );
+      const durationKey = String(
+        liveEvent?.effectId || liveEvent?.effectFileName || "",
+      ).trim();
+      const knownDurationMs = durationKey
+        ? Math.round(Number(libraryDurations[durationKey] || 0) * 1000)
+        : 0;
+      const fallbackEffectMs = 2400;
+
+      return Math.max(
+        1200,
+        preDelayMs + (knownDurationMs > 0 ? knownDurationMs : fallbackEffectMs) + 180,
+      );
+    },
+    [libraryDurations],
+  );
+
+  const hydrateImportedMusicTracks = useCallback((tracksToHydrate) => {
+    if (!Array.isArray(tracksToHydrate) || !tracksToHydrate.length) {
+      return;
+    }
+
+    void Promise.allSettled(
+      tracksToHydrate.map(async (track) => {
+        const resolved = await resolveDirectorYouTubeTrack(track.url);
+        return {
+          id: track.id,
+          name: resolved.name,
+          thumbnailUrl: resolved.thumbnailUrl,
+        };
+      }),
+    ).then((results) => {
+      const nextMetadataById = new Map();
+      results.forEach((result) => {
+        if (result.status !== "fulfilled" || !result.value?.id) {
+          return;
+        }
+        nextMetadataById.set(result.value.id, result.value);
+      });
+
+      if (!nextMetadataById.size) {
+        return;
+      }
+
+      setMusicTracks((current) =>
+        current.map((track) => {
+          const metadata = nextMetadataById.get(track.id);
+          return metadata
+            ? {
+                ...track,
+                name: metadata.name || track.name,
+                thumbnailUrl: metadata.thumbnailUrl || track.thumbnailUrl,
+              }
+            : track;
+        }),
+      );
+    });
+  }, []);
+
+  useEffect(() => {
+    setMusicTracks(readCachedDirectorYouTubeTracks());
+    setHasLoadedMusicTracks(true);
+  }, []);
+
+  useEffect(() => {
+    musicTracksRef.current = musicTracks;
+    if (hasLoadedMusicTracks) {
+      writeCachedDirectorYouTubeTracks(musicTracks);
+    }
+  }, [hasLoadedMusicTracks, musicTracks]);
+
+  useEffect(() => {
+    currentTrackIndexRef.current = currentTrackIndex;
+  }, [currentTrackIndex]);
+
+  const handlePasteMusicLink = useCallback(async () => {
+    if (typeof navigator === "undefined" || !navigator.clipboard?.readText) {
+      setMusicMessage("Clipboard paste is not supported here.");
+      return;
+    }
+
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+      if (!String(clipboardText || "").trim()) {
+        setMusicMessage("Clipboard is empty.");
+        return;
+      }
+      setMusicInput(String(clipboardText || "").trim());
+      setMusicMessage("Link pasted.");
+    } catch {
+      setMusicMessage("Could not paste from clipboard.");
+    }
+  }, []);
 
   const cancelMusicDuckAnimation = useCallback(() => {
     if (musicDuckAnimationFrameRef.current) {
@@ -749,10 +1358,14 @@ export default function DirectorConsoleClient({
     }
   }, []);
 
+  const directorMicLive = Boolean(
+    directorHoldLive || (micMonitor.isActive && !micMonitor.isPaused),
+  );
+
   const getBaseMusicVolume = useCallback(() => {
-    const micDuckFactor = micMonitor.isActive ? 0.24 : 1;
+    const micDuckFactor = directorMicLive ? 0.24 : 1;
     return Math.max(0, Math.min(1, musicVolume * masterVolume * micDuckFactor));
-  }, [masterVolume, micMonitor.isActive, musicVolume]);
+  }, [directorMicLive, masterVolume, musicVolume]);
 
   const getMusicTargetVolume = useCallback(
     (duckFactor = musicEffectDuckFactorRef.current) =>
@@ -760,23 +1373,60 @@ export default function DirectorConsoleClient({
     [getBaseMusicVolume],
   );
 
+  const setMusicOutputVolume = useCallback((nextVolume) => {
+    const safeVolume = Math.max(0, Math.min(1, Number(nextVolume) || 0));
+    const audio = audioRef.current;
+    if (audio) {
+      audio.volume = safeVolume;
+    }
+
+    const player = youtubePlayerRef.current;
+    if (player && typeof player.setVolume === "function") {
+      try {
+        player.setVolume(Math.round(safeVolume * 100));
+      } catch {
+        // Ignore YouTube player volume failures.
+      }
+    }
+  }, []);
+
+  const getCurrentMusicOutputVolume = useCallback(() => {
+    const player = youtubePlayerRef.current;
+    if (player && typeof player.getVolume === "function") {
+      try {
+        const playerVolume = Number(player.getVolume());
+        if (Number.isFinite(playerVolume)) {
+          return Math.max(0, Math.min(1, playerVolume / 100));
+        }
+      } catch {
+        // Ignore player volume reads and fall back below.
+      }
+    }
+
+    const audio = audioRef.current;
+    if (audio && Number.isFinite(audio.volume)) {
+      return Math.max(0, Math.min(1, audio.volume));
+    }
+
+    return getMusicTargetVolume();
+  }, [getMusicTargetVolume]);
+
   const applyMusicDuck = useCallback(
     (duckFactor, { durationMs = 220 } = {}) => {
       musicEffectDuckFactorRef.current = duckFactor;
       const audio = audioRef.current;
-      if (!audio) {
+      const player = youtubePlayerRef.current;
+      if (!audio && !player) {
         return;
       }
 
       cancelMusicDuckAnimation();
 
       const targetVolume = getMusicTargetVolume(duckFactor);
-      const startVolume = Number.isFinite(audio.volume)
-        ? audio.volume
-        : targetVolume;
+      const startVolume = getCurrentMusicOutputVolume();
 
       if (durationMs <= 0 || Math.abs(startVolume - targetVolume) < 0.01) {
-        audio.volume = targetVolume;
+        setMusicOutputVolume(targetVolume);
         return;
       }
 
@@ -784,7 +1434,9 @@ export default function DirectorConsoleClient({
       const step = (now) => {
         const progress = Math.min(1, (now - startTime) / durationMs);
         const eased = 0.5 - Math.cos(progress * Math.PI) / 2;
-        audio.volume = startVolume + (targetVolume - startVolume) * eased;
+        setMusicOutputVolume(
+          startVolume + (targetVolume - startVolume) * eased,
+        );
 
         if (progress < 1) {
           musicDuckAnimationFrameRef.current =
@@ -796,8 +1448,61 @@ export default function DirectorConsoleClient({
 
       musicDuckAnimationFrameRef.current = window.requestAnimationFrame(step);
     },
-    [cancelMusicDuckAnimation, getMusicTargetVolume],
+    [
+      cancelMusicDuckAnimation,
+      getCurrentMusicOutputVolume,
+      getMusicTargetVolume,
+      setMusicOutputVolume,
+    ],
   );
+
+  useEffect(() => {
+    if (!musicTracks.length) {
+      setCurrentTrackIndex(0);
+      loadedMusicVideoIdRef.current = "";
+      setMusicState("idle");
+      return;
+    }
+
+    if (currentTrackIndex >= musicTracks.length) {
+      setCurrentTrackIndex(musicTracks.length - 1);
+    }
+  }, [currentTrackIndex, musicTracks.length]);
+
+  const prepareMusicForDirectorAnnouncement = useCallback(() => {
+    const player = youtubePlayerRef.current;
+    if (!player || !currentTrack) {
+      return;
+    }
+
+    if (directorAudioMode === "duck") {
+      applyMusicDuck(0.14, { durationMs: 180 });
+      return;
+    }
+
+    if (musicState !== "playing") {
+      pendingMusicAutoplayRef.current = false;
+      return;
+    }
+
+    pendingMusicAutoplayRef.current = true;
+    if (musicResumeTimerRef.current) {
+      window.clearTimeout(musicResumeTimerRef.current);
+      musicResumeTimerRef.current = null;
+    }
+    try {
+      player.pauseVideo();
+      setMusicState("paused");
+      setMusicMessage("Paused for score announcement.");
+    } catch {
+      pendingMusicAutoplayRef.current = false;
+    }
+  }, [
+    applyMusicDuck,
+    currentTrack,
+    directorAudioMode,
+    musicState,
+  ]);
 
   const speakDirectorScoreAnnouncement = useCallback(
     (targetMatch, eventId, options = {}) => {
@@ -806,6 +1511,7 @@ export default function DirectorConsoleClient({
         return false;
       }
 
+      prepareMusicForDirectorAnnouncement();
       return speech.speak(announcement, {
         key: `director-auto-score-${eventId || targetMatch._id}`,
         ignoreEnabled: false,
@@ -815,7 +1521,7 @@ export default function DirectorConsoleClient({
         userGesture: Boolean(options.userGesture),
       });
     },
-    [speech],
+    [prepareMusicForDirectorAnnouncement, speech],
   );
 
   const flushPendingDirectorAnnouncement = useCallback(() => {
@@ -849,6 +1555,14 @@ export default function DirectorConsoleClient({
     speechSettings.muted,
   ]);
 
+  const clearSharedBoundaryDuckWindow = useCallback(() => {
+    sharedBoundaryEffectActiveRef.current = false;
+    if (sharedBoundaryDuckTimerRef.current) {
+      window.clearTimeout(sharedBoundaryDuckTimerRef.current);
+      sharedBoundaryDuckTimerRef.current = null;
+    }
+  }, []);
+
   const showTemporaryDirectorWalkieNotice = useCallback(
     (message, duration = 2600) => {
       setDirectorWalkieNotice(message);
@@ -864,6 +1578,10 @@ export default function DirectorConsoleClient({
   );
 
   useEffect(() => subscribeUiAudioUnlock(setAudioUnlocked), []);
+
+  useEffect(() => {
+    soundEffectPlaybackCutoffRef.current = Date.now();
+  }, []);
 
   useEffect(() => {
     if (audioUnlocked) {
@@ -883,12 +1601,14 @@ export default function DirectorConsoleClient({
         window.clearTimeout(directorWalkieNoticeTimerRef.current);
         directorWalkieNoticeTimerRef.current = null;
       }
+      clearSharedBoundaryDuckWindow();
     };
-  }, []);
+  }, [clearSharedBoundaryDuckWindow]);
 
   useEffect(() => {
     if (initialSessions?.length) {
       writeCachedDirectorSessions(initialSessions);
+      lastDirectorSessionsRefreshAtRef.current = Date.now();
     }
   }, [initialSessions]);
 
@@ -910,11 +1630,6 @@ export default function DirectorConsoleClient({
     );
   }, [managedSessionId, sessions]);
 
-  const audioOrderStorageKey = useMemo(
-    () => getDirectorAudioOrderStorageKey(),
-    [],
-  );
-
   const [liveMatch, setLiveMatch] = useState(managedSession?.match || null);
   useEffect(() => {
     const nextManagedMatch = managedSession?.match || null;
@@ -929,6 +1644,16 @@ export default function DirectorConsoleClient({
     pendingDirectorAnnouncementRef.current = null;
     lastDirectorAnnouncedLiveEventRef.current =
       nextManagedMatch?.lastLiveEvent?.id || "";
+    lastHandledSharedSoundEffectEventRef.current =
+      nextManagedMatch?.lastLiveEvent?.type === "sound_effect"
+        ? nextManagedMatch.lastLiveEvent.id || ""
+        : "";
+    lastHandledBoundarySoundEffectEventRef.current =
+      nextManagedMatch?.lastLiveEvent?.type === "sound_effect" &&
+      nextManagedMatch?.lastLiveEvent?.trigger === "score_boundary"
+        ? nextManagedMatch.lastLiveEvent.id || ""
+        : "";
+    clearSharedBoundaryDuckWindow();
 
     if (!nextManagedMatch?._id) {
       setLiveMatch(null);
@@ -938,7 +1663,7 @@ export default function DirectorConsoleClient({
     setLiveMatch((current) =>
       current?._id === nextManagedMatch._id && current ? current : nextManagedMatch,
     );
-  }, [managedSession?.match]);
+  }, [clearSharedBoundaryDuckWindow, managedSession?.match]);
 
   useEffect(() => {
     const firstLive = sessions.find((item) => item.isLive);
@@ -964,13 +1689,21 @@ export default function DirectorConsoleClient({
       setSelectedSessionId(preferredSessionId);
     }
 
-    if (authorized && pendingInitialManageRef.current) {
-      setManagedSessionId(preferredSessionId);
+    const autoManageSessionId = resolveDirectorAutoManageSessionId(sessions, {
+      preferredSessionId,
+      selectedSessionId,
+      autoManageRequested: pendingInitialManageRef.current,
+    });
+
+    if (authorized && !managedSessionId && !showPicker && autoManageSessionId) {
+      preferredSessionIdRef.current = autoManageSessionId;
+      writeStoredDirectorPreferredSessionId(autoManageSessionId);
+      setManagedSessionId(autoManageSessionId);
       setShowPicker(false);
       setAuthError("");
       pendingInitialManageRef.current = false;
     }
-  }, [authorized, selectedSessionId, sessions]);
+  }, [authorized, managedSessionId, selectedSessionId, sessions, showPicker]);
 
   useEffect(() => {
     if (!iOSSafari) {
@@ -1001,34 +1734,59 @@ export default function DirectorConsoleClient({
     if (!authorized) {
       return [];
     }
-    try {
-      const response = await fetch("/api/director/sessions", {
-        cache: "no-store",
-      });
-      const payload = await response.json().catch(() => ({ sessions: [] }));
-      if (!response.ok) {
-        return [];
-      }
-      const nextSessions = Array.isArray(payload.sessions)
-        ? payload.sessions
-        : [];
-      const hasLiveSessions = nextSessions.some((item) => item.isLive);
-      const currentManagedStillLive = Boolean(
-        managedSessionId &&
-          nextSessions.some(
-            (item) => item.session?._id === managedSessionId && item.isLive,
-          ),
-      );
-      writeCachedDirectorSessions(nextSessions);
-      setSessions(nextSessions);
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      return sessions;
+    }
+    if (directorSessionsRefreshPromiseRef.current) {
+      return directorSessionsRefreshPromiseRef.current;
+    }
+    if (Date.now() - lastDirectorSessionsRefreshAtRef.current < DIRECTOR_SESSIONS_REFRESH_MIN_GAP_MS) {
+      return sessions;
+    }
+    directorSessionsRefreshPromiseRef.current = (async () => {
+      try {
+        const response = await fetch("/api/director/sessions", {
+          cache: "no-store",
+        });
+        const payload = await response.json().catch(() => ({ sessions: [] }));
+        if (!response.ok) {
+          return [];
+        }
+        const nextSessions = Array.isArray(payload.sessions)
+          ? payload.sessions
+          : [];
+        const hasLiveSessions = nextSessions.some((item) => item.isLive);
+        const currentManagedStillLive = Boolean(
+          managedSessionId &&
+            nextSessions.some(
+              (item) => item.session?._id === managedSessionId && item.isLive,
+            ),
+        );
+        writeCachedDirectorSessions(nextSessions);
+        setSessions(nextSessions);
 
-      const nextLiveSessionId = getPreferredLiveSessionId(
-        nextSessions,
-        preferredSessionIdRef.current,
-      );
+        const nextLiveSessionId = getPreferredLiveSessionId(
+          nextSessions,
+          preferredSessionIdRef.current,
+        );
 
-      if (nextLiveSessionId) {
-        setSelectedSessionId((current) => {
+        if (nextLiveSessionId) {
+          setSelectedSessionId((current) => {
+            if (
+              current &&
+              nextSessions.some(
+                (item) => item.session?._id === current && item.isLive,
+              )
+            ) {
+              return current;
+            }
+            return nextLiveSessionId;
+          });
+        } else {
+          setSelectedSessionId("");
+        }
+
+        setManagedSessionId((current) => {
           if (
             current &&
             nextSessions.some(
@@ -1037,33 +1795,62 @@ export default function DirectorConsoleClient({
           ) {
             return current;
           }
-          return nextLiveSessionId;
+          return "";
         });
-      } else {
-        setSelectedSessionId("");
-      }
 
-      setManagedSessionId((current) => {
-        if (
-          current &&
-          nextSessions.some(
-            (item) => item.session?._id === current && item.isLive,
-          )
-        ) {
-          return current;
+        if (!hasLiveSessions || (managedSessionId && !currentManagedStillLive)) {
+          setShowPicker(true);
         }
-        return "";
-      });
 
-      if (!hasLiveSessions || (managedSessionId && !currentManagedStillLive)) {
-        setShowPicker(true);
+        lastDirectorSessionsRefreshAtRef.current = Date.now();
+        return nextSessions;
+      } catch {
+        return [];
+      } finally {
+        directorSessionsRefreshPromiseRef.current = null;
+      }
+    })();
+
+    return directorSessionsRefreshPromiseRef.current;
+  }, [authorized, managedSessionId, sessions]);
+
+  const openDirectorSession = useCallback((sessionId) => {
+    const normalizedSessionId = String(sessionId || "").trim();
+    if (!normalizedSessionId) {
+      return;
+    }
+
+    preferredSessionIdRef.current = normalizedSessionId;
+    writeStoredDirectorPreferredSessionId(normalizedSessionId);
+    setSelectedSessionId(normalizedSessionId);
+    setManagedSessionId(normalizedSessionId);
+    setShowPicker(false);
+    setAuthError("");
+  }, []);
+
+  const loadAuthorizedDirectorSessions = useCallback(async () => {
+    try {
+      const response = await fetch("/api/director/sessions", {
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => ({ sessions: [] }));
+
+      if (!response.ok) {
+        return [];
       }
 
+      const nextSessions = Array.isArray(payload.sessions)
+        ? payload.sessions
+        : [];
+      if (nextSessions.length) {
+        writeCachedDirectorSessions(nextSessions);
+      }
+      lastDirectorSessionsRefreshAtRef.current = Date.now();
       return nextSessions;
     } catch {
       return [];
     }
-  }, [authorized, managedSessionId]);
+  }, []);
 
   useEffect(() => {
     if (!authorized) {
@@ -1092,10 +1879,6 @@ export default function DirectorConsoleClient({
 
     void refreshIfActive();
 
-    const intervalId = window.setInterval(() => {
-      void refreshIfActive();
-    }, showPicker || !managedSessionId ? 5000 : 15000);
-
     const handleFocus = () => {
       void refreshIfActive();
     };
@@ -1111,7 +1894,6 @@ export default function DirectorConsoleClient({
 
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
@@ -1123,7 +1905,22 @@ export default function DirectorConsoleClient({
     void refreshDirectorSessions();
   }, [refreshDirectorSessions]);
 
-  const fetchAudioLibrary = useCallback(async () => {
+  const syncLibraryStateFromCache = useCallback(() => {
+    const nextFiles = readCachedDirectorAudioLibrary();
+    const nextOrder = readSharedSoundEffectsOrder();
+    setLibraryFiles(nextFiles);
+    setLibraryOrder(nextOrder);
+    lastPersistedLibraryOrderRef.current = serializeOrder(nextOrder);
+    if (
+      pendingLibraryOrderRef.current &&
+      serializeOrder(pendingLibraryOrderRef.current) ===
+        lastPersistedLibraryOrderRef.current
+    ) {
+      pendingLibraryOrderRef.current = null;
+    }
+  }, []);
+
+  const fetchAudioLibrary = useCallback(async ({ force = false } = {}) => {
     if (directorAudioLibraryPromise) {
       const nextFiles = await directorAudioLibraryPromise;
       setLibraryFiles(nextFiles);
@@ -1132,7 +1929,7 @@ export default function DirectorConsoleClient({
 
     directorAudioLibraryPromise = (async () => {
       const response = await fetch("/api/director/audio-library", {
-        cache: "no-store",
+        cache: force ? "no-store" : "default",
       });
       const payload = await response
         .json()
@@ -1153,16 +1950,7 @@ export default function DirectorConsoleClient({
       ) {
         pendingLibraryOrderRef.current = null;
       }
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(
-            audioOrderStorageKey,
-            JSON.stringify(nextOrder),
-          );
-        } catch {
-          // Ignore storage failures and keep the in-memory order.
-        }
-      }
+      writeSharedSoundEffectsOrder(nextOrder);
       writeCachedDirectorAudioLibrary(nextFiles);
       return nextFiles;
     })();
@@ -1174,36 +1962,20 @@ export default function DirectorConsoleClient({
     } finally {
       directorAudioLibraryPromise = null;
     }
-  }, [audioOrderStorageKey]);
+  }, []);
 
   useEffect(() => {
     const cachedFiles = readCachedDirectorAudioLibrary();
     if (cachedFiles.length) {
       setLibraryFiles(cachedFiles);
-      return;
     }
+  }, []);
 
-    let cancelled = false;
-
-    const loadLibraryOnce = async () => {
-      try {
-        const nextFiles = await fetchAudioLibrary();
-        if (!cancelled) {
-          setLibraryFiles(nextFiles);
-        }
-      } catch {
-        if (!cancelled) {
-          setLibraryFiles((current) => current);
-        }
-      }
-    };
-
-    void loadLibraryOnce();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchAudioLibrary]);
+  useEffect(() => {
+    return subscribeSoundEffectsLibrarySync(() => {
+      syncLibraryStateFromCache();
+    });
+  }, [syncLibraryStateFromCache]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1233,18 +2005,11 @@ export default function DirectorConsoleClient({
     }
 
     try {
-      const rawValue = window.localStorage.getItem(audioOrderStorageKey);
-      if (!rawValue) {
-        setLibraryOrder([]);
-        return;
-      }
-
-      const parsed = JSON.parse(rawValue);
-      setLibraryOrder(Array.isArray(parsed) ? parsed : []);
+      setLibraryOrder(readSharedSoundEffectsOrder());
     } catch {
       setLibraryOrder([]);
     }
-  }, [audioOrderStorageKey]);
+  }, []);
 
   const orderedLibraryFiles = useMemo(() => {
     if (!libraryFiles.length) {
@@ -1274,6 +2039,11 @@ export default function DirectorConsoleClient({
       return left.label.localeCompare(right.label);
     });
   }, [libraryDurations, libraryFiles, libraryOrder]);
+
+  const filteredLibraryFiles = useMemo(
+    () => filterSoundEffectsByQuery(orderedLibraryFiles, librarySearchQuery),
+    [librarySearchQuery, orderedLibraryFiles],
+  );
 
   const clearLibraryOrderSaveTimer = useCallback(() => {
     if (libraryOrderSaveTimerRef.current) {
@@ -1372,20 +2142,10 @@ export default function DirectorConsoleClient({
       setLibraryFiles(nextFiles);
       const nextOrder = nextFiles.map((file) => file.id);
       setLibraryOrder(nextOrder);
-
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(
-            audioOrderStorageKey,
-            JSON.stringify(nextOrder),
-          );
-        } catch {
-          // Ignore storage failures and keep the in-memory order.
-        }
-      }
+      writeSharedSoundEffectsOrder(nextOrder);
       scheduleLibraryOrderPersist(nextOrder);
     },
-    [audioOrderStorageKey, scheduleLibraryOrderPersist],
+    [scheduleLibraryOrderPersist],
   );
 
   useEffect(() => {
@@ -1409,12 +2169,13 @@ export default function DirectorConsoleClient({
 
   useEffect(() => {
     const effectsAudio = effectsAudioRef.current;
+    const musicUrls = musicUrlsRef.current;
 
     return () => {
       clearLibraryOrderSaveTimer();
       void flushPendingLibraryOrder({ useBeacon: true });
       cancelMusicDuckAnimation();
-      musicUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      musicUrls.forEach((url) => URL.revokeObjectURL(url));
       if (effectsAudio) {
         effectsAudio.pause();
         effectsAudio.src = "";
@@ -1651,7 +2412,7 @@ export default function DirectorConsoleClient({
   useEventSource({
     url:
       authorized && managedSession?.match?._id
-        ? `/api/live/matches/${managedSession.match._id}`
+        ? `/api/live/matches/${managedSession.match._id}?history=0`
         : null,
     event: "match",
     enabled: Boolean(authorized && managedSession?.match?._id),
@@ -1692,6 +2453,52 @@ export default function DirectorConsoleClient({
     managedSession?.match?._id &&
     (directorWalkieMatch?.isOngoing ?? managedSession?.isLive),
   );
+  const directorWalkiePreferenceScope =
+    managedSession?.match?._id || managedSession?.session?._id || managedSessionId || "";
+
+  useEffect(() => {
+    if (!directorWalkiePreferenceScope) {
+      directorWalkiePreferenceScopeRef.current = "";
+      directorWalkiePreferenceHydratingRef.current = false;
+      return;
+    }
+
+    if (directorWalkiePreferenceScopeRef.current === directorWalkiePreferenceScope) {
+      return;
+    }
+
+    directorWalkiePreferenceHydratingRef.current = true;
+    directorWalkiePreferenceScopeRef.current = directorWalkiePreferenceScope;
+    const savedPreference = readWalkieDevicePreference({
+      role: "director",
+      scopeId: directorWalkiePreferenceScope,
+      fallback: false,
+    });
+    queueMicrotask(() => {
+      if (
+        directorWalkiePreferenceScopeRef.current === directorWalkiePreferenceScope
+      ) {
+        setDirectorWalkieOn(savedPreference);
+        directorWalkiePreferenceHydratingRef.current = false;
+      }
+    });
+  }, [directorWalkiePreferenceScope]);
+
+  useEffect(() => {
+    if (
+      !directorWalkiePreferenceScope ||
+      directorWalkiePreferenceScopeRef.current !== directorWalkiePreferenceScope ||
+      directorWalkiePreferenceHydratingRef.current
+    ) {
+      return;
+    }
+
+    writeWalkieDevicePreference({
+      role: "director",
+      scopeId: directorWalkiePreferenceScope,
+      enabled: directorWalkieOn,
+    });
+  }, [directorWalkieOn, directorWalkiePreferenceScope]);
 
   const walkie = useWalkieTalkie({
     matchId: managedSession?.match?._id || "",
@@ -1701,11 +2508,10 @@ export default function DirectorConsoleClient({
       ? `${managedSession.session.name} Director`
       : "Director",
     autoConnectAudio: directorWalkieAvailable && directorWalkieOn,
-    signalingActive: directorWalkieAvailable,
+    signalingActive: directorWalkieAvailable && directorWalkieOn,
   });
   const directorWalkieSharedEnabled = Boolean(walkie.snapshot?.enabled);
   const directorWalkieRequestState = walkie.requestState || "idle";
-  const deactivateDirectorWalkieAudio = walkie.deactivateAudio;
 
   const handleDirectorWalkieSwitchChange = useCallback(
     async (nextChecked) => {
@@ -1725,6 +2531,8 @@ export default function DirectorConsoleClient({
       setDirectorWalkieOn(true);
 
       if (action === "enable") {
+        showTemporaryDirectorWalkieNotice("Refreshing walkie signal...", 3200);
+        await walkie.refreshSignal?.({ propagate: false });
         return;
       }
 
@@ -1774,7 +2582,6 @@ export default function DirectorConsoleClient({
       const sharedEnableMessage =
         walkie.nonUmpireUi?.sharedEnableNotice ||
         NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT;
-      setDirectorWalkieOn(true);
       showTemporaryDirectorWalkieNotice(sharedEnableMessage, 3600);
       speech.speak(
         walkie.nonUmpireUi?.sharedEnableAnnouncement ||
@@ -1798,13 +2605,11 @@ export default function DirectorConsoleClient({
         sharedEnabled: directorWalkieSharedEnabled,
       })
     ) {
-      setDirectorWalkieOn(false);
-      void deactivateDirectorWalkieAudio();
+      setDirectorHoldLive(false);
     }
 
     previousDirectorWalkieEnabledRef.current = directorWalkieSharedEnabled;
   }, [
-    deactivateDirectorWalkieAudio,
     directorWalkieSharedEnabled,
     managedSession?.match?._id,
     managedSession?.session?._id,
@@ -1865,6 +2670,7 @@ export default function DirectorConsoleClient({
       Boolean(libraryLiveId) ||
       libraryState === "loading" ||
       libraryState === "playing" ||
+      sharedBoundaryEffectActiveRef.current ||
       Boolean(bufferedEffectPlaybackRef.current);
 
     if (effectIsActive) {
@@ -1899,6 +2705,45 @@ export default function DirectorConsoleClient({
     speechSettings.muted,
   ]);
 
+  useEffect(() => {
+    const targetMatch = getDirectorPreferredMatch(
+      liveMatch,
+      managedSession?.match,
+    );
+    const liveEvent = targetMatch?.lastLiveEvent || null;
+
+    if (
+      !authorized ||
+      !liveEvent?.id ||
+      liveEvent.type !== "sound_effect" ||
+      liveEvent.trigger === "score_boundary"
+    ) {
+      return;
+    }
+
+    if (lastHandledSharedSoundEffectEventRef.current === liveEvent.id) {
+      return;
+    }
+
+    lastHandledSharedSoundEffectEventRef.current = liveEvent.id;
+    const createdAtMs = Date.parse(String(liveEvent.createdAt || ""));
+    if (
+      Number.isFinite(createdAtMs) &&
+      createdAtMs < soundEffectPlaybackCutoffRef.current
+    ) {
+      return;
+    }
+    void playEffectRef.current?.(
+      {
+        id: liveEvent.effectId || liveEvent.effectFileName || liveEvent.id,
+        fileName: liveEvent.effectFileName || liveEvent.effectId || "",
+        label: liveEvent.effectLabel || "Sound effect",
+        src: liveEvent.effectSrc || "",
+      },
+      { toggleIfActive: false },
+    );
+  }, [authorized, liveMatch, managedSession?.match]);
+
   const readCurrentScore = () => {
     const targetMatch = getDirectorPreferredMatch(
       liveMatch,
@@ -1912,6 +2757,7 @@ export default function DirectorConsoleClient({
     void primeUiAudio();
     speech.stop();
     speech.prime({ userGesture: true });
+    prepareMusicForDirectorAnnouncement();
     speech.speak(announcement, {
       key: `director-score-${targetMatch._id}`,
       userGesture: true,
@@ -1922,7 +2768,124 @@ export default function DirectorConsoleClient({
     });
   };
 
+  useEffect(() => {
+    if (directorAudioMode === "duck") {
+      if (speech.status === "speaking") {
+        applyMusicDuck(0.14, { durationMs: 180 });
+      } else if (
+        !libraryLiveId &&
+        libraryState !== "loading" &&
+        !sharedBoundaryEffectActiveRef.current
+      ) {
+        applyMusicDuck(1, { durationMs: 220 });
+      }
+      pendingMusicAutoplayRef.current = false;
+      return undefined;
+    }
+
+    if (speech.status === "speaking" || !pendingMusicAutoplayRef.current) {
+      return undefined;
+    }
+
+    pendingMusicAutoplayRef.current = false;
+    if (!currentTrack || !youtubePlayerRef.current) {
+      return undefined;
+    }
+
+    musicResumeTimerRef.current = window.setTimeout(() => {
+      musicResumeTimerRef.current = null;
+      try {
+        youtubePlayerRef.current?.playVideo();
+        setMusicState("playing");
+        setMusicMessage(`Back on: ${currentTrack.name}.`);
+      } catch {
+        setMusicMessage("Tap video to resume music.");
+      }
+    }, 180);
+
+    return () => {
+      if (musicResumeTimerRef.current) {
+        window.clearTimeout(musicResumeTimerRef.current);
+        musicResumeTimerRef.current = null;
+      }
+    };
+  }, [
+    applyMusicDuck,
+    currentTrack,
+    directorAudioMode,
+    libraryLiveId,
+    libraryState,
+    speech.status,
+  ]);
+
+  const restoreMusicAfterEffects = useCallback(
+    ({ durationMs = 220, flushDelayMs = 24 } = {}) => {
+      const shouldKeepDuck =
+        directorAudioMode === "duck" &&
+        (speech.status === "speaking" ||
+          sharedBoundaryEffectActiveRef.current ||
+          Boolean(pendingDirectorAnnouncementRef.current));
+
+      applyMusicDuck(shouldKeepDuck ? 0.14 : 1, { durationMs });
+      window.setTimeout(flushPendingDirectorAnnouncement, flushDelayMs);
+    },
+    [applyMusicDuck, directorAudioMode, flushPendingDirectorAnnouncement, speech.status],
+  );
+
+  useEffect(() => {
+    const targetMatch = getDirectorPreferredMatch(
+      liveMatch,
+      managedSession?.match,
+    );
+    const liveEvent = targetMatch?.lastLiveEvent || null;
+
+    if (
+      !authorized ||
+      !liveEvent?.id ||
+      liveEvent.type !== "sound_effect" ||
+      liveEvent.trigger !== "score_boundary"
+    ) {
+      return;
+    }
+
+    if (lastHandledBoundarySoundEffectEventRef.current === liveEvent.id) {
+      return;
+    }
+
+    lastHandledBoundarySoundEffectEventRef.current = liveEvent.id;
+    sharedBoundaryEffectActiveRef.current = true;
+
+    if (sharedBoundaryDuckTimerRef.current) {
+      window.clearTimeout(sharedBoundaryDuckTimerRef.current);
+      sharedBoundaryDuckTimerRef.current = null;
+    }
+
+    applyMusicDuck(0.14, { durationMs: 150 });
+
+    sharedBoundaryDuckTimerRef.current = window.setTimeout(() => {
+      sharedBoundaryDuckTimerRef.current = null;
+      sharedBoundaryEffectActiveRef.current = false;
+      restoreMusicAfterEffects({ durationMs: 220, flushDelayMs: 12 });
+    }, getDirectorBoundaryDuckWindowMs(liveEvent));
+  }, [
+    authorized,
+    applyMusicDuck,
+    getDirectorBoundaryDuckWindowMs,
+    liveMatch,
+    managedSession?.match,
+    restoreMusicAfterEffects,
+  ]);
+
   const submitDirectorPin = async () => {
+    if (isSubmittingPin) {
+      return;
+    }
+
+    if (directorPinRateLimit.isBlocked) {
+      setAuthError(directorPinRateLimit.message);
+      return;
+    }
+
     setIsSubmittingPin(true);
     setAuthError("");
 
@@ -1937,35 +2900,47 @@ export default function DirectorConsoleClient({
         .catch(() => ({ message: "Could not verify PIN." }));
 
       if (!response.ok) {
-        setAuthError(payload.message || "Could not verify PIN.");
-        return;
+        throw buildPinRequestError(response, payload, "Could not verify PIN.");
       }
 
+      clearClientPinRateLimit("director-auth");
+      directorPinRateLimit.sync();
       setConsoleError("");
       setAuthorized(true);
       setPin("");
-      const nextSessions = sessions.length
-        ? sessions
-        : readCachedDirectorSessions();
+      const fetchedSessions = await loadAuthorizedDirectorSessions();
+      const nextSessions = fetchedSessions.length
+        ? fetchedSessions
+        : sessions.length
+          ? sessions
+          : readCachedDirectorSessions();
       if (nextSessions.length) {
         writeCachedDirectorSessions(nextSessions);
         setSessions(nextSessions);
-        const preferredLive = preferredSessionIdRef.current
-          ? nextSessions.find(
-              (item) =>
-                item.session?._id === preferredSessionIdRef.current &&
-                item.isLive,
-            )
-          : null;
         const nextLive = nextSessions.find((item) => item.isLive);
-        setSelectedSessionId(
-          preferredLive?.session?._id ||
-            nextLive?.session?._id ||
-            nextSessions?.[0]?.session?._id ||
-            "",
+        const autoManageSessionId = resolveDirectorAutoManageSessionId(
+          nextSessions,
+          {
+            preferredSessionId: preferredSessionIdRef.current,
+            selectedSessionId,
+            autoManageRequested: pendingInitialManageRef.current,
+          },
         );
-        if (pendingInitialManageRef.current && preferredLive?.session?._id) {
-          setManagedSessionId(preferredLive.session._id);
+        const nextSelectedSessionId =
+          autoManageSessionId ||
+          getPreferredLiveSessionId(
+            nextSessions,
+            preferredSessionIdRef.current || selectedSessionId,
+          ) ||
+          nextLive?.session?._id ||
+          nextSessions?.[0]?.session?._id ||
+          "";
+        setSelectedSessionId(nextSelectedSessionId);
+        if (autoManageSessionId) {
+          preferredSessionIdRef.current = autoManageSessionId;
+          writeStoredDirectorPreferredSessionId(autoManageSessionId);
+          setManagedSessionId(autoManageSessionId);
+          setShowPicker(false);
           pendingInitialManageRef.current = false;
         } else {
           setManagedSessionId("");
@@ -1973,8 +2948,12 @@ export default function DirectorConsoleClient({
         }
       }
       setShowDirectorPinStep(false);
-    } catch {
-      setAuthError("Could not verify PIN.");
+    } catch (caughtError) {
+      registerClientPinFailure("director-auth", {
+        retryAfterMs: Number(caughtError?.retryAfterMs || 0),
+      });
+      directorPinRateLimit.sync();
+      setAuthError(caughtError?.message || "Could not verify PIN.");
     } finally {
       setIsSubmittingPin(false);
     }
@@ -2029,12 +3008,12 @@ export default function DirectorConsoleClient({
   useEffect(() => {
     const nextVolume = Math.max(
       0,
-      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume),
+      Math.min(1, (directorMicLive ? 0.24 : 1) * masterVolume),
     );
     if (effectsAudioRef.current) {
       effectsAudioRef.current.volume = nextVolume;
     }
-  }, [masterVolume, micMonitor.isActive]);
+  }, [directorMicLive, masterVolume]);
 
   useEffect(() => {
     const audio = effectsAudioRef.current;
@@ -2073,8 +3052,7 @@ export default function DirectorConsoleClient({
       setLibraryLiveId("");
       setLibraryState("idle");
       setLibraryCurrentTime(0);
-      applyMusicDuck(1, { durationMs: 260 });
-      window.setTimeout(flushPendingDirectorAnnouncement, 40);
+      restoreMusicAfterEffects({ durationMs: 220, flushDelayMs: 12 });
     };
     const handlePause = () => {
       setLibraryState((current) =>
@@ -2106,8 +3084,7 @@ export default function DirectorConsoleClient({
       setLibraryLiveId("");
       setLibraryState("idle");
       setLibraryCurrentTime(0);
-      applyMusicDuck(1, { durationMs: 200 });
-      window.setTimeout(flushPendingDirectorAnnouncement, 40);
+      restoreMusicAfterEffects({ durationMs: 180, flushDelayMs: 12 });
     };
     const handleTimeUpdate = () => {
       setLibraryCurrentTime(audio.currentTime || 0);
@@ -2134,7 +3111,7 @@ export default function DirectorConsoleClient({
       audio.removeEventListener("error", handleError);
       audio.removeEventListener("timeupdate", handleTimeUpdate);
     };
-  }, [applyMusicDuck, flushPendingDirectorAnnouncement]);
+  }, [restoreMusicAfterEffects]);
 
   useEffect(() => {
     if (!navigator?.mediaDevices?.enumerateDevices) {
@@ -2173,7 +3150,27 @@ export default function DirectorConsoleClient({
     };
   }, []);
 
-  const stopAllEffects = (options = {}) => {
+  const stopMusicDeck = useCallback(({ resetTime = true } = {}) => {
+    pendingMusicAutoplayRef.current = false;
+    if (musicResumeTimerRef.current) {
+      window.clearTimeout(musicResumeTimerRef.current);
+      musicResumeTimerRef.current = null;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      if (resetTime) {
+        audioRef.current.currentTime = 0;
+      }
+    }
+    try {
+      youtubePlayerRef.current?.stopVideo();
+    } catch {
+      // Ignore stop failures.
+    }
+    setMusicState("stopped");
+  }, []);
+
+  const stopAllEffects = useCallback((options = {}) => {
     const {
       clearSource = true,
       preserveRequest = false,
@@ -2190,6 +3187,10 @@ export default function DirectorConsoleClient({
 
     setConsoleError("");
     setEffectsNeedsUnlock(false);
+    if (libraryLoadTimeoutRef.current) {
+      window.clearTimeout(libraryLoadTimeoutRef.current);
+      libraryLoadTimeoutRef.current = null;
+    }
     if (bufferedEffectTimerRef.current) {
       window.clearInterval(bufferedEffectTimerRef.current);
       bufferedEffectTimerRef.current = null;
@@ -2217,39 +3218,85 @@ export default function DirectorConsoleClient({
     setLibraryState("idle");
     setLibraryCurrentTime(0);
     if (restoreMusic) {
-      applyMusicDuck(1, { durationMs: 240 });
-      window.setTimeout(flushPendingDirectorAnnouncement, 40);
+      restoreMusicAfterEffects({ durationMs: 200, flushDelayMs: 12 });
     }
-  };
+  }, [restoreMusicAfterEffects]);
+
+  useEffect(() => {
+    if (libraryLoadTimeoutRef.current) {
+      window.clearTimeout(libraryLoadTimeoutRef.current);
+      libraryLoadTimeoutRef.current = null;
+    }
+
+    if (libraryState !== "loading" || !libraryLiveId) {
+      return undefined;
+    }
+
+    libraryLoadTimeoutRef.current = window.setTimeout(() => {
+      const audio = effectsAudioRef.current;
+      if (
+        !audio ||
+        libraryState !== "loading" ||
+        !libraryLiveId ||
+        !audio.src
+      ) {
+        return;
+      }
+
+      setConsoleError("This sound got stuck loading. Tap it again.");
+      setLibraryState("idle");
+      setLibraryLiveId("");
+      setLibraryCurrentTime(0);
+      applyMusicDuck(1, { durationMs: 180 });
+    }, 4500);
+
+    return () => {
+      if (libraryLoadTimeoutRef.current) {
+        window.clearTimeout(libraryLoadTimeoutRef.current);
+        libraryLoadTimeoutRef.current = null;
+      }
+    };
+  }, [applyMusicDuck, libraryLiveId, libraryState]);
 
   const primeEffectsAudio = useCallback(async () => {
-    const audio = effectsAudioRef.current;
-    const unlocked = isUiAudioUnlocked()
-      ? true
-      : await primeUiAudio({
-          mediaElements: audio ? [audio] : [],
-        });
-
-    if (!audio) {
-      return unlocked;
+    if (effectPrimeRequestRef.current) {
+      return effectPrimeRequestRef.current;
     }
 
-    audio.muted = false;
-    audio.playsInline = true;
-    audio.setAttribute("playsinline", "");
-    audio.setAttribute("webkit-playsinline", "");
-    audio.volume = Math.max(0, Math.min(1, masterVolume));
-    setEffectsNeedsUnlock(!unlocked && iOSSafari);
-    return unlocked;
+    const audio = effectsAudioRef.current;
+    const request = (async () => {
+      const unlocked = isUiAudioUnlocked()
+        ? true
+        : await primeUiAudio({
+            mediaElements: audio ? [audio] : [],
+          });
+
+      if (!audio) {
+        return unlocked;
+      }
+
+      audio.muted = false;
+      audio.playsInline = true;
+      audio.setAttribute("playsinline", "");
+      audio.setAttribute("webkit-playsinline", "");
+      audio.volume = Math.max(0, Math.min(1, masterVolume));
+      setEffectsNeedsUnlock(!unlocked && iOSSafari);
+      return unlocked;
+    })().finally(() => {
+      effectPrimeRequestRef.current = null;
+    });
+
+    effectPrimeRequestRef.current = request;
+    return request;
   }, [iOSSafari, masterVolume]);
 
-  const playEffect = async (file) => {
+  const playEffect = useCallback(async (file, options = {}) => {
     const audio = effectsAudioRef.current;
     if (!file?.src) {
       return;
     }
 
-    if (libraryLiveId === file.id) {
+    if (options.toggleIfActive !== false && libraryLiveId === file.id) {
       stopAllEffects();
       return;
     }
@@ -2257,7 +3304,7 @@ export default function DirectorConsoleClient({
     const requestId = effectPlayRequestRef.current + 1;
     effectPlayRequestRef.current = requestId;
 
-    speech.stop();
+    stopDirectorSpeech();
     stopAllEffects({ clearSource: false, preserveRequest: true });
     setConsoleError("");
     setEffectsNeedsUnlock(false);
@@ -2265,6 +3312,9 @@ export default function DirectorConsoleClient({
     setLibraryState("loading");
     setLibraryCurrentTime(0);
     const unlocked = await primeEffectsAudio();
+    if (requestId !== effectPlayRequestRef.current) {
+      return;
+    }
     if (iOSSafari && !unlocked) {
       setConsoleError("Tap Enable Audio once, then play the sound again.");
       setLibraryState("idle");
@@ -2299,7 +3349,7 @@ export default function DirectorConsoleClient({
         const playback = await playBufferedUiAudio(file.src, {
           volume: Math.max(
             0,
-            Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume),
+            Math.min(1, (directorMicLive ? 0.24 : 1) * masterVolume),
           ),
           onEnded: () => {
             bufferedEffectPlaybackRef.current = null;
@@ -2310,7 +3360,7 @@ export default function DirectorConsoleClient({
             setLibraryLiveId("");
             setLibraryState("idle");
             setLibraryCurrentTime(0);
-            applyMusicDuck(1, { durationMs: 260 });
+            restoreMusicAfterEffects({ durationMs: 220, flushDelayMs: 12 });
           },
         });
 
@@ -2361,7 +3411,7 @@ export default function DirectorConsoleClient({
         setEffectsNeedsUnlock(true);
         setLibraryState("idle");
         setLibraryLiveId("");
-        applyMusicDuck(1, { durationMs: 180 });
+        restoreMusicAfterEffects({ durationMs: 160, flushDelayMs: 12 });
         return;
       }
     }
@@ -2370,7 +3420,7 @@ export default function DirectorConsoleClient({
       setConsoleError("This audio file could not be played in this browser.");
       setLibraryState("idle");
       setLibraryLiveId("");
-      applyMusicDuck(1, { durationMs: 180 });
+      restoreMusicAfterEffects({ durationMs: 160, flushDelayMs: 12 });
       return;
     }
 
@@ -2380,7 +3430,7 @@ export default function DirectorConsoleClient({
     audio.dataset.effectId = file.id;
     audio.volume = Math.max(
       0,
-      Math.min(1, (micMonitor.isActive ? 0.24 : 1) * masterVolume),
+      Math.min(1, (directorMicLive ? 0.24 : 1) * masterVolume),
     );
     if (sourceChanged) {
       audio.src = nextSrc;
@@ -2418,22 +3468,32 @@ export default function DirectorConsoleClient({
         setEffectsNeedsUnlock(true);
         setLibraryState("idle");
         setLibraryLiveId("");
-        applyMusicDuck(1, { durationMs: 180 });
+        restoreMusicAfterEffects({ durationMs: 160, flushDelayMs: 12 });
         return;
       }
       setConsoleError("This audio file could not be played in this browser.");
       setLibraryState("idle");
       setLibraryLiveId("");
-      applyMusicDuck(1, { durationMs: 180 });
+      restoreMusicAfterEffects({ durationMs: 160, flushDelayMs: 12 });
     }
-  };
+  }, [
+    applyMusicDuck,
+    directorMicLive,
+    iOSSafari,
+    libraryLiveId,
+    masterVolume,
+    primeEffectsAudio,
+    restoreMusicAfterEffects,
+    stopDirectorSpeech,
+    stopAllEffects,
+  ]);
+
+  useEffect(() => {
+    playEffectRef.current = playEffect;
+  }, [playEffect]);
 
   const stopAllAudio = async () => {
-    audioRef.current?.pause();
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0;
-    }
-    setMusicState("stopped");
+    stopMusicDeck();
     await micMonitor.stop({ resumeMedia: true });
     await walkie.stopTalking();
     stopAllEffects();
@@ -2447,6 +3507,7 @@ export default function DirectorConsoleClient({
     setDirectorHoldLive(false);
     setDirectorSpeakerOn(false);
     setDirectorWalkieOn(false);
+    clearSharedBoundaryDuckWindow();
     setLibraryCurrentTime(0);
     setLibraryLiveId("");
     setLibraryState("idle");
@@ -2464,6 +3525,7 @@ export default function DirectorConsoleClient({
       effectsAudioRef.current.src = "";
       delete effectsAudioRef.current.dataset.effectSrc;
       delete effectsAudioRef.current.dataset.effectId;
+      effectsAudioRef.current.load();
     }
     if (bufferedEffectTimerRef.current) {
       window.clearInterval(bufferedEffectTimerRef.current);
@@ -2478,101 +3540,448 @@ export default function DirectorConsoleClient({
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
-
+    stopMusicDeck();
     setMusicState("idle");
-  }, [clearLibraryDragState, managedSessionId]);
+  }, [clearLibraryDragState, clearSharedBoundaryDuckWindow, managedSessionId, stopMusicDeck]);
 
-  const handleMusicSelection = (event) => {
-    const files = Array.from(event.target.files || []);
-    if (!files.length) {
-      return;
-    }
+  const syncMusicTrackToPlayer = useCallback(
+    (track, { autoplay = false, restart = false } = {}) => {
+      const player = youtubePlayerRef.current;
+      if (!player || !track?.videoId) {
+        return false;
+      }
 
-    musicUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-    const nextTracks = files.map((file) => ({
-      id: `${file.name}-${file.size}-${file.lastModified}`,
-      name: file.name.replace(/\.[^.]+$/, ""),
-      url: URL.createObjectURL(file),
-      type: file.type || "audio/mpeg",
-    }));
-    musicUrlsRef.current = nextTracks.map((track) => track.url);
-    setMusicTracks(nextTracks);
-    setCurrentTrackIndex(0);
-    setMusicMessage(
-      `${nextTracks.length} track${nextTracks.length === 1 ? "" : "s"} loaded.`,
-    );
-    window.setTimeout(() => setMusicMessage(""), 2200);
-  };
+      setMusicPlayerError("");
+      setMusicOutputVolume(getMusicTargetVolume());
+
+      try {
+        const currentVideoId = String(player.getVideoData?.().video_id || "");
+        const sameVideo =
+          currentVideoId === track.videoId ||
+          loadedMusicVideoIdRef.current === track.videoId;
+
+        loadedMusicVideoIdRef.current = track.videoId;
+
+        if (autoplay) {
+          if (sameVideo && !restart) {
+            player.playVideo();
+          } else {
+            player.loadVideoById(track.videoId);
+          }
+          return true;
+        }
+
+        if (!sameVideo || restart) {
+          player.cueVideoById(track.videoId);
+        }
+        return true;
+      } catch {
+        setMusicPlayerError("Player is still loading.");
+        return false;
+      }
+    },
+    [getMusicTargetVolume, setMusicOutputVolume],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const mountNode = youtubePlayerHostRef.current;
+    setMusicPlayerReady(false);
+    setMusicPlayerError("");
+
+    void loadDirectorYouTubeIframeApi()
+      .then(() => {
+        if (
+          cancelled ||
+          !mountNode ||
+          youtubePlayerRef.current
+        ) {
+          return;
+        }
+
+        mountNode.innerHTML = "";
+        const playerHost = document.createElement("div");
+        playerHost.className = "h-full w-full";
+        mountNode.appendChild(playerHost);
+
+        const player = new window.YT.Player(playerHost, {
+          height: "100%",
+          width: "100%",
+          host: "https://www.youtube-nocookie.com",
+          playerVars: {
+            autoplay: 0,
+            controls: 0,
+            rel: 0,
+            playsinline: 1,
+            modestbranding: 1,
+            fs: 0,
+            disablekb: 1,
+            enablejsapi: 1,
+            origin: window.location.origin,
+            iv_load_policy: 3,
+          },
+          events: {
+            onReady: (event) => {
+              if (cancelled) {
+                return;
+              }
+
+              youtubePlayerRef.current = event.target;
+              setMusicPlayerReady(true);
+              setMusicPlayerError("");
+              setMusicOutputVolume(getMusicTargetVolume());
+
+              const initialTrack =
+                musicTracksRef.current[currentTrackIndexRef.current];
+              if (initialTrack?.videoId) {
+                loadedMusicVideoIdRef.current = initialTrack.videoId;
+                try {
+                  event.target.cueVideoById(initialTrack.videoId);
+                } catch {
+                  // Ignore cue failures until the user interacts.
+                }
+              }
+            },
+            onStateChange: (event) => {
+              if (cancelled) {
+                return;
+              }
+
+              if (event.data === window.YT.PlayerState.PLAYING) {
+                const activeTrack =
+                  musicTracksRef.current[currentTrackIndexRef.current];
+                setMusicPlayerReady(true);
+                setMusicPlayerError("");
+                setMusicState("playing");
+                setMusicMessage(
+                  activeTrack ? `Playing ${activeTrack.name}.` : "Playing video.",
+                );
+                return;
+              }
+
+              if (event.data === window.YT.PlayerState.PAUSED) {
+                setMusicPlayerReady(true);
+                setMusicState("paused");
+                return;
+              }
+
+              if (event.data === window.YT.PlayerState.BUFFERING) {
+                setMusicPlayerReady(true);
+                setMusicMessage("Loading video...");
+                return;
+              }
+
+              if (event.data === window.YT.PlayerState.CUED) {
+                setMusicPlayerReady(true);
+                setMusicState((current) =>
+                  current === "playing" ? current : "paused",
+                );
+                return;
+              }
+
+              if (event.data === window.YT.PlayerState.ENDED) {
+                if (musicTracksRef.current.length > 1) {
+                  const nextIndex =
+                    (currentTrackIndexRef.current + 1) %
+                    musicTracksRef.current.length;
+                  const nextTrack = musicTracksRef.current[nextIndex];
+                  currentTrackIndexRef.current = nextIndex;
+                  setCurrentTrackIndex(nextIndex);
+                  if (nextTrack?.videoId) {
+                    loadedMusicVideoIdRef.current = nextTrack.videoId;
+                    try {
+                      event.target.loadVideoById(nextTrack.videoId);
+                    } catch {
+                      setMusicState("stopped");
+                    }
+                  }
+                } else {
+                  setMusicState("stopped");
+                  setMusicMessage("Playback finished.");
+                }
+              }
+            },
+          },
+        });
+
+        youtubePlayerRef.current = player;
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMusicPlayerReady(false);
+          setMusicPlayerError("YouTube player could not load.");
+          setMusicMessage("YouTube player could not load.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      try {
+        youtubePlayerRef.current?.destroy();
+      } catch {
+        // Ignore destroy failures.
+      }
+      youtubePlayerRef.current = null;
+      loadedMusicVideoIdRef.current = "";
+      mountNode?.replaceChildren();
+      setMusicPlayerReady(false);
+    };
+  }, [getMusicTargetVolume, musicPlayerBootNonce, setMusicOutputVolume]);
 
   useEffect(() => {
     const currentTrack = musicTracks[currentTrackIndex];
-    const audio = audioRef.current;
-    if (!audio || !currentTrack) {
+    if (!currentTrack?.videoId || !youtubePlayerRef.current) {
       return;
     }
 
-    if (audio.src !== currentTrack.url) {
-      audio.src = currentTrack.url;
+    if (loadedMusicVideoIdRef.current === currentTrack.videoId) {
+      return;
     }
 
-    void syncSinkId(speakerDeviceId);
-  }, [currentTrackIndex, musicTracks, speakerDeviceId]);
+    const synced = syncMusicTrackToPlayer(currentTrack, { autoplay: false });
+    if (synced) {
+      setMusicMessage(`Ready: ${currentTrack.name}.`);
+      setMusicState("paused");
+    }
+  }, [currentTrackIndex, musicPlayerError, musicTracks, syncMusicTrackToPlayer]);
 
-  const handlePlayMusic = async () => {
-    const audio = audioRef.current;
+  useEffect(() => {
+    if (!currentTrack?.id) {
+      return;
+    }
+
+    const row = musicTrackRowRefs.current.get(currentTrack.id);
+    row?.scrollIntoView?.({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [currentTrack?.id]);
+
+  const handleAddMusicTrack = useCallback(async () => {
+    const nextValue = String(musicInput || "").trim();
+    if (!nextValue || isAddingMusicTrack) {
+      return;
+    }
+
+    setIsAddingMusicTrack(true);
+    setMusicMessage("");
+
+    try {
+      const playlistId = extractYouTubePlaylistId(nextValue);
+      if (playlistId) {
+        const resolvedPlaylist = await resolveDirectorYouTubePlaylist(nextValue);
+        const existingVideoIds = new Set(
+          musicTracks.map((track) => track.videoId),
+        );
+        const nextTracksToAdd = resolvedPlaylist.tracks.filter(
+          (track) => !existingVideoIds.has(track.videoId),
+        );
+
+        if (!nextTracksToAdd.length) {
+          setMusicInput("");
+          setMusicMessage("This playlist is already in the deck.");
+          return;
+        }
+
+        const firstAddedTrack = nextTracksToAdd[0];
+        const nextTrackIndex = musicTracks.length;
+        setMusicTracks((current) => [...current, ...nextTracksToAdd]);
+        setCurrentTrackIndex(nextTrackIndex);
+        setMusicInput("");
+        loadedMusicVideoIdRef.current = "";
+        window.setTimeout(() => {
+          syncMusicTrackToPlayer(firstAddedTrack, {
+            autoplay: false,
+            restart: true,
+          });
+        }, 0);
+        void hydrateImportedMusicTracks(nextTracksToAdd);
+        setMusicMessage(
+          resolvedPlaylist.totalCount > resolvedPlaylist.importedCount
+            ? `Playlist added. ${nextTracksToAdd.length} tracks loaded now.`
+            : `Playlist added. ${nextTracksToAdd.length} tracks ready.`,
+        );
+        return;
+      }
+
+      const nextTrack = await resolveDirectorYouTubeTrack(nextValue);
+      const existingIndex = musicTracks.findIndex(
+        (track) => track.videoId === nextTrack.videoId,
+      );
+
+      if (existingIndex >= 0) {
+        setCurrentTrackIndex(existingIndex);
+        setMusicInput("");
+        setMusicMessage("This video is already in the deck.");
+        loadedMusicVideoIdRef.current = "";
+        syncMusicTrackToPlayer(musicTracks[existingIndex], {
+          autoplay: false,
+          restart: true,
+        });
+        return;
+      }
+
+      setMusicTracks((current) => [...current, nextTrack]);
+      setCurrentTrackIndex(musicTracks.length);
+      setMusicInput("");
+      loadedMusicVideoIdRef.current = "";
+      window.setTimeout(() => {
+        syncMusicTrackToPlayer(nextTrack, {
+          autoplay: false,
+          restart: true,
+        });
+      }, 0);
+      setMusicMessage("Video added. Tap play.");
+    } catch (caughtError) {
+      setMusicMessage(caughtError.message || "Could not add this YouTube link.");
+    } finally {
+      setIsAddingMusicTrack(false);
+    }
+  }, [
+    hydrateImportedMusicTracks,
+    isAddingMusicTrack,
+    musicInput,
+    musicTracks,
+    syncMusicTrackToPlayer,
+  ]);
+
+  const handlePlayMusic = useCallback(async () => {
     const track = musicTracks[currentTrackIndex];
-    if (!audio || !track) {
+    if (!track) {
       return;
     }
 
-    audio.src = track.url;
-    audio.volume = musicVolume * masterVolume;
-    const sinkApplied = await syncSinkId(speakerDeviceId);
-    if (!sinkApplied && speakerDeviceId !== "default") {
-      setSpeakerMessage("Output routing is not supported in this browser.");
+    if (musicPlayerError) {
+      setMusicPlayerError("");
+      setMusicPlayerReady(false);
+      setMusicMessage("Reloading YouTube player...");
+      setMusicPlayerBootNonce((current) => current + 1);
+      return;
+    }
+
+    if (!youtubePlayerRef.current) {
+      setMusicPlayerReady(false);
+      setMusicMessage("Loading YouTube player...");
+      setMusicPlayerBootNonce((current) => current + 1);
+      return;
+    }
+
+    const synced = syncMusicTrackToPlayer(track, {
+      autoplay: true,
+    });
+
+    if (!synced) {
+      setMusicMessage("YouTube player is loading...");
+    }
+  }, [currentTrackIndex, musicPlayerError, musicTracks, syncMusicTrackToPlayer]);
+
+  const handlePauseMusic = useCallback(() => {
+    const player = youtubePlayerRef.current;
+    if (!player) {
+      return;
     }
 
     try {
-      await audio.play();
-      setMusicState("playing");
-      setMusicMessage(`Playing ${track.name}.`);
+      player.pauseVideo();
+      setMusicState("paused");
     } catch {
-      setMusicMessage("Music playback was blocked by the browser.");
+      setMusicMessage("Could not pause this video.");
     }
-  };
+  }, []);
 
-  const handlePauseMusic = () => {
-    audioRef.current?.pause();
-    setMusicState("paused");
-  };
+  const handleStopMusic = useCallback(() => {
+    stopMusicDeck();
+    setMusicMessage("Music stopped.");
+  }, [stopMusicDeck]);
 
-  const handleStopMusic = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-    setMusicState("stopped");
-  };
-
-  const handleNextMusic = async () => {
+  const handleNextMusic = useCallback(async () => {
     if (!musicTracks.length) {
       return;
     }
 
     const nextIndex = (currentTrackIndex + 1) % musicTracks.length;
+    const nextTrack = musicTracks[nextIndex];
     setCurrentTrackIndex(nextIndex);
-    window.setTimeout(() => {
-      void handlePlayMusic();
-    }, 60);
-  };
 
-  const handleTrackEnd = () => {
-    if (musicTracks.length > 1) {
-      void handleNextMusic();
+    if (!nextTrack) {
       return;
     }
-    setMusicState("stopped");
-  };
+
+    const synced = syncMusicTrackToPlayer(nextTrack, {
+      autoplay: true,
+      restart: true,
+    });
+
+    if (!synced) {
+      setMusicMessage("YouTube player is loading...");
+    }
+  }, [currentTrackIndex, musicTracks, syncMusicTrackToPlayer]);
+
+  const handleToggleMusicPlayback = useCallback(() => {
+    if (!musicTracks[currentTrackIndex]) {
+      return;
+    }
+
+    if (musicState === "playing") {
+      handlePauseMusic();
+      return;
+    }
+
+    void handlePlayMusic();
+  }, [currentTrackIndex, handlePauseMusic, handlePlayMusic, musicState, musicTracks]);
+
+  const handleRemoveMusicTrack = useCallback(
+    (trackId) => {
+      const removeIndex = musicTracks.findIndex((track) => track.id === trackId);
+      if (removeIndex < 0) {
+        return;
+      }
+
+      const nextTracks = musicTracks.filter((track) => track.id !== trackId);
+      setMusicTracks(nextTracks);
+
+      if (!nextTracks.length) {
+        loadedMusicVideoIdRef.current = "";
+        stopMusicDeck();
+        setCurrentTrackIndex(0);
+        setMusicState("idle");
+        setMusicMessage("Deck cleared.");
+        return;
+      }
+
+      const nextIndex =
+        currentTrackIndex > removeIndex
+          ? currentTrackIndex - 1
+          : Math.min(currentTrackIndex, nextTracks.length - 1);
+      const nextTrack = nextTracks[nextIndex];
+      setCurrentTrackIndex(nextIndex);
+      loadedMusicVideoIdRef.current = "";
+      if (nextTrack) {
+        const autoplay = musicState === "playing";
+        window.setTimeout(() => {
+          syncMusicTrackToPlayer(nextTrack, { autoplay });
+        }, 0);
+      }
+      setMusicMessage("Video removed.");
+    },
+    [currentTrackIndex, musicState, musicTracks, stopMusicDeck, syncMusicTrackToPlayer],
+  );
+
+  const handleSelectMusicTrack = useCallback(
+    (index) => {
+      const nextTrack = musicTracks[index];
+      if (!nextTrack) {
+        return;
+      }
+
+      setCurrentTrackIndex(index);
+      loadedMusicVideoIdRef.current = "";
+      syncMusicTrackToPlayer(nextTrack, {
+        autoplay: musicState === "playing",
+      });
+    },
+    [musicState, musicTracks, syncMusicTrackToPlayer],
+  );
 
   const handleDirectorMicStart = useCallback(async () => {
     if (!directorSpeakerOn || directorMicHoldingRef.current) {
@@ -2582,7 +3991,15 @@ export default function DirectorConsoleClient({
     directorMicHoldingRef.current = true;
     setDirectorHoldLive(true);
     playUiTone({ frequency: 900, durationMs: 100, type: "sine", volume: 0.04 });
-    const started = await micMonitor.start({ pauseMedia: true });
+    const started = micMonitor.isPaused
+      ? await micMonitor.resume({ pauseMedia: true })
+      : micMonitor.isActive
+        ? true
+        : await micMonitor.start({
+            pauseMedia: true,
+            startPaused: false,
+            playStartCue: false,
+          });
     if (!started) {
       directorMicHoldingRef.current = false;
       setDirectorHoldLive(false);
@@ -2592,6 +4009,11 @@ export default function DirectorConsoleClient({
   const handleDirectorMicStop = useCallback(async () => {
     directorMicHoldingRef.current = false;
     setDirectorHoldLive(false);
+    if (micMonitor.isActive && !micMonitor.isPaused) {
+      await micMonitor.pause({ resumeMedia: true });
+      return;
+    }
+
     await micMonitor.stop({ resumeMedia: true });
   }, [micMonitor]);
 
@@ -2600,6 +4022,22 @@ export default function DirectorConsoleClient({
       setDirectorSpeakerOn(nextChecked);
 
       if (nextChecked) {
+        const prepared = await micMonitor.prepare({ requestPermission: true });
+        if (!prepared) {
+          setDirectorSpeakerOn(false);
+          return;
+        }
+
+        if (!micMonitor.isActive && !micMonitor.isPaused) {
+          const primed = await micMonitor.start({
+            pauseMedia: false,
+            startPaused: true,
+            playStartCue: false,
+          });
+          if (!primed) {
+            setDirectorSpeakerOn(false);
+          }
+        }
         return;
       }
 
@@ -2670,8 +4108,6 @@ export default function DirectorConsoleClient({
     );
   };
 
-  const currentTrack = musicTracks[currentTrackIndex];
-
   useEffect(() => {
     if (
       typeof navigator === "undefined" ||
@@ -2697,7 +4133,7 @@ export default function DirectorConsoleClient({
 
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentTrack.name,
-      artist: "Local phone audio",
+      artist: "YouTube deck",
       album: "GV Cricket Music Deck",
     });
     navigator.mediaSession.playbackState =
@@ -2705,32 +4141,18 @@ export default function DirectorConsoleClient({
 
     try {
       navigator.mediaSession.setActionHandler("play", () => {
-        const audio = audioRef.current;
-        if (!audio || !currentTrack) {
-          return;
-        }
-        audio
-          .play()
-          .then(() => {
-            setMusicState("playing");
-          })
-          .catch(() => {});
+        void handlePlayMusic();
       });
       navigator.mediaSession.setActionHandler("pause", () => {
-        audioRef.current?.pause();
-        setMusicState("paused");
+        handlePauseMusic();
       });
       navigator.mediaSession.setActionHandler("nexttrack", () => {
         if (musicTracks.length > 1) {
-          setCurrentTrackIndex((index) => (index + 1) % musicTracks.length);
+          void handleNextMusic();
         }
       });
       navigator.mediaSession.setActionHandler("stop", () => {
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current.currentTime = 0;
-        }
-        setMusicState("stopped");
+        handleStopMusic();
       });
     } catch {
       // Some browsers only support a subset of media session actions.
@@ -2746,7 +4168,16 @@ export default function DirectorConsoleClient({
         // Ignore unsupported action cleanup.
       }
     };
-  }, [currentTrack, iOSSafari, musicState, musicTracks.length]);
+  }, [
+    currentTrack,
+    handleNextMusic,
+    handlePauseMusic,
+    handlePlayMusic,
+    handleStopMusic,
+    iOSSafari,
+    musicState,
+    musicTracks.length,
+  ]);
 
   const directorWalkieChannelEnabled = directorWalkieSharedEnabled;
   const directorWalkieUi =
@@ -2784,7 +4215,9 @@ export default function DirectorConsoleClient({
       : directorWalkiePending
         ? "Requested"
         : !directorWalkieChannelEnabled
-          ? "Off"
+          ? directorWalkieOn
+            ? "Standing By"
+            : "Off"
           : !directorWalkieOn
             ? "Off"
             : walkie.isFinishing
@@ -2805,7 +4238,7 @@ export default function DirectorConsoleClient({
   const canManageSession = Boolean(authorized && managedSession?.match?._id);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 lg:max-w-375 lg:px-6 2xl:max-w-440">
+    <div className="mx-auto w-full max-w-full overflow-x-clip px-4 py-6 lg:max-w-375 lg:px-6 2xl:max-w-440">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
@@ -2865,9 +4298,9 @@ export default function DirectorConsoleClient({
                     className="text-2xl font-semibold tracking-[-0.03em] sm:text-[2rem]"
                   />
                 </div>
-                {authError ? (
+                {directorPinError ? (
                   <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                    {authError}
+                    {directorPinError}
                   </div>
                 ) : null}
                 {!showDirectorPinStep ? (
@@ -2920,6 +4353,9 @@ export default function DirectorConsoleClient({
                       autoComplete="one-time-code"
                       maxLength={4}
                       value={pin}
+                      disabled={
+                        isSubmittingPin || directorPinRateLimit.isBlocked
+                      }
                       onChange={(event) =>
                         setPin(
                           event.target.value.replace(/\D/g, "").slice(0, 4),
@@ -2937,12 +4373,14 @@ export default function DirectorConsoleClient({
                     <LoadingButton
                       type="button"
                       onClick={() => void submitDirectorPin()}
-                      disabled={pin.length !== 4}
+                      disabled={
+                        pin.length !== 4 || directorPinRateLimit.isBlocked
+                      }
                       loading={isSubmittingPin}
-                      pendingLabel="Checking..."
+                      pendingLabel="Opening..."
                       className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(90deg,#10b981_0%,#22c55e_58%,#34d399_100%)] px-5 py-3.5 font-bold text-black shadow-[0_16px_36px_rgba(16,185,129,0.2)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Continue to Match Picker
+                      Open Director Mode
                     </LoadingButton>
                     {!isSubmittingPin && pin.length !== 4 ? (
                       <p className="mt-3 text-center text-xs text-zinc-500">
@@ -2966,16 +4404,10 @@ export default function DirectorConsoleClient({
                 <DirectorSessionPicker
                   sessions={sessions}
                   onSelect={(item) => {
-                    setSelectedSessionId(item.session._id);
-                    setManagedSessionId(item.session._id);
-                    setShowPicker(false);
-                    setAuthError("");
+                    openDirectorSession(item.session._id);
                   }}
                   onQuickStart={(item) => {
-                    setSelectedSessionId(item.session._id);
-                    setManagedSessionId(item.session._id);
-                    setShowPicker(false);
-                    setAuthError("");
+                    openDirectorSession(item.session._id);
                   }}
                 />
               </div>
@@ -2991,12 +4423,12 @@ export default function DirectorConsoleClient({
       ) : null}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.78fr)] 2xl:grid-cols-[minmax(0,1.48fr)_minmax(380px,0.72fr)]">
-        <div className="flex flex-col gap-5">
-          <div className="order-3 xl:order-1">
+        <div className="min-w-0 flex flex-col gap-5">
+          <div className="order-4 xl:order-4">
             <Card
               title="Loudspeaker"
               subtitle={
-                directorHoldLive || micMonitor.isActive
+                directorMicLive
                   ? "Live on speaker"
                   : micMonitor.isStarting
                     ? "Starting loudspeaker"
@@ -3064,7 +4496,7 @@ export default function DirectorConsoleClient({
                     className={`relative inline-flex h-28 w-28 items-center justify-center rounded-full border text-3xl transition focus:outline-none focus:ring-2 focus:ring-emerald-400/40 ${
                       !directorSpeakerOn
                         ? "cursor-not-allowed border-white/8 bg-white/3 text-zinc-500"
-                        : directorHoldLive || micMonitor.isActive
+                        : directorMicLive
                           ? "border-emerald-300 bg-emerald-500 text-black shadow-[0_0_40px_rgba(16,185,129,0.34)]"
                           : "border-white/10 bg-white/5 text-white"
                     }`}
@@ -3073,7 +4505,7 @@ export default function DirectorConsoleClient({
                     <span
                       className={`absolute -inset-2 rounded-full border ${
                         directorSpeakerOn &&
-                        (directorHoldLive || micMonitor.isActive)
+                        directorMicLive
                           ? "animate-pulse border-emerald-300/35"
                           : "border-transparent"
                       }`}
@@ -3092,7 +4524,7 @@ export default function DirectorConsoleClient({
                         ? "Turn on to talk"
                         : micMonitor.isStarting
                           ? "Starting..."
-                          : directorHoldLive || micMonitor.isActive
+                          : directorMicLive
                             ? "Release to stop"
                             : "Hold to talk"}
                     </p>
@@ -3264,22 +4696,45 @@ export default function DirectorConsoleClient({
 
           <div className="order-2 xl:order-3">
             <Card
-              title="Audio Library"
-              subtitle="Tap to play audio"
+              title="Sound Effects"
+              subtitle={libraryPanelOpen ? "Tap to play audio" : "Ready to fire"}
               icon={<FaBullhorn />}
               accent="violet"
               help={{
-                title: "Audio Library",
+                title: "Sound Effects",
                 body: "Drop audio files into public/audio/effects and they will show here automatically. Files only load when you tap them.",
               }}
               action={
-                <button
-                  type="button"
-                  onClick={stopAllEffects}
-                  className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-zinc-200"
-                >
-                  Stop audio
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLibraryPanelOpen((current) => {
+                        const nextOpen = !current;
+                        if (nextOpen && !libraryFiles.length) {
+                          void fetchAudioLibrary({
+                            force: true,
+                          });
+                        }
+                        return nextOpen;
+                      })
+                    }
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
+                    aria-expanded={libraryPanelOpen}
+                    aria-label={libraryPanelOpen ? "Collapse sound effects" : "Expand sound effects"}
+                  >
+                    <FaChevronDown
+                      className={`text-sm transition ${libraryPanelOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={stopAllEffects}
+                    className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-zinc-200"
+                  >
+                    Stop audio
+                  </button>
+                </div>
               }
             >
               <audio
@@ -3290,6 +4745,40 @@ export default function DirectorConsoleClient({
               />
               <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,16,30,0.36),rgba(10,10,14,0.32))] p-2">
                 <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(192,132,252,0.84)_18%,rgba(59,130,246,0.42)_76%,rgba(0,0,0,0))]" />
+                <div className="mb-3 flex items-center justify-between gap-3 rounded-[22px] border border-white/10 bg-white/4 px-4 py-3 text-sm text-zinc-300">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-white">
+                      {String(librarySearchQuery || "").trim()
+                        ? `${filteredLibraryFiles.length} of ${orderedLibraryFiles.length} effects`
+                        : `${orderedLibraryFiles.length} effects ready`}
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-400">
+                      {libraryLiveId
+                        ? "Tap the active pad again or use Stop audio."
+                        : "Open the deck when you need quick pads."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLibraryPanelOpen((current) => {
+                        const nextOpen = !current;
+                        if (nextOpen && !libraryFiles.length) {
+                          void fetchAudioLibrary({
+                            force: true,
+                          });
+                        }
+                        return nextOpen;
+                      })
+                    }
+                    className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-200 transition hover:bg-white/10"
+                  >
+                    {libraryPanelOpen ? "Hide" : "Open"}
+                    <FaChevronDown
+                      className={`text-[10px] transition ${libraryPanelOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                </div>
                 {effectsNeedsUnlock ? (
                   <div className="mb-3 rounded-[22px] border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
                     <p>
@@ -3318,9 +4807,39 @@ export default function DirectorConsoleClient({
                 <div className="mb-3 rounded-[22px] border border-white/10 bg-white/3 px-4 py-3 text-sm text-zinc-300">
                   Turn off silent mode to hear sound effects
                 </div>
-                {orderedLibraryFiles.length ? (
+                {libraryPanelOpen && orderedLibraryFiles.length ? (
+                  <>
+                    <div className="relative mb-3">
+                      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
+                        <FaSearch className="text-xs" />
+                      </span>
+                      <input
+                        type="search"
+                        inputMode="search"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        value={librarySearchQuery}
+                        onChange={(event) =>
+                          setLibrarySearchQuery(event.target.value)
+                        }
+                        placeholder="Search sound effects"
+                        className="w-full rounded-[22px] border border-white/10 bg-white/4 py-3 pl-10 pr-11 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-violet-300/24 focus:bg-white/6"
+                        aria-label="Search director sound effects"
+                      />
+                      {String(librarySearchQuery || "").trim() ? (
+                        <button
+                          type="button"
+                          onClick={() => setLibrarySearchQuery("")}
+                          className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10"
+                          aria-label="Clear sound effect search"
+                        >
+                          <FaTimes className="text-xs" />
+                        </button>
+                      ) : null}
+                    </div>
                   <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">
-                    {orderedLibraryFiles.map((file) => (
+                    {filteredLibraryFiles.map((file) => (
                       <div
                         key={file.id}
                         data-library-effect-id={file.id}
@@ -3334,9 +4853,6 @@ export default function DirectorConsoleClient({
                         }
                         onDrop={(event) => handleLibraryDrop(event, file.id)}
                         onDragEnd={clearLibraryDragState}
-                        onPointerDown={() => {
-                          void primeEffectsAudio();
-                        }}
                         onClick={() => void playEffect(file)}
                         role="button"
                         tabIndex={0}
@@ -3448,24 +4964,426 @@ export default function DirectorConsoleClient({
                       </div>
                     ))}
                   </div>
-                ) : (
+                    {!filteredLibraryFiles.length ? (
+                      <div className="mt-3 rounded-[22px] border border-white/10 bg-black/20 px-4 py-5 text-left text-sm text-zinc-400">
+                        No sound effects match &quot;{librarySearchQuery.trim()}&quot;.
+                      </div>
+                    ) : null}
+                  </>
+                ) : libraryPanelOpen ? (
                   <button
                     type="button"
-                    disabled
+                    onClick={() => {
+                      void fetchAudioLibrary({
+                        force: true,
+                      });
+                    }}
                     className="w-full rounded-[22px] border border-white/10 bg-black/20 px-4 py-5 text-left text-sm text-zinc-400"
                   >
-                    Drop audio files into{" "}
+                    Load audio files from{" "}
                     <span className="font-semibold text-zinc-200">
                       public/audio/effects
                     </span>{" "}
-                    and they will appear here.
+                    when you want to refresh this deck.
                   </button>
+                ) : null}
+              </div>
+            </Card>
+          </div>
+
+          <div className="order-3 xl:order-3">
+            <Card
+              title="YouTube Deck"
+              subtitle="Videos and playlists"
+              icon={<FaYoutube />}
+              accent="cyan"
+              help={{
+                title: "YouTube Deck",
+                body: "Paste a YouTube video or playlist, then play it right here.",
+              }}
+              action={
+                <span className="inline-flex items-center gap-2 rounded-full border border-red-300/16 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-100 shadow-[0_10px_30px_rgba(239,68,68,0.14)]">
+                  <FaYoutube className="text-base text-red-300" />
+                  YouTube
+                </span>
+              }
+            >
+              <audio ref={audioRef} hidden />
+              <div className="space-y-4">
+                <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(8,25,34,0.34),rgba(10,10,14,0.52))] p-3">
+                  <label
+                    htmlFor="director-youtube-input"
+                    className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500"
+                  >
+                    Paste video or playlist
+                  </label>
+                  <p className="mt-2 text-sm text-zinc-400">
+                    Open YouTube, copy the link, then paste it here.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <a
+                      href="https://www.youtube.com/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-full border border-red-300/16 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-100 transition hover:bg-red-500/16"
+                    >
+                      <FaYoutube className="text-sm text-red-300" />
+                      Open YouTube
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => void handlePasteMusicLink()}
+                      className="inline-flex items-center gap-2 rounded-full border border-cyan-300/16 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-400/16"
+                    >
+                      Paste link
+                    </button>
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      id="director-youtube-input"
+                      type="url"
+                      inputMode="url"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      value={musicInput}
+                      onChange={(event) => setMusicInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void handleAddMusicTrack();
+                        }
+                      }}
+                      placeholder={
+                        isPlaylistInput
+                          ? "https://youtube.com/playlist?list=..."
+                          : "https://youtube.com/watch?v=..."
+                      }
+                      className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 text-base text-white outline-none transition placeholder:text-zinc-500 focus:border-cyan-300/26 focus:bg-white/7"
+                    />
+                    <LoadingButton
+                      type="button"
+                      onClick={() => void handleAddMusicTrack()}
+                      loading={isAddingMusicTrack}
+                      pendingLabel={isPlaylistInput ? "Importing..." : "Adding..."}
+                      disabled={!String(musicInput || "").trim()}
+                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(90deg,#22d3ee_0%,#3b82f6_100%)] px-4 py-3 text-sm font-semibold text-black shadow-[0_14px_34px_rgba(34,211,238,0.18)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isPlaylistInput ? <FaYoutube /> : <FaCompactDisc />}
+                      {isPlaylistInput ? "Import playlist" : "Add video"}
+                    </LoadingButton>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-1.5">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setDirectorAudioMode("cut")}
+                      aria-pressed={directorAudioMode === "cut"}
+                      className={`rounded-[20px] px-4 py-3 text-left transition ${
+                        directorAudioMode === "cut"
+                          ? "bg-[linear-gradient(135deg,rgba(127,29,29,0.9),rgba(239,68,68,0.18))] text-white shadow-[0_14px_28px_rgba(127,29,29,0.18)]"
+                          : "bg-transparent text-zinc-300 hover:bg-white/4"
+                      }`}
+                    >
+                      <p className="text-sm font-semibold">Cut music</p>
+                      <p className="mt-1 text-xs text-zinc-400">
+                        Pause YouTube for score calls, then resume.
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDirectorAudioMode("duck")}
+                      aria-pressed={directorAudioMode === "duck"}
+                      className={`rounded-[20px] px-4 py-3 text-left transition ${
+                        directorAudioMode === "duck"
+                          ? "bg-[linear-gradient(135deg,rgba(8,47,73,0.92),rgba(34,211,238,0.16))] text-white shadow-[0_14px_28px_rgba(8,145,178,0.18)]"
+                          : "bg-transparent text-zinc-300 hover:bg-white/4"
+                      }`}
+                    >
+                      <p className="text-sm font-semibold">Duck music</p>
+                      <p className="mt-1 text-xs text-zinc-400">
+                        Keep YouTube on and lower it under score calls.
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(8,25,34,0.38),rgba(10,10,14,0.52))]">
+                  <div className="relative aspect-video bg-black">
+                    {currentTrack ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={
+                            currentTrack.thumbnailUrl ||
+                            buildYouTubeThumbnailUrl(currentTrack.videoId)
+                          }
+                          alt={currentTrack.name}
+                          className={`absolute inset-0 h-full w-full object-cover transition duration-300 ${
+                            musicState === "playing" && musicPlayerReady
+                              ? "opacity-0"
+                              : "opacity-100"
+                          }`}
+                        />
+                        <div
+                          className={`absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.18),rgba(0,0,0,0.62))] transition ${
+                            musicState === "playing" && musicPlayerReady
+                              ? "opacity-0"
+                              : "opacity-100"
+                          }`}
+                        />
+                      </>
+                    ) : null}
+                    <div
+                      ref={youtubePlayerHostRef}
+                      className={`h-full w-full transition ${
+                        currentTrack ? "opacity-100" : "pointer-events-none opacity-0"
+                      }`}
+                      style={{ pointerEvents: "none" }}
+                    />
+                    {!currentTrack ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-5 text-center">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/6 text-zinc-300">
+                          <FaMusic className="text-lg" />
+                        </div>
+                        <div>
+                          <p className="text-lg font-semibold text-white">
+                            No video loaded
+                          </p>
+                          <p className="mt-1 text-sm text-zinc-400">
+                            Paste a YouTube link to start.
+                          </p>
+                        </div>
+                      </div>
+                    ) : currentTrack && (!musicPlayerReady || musicPlayerError) ? (
+                      <div className="absolute inset-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={
+                            currentTrack.thumbnailUrl ||
+                            buildYouTubeThumbnailUrl(currentTrack.videoId)
+                          }
+                          alt={currentTrack.name}
+                          className="h-full w-full object-cover opacity-72"
+                        />
+                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.28),rgba(0,0,0,0.78))]" />
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-5 text-center">
+                          <p className="text-lg font-semibold text-white">
+                            {musicPlayerError || "Loading player..."}
+                          </p>
+                          <p className="max-w-xs text-sm text-zinc-300">
+                            If it takes too long, open the video in YouTube and paste
+                            another link.
+                          </p>
+                          <a
+                            href={currentTrack.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/8 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/12"
+                          >
+                            <FaExternalLinkAlt className="text-xs" />
+                            Open on YouTube
+                          </a>
+                        </div>
+                      </div>
+                    ) : null}
+                    {currentTrack ? (
+                      <button
+                        type="button"
+                        onClick={handleToggleMusicPlayback}
+                        className="absolute inset-0 z-10 flex items-center justify-center"
+                        aria-label={
+                          musicState === "playing"
+                            ? "Pause video"
+                            : "Play video"
+                        }
+                      >
+                        <div
+                          className={`inline-flex h-18 w-18 items-center justify-center rounded-full border border-white/18 shadow-[0_16px_36px_rgba(0,0,0,0.32)] transition ${
+                            musicState === "playing" && musicPlayerReady
+                              ? "bg-black/28 text-white/92 opacity-0 hover:opacity-100"
+                              : "bg-white/16 text-white opacity-100 backdrop-blur-sm"
+                          }`}
+                        >
+                          {musicState === "playing" && musicPlayerReady ? (
+                            <FaPause className="text-xl" />
+                          ) : (
+                            <FaPlay className="ml-1 text-xl" />
+                          )}
+                        </div>
+                      </button>
+                    ) : null}
+                    {currentTrack ? (
+                      <div className="pointer-events-none absolute bottom-3 left-3 z-10 inline-flex items-center gap-2 rounded-full border border-white/14 bg-black/45 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/88 backdrop-blur-sm">
+                        <FaYoutube className="text-red-300" />
+                        {musicState === "playing" && musicPlayerReady
+                          ? "Tap video to pause"
+                          : "Tap video to play"}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(8,25,34,0.38),rgba(10,10,14,0.52))] px-4 py-4">
+                  <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(34,211,238,0.82)_18%,rgba(59,130,246,0.76)_56%,rgba(250,204,21,0.34)_82%,rgba(0,0,0,0))]" />
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                        Now playing
+                      </p>
+                      <p className="mt-2 line-clamp-2 text-lg font-semibold text-white">
+                        {currentTrack ? currentTrack.name : "No video loaded"}
+                      </p>
+                    </div>
+                    {currentTrack ? (
+                      <a
+                        href={currentTrack.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
+                        aria-label="Open on YouTube"
+                      >
+                        <FaExternalLinkAlt className="text-xs" />
+                      </a>
+                    ) : null}
+                  </div>
+                  <p className="mt-2 text-sm text-zinc-400">
+                    {musicMessage ||
+                      (musicState === "playing"
+                        ? "Playing"
+                        : musicState === "paused"
+                          ? "Paused"
+                          : "Ready")}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleNextMusic}
+                    disabled={!currentTrack || musicTracks.length < 2}
+                    className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/6 text-white disabled:cursor-not-allowed disabled:text-zinc-500"
+                    aria-label="Next track"
+                  >
+                    <FaForward />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleStopMusic}
+                    disabled={!currentTrack}
+                    className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/6 text-white disabled:cursor-not-allowed disabled:text-zinc-500"
+                    aria-label="Stop music"
+                  >
+                    <FaStop />
+                  </button>
+                </div>
+
+                <label className="space-y-2 pb-1">
+                  <span className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                    Music volume
+                  </span>
+                  <div className="director-gradient-slider">
+                    <div
+                      className="pointer-events-none absolute inset-y-0 left-0 rounded-full bg-[linear-gradient(90deg,#22d3ee_0%,#38bdf8_26%,#3b82f6_52%,#facc15_78%,#f59e0b_100%)]"
+                      style={{ width: `${Math.round(musicVolume * 100)}%` }}
+                    />
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={musicVolume}
+                      onChange={(event) =>
+                        setMusicVolume(Number(event.target.value))
+                      }
+                      className="director-gradient-slider__input"
+                    />
+                  </div>
+                </label>
+
+                {musicTracks.length ? (
+                  <div className="rounded-3xl border border-white/10 bg-black/20 p-3">
+                    <div className="mb-3 flex items-center justify-between gap-3 px-1">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                          Playlist
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-white">
+                          {musicTracks.length} {musicTracks.length === 1 ? "track" : "tracks"}
+                        </p>
+                      </div>
+                      {currentTrack ? (
+                        <div className="rounded-full border border-emerald-300/16 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100">
+                          {currentTrackIndex + 1} / {musicTracks.length}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="max-h-92 space-y-2 overflow-y-auto pr-1">
+                      {musicTracks.map((track, index) => (
+                        <div
+                          key={track.id}
+                          ref={(node) => {
+                            if (node) {
+                              musicTrackRowRefs.current.set(track.id, node);
+                            } else {
+                              musicTrackRowRefs.current.delete(track.id);
+                            }
+                          }}
+                          className={`flex items-center gap-3 rounded-2xl border px-3 py-2 ${
+                            index === currentTrackIndex
+                              ? "border-emerald-300/18 bg-emerald-500/10"
+                              : "border-white/8 bg-white/3"
+                          }`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={track.thumbnailUrl || buildYouTubeThumbnailUrl(track.videoId)}
+                            alt={track.name}
+                            className="h-12 w-20 shrink-0 rounded-xl object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSelectMusicTrack(index)}
+                            className="min-w-0 flex-1 text-left"
+                          >
+                            <div className="truncate text-sm font-semibold text-white">
+                              {track.name}
+                            </div>
+                            <div className="mt-1 flex items-center gap-2 text-xs text-zinc-400">
+                              <span className="rounded-full border border-white/10 bg-white/4 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-300">
+                                #{index + 1}
+                              </span>
+                              {index === currentTrackIndex
+                                ? musicState === "playing"
+                                  ? "Live"
+                                  : "Ready"
+                                : "Tap to load"}
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMusicTrack(track.id)}
+                            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-rose-500/18 hover:text-rose-100"
+                            aria-label={`Remove ${track.name}`}
+                          >
+                            <FaTrash className="text-sm" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2 rounded-3xl border border-white/10 bg-black/20 px-4 py-4 text-center text-sm text-zinc-400">
+                    Paste a YouTube video or playlist above to build the deck.
+                  </div>
                 )}
               </div>
             </Card>
           </div>
 
-          <div className="order-4 xl:order-4 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
+          <div className="order-5 xl:order-5 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1">
               <FaHeadphones className="text-zinc-200" />
               {speakerMessage || "Using phone speaker output."}
@@ -3473,7 +5391,7 @@ export default function DirectorConsoleClient({
           </div>
         </div>
 
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <Card
             title="Score announcer"
             subtitle="Live score readout"
@@ -3528,143 +5446,6 @@ export default function DirectorConsoleClient({
                   ? "Read current score"
                   : "Choose session first"}
               </button>
-            </div>
-          </Card>
-
-          <Card
-            title="Music Deck"
-            subtitle="Files on this phone"
-            icon={<FaMusic />}
-            accent="cyan"
-            help={{
-              title: "Music Deck",
-              body: "Use audio files from Files, Downloads, or this phone. Connect a Bluetooth speaker first for louder playback. External apps like Spotify or Apple Music cannot be controlled here.",
-            }}
-            action={
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black shadow-[0_10px_30px_rgba(16,185,129,0.2)]">
-                <FaCompactDisc />
-                Add tracks
-                <input
-                  type="file"
-                  accept="audio/*"
-                  multiple
-                  className="hidden"
-                  onChange={handleMusicSelection}
-                />
-              </label>
-            }
-          >
-            <audio ref={audioRef} onEnded={handleTrackEnd} hidden />
-            <div className="space-y-4">
-              <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(8,25,34,0.38),rgba(10,10,14,0.52))] px-4 py-4">
-                <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(34,211,238,0.82)_18%,rgba(59,130,246,0.76)_56%,rgba(250,204,21,0.34)_82%,rgba(0,0,0,0))]" />
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                  Now playing
-                </p>
-                <p className="mt-2 text-lg font-semibold text-white">
-                  {currentTrack ? currentTrack.name : "No track loaded"}
-                </p>
-                <p className="mt-1 text-sm text-zinc-400">
-                  {musicMessage ||
-                    (musicState === "playing"
-                      ? "Playing"
-                      : musicState === "paused"
-                        ? "Paused"
-                        : "Ready")}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handlePlayMusic();
-                  }}
-                  disabled={!currentTrack}
-                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-black disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-                  aria-label="Play music"
-                >
-                  <FaPlay />
-                </button>
-                <button
-                  type="button"
-                  onClick={handlePauseMusic}
-                  disabled={!currentTrack}
-                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/6 text-white disabled:cursor-not-allowed disabled:text-zinc-500"
-                  aria-label="Pause music"
-                >
-                  <FaPause />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNextMusic}
-                  disabled={!currentTrack || musicTracks.length < 2}
-                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/6 text-white disabled:cursor-not-allowed disabled:text-zinc-500"
-                  aria-label="Next track"
-                >
-                  <FaForward />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleStopMusic}
-                  disabled={!currentTrack}
-                  className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/6 text-white disabled:cursor-not-allowed disabled:text-zinc-500"
-                  aria-label="Stop music"
-                >
-                  <FaStop />
-                </button>
-              </div>
-
-              <label className="space-y-2 pb-1">
-                <span className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                  Music volume
-                </span>
-                <div className="director-gradient-slider">
-                  <div
-                    className="pointer-events-none absolute inset-y-0 left-0 rounded-full bg-[linear-gradient(90deg,#22d3ee_0%,#38bdf8_26%,#3b82f6_52%,#facc15_78%,#f59e0b_100%)]"
-                    style={{ width: `${Math.round(musicVolume * 100)}%` }}
-                  />
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={musicVolume}
-                    onChange={(event) =>
-                      setMusicVolume(Number(event.target.value))
-                    }
-                    className="director-gradient-slider__input"
-                  />
-                </div>
-              </label>
-
-              {musicTracks.length ? (
-                <div className="space-y-2 rounded-3xl border border-white/10 bg-black/20 p-3">
-                  {musicTracks.map((track, index) => (
-                    <button
-                      key={track.id}
-                      type="button"
-                      onClick={() => setCurrentTrackIndex(index)}
-                      className={`flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left text-sm ${
-                        index === currentTrackIndex
-                          ? "bg-emerald-500/12 text-emerald-100"
-                          : "text-zinc-300 hover:bg-white/4"
-                      }`}
-                    >
-                      <span className="truncate">{track.name}</span>
-                      {index === currentTrackIndex ? (
-                        <span className="text-xs font-semibold uppercase tracking-[0.16em]">
-                          Live
-                        </span>
-                      ) : null}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-2 rounded-3xl border border-white/10 bg-black/20 px-4 py-4 text-center text-sm text-zinc-400">
-                  Add audio files from Files, Downloads, or this phone.
-                </div>
-              )}
             </div>
           </Card>
 

@@ -7,12 +7,14 @@ import {
   versionedSocialImagePath,
 } from "../../lib/site-metadata";
 import { loadPublicMatchData } from "../../lib/server-data";
+import { cache } from "react";
 
 export const dynamic = "force-dynamic";
+const loadPublicMatchDataCached = cache(loadPublicMatchData);
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
-  const match = await loadPublicMatchData(id);
+  const match = await loadPublicMatchDataCached(id);
   if (!match) {
     return {
       title: "Result Not Found",
@@ -54,7 +56,7 @@ export async function generateMetadata({ params }) {
 
 export default async function ResultPage({ params }) {
   const { id } = await params;
-  const initialMatch = await loadPublicMatchData(id);
+  const initialMatch = await loadPublicMatchDataCached(id);
   if (!initialMatch) {
     notFound();
   }

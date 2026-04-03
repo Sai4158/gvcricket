@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { AnimatePresence } from "framer-motion";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   FaArrowLeft,
   FaArrowRight,
+  FaCircle,
   FaInfoCircle,
+  FaRedo,
 } from "react-icons/fa";
 import TeamsInfoModal from "../../components/teams/InfoModal";
 import TeamRoster, {
@@ -17,82 +19,228 @@ import LoadingButton from "../../components/shared/LoadingButton";
 import LiquidSportText from "../../components/home/LiquidSportText";
 import {
   clearPendingSessionImage,
+  clearPendingSessionImageNotice,
   getPendingSessionImage,
+  getPendingSessionImageNotice,
   uploadPendingSessionImageToDraftSession,
 } from "../../lib/pending-session-image";
 import { primeUiAudio } from "../../lib/page-audio";
 import StepFlow from "../../components/shared/StepFlow";
+import useSpeechAnnouncer from "../../components/live/useSpeechAnnouncer";
+import { CoinHeads, CoinTails, SpinningCoin } from "../../components/toss/CoinArt";
 
-export default function TeamSelectionPageClient() {
-  const { id: sessionId } = useParams();
+const TEAM_SETUP_TOSS_ANNOUNCER_SETTINGS = {
+  enabled: true,
+  muted: false,
+  volume: 1,
+  mode: "full",
+};
+
+async function readJsonSafely(response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+export default function TeamSelectionPageClient({ sessionId }) {
+  const resolvedSessionId = String(sessionId || "").trim();
   const router = useRouter();
-  const draftTokenKey = `session_${sessionId}_draftToken`;
+  const draftTokenKey = `session_${resolvedSessionId}_draftToken`;
   const [teamA, setTeamA] = useSessionStorageState(
-    `session_${sessionId}_teamA_v2`,
+    `session_${resolvedSessionId}_teamA_v2`,
     createDefaultRoster("Team Blue")
   );
   const [teamB, setTeamB] = useSessionStorageState(
-    `session_${sessionId}_teamB_v2`,
+    `session_${resolvedSessionId}_teamB_v2`,
     createDefaultRoster("Team Red")
   );
   const [overs, setOvers] = useSessionStorageState(
-    `session_${sessionId}_overs_v2`,
+    `session_${resolvedSessionId}_overs_v2`,
     6
   );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [imageUploadState, setImageUploadState] = useState("idle");
+  const [imageUploadNotice, setImageUploadNotice] = useState("");
+  const [tossStatus, setTossStatus] = useState("choosing");
+  const [tossCountdown, setTossCountdown] = useState(3);
+  const [tossCall, setTossCall] = useState("");
+  const [tossSide, setTossSide] = useState("");
+  const imageUploadPromiseRef = useRef(null);
+  const spokenCountdownRef = useRef(null);
+  const { speak, prime, stop } = useSpeechAnnouncer(
+    TEAM_SETUP_TOSS_ANNOUNCER_SETTINGS
+  );
 
-  useEffect(() => {
+  const uploadDraftImageIfNeeded = useCallback(async () => {
     if (typeof window === "undefined") {
-      return undefined;
+      return true;
+    }
+
+    if (imageUploadPromiseRef.current) {
+      return imageUploadPromiseRef.current;
+    }
+
+    if (!resolvedSessionId) {
+      setImageUploadState("failed");
+      return false;
     }
 
     const draftToken = window.sessionStorage.getItem(draftTokenKey) || "";
     const pendingImage = getPendingSessionImage();
 
     if (!draftToken || !pendingImage?.dataUrl) {
-      return undefined;
+      setImageUploadState("done");
+      return true;
     }
-
-    let isMounted = true;
 
     setImageUploadState("uploading");
 
-    void uploadPendingSessionImageToDraftSession({
-      sessionId,
+    const uploadPromise = uploadPendingSessionImageToDraftSession({
+      sessionId: resolvedSessionId,
       draftToken,
       pendingImage,
     })
       .then((didUpload) => {
         if (didUpload) {
           clearPendingSessionImage();
-          if (!isMounted) return;
+          clearPendingSessionImageNotice(resolvedSessionId);
+          setImageUploadNotice("");
           setImageUploadState("done");
-          return;
+          return true;
         }
 
-        if (!isMounted) return;
         setImageUploadState("failed");
+        return false;
       })
       .catch(() => {
-        if (!isMounted) return;
         setImageUploadState("failed");
+        return false;
+      })
+      .finally(() => {
+        imageUploadPromiseRef.current = null;
       });
+
+    imageUploadPromiseRef.current = uploadPromise;
+    return uploadPromise;
+  }, [draftTokenKey, resolvedSessionId]);
+
+  useEffect(() => {
+    const pendingImage = getPendingSessionImage();
+
+    if (!pendingImage?.dataUrl) {
+      clearPendingSessionImageNotice(resolvedSessionId);
+      setImageUploadNotice("");
+      setImageUploadState("done");
+      return;
+    }
+
+    setImageUploadNotice(getPendingSessionImageNotice(resolvedSessionId));
+  }, [resolvedSessionId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    if (!window.sessionStorage.getItem(draftTokenKey) || !getPendingSessionImage()?.dataUrl) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    void uploadDraftImageIfNeeded().then((didUpload) => {
+      if (!isMounted || didUpload) {
+        return;
+      }
+      setImageUploadState("failed");
+    });
 
     return () => {
       isMounted = false;
     };
-  }, [draftTokenKey, sessionId]);
+  }, [draftTokenKey, resolvedSessionId, uploadDraftImageIfNeeded]);
+
+  useEffect(() => {
+    if (tossStatus !== "counting" || tossCountdown <= 0) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setTossCountdown((current) => current - 1);
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [tossCountdown, tossStatus]);
+
+  useEffect(() => {
+    if (
+      tossStatus !== "counting" ||
+      tossCountdown <= 0 ||
+      spokenCountdownRef.current === tossCountdown
+    ) {
+      return;
+    }
+
+    const didSpeak = speak(String(tossCountdown), { interrupt: true });
+    if (didSpeak) {
+      spokenCountdownRef.current = tossCountdown;
+    }
+  }, [speak, tossCountdown, tossStatus]);
+
+  useEffect(() => {
+    if (tossStatus !== "counting" || tossCountdown !== 0 || !tossCall) {
+      return undefined;
+    }
+
+    const resultTimer = window.setTimeout(() => {
+      const nextSide = Math.random() < 0.5 ? "heads" : "tails";
+      setTossSide(nextSide);
+      setTossStatus("finished");
+      speak(
+        `${nextSide} wins. Winner gets to pick the first player. Please edit team names, players and overs, then proceed to match toss on the next step.`,
+        {
+          interrupt: true,
+          priority: 3,
+        }
+      );
+    }, 700);
+
+    return () => window.clearTimeout(resultTimer);
+  }, [speak, tossCall, tossCountdown, tossStatus]);
+
+  useEffect(() => () => stop(), [stop]);
+
+  const handleTossChoice = (choice) => {
+    stop();
+    setError("");
+    setTossCall(choice);
+    setTossSide("");
+    spokenCountdownRef.current = null;
+    prime({ userGesture: true });
+    setTossCountdown(3);
+    setTossStatus("counting");
+  };
+
+  const redoCompactToss = () => {
+    stop();
+    setTossStatus("choosing");
+    setTossCountdown(3);
+    setTossCall("");
+    setTossSide("");
+    spokenCountdownRef.current = null;
+  };
 
   const deleteDraftSession = async () => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !resolvedSessionId) return;
     const draftToken = window.sessionStorage.getItem(draftTokenKey);
     if (!draftToken) return;
 
     try {
-      await fetch(`/api/sessions/${sessionId}`, {
+      await fetch(`/api/sessions/${resolvedSessionId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ draftToken }),
@@ -102,18 +250,26 @@ export default function TeamSelectionPageClient() {
       // Ignore cleanup errors; the session is hidden as a draft anyway.
     } finally {
       window.sessionStorage.removeItem(draftTokenKey);
-      window.sessionStorage.removeItem(`session_${sessionId}_teamA_v2`);
-      window.sessionStorage.removeItem(`session_${sessionId}_teamB_v2`);
-      window.sessionStorage.removeItem(`session_${sessionId}_overs_v2`);
+      clearPendingSessionImageNotice(resolvedSessionId);
+      window.sessionStorage.removeItem(`session_${resolvedSessionId}_teamA_v2`);
+      window.sessionStorage.removeItem(`session_${resolvedSessionId}_teamB_v2`);
+      window.sessionStorage.removeItem(`session_${resolvedSessionId}_overs_v2`);
     }
   };
 
   const handleBack = async () => {
+    stop();
     await deleteDraftSession();
     router.push("/session/new");
   };
 
   const handleSubmit = async () => {
+    stop();
+    if (!resolvedSessionId) {
+      setError("Session is still loading. Please try again.");
+      return;
+    }
+
     const finalTeamAName = teamA.name.trim();
     const finalTeamBName = teamB.name.trim();
     const finalTeamAPlayers = teamA.players.map((player) => player.trim()).filter(Boolean);
@@ -134,7 +290,11 @@ export default function TeamSelectionPageClient() {
     await primeUiAudio().catch(() => false);
 
     try {
-      const response = await fetch(`/api/sessions/${sessionId}/setup-match`, {
+      if (getPendingSessionImage()?.dataUrl) {
+        void uploadDraftImageIfNeeded();
+      }
+
+      const response = await fetch(`/api/sessions/${resolvedSessionId}/setup-match`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -149,15 +309,15 @@ export default function TeamSelectionPageClient() {
               : "",
         }),
       });
+      const payload = await readJsonSafely(response);
 
       if (!response.ok) {
         throw new Error(
-          (await response.json()).message || "Failed to set up the match."
+          payload?.message || "Failed to set up the match."
         );
       }
 
-      await response.json();
-      router.push(`/toss/${sessionId}`);
+      router.push(`/toss/${resolvedSessionId}`);
     } catch (caughtError) {
       setError(caughtError.message);
       setIsLoading(false);
@@ -194,14 +354,112 @@ export default function TeamSelectionPageClient() {
               text="TEAM SELECTION"
               variant="hero-bright"
               simplifyMotion
-              className="text-[2.2rem] font-semibold uppercase tracking-[-0.045em] sm:text-[2.95rem]"
+              className="text-[2.45rem] font-semibold uppercase tracking-[-0.05em] sm:text-[3.2rem]"
               lineClassName="leading-[0.94]"
             />
           </div>
           <p className="mx-auto mt-4 max-w-xl text-center text-sm leading-6 text-zinc-400 sm:text-base">
-            Set team names, squad size, and overs before the toss.
+            Optional toss first, then teams and overs.
           </p>
         </header>
+
+        <section className="mb-8">
+          <div className="relative overflow-hidden rounded-[30px] border border-amber-400/18 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.12),transparent_34%),linear-gradient(180deg,rgba(20,20,24,0.96),rgba(10,10,14,0.98))] p-5 shadow-[0_18px_45px_rgba(0,0,0,0.22)]">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 overflow-hidden bg-[linear-gradient(90deg,rgba(59,130,246,0.96)_0%,rgba(96,165,250,0.88)_36%,rgba(251,113,133,0.86)_64%,rgba(239,68,68,0.96)_100%)] shadow-[0_0_18px_rgba(96,165,250,0.22)]" />
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),transparent_18%)]" />
+            <div className="mb-4 text-center">
+              <LiquidSportText
+                as="h2"
+                text={["WINNER PICKS", "FIRST PLAYER"]}
+                variant="hero-bright"
+                simplifyMotion
+                className="text-[1.36rem] font-semibold uppercase tracking-[0.08em] sm:text-[1.52rem]"
+                lineClassName="leading-[1.24]"
+              />
+            </div>
+
+            <div className="mb-4 flex justify-center">
+              {tossStatus !== "choosing" ? (
+                <button
+                  type="button"
+                  onClick={redoCompactToss}
+                  className="btn-ui btn-ui-quiet inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em]"
+                >
+                  <FaRedo className="text-[0.8rem]" />
+                  Redo
+                </button>
+              ) : null}
+            </div>
+
+            <div className="rounded-[28px] border border-white/10 bg-black/20 px-5 py-6">
+              <div className="flex min-h-[240px] flex-col items-center justify-center text-center">
+                {tossStatus === "choosing" ? (
+                  <>
+                    <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-400">
+                      <FaCircle className="text-[8px] text-amber-300" />
+                      Pick Call
+                    </div>
+                    <div className="mb-5 scale-[0.88]">
+                      <motion.div
+                        animate={{ rotateY: 720 }}
+                        transition={{
+                          duration: 6,
+                          ease: "linear",
+                          repeat: Number.POSITIVE_INFINITY,
+                        }}
+                        className="[transform-style:preserve-3d]"
+                      >
+                        <SpinningCoin />
+                      </motion.div>
+                    </div>
+                    <div className="grid w-full max-w-sm grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleTossChoice("heads")}
+                        className="btn-ui btn-ui-glass-dark rounded-[24px] px-4 py-4 text-base font-bold uppercase tracking-[0.22em]"
+                      >
+                        Heads
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleTossChoice("tails")}
+                        className="btn-ui btn-ui-glass-dark-alt rounded-[24px] px-4 py-4 text-base font-bold uppercase tracking-[0.22em]"
+                      >
+                        Tails
+                      </button>
+                    </div>
+                  </>
+                ) : tossStatus === "counting" ? (
+                  <>
+                    <motion.div
+                      className="mb-3 [transform-style:preserve-3d]"
+                      animate={{ rotateY: 1440 }}
+                      transition={{ duration: 2.2, ease: "easeInOut" }}
+                    >
+                      <SpinningCoin />
+                    </motion.div>
+                    <p className="text-6xl font-black text-white">{tossCountdown}</p>
+                    <p className="mt-2 text-xs uppercase tracking-[0.24em] text-amber-200/70">
+                      {tossCall}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="mb-4 scale-[0.88]">
+                      {tossSide === "heads" ? <CoinHeads /> : <CoinTails />}
+                    </div>
+                    <p className="text-2xl font-black uppercase tracking-[0.14em] text-white">
+                      {tossSide}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                      Scroll and proceed to match toss
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
 
         <section className="grid md:grid-cols-2 gap-8 mb-10">
           <TeamRoster color="blue" roster={teamA} setRoster={setTeamA} />
@@ -251,8 +509,11 @@ export default function TeamSelectionPageClient() {
             <p className="text-center text-xs font-medium text-cyan-200/80">
               Cover image is uploading in the background while you set up teams.
             </p>
-          ) : null}
-          {imageUploadState === "failed" ? (
+          ) : imageUploadNotice ? (
+            <p className="text-center text-xs font-medium text-zinc-500">
+              {imageUploadNotice}
+            </p>
+          ) : imageUploadState === "failed" ? (
             <p className="text-center text-xs font-medium text-zinc-500">
               Cover image will keep trying later and will not block the match setup.
             </p>

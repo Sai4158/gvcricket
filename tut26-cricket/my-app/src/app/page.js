@@ -1,18 +1,16 @@
 import nextDynamic from "next/dynamic";
-import Image from "next/image";
-import BackToTopButton from "./components/home/BackToTopButton";
 import HeroSection from "./components/home/HeroSection";
 import HomeHeader from "./components/home/HomeHeader";
 import PrimaryActionsSection from "./components/home/PrimaryActionsSection";
-import { absoluteUrl, siteConfig } from "./lib/site-metadata";
+import SiteFooter from "./components/shared/SiteFooter";
 import { loadHomeLiveBannerData } from "./lib/server-data";
+import { absoluteUrl, siteConfig } from "./lib/site-metadata";
 
 const HowItWorksSection = nextDynamic(() => import("./components/home/HowItWorksSection"), { ssr: true });
 const CommunityHighlightsSection = nextDynamic(() => import("./components/home/CommunityHighlightsSection"), { ssr: true });
 const LearnCricketCard = nextDynamic(() => import("./components/home/LearnCricketCard"), { ssr: true });
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export const metadata = {
   title: "GV Cricket | Live Cricket Scoring, Umpire Mode, Match Control",
@@ -44,13 +42,7 @@ export const metadata = {
 };
 
 export default async function HomePage() {
-  let liveMatch = null;
-
-  try {
-    liveMatch = await loadHomeLiveBannerData();
-  } catch (error) {
-    console.error("Home live banner load failed:", error);
-  }
+  const liveMatch = await loadHomeLiveBannerData();
 
   return (
     <>
@@ -62,34 +54,7 @@ export default async function HomePage() {
           <HowItWorksSection />
           <CommunityHighlightsSection />
           <LearnCricketCard />
-          <footer className="border-t border-white/10 pt-14 pb-12 text-center">
-            <div className="mb-6 flex justify-center">
-              <BackToTopButton />
-            </div>
-            <div className="mx-auto mb-8 h-px w-full max-w-4xl bg-[linear-gradient(90deg,rgba(255,255,255,0.06),rgba(255,255,255,0.9),rgba(255,255,255,0.06))]" />
-            <div className="mb-8 flex justify-center">
-              <Image
-                src="/gvLogo.png"
-                alt="GV Cricket logo"
-                width={220}
-                height={220}
-                priority={false}
-                className="h-auto w-[150px] object-contain drop-shadow-[0_16px_40px_rgba(0,0,0,0.42)] sm:w-[180px]"
-              />
-            </div>
-            <p className="text-zinc-400">
-              &copy; {new Date().getFullYear()} GV Cricket. All rights reserved.
-            </p>
-            <p className="mt-2 text-sm text-zinc-500">
-              GV Cricket brings live score, umpire mode, spectator view, director controls, walkie-talkie, and results into one fast mobile flow.
-            </p>
-            <a
-              href="https://gvcricket.com"
-              className="mt-2 inline-block text-zinc-400 transition-colors duration-200 hover:text-zinc-200"
-            >
-              gvcricket.com
-            </a>
-          </footer>
+          <SiteFooter />
         </div>
       </main>
     </>

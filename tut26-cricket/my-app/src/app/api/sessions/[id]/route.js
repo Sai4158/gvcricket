@@ -8,27 +8,40 @@ import { connectDB } from "../../../lib/db";
 import {
   getMatchAccessCookieName,
   hasValidMatchAccess,
+  isValidManagePin,
   isValidUmpirePin,
 } from "../../../lib/match-access";
 import { serializePublicSession } from "../../../lib/public-data";
+import { enforceSmartPinRateLimit } from "../../../lib/pin-attempt-server";
 import { getRequestMeta } from "../../../lib/request-meta";
 import { enforceRateLimit } from "../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../lib/request-security";
 import { hasValidDraftToken } from "../../../lib/session-draft";
+import { invalidateSessionsDataCache } from "../../../lib/server-data";
 import {
   pinSchema,
-  sessionDraftDeleteSchema,
   sessionPatchObjectSchema,
+  secretPinSchema,
 } from "../../../lib/validators";
 
 const sessionAdminPatchSchema = z
   .object({
-    pin: pinSchema.optional(),
+    pin: z.union([pinSchema, secretPinSchema]).optional(),
   })
   .extend(sessionPatchObjectSchema.shape)
   .strict()
   .refine((value) => Object.keys(value).some((key) => key !== "pin"), {
     message: "No valid session fields provided.",
+  });
+
+const sessionDeleteSchema = z
+  .object({
+    draftToken: z.string().trim().optional(),
+    pin: secretPinSchema.optional(),
+  })
+  .strict()
+  .refine((value) => Boolean(value.draftToken || value.pin), {
+    message: "A draft token or manage PIN is required.",
   });
 
 async function hasSessionAdminAccess(session) {
@@ -84,6 +97,22 @@ export async function PATCH(req, { params }) {
     if (!parsedRequest.ok) {
       return jsonError(parsedRequest.message, parsedRequest.status);
     }
+    const pinValue = String(parsedRequest.value.pin || "").trim();
+    if (pinValue) {
+      const pinAttemptLimit = enforceSmartPinRateLimit({
+        key: `session-patch-pin:${id}:${meta.ip}`,
+        longLimit: 5,
+        longWindowMs: 5 * 60 * 1000,
+        longBlockMs: 2 * 60 * 1000,
+      });
+
+      if (!pinAttemptLimit.allowed) {
+        return jsonRateLimit(
+          "Too many PIN attempts. Try again shortly.",
+          pinAttemptLimit.retryAfterMs,
+        );
+      }
+    }
 
     await connectDB();
     const session = await Session.findById(id);
@@ -92,8 +121,8 @@ export async function PATCH(req, { params }) {
     }
 
     const hasCookieAccess = await hasSessionAdminAccess(session);
-    const hasPinAccess = parsedRequest.value.pin
-      ? isValidUmpirePin(parsedRequest.value.pin)
+    const hasPinAccess = pinValue
+      ? isValidUmpirePin(pinValue) || isValidManagePin(pinValue)
       : false;
 
     if (!hasCookieAccess && !hasPinAccess) {
@@ -126,6 +155,7 @@ export async function PATCH(req, { params }) {
           teamBName: session.teamBName,
           overs: session.overs,
           tossWinner: session.tossWinner,
+          matchImages: session.matchImages,
           matchImageUrl: session.matchImageUrl,
           matchImagePublicId: session.matchImagePublicId,
           matchImageUploadedAt: session.matchImageUploadedAt,
@@ -137,6 +167,17 @@ export async function PATCH(req, { params }) {
           adminAccessVersion: session.adminAccessVersion,
         },
       });
+    }
+
+    invalidateSessionsDataCache();
+    {
+      const { publishMatchUpdate, publishSessionUpdate } = await import(
+        "../../../lib/live-updates"
+      );
+      if (session.match) {
+        publishMatchUpdate(String(session.match));
+      }
+      publishSessionUpdate(id);
     }
 
     await writeAuditLog({
@@ -163,7 +204,7 @@ export async function DELETE(req, { params }) {
   const { id } = await params;
   const meta = getRequestMeta(req);
   const deleteLimit = enforceRateLimit({
-    key: `session-draft-delete:${id}:${meta.ip}`,
+    key: `session-delete:${id}:${meta.ip}`,
     limit: 6,
     windowMs: 60 * 1000,
     blockMs: 60 * 1000,
@@ -171,17 +212,33 @@ export async function DELETE(req, { params }) {
 
   if (!deleteLimit.allowed) {
     return jsonRateLimit(
-      "Too many draft delete attempts. Try again shortly.",
+      "Too many delete attempts. Try again shortly.",
       deleteLimit.retryAfterMs
     );
   }
 
   try {
-    const parsedRequest = await parseJsonRequest(req, sessionDraftDeleteSchema, {
+    const parsedRequest = await parseJsonRequest(req, sessionDeleteSchema, {
       maxBytes: 4096,
     });
     if (!parsedRequest.ok) {
       return jsonError(parsedRequest.message, parsedRequest.status);
+    }
+    const pinValue = String(parsedRequest.value.pin || "").trim();
+    if (pinValue) {
+      const pinAttemptLimit = enforceSmartPinRateLimit({
+        key: `session-delete-pin:${id}:${meta.ip}`,
+        longLimit: 5,
+        longWindowMs: 5 * 60 * 1000,
+        longBlockMs: 2 * 60 * 1000,
+      });
+
+      if (!pinAttemptLimit.allowed) {
+        return jsonRateLimit(
+          "Too many PIN attempts. Try again shortly.",
+          pinAttemptLimit.retryAfterMs,
+        );
+      }
     }
 
     await connectDB();
@@ -190,24 +247,72 @@ export async function DELETE(req, { params }) {
       return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
     }
 
-    if (!session.isDraft || session.match || session.isLive) {
-      return jsonError("Only unfinished draft sessions can be removed.", 409);
+    if (
+      session.isDraft &&
+      !session.match &&
+      !session.isLive &&
+      parsedRequest.value.draftToken
+    ) {
+      if (!hasValidDraftToken(session, parsedRequest.value.draftToken)) {
+        return jsonError("Draft access denied.", 403);
+      }
+
+      await Session.deleteOne({ _id: id });
+      invalidateSessionsDataCache();
+      const { publishSessionUpdate } = await import("../../../lib/live-updates");
+      publishSessionUpdate(id);
+
+      await writeAuditLog({
+        action: "session_draft_delete",
+        targetType: "session",
+        targetId: id,
+        status: "success",
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+      });
+
+      return Response.json(
+        { ok: true },
+        {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        }
+      );
     }
 
-    if (!hasValidDraftToken(session, parsedRequest.value.draftToken)) {
-      return jsonError("Draft access denied.", 403);
+    const hasCookieAccess = await hasSessionAdminAccess(session);
+    const hasPinAccess = pinValue ? isValidManagePin(pinValue) : false;
+
+    if (!hasCookieAccess && !hasPinAccess) {
+      return jsonError("Manage access denied.", 403);
     }
 
+    const matchId = session.match ? String(session.match) : "";
+    if (matchId) {
+      await Match.deleteOne({ _id: matchId });
+    }
     await Session.deleteOne({ _id: id });
+    invalidateSessionsDataCache();
 
     await writeAuditLog({
-      action: "session_draft_delete",
+      action: "session_delete",
       targetType: "session",
       targetId: id,
       status: "success",
       ip: meta.ip,
       userAgent: meta.userAgent,
     });
+
+    {
+      const { publishMatchUpdate, publishSessionUpdate } = await import(
+        "../../../lib/live-updates"
+      );
+      if (matchId) {
+        publishMatchUpdate(matchId);
+      }
+      publishSessionUpdate(id);
+    }
 
     return Response.json(
       { ok: true },
@@ -218,6 +323,6 @@ export async function DELETE(req, { params }) {
       }
     );
   } catch {
-    return jsonError("Could not remove the draft session.", 500);
+    return jsonError("Could not remove the session.", 500);
   }
 }

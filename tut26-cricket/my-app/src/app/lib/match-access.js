@@ -13,6 +13,19 @@ function getConfiguredPinValue() {
   );
 }
 
+function getConfiguredManagePinValue() {
+  return (
+    process.env.SESSION_MANAGE_PIN ||
+    process.env.MATCH_MEDIA_PIN ||
+    process.env.UMPIRE_PIN ||
+    ""
+  );
+}
+
+function getConfiguredManagePinHashValue() {
+  return process.env.SESSION_MANAGE_PIN_HASH || "";
+}
+
 function getConfiguredPinHashValue() {
   return (
     process.env.UMPIRE_ADMIN_PIN_HASH ||
@@ -33,12 +46,29 @@ function getAccessSecret() {
   );
 }
 
+function getManageSecret() {
+  return (
+    process.env.SESSION_MANAGE_ACCESS_SECRET ||
+    process.env.SESSION_MANAGE_PIN ||
+    process.env.MATCH_ACCESS_SECRET ||
+    getAccessSecret()
+  );
+}
+
 function hashPin(pin) {
   return crypto.scryptSync(String(pin || ""), getAccessSecret(), 64);
 }
 
+function hashManagePin(pin) {
+  return crypto.scryptSync(String(pin || "").trim(), getManageSecret(), 64);
+}
+
 export function getConfiguredUmpirePin() {
   return getConfiguredPinValue();
+}
+
+export function getConfiguredManagePin() {
+  return getConfiguredManagePinValue();
 }
 
 export function isValidUmpirePin(pin) {
@@ -56,6 +86,24 @@ export function isValidUmpirePin(pin) {
 
   const incomingHash = hashPin(pin);
   const expectedHash = hashPin(configuredPin);
+  return crypto.timingSafeEqual(incomingHash, expectedHash);
+}
+
+export function isValidManagePin(pin) {
+  const configuredHash = getConfiguredManagePinHashValue();
+
+  if (configuredHash) {
+    const incomingHash = hashManagePin(pin);
+    const expectedBuffer = Buffer.from(configuredHash, "hex");
+    if (incomingHash.length !== expectedBuffer.length) return false;
+    return crypto.timingSafeEqual(incomingHash, expectedBuffer);
+  }
+
+  const configuredPin = getConfiguredManagePin();
+  if (!configuredPin) return false;
+
+  const incomingHash = hashManagePin(pin);
+  const expectedHash = hashManagePin(configuredPin);
   return crypto.timingSafeEqual(incomingHash, expectedHash);
 }
 

@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import test from "node:test";
 import {
+  createMatchSchema,
   matchActionSchema,
   sessionCreateSchema,
 } from "../src/app/lib/validators.js";
 import {
   createMatchAccessToken,
   hasValidMatchAccess,
+  isValidManagePin,
   isValidUmpirePin,
 } from "../src/app/lib/match-access.js";
 import {
@@ -14,6 +17,15 @@ import {
   hasValidDirectorAccess,
   isValidDirectorPin,
 } from "../src/app/lib/director-access.js";
+import {
+  getImagePinCheckPayload,
+  getImagePinPromptConfig,
+  getRequiredImagePinKind,
+  IMAGE_PIN_ATTEMPT_LIMIT,
+  IMAGE_PIN_KIND,
+} from "../src/app/lib/image-pin-policy.js";
+import { PIN_BURST_BLOCK_MS } from "../src/app/lib/pin-attempt-policy.js";
+import { enforceSmartPinRateLimit } from "../src/app/lib/pin-attempt-server.js";
 import {
   applyMatchAction,
   applySafeMatchPatch,
@@ -30,15 +42,18 @@ import {
   serializePublicSession,
 } from "../src/app/lib/public-data.js";
 import { getTeamBundle } from "../src/app/lib/team-utils.js";
-import { middleware } from "../middleware.js";
+import { applySecurityHeaders } from "../security-headers.mjs";
 import { countLegalBalls, buildWinByWicketsText } from "../src/app/lib/match-scoring.js";
 import {
   buildCurrentScoreAnnouncement,
+  buildLiveScoreAnnouncementSequence,
   buildUmpireAnnouncement,
   buildUmpireTapAnnouncement,
+  createManualScoreAnnouncementLiveEvent,
   buildSpectatorAnnouncement,
   buildSpectatorOverCompleteAnnouncement,
   buildSpectatorScoreAnnouncement,
+  createMatchCorrectionLiveEvent,
   createScoreLiveEvent,
   createUndoLiveEvent,
 } from "../src/app/lib/live-announcements.js";
@@ -50,6 +65,8 @@ import {
   hasCompleteTossState,
   normalizeLegacyTossState,
 } from "../src/app/lib/match-toss.js";
+import MatchImport from "../src/models/Match.js";
+import { HOME_LIVE_BANNER_MATCH_FILTER } from "../src/app/lib/home-live-banner.js";
 import {
   getWalkieSnapshot,
   hydrateWalkieEnabled,
@@ -84,6 +101,8 @@ function buildBaseMatch() {
   };
 }
 
+const Match = MatchImport.default || MatchImport;
+
 test("validators reject unknown fields and malformed scoring payloads", () => {
   const invalidSession = sessionCreateSchema.safeParse({
     name: "League Final",
@@ -99,6 +118,31 @@ test("validators reject unknown fields and malformed scoring payloads", () => {
   assert.equal(sanitizedSession.data.name.includes("<"), false);
   assert.equal(sanitizedSession.data.date.includes("<"), false);
 
+  const normalizedSession = sessionCreateSchema.safeParse({
+    name: "Fal\u200Bcons\u202E XI",
+    date: "  June\u00A01  ",
+  });
+  assert.equal(normalizedSession.success, true);
+  assert.equal(normalizedSession.data.name, "Fal cons XI");
+  assert.equal(normalizedSession.data.date, "June 1");
+
+  const spammySession = sessionCreateSchema.safeParse({
+    name: "!!!!!!!!!!",
+  });
+  assert.equal(spammySession.success, false);
+
+  const sanitizedMatch = createMatchSchema.safeParse({
+    sessionId: "507f1f77bcf86cd799439011",
+    teamAName: "<b>Team A</b>",
+    teamBName: "Team B",
+    teamA: ["Ali\u200Bce", "Bea"],
+    teamB: ["Cara", "Dina"],
+    overs: 6,
+  });
+  assert.equal(sanitizedMatch.success, true);
+  assert.equal(sanitizedMatch.data.teamAName, "Team A");
+  assert.equal(sanitizedMatch.data.teamA[0], "Ali ce");
+
   const invalidAction = matchActionSchema.safeParse({
     actionId: "score:test-action",
     type: "score_ball",
@@ -107,6 +151,60 @@ test("validators reject unknown fields and malformed scoring payloads", () => {
     extraType: null,
   });
   assert.equal(invalidAction.success, false);
+});
+
+test("home live banner match filter stays cast-safe for the Match result field", () => {
+  assert.doesNotThrow(() => {
+    Match.findOne(HOME_LIVE_BANNER_MATCH_FILTER).cast(Match);
+  });
+});
+
+test("smart pin rate limit blocks the fourth rapid attempt inside 10 seconds", () => {
+  const key = `pin-burst-${crypto.randomBytes(6).toString("hex")}`;
+  const baseNow = 1_710_000_000_000;
+
+  assert.equal(
+    enforceSmartPinRateLimit({
+      key,
+      longLimit: 10,
+      longWindowMs: 60 * 1000,
+      longBlockMs: 60 * 1000,
+      now: baseNow,
+    }).allowed,
+    true,
+  );
+  assert.equal(
+    enforceSmartPinRateLimit({
+      key,
+      longLimit: 10,
+      longWindowMs: 60 * 1000,
+      longBlockMs: 60 * 1000,
+      now: baseNow + 1_000,
+    }).allowed,
+    true,
+  );
+  assert.equal(
+    enforceSmartPinRateLimit({
+      key,
+      longLimit: 10,
+      longWindowMs: 60 * 1000,
+      longBlockMs: 60 * 1000,
+      now: baseNow + 2_000,
+    }).allowed,
+    true,
+  );
+
+  const blockedAttempt = enforceSmartPinRateLimit({
+    key,
+    longLimit: 10,
+    longWindowMs: 60 * 1000,
+    longBlockMs: 60 * 1000,
+    now: baseNow + 3_000,
+  });
+
+  assert.equal(blockedAttempt.allowed, false);
+  assert.ok(blockedAttempt.retryAfterMs > 0);
+  assert.ok(blockedAttempt.retryAfterMs <= PIN_BURST_BLOCK_MS);
 });
 
 test("match access tokens validate by version and PIN checks use constant-time flow", () => {
@@ -136,6 +234,124 @@ test("match access tokens validate by version and PIN checks use constant-time f
     if (previousPinHash === undefined) delete process.env.UMPIRE_ADMIN_PIN_HASH;
     else process.env.UMPIRE_ADMIN_PIN_HASH = previousPinHash;
   }
+});
+
+test("manage PIN validation supports hashed env configuration", () => {
+  const previousSecret = process.env.MATCH_ACCESS_SECRET;
+  const previousManageSecret = process.env.SESSION_MANAGE_ACCESS_SECRET;
+  const previousManagePin = process.env.SESSION_MANAGE_PIN;
+  const previousManagePinHash = process.env.SESSION_MANAGE_PIN_HASH;
+
+  process.env.MATCH_ACCESS_SECRET = "manage-hash-fallback-secret";
+  process.env.SESSION_MANAGE_ACCESS_SECRET = "manage-hash-secret";
+  process.env.SESSION_MANAGE_PIN = "636363";
+  process.env.SESSION_MANAGE_PIN_HASH = crypto
+    .scryptSync("636363", "manage-hash-secret", 64)
+    .toString("hex");
+
+  try {
+    assert.equal(isValidManagePin("636363"), true);
+    assert.equal(isValidManagePin("000000"), false);
+  } finally {
+    if (previousSecret === undefined) delete process.env.MATCH_ACCESS_SECRET;
+    else process.env.MATCH_ACCESS_SECRET = previousSecret;
+
+    if (previousManageSecret === undefined) {
+      delete process.env.SESSION_MANAGE_ACCESS_SECRET;
+    } else {
+      process.env.SESSION_MANAGE_ACCESS_SECRET = previousManageSecret;
+    }
+
+    if (previousManagePin === undefined) delete process.env.SESSION_MANAGE_PIN;
+    else process.env.SESSION_MANAGE_PIN = previousManagePin;
+
+    if (previousManagePinHash === undefined) delete process.env.SESSION_MANAGE_PIN_HASH;
+    else process.env.SESSION_MANAGE_PIN_HASH = previousManagePinHash;
+  }
+});
+
+test("image pin policy keeps first upload on umpire PIN and protects gallery deletes with manage PIN", () => {
+  assert.equal(IMAGE_PIN_ATTEMPT_LIMIT, 4);
+
+  assert.equal(
+    getRequiredImagePinKind({
+      actionType: "upload",
+      plannedGalleryCount: 1,
+    }),
+    IMAGE_PIN_KIND.UMPIRE_OR_MANAGE
+  );
+  assert.equal(
+    getRequiredImagePinKind({
+      actionType: "upload",
+      plannedGalleryCount: 2,
+    }),
+    IMAGE_PIN_KIND.MANAGE
+  );
+  assert.equal(
+    getRequiredImagePinKind({
+      actionType: "remove",
+      plannedGalleryCount: 1,
+    }),
+    IMAGE_PIN_KIND.MANAGE
+  );
+  assert.equal(
+    getRequiredImagePinKind({
+      actionType: "reorder",
+      plannedGalleryCount: 3,
+    }),
+    IMAGE_PIN_KIND.MANAGE
+  );
+
+  assert.deepEqual(
+    getImagePinPromptConfig({
+      actionType: "upload",
+      plannedGalleryCount: 1,
+    }),
+    {
+      pinKind: IMAGE_PIN_KIND.UMPIRE_OR_MANAGE,
+      usesManagePin: false,
+      digitCount: 4,
+      title: "Umpire PIN",
+      label: "4-digit PIN",
+      placeholder: "0000",
+      description: "Enter PIN to upload.",
+    }
+  );
+  assert.deepEqual(
+    getImagePinPromptConfig({
+      actionType: "remove",
+      plannedGalleryCount: 1,
+    }),
+    {
+      pinKind: IMAGE_PIN_KIND.MANAGE,
+      usesManagePin: true,
+      digitCount: 6,
+      title: "Manage PIN",
+      label: "Manage PIN",
+      placeholder: "- - - - - -",
+      description: "Enter manage PIN to remove.",
+    }
+  );
+  assert.deepEqual(
+    getImagePinCheckPayload({
+      pin: " 636363 ",
+      usesManagePin: true,
+    }),
+    {
+      pin: "636363",
+      allowUmpirePin: false,
+    }
+  );
+  assert.deepEqual(
+    getImagePinCheckPayload({
+      pin: "0000",
+      usesManagePin: false,
+    }),
+    {
+      pin: "0000",
+      allowUmpirePin: true,
+    }
+  );
 });
 
 test("director access tokens validate and director PIN uses the configured secret", () => {
@@ -670,6 +886,11 @@ test("umpire match patching blocks impossible over changes and unsafe roster edi
 
   const oversRaised = applySafeMatchPatch(match, { overs: 3 });
   assert.equal(oversRaised.overs, 3);
+  const correctedFirstInnings = applySafeMatchPatch(match, { innings1Score: 9 });
+  assert.equal(correctedFirstInnings.innings1.score, 9);
+  assert.equal(correctedFirstInnings.score, 0);
+  assert.equal(correctedFirstInnings.isOngoing, true);
+  assert.equal(correctedFirstInnings.result, "");
 
   const renamedLockedTeam = applySafeMatchPatch(match, {
     teamAName: "Falcons Prime",
@@ -705,6 +926,22 @@ test("umpire match patching blocks impossible over changes and unsafe roster edi
     isOut: true,
     extraType: null,
   });
+  const afterSecondInningsBoundary = applyMatchAction(match, {
+    actionId: "score:patch-second-boundary",
+    type: "score_ball",
+    runs: 6,
+    isOut: false,
+    extraType: null,
+  });
+  const correctedWinningTarget = applySafeMatchPatch(afterSecondInningsBoundary, {
+    innings1Score: 5,
+  });
+
+  assert.equal(correctedWinningTarget.innings1.score, 5);
+  assert.equal(correctedWinningTarget.score, 6);
+  assert.equal(correctedWinningTarget.isOngoing, false);
+  assert.equal(correctedWinningTarget.result, "Titans won by 3 wickets.");
+  assert.equal(correctedWinningTarget.lastLiveEvent?.type, "match_end");
 
   assert.throws(
     () =>
@@ -861,6 +1098,10 @@ test("match image fallback resolves unsafe or missing images to the GV logo", ()
     resolveSafeMatchImage("https://i.ibb.co/demo/sample.jpg"),
     "https://i.ibb.co/demo/sample.jpg"
   );
+  assert.equal(
+    resolveSafeMatchImage("data:image/jpeg;base64,Zm9vYmFy"),
+    "data:image/jpeg;base64,Zm9vYmFy"
+  );
 });
 
 test("sensitive image moderation flags explicit predictions and allows neutral ones", () => {
@@ -881,15 +1122,15 @@ test("sensitive image moderation flags explicit predictions and allows neutral o
   assert.deepEqual(safe.blockedLabels, []);
 });
 
-test("middleware adds core security headers", () => {
-  const response = middleware();
-  const contentSecurityPolicy = response.headers.get("content-security-policy") || "";
-  assert.equal(response.headers.get("x-frame-options"), "DENY");
-  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+test("security headers include the required protection policy", () => {
+  const headers = applySecurityHeaders(new Headers(), { isProduction: false });
+  const contentSecurityPolicy = headers.get("content-security-policy") || "";
+  assert.equal(headers.get("x-frame-options"), "DENY");
+  assert.equal(headers.get("x-content-type-options"), "nosniff");
   assert.match(contentSecurityPolicy, /frame-ancestors 'none'/);
   assert.match(contentSecurityPolicy, /wss:\/\/\*\.edge\.agora\.io:\*/);
   assert.match(contentSecurityPolicy, /wss:\/\/\*\.edge\.sd-rtn\.com:\*/);
-  assert.match(response.headers.get("permissions-policy"), /camera=\(\)/);
+  assert.match(headers.get("permissions-policy"), /camera=\(\)/);
 });
 
 test("spectator commentary uses simple ball-first wording and separate score line", () => {
@@ -920,18 +1161,26 @@ test("spectator commentary uses simple ball-first wording and separate score lin
     isOut: false,
     extraType: null,
   });
+  const dotEvent = createScoreLiveEvent(before, before, {
+    runs: 0,
+    isOut: false,
+    extraType: null,
+  });
 
   const fullLine = buildSpectatorAnnouncement(event, after, "full");
   assert.equal(fullLine, "Umpire has given 1 run.");
+  assert.equal(
+    buildSpectatorAnnouncement(dotEvent, before, "full"),
+    "Umpire has given dot ball.",
+  );
 
   const scoreLine = buildSpectatorScoreAnnouncement(event, after);
   assert.equal(scoreLine, "Score is 8 for 1.");
 
   const currentScoreLine = buildCurrentScoreAnnouncement(after);
   assert.match(currentScoreLine, /Score is 8 for 1\./);
-  assert.match(currentScoreLine, /0 overs are done\./);
-  assert.match(currentScoreLine, /2 overs are left\./);
-  assert.match(currentScoreLine, /3 needed from 1 over and 5 balls\./);
+  assert.match(currentScoreLine, /Target is 11\./);
+  assert.match(currentScoreLine, /5 balls left in this over and 1 over left\./);
 });
 
 test("walkie requests support spectator and director, prevent duplicates, and require umpire response", () => {
@@ -1050,7 +1299,7 @@ test("spectator commentary handles last-ball warnings and over summaries", () =>
   assert.equal(fullLine, "Umpire has given 1 run.");
 
   const scoreLine = buildSpectatorScoreAnnouncement(event, after);
-  assert.equal(scoreLine, "Score is 5 for 2. This is the last ball of the over.");
+  assert.equal(scoreLine, "Score is 5 for 2. One ball to finish the over.");
 
   const overLine = buildSpectatorOverCompleteAnnouncement({
     ...after,
@@ -1076,7 +1325,7 @@ test("spectator commentary handles last-ball warnings and over summaries", () =>
   });
   assert.match(overLine, /Over complete\./);
   assert.match(overLine, /Score is 6 for 2\./);
-  assert.match(overLine, /1 over is done\./);
+  assert.match(overLine, /1 over completed\./);
   assert.match(overLine, /1 over is left\./);
   assert.match(overLine, /1 wicket fell in this over\./);
 });
@@ -1213,7 +1462,93 @@ test("spectator commentary gives progress reminders and clean undo lines", () =>
     buildSpectatorScoreAnnouncement(ballFourEvent, match),
     "Score is 4 for 0. This is ball 4."
   );
-  assert.equal(buildSpectatorAnnouncement(undoEvent, match, "full"), "Umpire has undone the last ball.");
+  assert.equal(
+    buildSpectatorAnnouncement(undoEvent, match, "full"),
+    "Umpire has removed the score for that ball. Umpire will redo this ball."
+  );
+  assert.equal(buildSpectatorScoreAnnouncement(undoEvent, match), "Score is 4 for 0.");
+});
+
+test("manual score announcement event reads the current score without a duplicate lead line", () => {
+  const match = {
+    ...buildBaseMatch(),
+    tossWinner: "Falcons",
+    tossDecision: "bat",
+    innings: "first",
+    score: 42,
+    outs: 2,
+    innings1: {
+      team: "Falcons",
+      score: 42,
+      outs: 2,
+      history: [
+        {
+          overNumber: 1,
+          balls: [
+            { runs: 1 },
+            { runs: 2 },
+            { runs: 0 },
+            { runs: 4 },
+            { runs: 1 },
+            { runs: 0 },
+          ],
+        },
+      ],
+    },
+    innings2: { team: "Titans", score: 0, history: [] },
+  };
+
+  const event = createManualScoreAnnouncementLiveEvent(match);
+  const sequence = buildLiveScoreAnnouncementSequence(event, match, "full");
+
+  assert.equal(buildSpectatorAnnouncement(event, match, "full"), "");
+  assert.equal(sequence.items.length, 1);
+  assert.match(sequence.items[0].text, /Score is 42 for 2\./);
+});
+
+test("score correction announcements stay smart for umpire and spectator", () => {
+  const firstInnings = applyMatchAction(buildBaseMatch(), {
+    actionId: "toss:correction-flow",
+    type: "set_toss",
+    tossWinner: "Falcons",
+    tossDecision: "bat",
+  });
+  const singleOverMatch = applySafeMatchPatch(firstInnings, { overs: 1 });
+  const firstInningsComplete = [
+    { actionId: "score:first-1", type: "score_ball", runs: 1, isOut: false, extraType: null },
+    { actionId: "score:first-2", type: "score_ball", runs: 1, isOut: false, extraType: null },
+    { actionId: "score:first-3", type: "score_ball", runs: 1, isOut: false, extraType: null },
+    { actionId: "score:first-4", type: "score_ball", runs: 1, isOut: false, extraType: null },
+    { actionId: "score:first-5", type: "score_ball", runs: 1, isOut: false, extraType: null },
+    { actionId: "score:first-6", type: "score_ball", runs: 0, isOut: false, extraType: null },
+  ].reduce((nextMatch, action) => applyMatchAction(nextMatch, action), singleOverMatch);
+  const secondInnings = applyMatchAction(firstInningsComplete, {
+    actionId: "advance:to-second",
+    type: "complete_innings",
+  });
+  const chaseMatch = applyMatchAction(secondInnings, {
+    actionId: "score:second-1",
+    type: "score_ball",
+    runs: 2,
+    isOut: false,
+    extraType: null,
+  });
+
+  const correctedMatch = applySafeMatchPatch(chaseMatch, {
+    innings1Score: 6,
+  });
+  const correctionEvent = createMatchCorrectionLiveEvent(chaseMatch, correctedMatch, {
+    innings1Score: 6,
+  });
+
+  assert.equal(
+    buildSpectatorAnnouncement(correctionEvent, correctedMatch, "full"),
+    "Umpire corrected the first innings score."
+  );
+  assert.equal(
+    buildSpectatorScoreAnnouncement(correctionEvent, correctedMatch),
+    "Score is 2 for 0. Target is now 7. 5 needed from 5 balls."
+  );
 });
 
 test("umpire commentary speaks score buttons and undo with clean wording", () => {
@@ -1236,12 +1571,24 @@ test("umpire commentary speaks score buttons and undo with clean wording", () =>
     isOut: false,
     extraType: null,
   });
+  const dotBallEvent = createScoreLiveEvent(matchBefore, matchBefore, {
+    runs: 0,
+    isOut: false,
+    extraType: null,
+  });
   const undoEvent = createUndoLiveEvent(matchAfter);
 
-  assert.equal(buildUmpireAnnouncement(scoreEvent, "simple"), "Umpire gives 2 runs.");
+  assert.equal(
+    buildUmpireAnnouncement(scoreEvent, "simple"),
+    "Umpire has given 2 runs."
+  );
+  assert.equal(
+    buildUmpireAnnouncement(dotBallEvent, "simple"),
+    "Umpire has given dot ball."
+  );
   assert.equal(
     buildUmpireAnnouncement(undoEvent, "simple"),
-    "Umpire has undone the last ball. The score for that ball has been removed. Umpire will redo this ball."
+    "Umpire has removed the score for that ball. Umpire will redo this ball."
   );
 });
 
@@ -1287,6 +1634,61 @@ test("umpire tap announcer keeps score-button speech short and direct", () => {
   assert.equal(buildUmpireTapAnnouncement(dotBallEvent, "simple"), "Dot ball.");
   assert.equal(buildUmpireTapAnnouncement(outEvent, "simple"), "Out.");
   assert.equal(buildUmpireTapAnnouncement(undoEvent, "simple"), "Undo.");
+});
+
+test("wide and no-ball extras use given wording in announcer text", () => {
+  const matchBefore = applyMatchAction(buildBaseMatch(), {
+    actionId: "toss:extras-given-wording",
+    type: "set_toss",
+    tossWinner: "Falcons",
+    tossDecision: "bat",
+  });
+  const wideAfter = applyMatchAction(matchBefore, {
+    actionId: "score:wide-given-wording",
+    type: "score_ball",
+    runs: 1,
+    isOut: false,
+    extraType: "wide",
+  });
+  const noBallAfter = applyMatchAction(matchBefore, {
+    actionId: "score:noball-given-wording",
+    type: "score_ball",
+    runs: 1,
+    isOut: false,
+    extraType: "noball",
+  });
+  const wideEvent = createScoreLiveEvent(matchBefore, wideAfter, {
+    runs: 1,
+    isOut: false,
+    extraType: "wide",
+  });
+  const noBallEvent = createScoreLiveEvent(matchBefore, noBallAfter, {
+    runs: 1,
+    isOut: false,
+    extraType: "noball",
+  });
+
+  assert.equal(
+    buildSpectatorAnnouncement(wideEvent, wideAfter, "simple"),
+    "Umpire has given a wide. 1 run given."
+  );
+  assert.equal(
+    buildSpectatorAnnouncement(noBallEvent, noBallAfter, "simple"),
+    "Umpire has given a no ball. 1 run given."
+  );
+  assert.equal(
+    buildUmpireAnnouncement(wideEvent, "simple"),
+    "Umpire has given a wide. 1 run given."
+  );
+  assert.equal(
+    buildUmpireAnnouncement(noBallEvent, "simple"),
+    "Umpire has given a no ball. 1 run given."
+  );
+  assert.equal(buildUmpireTapAnnouncement(wideEvent, "simple"), "Wide, 1 run given.");
+  assert.equal(
+    buildUmpireTapAnnouncement(noBallEvent, "simple"),
+    "No ball, 1 run given."
+  );
 });
 
 test("walkie snapshot tracks director presence and spectator requests stay live-only", () => {

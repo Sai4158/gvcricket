@@ -15,6 +15,9 @@ export function getWalkieRemoteSpeakerState({
   const activeSpeakerName = String(snapshot?.activeSpeakerName || "").trim();
   const roleLabel = getWalkieRoleLabel(activeSpeakerRole);
   const nameLabel = activeSpeakerName || roleLabel;
+  const speakerLabel = activeSpeakerName
+    ? `${activeSpeakerName} (${roleLabel})`
+    : roleLabel;
   const isRemoteTalking = Boolean(
     snapshot?.enabled &&
       snapshot?.busy &&
@@ -39,9 +42,13 @@ export function getWalkieRemoteSpeakerState({
     isRemoteTalking: true,
     roleLabel,
     nameLabel,
-    shortStatus: `${roleLabel} is talking.`,
-    title: `${roleLabel} is talking.`,
-    detail: "Please wait.",
-    capsuleLabel: `${roleLabel.toUpperCase()} TALKING`,
+    shortStatus: `${speakerLabel} is talking.`,
+    title: `${speakerLabel} is talking.`,
+    detail: activeSpeakerName
+      ? `${activeSpeakerName} has the walkie live right now.`
+      : "Please wait while the current speaker finishes.",
+    capsuleLabel: activeSpeakerName
+      ? `${roleLabel.toUpperCase()} LIVE`
+      : `${roleLabel.toUpperCase()} TALKING`,
   };
 }

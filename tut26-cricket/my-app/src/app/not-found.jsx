@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import LiquidSportText from "./components/home/LiquidSportText";
+import SiteFooter from "./components/shared/SiteFooter";
 
 // Define animation variants for staggered appearance
 const containerVariants = {
@@ -27,11 +28,14 @@ const itemVariants = {
 };
 
 // IMPORTANT: Create a motion-enhanced Link component
-const MotionLink = motion(Link);
+const MotionLink = motion.create(Link);
 
 export default function NotFound() {
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,rgba(127,29,29,0.22),transparent_24%),linear-gradient(180deg,#09090b_0%,#000000_100%)] p-4 text-center">
+    <div
+      id="top"
+      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,rgba(127,29,29,0.22),transparent_24%),linear-gradient(180deg,#09090b_0%,#000000_100%)] p-4 text-center"
+    >
       <div
         className="absolute inset-0 z-0 opacity-10"
         style={{
@@ -46,19 +50,19 @@ export default function NotFound() {
         initial="hidden"
         animate="visible"
       >
-        <motion.div variants={itemVariants} className="mb-6">
+        <motion.div variants={itemVariants} className="mb-2">
           <Image
             src="/gvLogo.png"
             alt="GV Cricket"
-            width={220}
-            height={220}
-            className="mx-auto h-28 w-28 object-contain drop-shadow-[0_0_32px_rgba(220,38,38,0.18)] sm:h-36 sm:w-36"
+            width={1800}
+            height={1800}
+            className="mx-auto h-[22rem] w-[22rem] object-contain drop-shadow-[0_0_42px_rgba(220,38,38,0.2)] sm:h-[28rem] sm:w-[28rem]"
             priority
           />
         </motion.div>
 
         <motion.h2
-          className="mb-2 text-xs font-semibold uppercase tracking-[0.38em] text-rose-200/72"
+          className="mb-1 text-xs font-semibold uppercase tracking-[0.38em] text-rose-200/72"
           variants={itemVariants}
         >
           Page Not Found
@@ -104,6 +108,7 @@ export default function NotFound() {
           404
         </motion.p>
       </motion.div>
+      <SiteFooter showBackToTop={false} className="relative z-10 mt-14" />
     </div>
   );
 }

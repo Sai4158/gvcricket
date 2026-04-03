@@ -1,8 +1,8 @@
 import SessionsPageClient from "../components/session/SessionsPageClient";
 import { absoluteUrl, siteConfig } from "../lib/site-metadata";
-import { loadSessionsIndexData } from "../lib/server-data";
+import { loadSessionsIndexPageData } from "../lib/server-data";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 15;
 
 export const metadata = {
   title: "All Cricket Sessions - Live and Completed Matches",
@@ -33,7 +33,15 @@ export const metadata = {
   },
 };
 
-export default async function SessionsPage() {
-  const initialSessions = await loadSessionsIndexData();
-  return <SessionsPageClient initialSessions={initialSessions} />;
+export default async function SessionsPage({ searchParams }) {
+  const { sessions, totalCount } = await loadSessionsIndexPageData();
+  const resolvedSearchParams = await searchParams;
+  const refreshToken = String(resolvedSearchParams?.refresh || "").trim();
+  return (
+    <SessionsPageClient
+      initialSessions={sessions}
+      initialTotalCount={totalCount}
+      refreshToken={refreshToken}
+    />
+  );
 }

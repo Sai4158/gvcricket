@@ -2,6 +2,10 @@
 
 import { motion } from "framer-motion";
 import { FaInfoCircle } from "react-icons/fa";
+import {
+  getScoreControlToneClasses,
+  scoreControlFont,
+} from "./score-control-theme";
 
 function ScoreButton({ onClick, disabled, className, children }) {
   return (
@@ -11,7 +15,11 @@ function ScoreButton({ onClick, disabled, className, children }) {
       disabled={disabled}
       className={`press-feedback ${className}`}
     >
-      {children}
+      <span
+        className={`${scoreControlFont.className} inline-flex origin-center scale-[1.08] items-center justify-center whitespace-nowrap text-[1.45rem] font-bold leading-none`}
+      >
+        {children}
+      </span>
     </motion.button>
   );
 }
@@ -32,15 +40,23 @@ function ButtonWithInfo({
         disabled={disabled}
         className={`press-feedback pr-12 ${className}`}
       >
-        {children}
+        <span
+          className={`${scoreControlFont.className} inline-flex origin-center scale-[1.08] items-center justify-center whitespace-nowrap text-[1.45rem] font-bold leading-none`}
+        >
+          {children}
+        </span>
       </motion.button>
       <button
         type="button"
         onPointerDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        onClick={(event) => {
+          event.preventDefault();
           event.stopPropagation();
           setInfoText(info);
         }}
-        onPointerUp={() => setTimeout(() => setInfoText(null), 2000)}
         aria-label="Show scoring help"
         className="press-feedback absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-black/30 text-zinc-100 shadow-[0_6px_16px_rgba(0,0,0,0.25)] transition-colors hover:bg-black/40 hover:text-white"
       >
@@ -59,23 +75,29 @@ export function Controls({
   disabled,
 }) {
   const baseBtn =
-    "py-6 text-xl font-bold rounded-2xl transition-transform active:scale-95 shadow-lg w-full disabled:opacity-50 disabled:cursor-not-allowed";
+    "py-6 rounded-2xl transition-transform active:scale-95 shadow-lg w-full disabled:opacity-50 disabled:cursor-not-allowed";
 
   return (
     <div className="grid grid-cols-4 gap-3">
       <ScoreButton
         onClick={() => onScore(0)}
         disabled={disabled}
-        className={`${baseBtn} bg-zinc-800 hover:bg-zinc-700`}
+        className={`${baseBtn} ${getScoreControlToneClasses("dot")}`}
       >
         Dot
       </ScoreButton>
-      {[1, 2, 3, 4, 6].map((runs) => (
+      {[
+        { key: "one", runs: 1 },
+        { key: "two", runs: 2 },
+        { key: "three", runs: 3 },
+        { key: "four", runs: 4 },
+        { key: "six", runs: 6 },
+      ].map(({ key, runs }) => (
         <ScoreButton
-          key={runs}
+          key={key}
           onClick={() => onScore(runs)}
           disabled={disabled}
-          className={`${baseBtn} bg-zinc-800 hover:bg-zinc-700`}
+          className={`${baseBtn} ${getScoreControlToneClasses("neutral")}`}
         >
           {runs}
         </ScoreButton>
@@ -85,7 +107,7 @@ export function Controls({
         setInfoText={setInfoText}
         onClick={onOut}
         disabled={disabled}
-        className={`${baseBtn} bg-rose-700 hover:bg-rose-600`}
+        className={`${baseBtn} ${getScoreControlToneClasses("out")}`}
       >
         OUT
       </ButtonWithInfo>
@@ -94,7 +116,7 @@ export function Controls({
         setInfoText={setInfoText}
         onClick={onWide}
         disabled={disabled}
-        className={`${baseBtn} bg-green-600 hover:bg-green-500`}
+        className={`${baseBtn} ${getScoreControlToneClasses("wide")}`}
       >
         WIDE
       </ButtonWithInfo>
@@ -103,7 +125,7 @@ export function Controls({
         setInfoText={setInfoText}
         onClick={onNoBall}
         disabled={disabled}
-        className={`${baseBtn} bg-orange-600 hover:bg-orange-500`}
+        className={`${baseBtn} ${getScoreControlToneClasses("noball")}`}
       >
         NO BALL
       </ButtonWithInfo>

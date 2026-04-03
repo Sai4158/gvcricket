@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { sanitizePlainText } from "./validators";
 
 const SPEAKER_MAX_MS = 30_000;
 const CLEANUP_GRACE_MS = 3_000;
@@ -189,27 +190,6 @@ function clearActiveLock(matchId, reason = "ended") {
   }
 }
 
-function disableForNoListeners(matchId) {
-  const matchState = getMatchState(matchId);
-  if (!matchState.enabled) {
-    return;
-  }
-
-  const listenerCount =
-    listParticipants(matchState, "spectator").length +
-    listParticipants(matchState, "director").length;
-  if (listenerCount > 0) {
-    return;
-  }
-
-  matchState.enabled = false;
-  clearActiveLock(matchId, "disabled");
-  notifyMatch(matchId, {
-    type: "state",
-    snapshot: buildSnapshot(matchId),
-  });
-}
-
 function scheduleTransmissionTimeout(matchId, transmissionId) {
   const matchState = getMatchState(matchId);
   if (matchState.timeoutId) {
@@ -240,11 +220,12 @@ export function subscribeToWalkieParticipant(matchId, participantId, callback) {
 
 export function registerWalkieParticipant(matchId, participant) {
   const matchState = getMatchState(matchId);
+  const safeName = sanitizePlainText(participant.name || "").slice(0, 48);
   const nextParticipant = {
     id: String(participant.id),
     role: participant.role,
     name:
-      participant.name ||
+      safeName ||
       (participant.role === "umpire"
         ? "Umpire"
         : participant.role === "director"
@@ -303,12 +284,6 @@ export function registerWalkieParticipant(matchId, participant) {
           snapshot: buildSnapshot(matchId),
         });
 
-        if (
-          listParticipants(settledState, "spectator").length === 0 &&
-          listParticipants(settledState, "director").length === 0
-        ) {
-          disableForNoListeners(matchId);
-        }
       }, DISCONNECT_GRACE_MS);
 
       latestState.disconnectTimers.set(nextParticipant.id, timer);

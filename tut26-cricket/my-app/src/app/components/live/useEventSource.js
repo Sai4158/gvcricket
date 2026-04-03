@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+
+function readPageVisibility() {
+  if (typeof document === "undefined") {
+    return true;
+  }
+
+  return document.visibilityState !== "hidden";
+}
 
 export default function useEventSource({
   url,
@@ -8,9 +16,11 @@ export default function useEventSource({
   onMessage,
   onError,
   enabled = true,
+  disconnectWhenHidden = true,
 }) {
   const onMessageRef = useRef(onMessage);
   const onErrorRef = useRef(onError);
+  const [isPageVisible, setIsPageVisible] = useState(readPageVisibility);
 
   useEffect(() => {
     onMessageRef.current = onMessage;
@@ -21,7 +31,28 @@ export default function useEventSource({
   }, [onError]);
 
   useEffect(() => {
-    if (!enabled || !url) return undefined;
+    if (!disconnectWhenHidden || typeof document === "undefined") {
+      return undefined;
+    }
+
+    const handleVisibilityChange = () => {
+      setIsPageVisible((current) => {
+        const next = readPageVisibility();
+        return current === next ? current : next;
+      });
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [disconnectWhenHidden]);
+
+  useEffect(() => {
+    if (!enabled || !url || (disconnectWhenHidden && !isPageVisible)) {
+      return undefined;
+    }
 
     const source = new EventSource(url);
     let closed = false;
@@ -55,5 +86,5 @@ export default function useEventSource({
       source.removeEventListener("error", errorHandler);
       source.close();
     };
-  }, [enabled, event, url]);
+  }, [disconnectWhenHidden, enabled, event, isPageVisible, url]);
 }

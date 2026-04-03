@@ -2,12 +2,10 @@
 
 import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
-import { toPng } from "html-to-image";
 import {
   FaBolt,
   FaChartBar,
   FaClipboard,
-  FaDownload,
   FaExchangeAlt,
   FaMedal,
   FaShareAlt,
@@ -17,9 +15,12 @@ import {
 import { buildResultInsights } from "../../lib/result-insights";
 import { buildShareUrl } from "../../lib/site-metadata";
 
-function SectionShell({ title, icon, children }) {
+function SectionShell({ id, title, icon, children }) {
   return (
-    <section className="rounded-[28px] border border-white/10 bg-zinc-900/50 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.32)] ring-1 ring-white/6 sm:p-6">
+    <section
+      id={id}
+      className="scroll-mt-24 rounded-[28px] border border-white/10 bg-zinc-900/50 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.32)] ring-1 ring-white/6 sm:p-6"
+    >
       <div className="mb-5 flex items-center gap-3">
         <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.05] text-lg text-amber-300">
           {icon}
@@ -80,7 +81,6 @@ function TeamCompareColumn({ teamName, stats, accentClass }) {
 
 export default function ResultInsightsSections({ match }) {
   const [shareStatus, setShareStatus] = useState("");
-  const exportRef = useRef(null);
   const insights = useMemo(() => buildResultInsights(match), [match]);
   const statsFallback = "Detailed player stats were not recorded for this match.";
 
@@ -116,22 +116,14 @@ export default function ResultInsightsSections({ match }) {
     await handleCopyLink();
   };
 
-  const handleDownloadImage = async () => {
-    if (!exportRef.current) return;
-
+  const handleCopyResultSectionLink = async () => {
     try {
-      const dataUrl = await toPng(exportRef.current, {
-        cacheBust: true,
-        pixelRatio: 2,
-        backgroundColor: "#09090b",
-      });
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = `${match?.name || "gv-cricket-result"}.png`;
-      link.click();
-      setShareStatus("");
+      const url = new URL(window.location.href);
+      url.hash = "result-share-actions";
+      await navigator.clipboard.writeText(url.toString());
+      setShareStatus("Result section link copied.");
     } catch {
-      setShareStatus("Could not download the result image.");
+      setShareStatus("Could not copy the result section link.");
     }
   };
 
@@ -372,12 +364,13 @@ export default function ResultInsightsSections({ match }) {
         </div>
       </SectionShell>
 
-      <SectionShell title="Share / Export Actions" icon={<FaShareAlt />}>
+      <SectionShell
+        id="result-share-actions"
+        title="Share / Export Actions"
+        icon={<FaShareAlt />}
+      >
         <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <div
-            ref={exportRef}
-            className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,8,12,0.98))] p-5"
-          >
+          <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,8,12,0.98))] p-5">
             <div className="flex justify-center">
               <Image
                 src="/gvLogo.png"
@@ -427,11 +420,11 @@ export default function ResultInsightsSections({ match }) {
             </button>
             <button
               type="button"
-              onClick={handleDownloadImage}
+              onClick={handleCopyResultSectionLink}
               className="inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-[linear-gradient(90deg,#facc15_0%,#f59e0b_54%,#fb7185_100%)] px-4 py-3.5 font-semibold text-black shadow-[0_16px_36px_rgba(245,158,11,0.18)] transition hover:brightness-105"
             >
-              <FaDownload />
-              <span>Download result image</span>
+              <FaClipboard />
+              <span>Copy result section link</span>
             </button>
             {shareStatus ? (
               <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-zinc-300">

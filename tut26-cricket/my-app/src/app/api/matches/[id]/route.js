@@ -26,6 +26,9 @@ import { matchPatchSchema } from "../../../lib/validators";
 import Match from "../../../../models/Match";
 import Session from "../../../../models/Session";
 
+const FALLBACK_SESSION_FIELDS =
+  "tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy updatedAt";
+
 async function hasMatchAccess(matchId, accessVersion) {
   const cookieStore = await cookies();
   const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
@@ -49,7 +52,7 @@ export async function GET(_req, { params }) {
 
     const fallbackSession = match.sessionId
       ? await Session.findById(match.sessionId).select(
-          "tossWinner tossDecision teamAName teamBName teamA teamB"
+          FALLBACK_SESSION_FIELDS
         )
       : null;
 
@@ -135,7 +138,7 @@ export async function PATCH(req, { params }) {
 
     const fallbackSession = match.sessionId
       ? await Session.findById(match.sessionId).select(
-          "tossWinner tossDecision teamAName teamBName teamA teamB"
+          FALLBACK_SESSION_FIELDS
         )
       : null;
 
@@ -152,11 +155,24 @@ export async function PATCH(req, { params }) {
     match.teamAName = nextState.teamAName;
     match.teamBName = nextState.teamBName;
     match.overs = nextState.overs;
+    match.score = nextState.score;
+    match.outs = nextState.outs;
+    match.isOngoing = nextState.isOngoing;
+    match.innings = nextState.innings;
+    match.result = nextState.result;
     match.tossWinner = nextState.tossWinner;
     match.innings1 = nextState.innings1;
     match.innings2 = nextState.innings2;
+    match.balls = nextState.balls;
+    match.lastLiveEvent = nextState.lastLiveEvent;
+    match.lastEventType = nextState.lastEventType;
+    match.lastEventText = nextState.lastEventText;
     match.announcerEnabled = nextState.announcerEnabled;
     match.announcerMode = nextState.announcerMode;
+    match.announcerScoreSoundEffectsEnabled =
+      nextState.announcerScoreSoundEffectsEnabled;
+    match.announcerBroadcastScoreSoundEffectsEnabled =
+      nextState.announcerBroadcastScoreSoundEffectsEnabled;
     await match.save();
 
     await Session.findByIdAndUpdate(match.sessionId, {
@@ -175,7 +191,7 @@ export async function PATCH(req, { params }) {
       metadata: { fields: Object.keys(parsedRequest.value) },
     });
 
-    return Response.json(serializePublicMatch(match, null, { includeActionHistory: true }), {
+    return Response.json(serializePublicMatch(match, fallbackSession, { includeActionHistory: true }), {
       headers: {
         "Cache-Control": "no-store",
       },

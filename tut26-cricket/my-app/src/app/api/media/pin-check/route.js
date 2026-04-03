@@ -1,18 +1,33 @@
 import { jsonError, jsonRateLimit } from "../../../lib/api-response";
 import { writeAuditLog } from "../../../lib/audit-log";
-import { isValidUmpirePin } from "../../../lib/match-access";
+import {
+  IMAGE_PIN_ATTEMPT_BLOCK_MS,
+  IMAGE_PIN_ATTEMPT_LIMIT,
+  IMAGE_PIN_ATTEMPT_WINDOW_MS,
+} from "../../../lib/image-pin-policy";
+import { isValidManagePin, isValidUmpirePin } from "../../../lib/match-access";
 import { getRequestMeta } from "../../../lib/request-meta";
-import { enforceRateLimit } from "../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../lib/request-security";
-import { pinPayloadSchema } from "../../../lib/validators";
+import { enforceSmartPinRateLimit } from "../../../lib/pin-attempt-server";
+import { z } from "zod";
+
+const mediaPinCheckSchema = z
+  .object({
+    pin: z
+      .string()
+      .trim()
+      .regex(/^(\d{4}|\d{6})$/, "PIN must be 4 or 6 digits."),
+    allowUmpirePin: z.boolean().optional().default(false),
+  })
+  .strict();
 
 export async function POST(req) {
   const meta = getRequestMeta(req);
-  const pinAttemptLimit = enforceRateLimit({
+  const pinAttemptLimit = enforceSmartPinRateLimit({
     key: `media-pin-check:${meta.ip}`,
-    limit: 5,
-    windowMs: 5 * 60 * 1000,
-    blockMs: 2 * 60 * 1000,
+    longLimit: IMAGE_PIN_ATTEMPT_LIMIT,
+    longWindowMs: IMAGE_PIN_ATTEMPT_WINDOW_MS,
+    longBlockMs: IMAGE_PIN_ATTEMPT_BLOCK_MS,
   });
 
   if (!pinAttemptLimit.allowed) {
@@ -32,14 +47,19 @@ export async function POST(req) {
     );
   }
 
-  const parsedRequest = await parseJsonRequest(req, pinPayloadSchema, {
+  const parsedRequest = await parseJsonRequest(req, mediaPinCheckSchema, {
     maxBytes: 2048,
   });
   if (!parsedRequest.ok) {
     return jsonError(parsedRequest.message, parsedRequest.status);
   }
 
-  if (!isValidUmpirePin(parsedRequest.value.pin)) {
+  const submittedPin = parsedRequest.value.pin;
+  const isValidPin = parsedRequest.value.allowUmpirePin
+    ? isValidUmpirePin(submittedPin) || isValidManagePin(submittedPin)
+    : isValidManagePin(submittedPin);
+
+  if (!isValidPin) {
     await writeAuditLog({
       action: "media_pin_failed",
       targetType: "media",

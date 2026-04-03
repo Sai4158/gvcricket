@@ -93,6 +93,9 @@ export default function MatchModalLayer({
           currentOverNumber={currentOverNumber}
           innings={match.innings}
           firstInningsOversPlayed={firstInningsOversPlayed}
+          currentFirstInningsScore={Number(match?.innings1?.score || 0)}
+          firstInningsTeamName={match?.innings1?.team || ""}
+          currentSecondInningsScore={Number(match?.innings2?.score || match?.score || 0)}
           onUpdate={onUpdate}
           onClose={onClose}
           isUpdating={isUpdating}

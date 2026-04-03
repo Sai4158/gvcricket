@@ -8,6 +8,7 @@ import {
   FaVolumeUp,
 } from "react-icons/fa";
 import { ModalBase } from "../match/MatchBaseModals";
+import ModalGradientTitle from "../shared/ModalGradientTitle";
 import useLocalMicMonitor from "./useLocalMicMonitor";
 
 function IosSwitch({ checked, onChange, disabled = false, label }) {
@@ -42,6 +43,7 @@ export default function LiveMicModal({
   const fallbackMonitor = useLocalMicMonitor();
   const {
     isActive,
+    isPaused,
     isStarting,
     error,
     start,
@@ -49,14 +51,20 @@ export default function LiveMicModal({
     prepare = async () => true,
   } = monitor ?? fallbackMonitor;
 
-  const statusLabel = isStarting ? "STARTING" : isActive ? "LIVE" : "OFF";
+  const statusLabel = isStarting
+    ? "STARTING"
+    : isActive && isPaused
+      ? "READY"
+      : isActive
+        ? "LIVE"
+        : "OFF";
 
   const handleToggle = () => {
     if (isStarting) {
       return;
     }
 
-    if (isActive) {
+    if (isActive || isPaused) {
       void stop({ resumeMedia: true });
       return;
     }
@@ -67,7 +75,11 @@ export default function LiveMicModal({
         return;
       }
 
-      await start({ pauseMedia: false });
+      await start({
+        pauseMedia: false,
+        startPaused: true,
+        playStartCue: false,
+      });
     })();
   };
 
@@ -75,9 +87,11 @@ export default function LiveMicModal({
     <ModalBase title="" onExit={onClose} hideHeader>
       <div className="space-y-4 text-left">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-[1.7rem] font-black tracking-[-0.03em] text-white">
-            Live Commentary
-          </h2>
+          <ModalGradientTitle
+            as="h2"
+            text="Live Commentary"
+            className="text-[1.7rem]"
+          />
           <div className="flex items-center gap-3">
             <IosSwitch
               checked={isActive}
@@ -140,6 +154,10 @@ export default function LiveMicModal({
               {isStarting ? (
                 <p className="text-sm text-zinc-400">
                   Starting microphone. Please wait a moment.
+                </p>
+              ) : isActive && isPaused ? (
+                <p className="text-sm text-zinc-400">
+                  Mic is ready. Hold the loudspeaker button on the main screen to talk.
                 </p>
               ) : null}
             </div>

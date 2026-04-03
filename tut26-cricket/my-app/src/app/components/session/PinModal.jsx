@@ -4,6 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { FaBroadcastTower, FaShieldAlt } from "react-icons/fa";
 import LoadingButton from "../shared/LoadingButton";
+import {
+  clearClientPinRateLimit,
+  registerClientPinFailure,
+  useClientPinRateLimit,
+} from "../../lib/pin-attempt-client";
 
 const THEME_STYLES = {
   sky: {
@@ -36,14 +41,41 @@ export default function PinModal({
   submitLabel = "Enter",
   theme = "sky",
   mode = "umpire",
+  rateLimitScope = "session-access-pin",
 }) {
   const [pin, setPin] = useState("");
+  const [localError, setLocalError] = useState("");
   const inputRef = useRef(null);
   const styles = THEME_STYLES[theme] || THEME_STYLES.sky;
   const Icon = mode === "director" ? FaBroadcastTower : FaShieldAlt;
+  const pinRateLimit = useClientPinRateLimit(rateLimitScope);
+  const displayError = pinRateLimit.isBlocked
+    ? pinRateLimit.message
+    : error || localError;
 
-  const handleSubmit = () => {
-    onPinSubmit(pin);
+  const handleSubmit = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (pinRateLimit.isBlocked) {
+      setLocalError(pinRateLimit.message);
+      return;
+    }
+
+    setLocalError("");
+
+    try {
+      await onPinSubmit(pin);
+      clearClientPinRateLimit(rateLimitScope);
+      pinRateLimit.sync();
+    } catch (caughtError) {
+      registerClientPinFailure(rateLimitScope, {
+        retryAfterMs: Number(caughtError?.retryAfterMs || 0),
+      });
+      pinRateLimit.sync();
+      setLocalError(caughtError?.message || "Incorrect PIN.");
+    }
   };
 
   useEffect(() => {
@@ -82,6 +114,7 @@ export default function PinModal({
             autoComplete="one-time-code"
             maxLength={4}
             value={pin}
+            disabled={isSubmitting || pinRateLimit.isBlocked}
             onChange={(event) =>
               setPin(event.target.value.replace(/\D/g, "").slice(0, 4))
             }
@@ -97,7 +130,7 @@ export default function PinModal({
           <LoadingButton
             type="button"
             onClick={handleSubmit}
-            disabled={pin.length !== 4}
+            disabled={pin.length !== 4 || pinRateLimit.isBlocked}
             loading={isSubmitting}
             pendingLabel="Checking..."
             className={`w-full rounded-2xl border py-3 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${styles.button}`}
@@ -105,7 +138,7 @@ export default function PinModal({
             {submitLabel}
           </LoadingButton>
         </div>
-        {error && <p className="text-red-400 text-sm mt-4">{error}</p>}
+        {displayError ? <p className="text-red-400 text-sm mt-4">{displayError}</p> : null}
       </motion.div>
     </motion.div>
   );

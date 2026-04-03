@@ -3,23 +3,24 @@
 import dynamic from "next/dynamic";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
-import { FaArrowLeft, FaImage } from "react-icons/fa";
+import { AnimatePresence } from "framer-motion";
+import { FaArrowLeft } from "react-icons/fa";
 import useEventSource from "../live/useEventSource";
 import LiquidSportText from "../home/LiquidSportText";
 import MatchHeroBackdrop from "../match/MatchHeroBackdrop";
 import MatchImageUploader from "../match/MatchImageUploader";
 import { ModalBase } from "../match/MatchBaseModals";
-import ImagePinModal from "../shared/ImagePinModal";
-import SafeMatchImage, {
-  resolveSafeMatchImage,
-} from "../shared/SafeMatchImage";
+import SafeMatchImage from "../shared/SafeMatchImage";
+import MatchImageCarousel from "../shared/MatchImageCarousel";
+import LoadingButton from "../shared/LoadingButton";
+import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
 import { calculateInningsSummary } from "../../lib/match-stats";
 import CongratulationsCard from "./CongratulationsCard";
 import EnhancedScorecard from "./EnhancedScorecard";
 import PlayerLists from "./PlayerLists";
 import ResultInsightsSections from "./ResultInsightsSections";
 import PlayerStatsSection from "./PlayerStatsSection";
+import SiteFooter from "../shared/SiteFooter";
 
 const RunsPerOverChart = dynamic(() => import("./RunsPerOverChart"), {
   ssr: false,
@@ -30,16 +31,15 @@ const ScoringBreakdownCharts = dynamic(() => import("./ScoringBreakdownCharts"),
 
 export default function ResultPageClient({ matchId, initialMatch }) {
   const router = useRouter();
+  const { startNavigation } = useRouteFeedback();
   const [match, setMatch] = useState(initialMatch);
   const [streamError, setStreamError] = useState("");
-  const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
-  const [isImageActionsOpen, setIsImageActionsOpen] = useState(false);
-  const [isReplaceModalOpen, setIsReplaceModalOpen] = useState(false);
-  const [removeError, setRemoveError] = useState("");
+  const [isImageManagerOpen, setIsImageManagerOpen] = useState(false);
+  const [isLeavingToSessions, setIsLeavingToSessions] = useState(false);
   const [showConfetti, setShowConfetti] = useState(true);
+  const [activeGalleryImageId, setActiveGalleryImageId] = useState("");
+  const [zoomedImage, setZoomedImage] = useState(null);
   const lastStreamUpdateRef = useRef(initialMatch?.updatedAt || "");
-  const imageHoldTimerRef = useRef(null);
-  const imageHoldTriggeredRef = useRef(false);
 
   const confettiPieces = useMemo(
     () =>
@@ -60,17 +60,8 @@ export default function ResultPageClient({ matchId, initialMatch }) {
     return () => window.clearTimeout(timeout);
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (imageHoldTimerRef.current) {
-        window.clearTimeout(imageHoldTimerRef.current);
-        imageHoldTimerRef.current = null;
-      }
-    };
-  }, []);
-
   useEventSource({
-    url: matchId ? `/api/live/matches/${matchId}` : null,
+    url: matchId ? `/api/live/matches/${matchId}?history=0` : null,
     event: "match",
     enabled: Boolean(matchId) && Boolean(!match || match.isOngoing),
     onMessage: (payload) => {
@@ -91,9 +82,16 @@ export default function ResultPageClient({ matchId, initialMatch }) {
     },
   });
 
+  const matchImages = Array.isArray(match?.matchImages) ? match.matchImages : [];
+  const hasGalleryImages = matchImages.length > 0;
+  const activeGalleryImage =
+    matchImages.find((image) => image.id === activeGalleryImageId) ||
+    matchImages[0] ||
+    null;
+
   if (streamError) {
     return (
-      <main className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <main id="top" className="min-h-screen bg-zinc-950 flex items-center justify-center">
         <div className="text-center text-red-400">{streamError}</div>
       </main>
     );
@@ -101,7 +99,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
 
   if (!match) {
     return (
-      <main className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <main id="top" className="min-h-screen bg-zinc-950 flex items-center justify-center">
         <div className="text-lg font-medium">Loading Match Results...</div>
       </main>
     );
@@ -110,70 +108,70 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   const innings1Summary = calculateInningsSummary(match.innings1);
   const innings2Summary = calculateInningsSummary(match.innings2);
 
-  const handleRemoveImage = async (pin) => {
-    const response = await fetch(`/api/matches/${matchId}/image`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pin }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.message || "Failed to remove the image.");
-    }
-
-    startTransition(() => {
-      setMatch(payload);
-      setRemoveError("");
-      setIsRemoveModalOpen(false);
-    });
+  const handleOpenSessions = () => {
+    setIsLeavingToSessions(true);
+    startNavigation("Opening sessions...");
+    router.push(`/session?refresh=${Date.now()}`);
   };
 
-  const clearImageHoldTimer = () => {
-    if (imageHoldTimerRef.current) {
-      window.clearTimeout(imageHoldTimerRef.current);
-      imageHoldTimerRef.current = null;
-    }
-  };
-
-  const handleImageHoldStart = () => {
-    if (resolveSafeMatchImage(match?.matchImageUrl || "") === "/gvLogo.png") {
-      return;
-    }
-
-    imageHoldTriggeredRef.current = false;
-    clearImageHoldTimer();
-    imageHoldTimerRef.current = window.setTimeout(() => {
-      imageHoldTriggeredRef.current = true;
-      setRemoveError("");
-      setIsImageActionsOpen(true);
-    }, 520);
-  };
-
-  const handleImageHoldEnd = () => {
-    clearImageHoldTimer();
-    window.setTimeout(() => {
-      imageHoldTriggeredRef.current = false;
-    }, 0);
-  };
-
-  const handleImageClickCapture = (event) => {
-    if (imageHoldTriggeredRef.current) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-  };
+  const gallerySection = (
+    <section id="match-image" className="scroll-mt-24 space-y-4">
+      <div
+        className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.94),rgba(10,10,14,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.35)]"
+        onContextMenu={(event) => event.preventDefault()}
+        style={{ WebkitUserSelect: "none", userSelect: "none" }}
+      >
+        <MatchImageCarousel
+          images={matchImages.length ? matchImages : [{ id: "fallback", url: "" }]}
+          alt={match.name || "Match cover"}
+          showFallback
+          imageClassName="object-contain object-center bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))]"
+          fallbackClassName="object-contain object-center bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))] p-10 sm:p-14"
+          className="bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))]"
+          onActiveImageChange={(image) => {
+            setActiveGalleryImageId(image?.url ? image.id || "" : "");
+          }}
+          onImageTap={(image) => {
+            setZoomedImage(image || null);
+          }}
+          onImageHold={(image, _index, event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setActiveGalleryImageId(image?.url ? image.id || "" : "");
+            setIsImageManagerOpen(true);
+          }}
+        />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
+          {matchImages.length
+            ? `${matchImages.length} image${matchImages.length === 1 ? "" : "s"} in gallery`
+            : "No gallery yet"}
+        </p>
+        <button
+          type="button"
+          onClick={() => setIsImageManagerOpen(true)}
+          className="rounded-full border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(10,16,26,0.96),rgba(8,47,73,0.78))] px-4 py-2 text-sm font-semibold text-cyan-50 transition hover:brightness-110"
+        >
+          Manage Images
+        </button>
+      </div>
+    </section>
+  );
 
   return (
-    <main className="min-h-screen bg-zinc-950 p-4 sm:p-8 text-zinc-300 font-sans">
+    <main id="top" className="min-h-screen bg-zinc-950 p-4 sm:p-8 text-zinc-300 font-sans">
       <div className="max-w-5xl mx-auto space-y-12 py-10">
         <div className="flex justify-start">
-          <button
-            onClick={() => router.push("/session")}
+          <LoadingButton
+            onClick={handleOpenSessions}
+            loading={isLeavingToSessions}
+            pendingLabel="Opening..."
             className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-zinc-100 backdrop-blur-sm transition-colors hover:bg-black/45"
           >
             <FaArrowLeft />
-            <span>Back to Sessions</span>
-          </button>
+            Back to Sessions
+          </LoadingButton>
         </div>
 
         <MatchHeroBackdrop match={match} className="mb-2">
@@ -239,6 +237,8 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           </div>
         </MatchHeroBackdrop>
 
+        {hasGalleryImages ? gallerySection : null}
+
         <section className="space-y-8">
           <EnhancedScorecard
             match={match}
@@ -247,44 +247,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           />
         </section>
 
-        <section className="space-y-4">
-          <div
-            className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.94),rgba(10,10,14,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.35)]"
-            onPointerDown={handleImageHoldStart}
-            onPointerUp={handleImageHoldEnd}
-            onPointerLeave={handleImageHoldEnd}
-            onPointerCancel={handleImageHoldEnd}
-            onContextMenu={(event) => event.preventDefault()}
-            onClickCapture={handleImageClickCapture}
-            style={{ WebkitUserSelect: "none", userSelect: "none" }}
-          >
-            <div className="relative">
-              <SafeMatchImage
-                src={match?.matchImageUrl || ""}
-                alt={match.name || "Match cover"}
-                width={1600}
-                height={900}
-                className="max-h-[420px] w-full object-cover"
-                fallbackClassName="max-h-[420px] w-full object-contain bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))] p-10 sm:p-14"
-                sizes="(max-width: 768px) 100vw, 1200px"
-                draggable={false}
-                onDragStart={(event) => event.preventDefault()}
-              />
-              {resolveSafeMatchImage(match?.matchImageUrl || "") !== "/gvLogo.png" ? (
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.7))] px-5 py-4 text-center">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/72">
-                    Press and hold to manage image
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          </div>
-          {removeError ? (
-            <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-              {removeError}
-            </div>
-          ) : null}
-        </section>
+        {!hasGalleryImages ? gallerySection : null}
 
         <section className="space-y-8">
           <h2 className="text-3xl font-bold text-white text-center pt-8 border-t border-white/10">
@@ -318,81 +281,70 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           />
         </section>
 
-        <footer className="text-center pt-8 border-t border-white/10">
-          <button
-            onClick={() => router.push("/session")}
+      </div>
+      <SiteFooter
+        action={
+          <LoadingButton
+            onClick={handleOpenSessions}
+            loading={isLeavingToSessions}
+            pendingLabel="Opening..."
             className="bg-blue-600 text-white px-8 py-3 rounded-lg shadow-lg hover:bg-blue-500 transition-colors font-semibold"
           >
             View All Match History
-          </button>
-        </footer>
-      </div>
-      <ImagePinModal
-        isOpen={isRemoveModalOpen}
-        title="Remove picture"
-        subtitle="Enter the 4-digit PIN to remove this session image."
-        confirmLabel="Remove picture"
-        onConfirm={handleRemoveImage}
-        onClose={() => setIsRemoveModalOpen(false)}
+          </LoadingButton>
+        }
       />
       <AnimatePresence>
-        {isImageActionsOpen ? (
+        {isImageManagerOpen ? (
           <ModalBase
-            title="Match Image"
-            onExit={() => setIsImageActionsOpen(false)}
-            panelClassName="max-w-sm"
-          >
-            <div className="space-y-3">
-              <p className="text-sm leading-6 text-zinc-400">
-                Choose what you want to do with this image.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsImageActionsOpen(false);
-                  setIsReplaceModalOpen(true);
-                }}
-                className="w-full rounded-2xl border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(10,16,26,0.96),rgba(8,47,73,0.78))] px-4 py-3 text-sm font-semibold text-cyan-50 transition hover:brightness-110"
-              >
-                Replace Image
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsImageActionsOpen(false);
-                  setRemoveError("");
-                  setIsRemoveModalOpen(true);
-                }}
-                className="w-full rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/15"
-              >
-                Delete Image
-              </button>
-            </div>
-          </ModalBase>
-        ) : null}
-      </AnimatePresence>
-      <AnimatePresence>
-        {isReplaceModalOpen ? (
-          <ModalBase
-            title="Replace Match Image"
-            onExit={() => setIsReplaceModalOpen(false)}
+            onExit={undefined}
+            hideHeader
             panelClassName="max-w-md"
             bodyClassName="max-h-[calc(100vh-7rem)]"
           >
             <MatchImageUploader
               matchId={String(match._id)}
-              existingImageUrl={match?.matchImageUrl || ""}
+              existingImages={matchImages}
+              existingImageUrl={activeGalleryImage?.url || match?.matchImageUrl || ""}
+              existingImageCount={matchImages.length || (match?.matchImageUrl ? 1 : 0)}
+              targetImageId={activeGalleryImage?.id || ""}
+              appendOnUpload={matchImages.length > 0 || Boolean(match?.matchImageUrl)}
               onUploaded={(updatedMatch) => {
                 startTransition(() => {
                   setMatch(updatedMatch);
-                  setRemoveError("");
-                  setIsReplaceModalOpen(false);
                 });
               }}
-              title="Replace the current image"
-              description="Upload a fresh match image. Press and hold the cover image any time to replace or delete it."
-              primaryLabel="Replace Image"
+              onComplete={() => {
+                setIsImageManagerOpen(false);
+              }}
+              onRequestClose={() => setIsImageManagerOpen(false)}
+              promptForUploadPin
+              title="Match Images"
+              description="Manage the result gallery."
+              primaryLabel="Save Images"
             />
+          </ModalBase>
+        ) : null}
+      </AnimatePresence>
+      <AnimatePresence>
+        {zoomedImage?.url ? (
+          <ModalBase
+            title=""
+            onExit={() => setZoomedImage(null)}
+            panelClassName="max-w-5xl bg-black/95"
+            bodyClassName="max-h-[calc(100vh-4rem)] p-0"
+          >
+            <div className="overflow-hidden rounded-[24px] bg-black">
+              <SafeMatchImage
+                src={zoomedImage.url}
+                alt={match.name || "Match image"}
+                width={2000}
+                height={1400}
+                className="mx-auto h-auto max-h-[82vh] w-full object-contain"
+                fallbackClassName="mx-auto h-auto max-h-[82vh] w-full object-contain bg-black p-10"
+                sizes="100vw"
+              />
+            </div>
           </ModalBase>
         ) : null}
       </AnimatePresence>

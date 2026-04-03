@@ -1,7 +1,23 @@
 import { getTeamBundle } from "./team-utils";
 import { getPublicMatchImagePath } from "./match-image-secure";
+import { getPublicMatchImages } from "./match-image-gallery";
 import { isSafeMatchImageUrl } from "./match-image";
 import { hasCompleteTossState, normalizeLegacyTossState } from "./match-toss";
+
+function getPublicMatchImagesWithFallback(match, fallbackState = null) {
+  const matchId = String(match?._id || "");
+  const directImages = getPublicMatchImages(match, {
+    matchId,
+  });
+
+  if (directImages.length || !fallbackState) {
+    return directImages;
+  }
+
+  return getPublicMatchImages(fallbackState, {
+    matchId,
+  });
+}
 
 export function serializePublicMatch(
   matchDocument,
@@ -16,6 +32,7 @@ export function serializePublicMatch(
       : matchDocument;
   const match = normalizeLegacyTossState(rawMatch, fallbackState);
   const includeActionHistory = Boolean(options.includeActionHistory);
+  const publicImages = getPublicMatchImagesWithFallback(match, fallbackState);
 
   return {
     _id: String(match._id),
@@ -38,9 +55,14 @@ export function serializePublicMatch(
     innings2: match.innings2 || { team: "", score: 0, history: [] },
     tossReady: hasCompleteTossState(match, fallbackState),
     balls: Array.isArray(match.balls) ? match.balls : [],
-    matchImageUrl: getPublicMatchImagePath(match),
+    matchImageUrl: publicImages[0]?.url || getPublicMatchImagePath(match),
+    matchImages: publicImages,
     announcerEnabled: Boolean(match.announcerEnabled),
     announcerMode: match.announcerMode || "",
+    announcerScoreSoundEffectsEnabled:
+      match.announcerScoreSoundEffectsEnabled !== false,
+    announcerBroadcastScoreSoundEffectsEnabled:
+      match.announcerBroadcastScoreSoundEffectsEnabled !== false,
     lastLiveEvent: match.lastLiveEvent || null,
     lastEventType: match.lastEventType || "",
     lastEventText: match.lastEventText || "",
@@ -51,7 +73,9 @@ export function serializePublicMatch(
             : [],
         }
       : {}),
-    undoCount: Array.isArray(match.actionHistory) ? match.actionHistory.length : 0,
+    undoCount: Array.isArray(match.actionHistory)
+      ? match.actionHistory.length
+      : Number(match.undoCount || 0),
     createdAt: match.createdAt || null,
     updatedAt: match.updatedAt || null,
   };
@@ -64,6 +88,9 @@ export function serializePublicSession(sessionDocument) {
     typeof sessionDocument.toObject === "function"
       ? sessionDocument.toObject()
       : sessionDocument;
+  const publicImages = getPublicMatchImages(session, {
+    matchId: String(session.match?._id || session.match || ""),
+  });
 
   const teamA = getTeamBundle(session, "teamA");
   const teamB = getTeamBundle(session, "teamB");
@@ -82,9 +109,11 @@ export function serializePublicSession(sessionDocument) {
     teamBName: teamB.name,
     teamA: teamA.players,
     teamB: teamB.players,
-    matchImageUrl: isSafeMatchImageUrl(session.matchImageUrl || "")
-      ? session.matchImageUrl || ""
-      : getPublicMatchImagePath({
+    matchImageUrl:
+      publicImages[0]?.url ||
+      (isSafeMatchImageUrl(session.matchImageUrl || "")
+        ? session.matchImageUrl || ""
+        : getPublicMatchImagePath({
           _id: session.match?._id || session.match || "",
           matchImageUrl: session.matchImageUrl || "",
           matchImageStorageUrlEnc: session.matchImageStorageUrlEnc || "",
@@ -92,9 +121,14 @@ export function serializePublicSession(sessionDocument) {
           matchImagePublicId: session.matchImagePublicId || "",
           matchImageUploadedAt: session.matchImageUploadedAt || null,
           updatedAt: session.updatedAt || null,
-        }),
+        })),
+    matchImages: publicImages,
     announcerEnabled: Boolean(session.announcerEnabled),
     announcerMode: session.announcerMode || "",
+    announcerScoreSoundEffectsEnabled:
+      session.announcerScoreSoundEffectsEnabled !== false,
+    announcerBroadcastScoreSoundEffectsEnabled:
+      session.announcerBroadcastScoreSoundEffectsEnabled !== false,
     lastEventType: session.lastEventType || "",
     lastEventText: session.lastEventText || "",
     createdAt: session.createdAt || null,

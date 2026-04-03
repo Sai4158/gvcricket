@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
+import { EMPTY_SCORE_SOUND_EFFECT_MAP } from "../../lib/score-sound-effects";
 
-const SETTINGS_VERSION = 4;
+const SETTINGS_VERSION = 11;
 
 const DEFAULTS = {
   spectator: {
@@ -12,6 +13,11 @@ const DEFAULTS = {
     volume: 0.85,
     mode: "full",
     accessibilityMode: false,
+    playScoreSoundEffects: true,
+    broadcastScoreSoundEffects: true,
+    scoreSoundEffectMap: {
+      ...EMPTY_SCORE_SOUND_EFFECT_MAP,
+    },
   },
   umpire: {
     version: SETTINGS_VERSION,
@@ -20,8 +26,44 @@ const DEFAULTS = {
     volume: 0.75,
     mode: "simple",
     accessibilityMode: false,
+    playScoreSoundEffects: true,
+    broadcastScoreSoundEffects: true,
+    scoreSoundEffectMap: {
+      ...EMPTY_SCORE_SOUND_EFFECT_MAP,
+      six: "ipl_theme_song.mp3",
+    },
   },
 };
+
+function mergeSettings(role, parsed = {}) {
+  const base = DEFAULTS[role] || {};
+  const parsedMap =
+    parsed?.scoreSoundEffectMap && typeof parsed.scoreSoundEffectMap === "object"
+      ? parsed.scoreSoundEffectMap
+      : {};
+  const legacyWideValue = String(parsedMap.wide || "").trim();
+  const normalizedScoreSoundEffectMap = {
+    ...(base.scoreSoundEffectMap || {}),
+    ...parsedMap,
+  };
+
+  if (legacyWideValue) {
+    if (!String(normalizedScoreSoundEffectMap.wide_zero || "").trim()) {
+      normalizedScoreSoundEffectMap.wide_zero = legacyWideValue;
+    }
+    if (!String(normalizedScoreSoundEffectMap.wide_plus_one || "").trim()) {
+      normalizedScoreSoundEffectMap.wide_plus_one = legacyWideValue;
+    }
+  }
+
+  delete normalizedScoreSoundEffectMap.wide;
+
+  return {
+    ...base,
+    ...parsed,
+    scoreSoundEffectMap: normalizedScoreSoundEffectMap,
+  };
+}
 
 function getStorageKey(role) {
   return `gv-announcer-${role}`;
@@ -70,6 +112,12 @@ function persistSettings(role, settings) {
 }
 
 export default function useAnnouncementSettings(role, scopeKey = "") {
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+
   const subscribe = useMemo(
     () => (onStoreChange) => {
       if (typeof window === "undefined") {
@@ -108,12 +156,12 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
 
   const rawValue = useSyncExternalStore(
     subscribe,
-    () => readRawValue(role),
+    () => (hydrated ? readRawValue(role) : ""),
     () => ""
   );
   const enabledValue = useSyncExternalStore(
     subscribe,
-    () => readEnabledValue(role, scopeKey),
+    () => (hydrated ? readEnabledValue(role, scopeKey) : ""),
     () => ""
   );
 
@@ -124,10 +172,18 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
       }
 
       const parsed = JSON.parse(rawValue);
+      const isLegacyVersion =
+        !parsed?.version || Number(parsed.version) < SETTINGS_VERSION;
 
       return {
-        ...DEFAULTS[role],
-        ...parsed,
+        ...mergeSettings(role, parsed),
+        ...(role === "umpire" && isLegacyVersion
+          ? {
+              enabled: true,
+              playScoreSoundEffects: true,
+              broadcastScoreSoundEffects: true,
+            }
+          : {}),
         version: SETTINGS_VERSION,
       };
     } catch (error) {
@@ -167,39 +223,42 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
     }
   }, [rawValue, role, settings]);
 
-  const updateSetting = (key, value) => {
-    if (typeof window === "undefined") {
-      return;
-    }
+  const updateSetting = useCallback(
+    (key, value) => {
+      if (typeof window === "undefined") {
+        return;
+      }
 
-    try {
-      if (key === "enabled") {
-        window.sessionStorage.setItem(
-          getEnabledStorageKey(role, scopeKey),
-          value ? "true" : "false"
-        );
+      try {
+        if (key === "enabled") {
+          window.sessionStorage.setItem(
+            getEnabledStorageKey(role, scopeKey),
+            value ? "true" : "false"
+          );
+          window.dispatchEvent(
+            new CustomEvent("gv-announcer-change", {
+              detail: { role, scopeKey },
+            })
+          );
+          return;
+        }
+
+        const nextSettings = {
+          ...persistedSettings,
+          [key]: value,
+        };
+        persistSettings(role, nextSettings);
         window.dispatchEvent(
           new CustomEvent("gv-announcer-change", {
             detail: { role, scopeKey },
           })
         );
-        return;
+      } catch (error) {
+        console.error("Failed to save announcer settings:", error);
       }
-
-      const nextSettings = {
-        ...persistedSettings,
-        [key]: value,
-      };
-      persistSettings(role, nextSettings);
-      window.dispatchEvent(
-        new CustomEvent("gv-announcer-change", {
-          detail: { role, scopeKey },
-        })
-      );
-    } catch (error) {
-      console.error("Failed to save announcer settings:", error);
-    }
-  };
+    },
+    [persistedSettings, role, scopeKey]
+  );
 
   return {
     settings,

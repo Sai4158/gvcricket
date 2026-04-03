@@ -220,6 +220,27 @@ export async function primeUiAudio(options = {}) {
   return unlocked;
 }
 
+function normalizeCachedAudioSource(src) {
+  const safeSrc = String(src || "");
+  if (!safeSrc) {
+    return "";
+  }
+
+  if (safeSrc.startsWith("blob:") || safeSrc.startsWith("data:")) {
+    return safeSrc;
+  }
+
+  if (typeof window === "undefined") {
+    return safeSrc;
+  }
+
+  try {
+    return new URL(safeSrc, window.location.href).toString();
+  } catch {
+    return safeSrc;
+  }
+}
+
 export async function getCachedAudioAssetUrl(src) {
   const safeSrc = String(src || "");
   if (!safeSrc) {
@@ -233,12 +254,14 @@ export async function getCachedAudioAssetUrl(src) {
     return safeSrc;
   }
 
-  if (cachedAudioUrlMap.has(safeSrc)) {
-    return cachedAudioUrlMap.get(safeSrc);
+  const cacheKey = normalizeCachedAudioSource(safeSrc);
+
+  if (cachedAudioUrlMap.has(cacheKey)) {
+    return cachedAudioUrlMap.get(cacheKey);
   }
 
-  if (cachedAudioRequestMap.has(safeSrc)) {
-    return cachedAudioRequestMap.get(safeSrc);
+  if (cachedAudioRequestMap.has(cacheKey)) {
+    return cachedAudioRequestMap.get(cacheKey);
   }
 
   const request = (async () => {
@@ -249,11 +272,11 @@ export async function getCachedAudioAssetUrl(src) {
     ) {
       try {
         const cache = await window.caches.open(UI_AUDIO_CACHE_NAME);
-        const cachedResponse = await cache.match(safeSrc);
+        const cachedResponse = await cache.match(cacheKey);
         if (cachedResponse?.ok) {
           const cachedBlob = await cachedResponse.blob();
           const cachedObjectUrl = URL.createObjectURL(cachedBlob);
-          cachedAudioUrlMap.set(safeSrc, cachedObjectUrl);
+          cachedAudioUrlMap.set(cacheKey, cachedObjectUrl);
           return cachedObjectUrl;
         }
       } catch {
@@ -261,7 +284,7 @@ export async function getCachedAudioAssetUrl(src) {
       }
     }
 
-    const response = await fetch(safeSrc, { cache: "force-cache" });
+    const response = await fetch(cacheKey, { cache: "force-cache" });
     if (!response.ok) {
       throw new Error("Audio file could not be fetched.");
     }
@@ -273,7 +296,7 @@ export async function getCachedAudioAssetUrl(src) {
         /^https?:/i.test(window.location?.protocol || "http:")
       ) {
         const cache = await window.caches.open(UI_AUDIO_CACHE_NAME);
-        await cache.put(safeSrc, response.clone());
+        await cache.put(cacheKey, response.clone());
       }
     } catch {
       // Ignore Cache Storage failures and continue with in-memory caching.
@@ -281,14 +304,14 @@ export async function getCachedAudioAssetUrl(src) {
 
     const blob = await response.blob();
     const objectUrl = URL.createObjectURL(blob);
-    cachedAudioUrlMap.set(safeSrc, objectUrl);
+    cachedAudioUrlMap.set(cacheKey, objectUrl);
     return objectUrl;
   })()
     .finally(() => {
-      cachedAudioRequestMap.delete(safeSrc);
+      cachedAudioRequestMap.delete(cacheKey);
     });
 
-  cachedAudioRequestMap.set(safeSrc, request);
+  cachedAudioRequestMap.set(cacheKey, request);
   return request;
 }
 
@@ -298,6 +321,8 @@ async function getCachedAudioArrayBuffer(src) {
     return null;
   }
 
+  const cacheKey = normalizeCachedAudioSource(safeSrc);
+
   if (
     typeof window !== "undefined" &&
     "caches" in window &&
@@ -305,7 +330,7 @@ async function getCachedAudioArrayBuffer(src) {
   ) {
     try {
       const cache = await window.caches.open(UI_AUDIO_CACHE_NAME);
-      const cachedResponse = await cache.match(safeSrc);
+      const cachedResponse = await cache.match(cacheKey);
       if (cachedResponse?.ok) {
         return await cachedResponse.arrayBuffer();
       }
@@ -314,7 +339,7 @@ async function getCachedAudioArrayBuffer(src) {
     }
   }
 
-  const response = await fetch(safeSrc, { cache: "force-cache" });
+  const response = await fetch(cacheKey, { cache: "force-cache" });
   if (!response.ok) {
     throw new Error("Audio file could not be fetched.");
   }
@@ -326,7 +351,7 @@ async function getCachedAudioArrayBuffer(src) {
       /^https?:/i.test(window.location?.protocol || "http:")
     ) {
       const cache = await window.caches.open(UI_AUDIO_CACHE_NAME);
-      await cache.put(safeSrc, response.clone());
+      await cache.put(cacheKey, response.clone());
     }
   } catch {
     // Ignore Cache Storage failures and continue.
@@ -341,12 +366,14 @@ async function getCachedAudioBuffer(src) {
     return null;
   }
 
-  if (cachedAudioBufferMap.has(safeSrc)) {
-    return cachedAudioBufferMap.get(safeSrc);
+  const cacheKey = normalizeCachedAudioSource(safeSrc);
+
+  if (cachedAudioBufferMap.has(cacheKey)) {
+    return cachedAudioBufferMap.get(cacheKey);
   }
 
-  if (cachedAudioBufferRequestMap.has(safeSrc)) {
-    return cachedAudioBufferRequestMap.get(safeSrc);
+  if (cachedAudioBufferRequestMap.has(cacheKey)) {
+    return cachedAudioBufferRequestMap.get(cacheKey);
   }
 
   const request = (async () => {
@@ -355,19 +382,19 @@ async function getCachedAudioBuffer(src) {
       throw new Error("Web Audio is unavailable.");
     }
 
-    const arrayBuffer = await getCachedAudioArrayBuffer(safeSrc);
+    const arrayBuffer = await getCachedAudioArrayBuffer(cacheKey);
     if (!arrayBuffer) {
       throw new Error("Audio buffer could not be loaded.");
     }
 
     const decodedBuffer = await context.decodeAudioData(arrayBuffer.slice(0));
-    cachedAudioBufferMap.set(safeSrc, decodedBuffer);
+    cachedAudioBufferMap.set(cacheKey, decodedBuffer);
     return decodedBuffer;
   })().finally(() => {
-    cachedAudioBufferRequestMap.delete(safeSrc);
+    cachedAudioBufferRequestMap.delete(cacheKey);
   });
 
-  cachedAudioBufferRequestMap.set(safeSrc, request);
+  cachedAudioBufferRequestMap.set(cacheKey, request);
   return request;
 }
 
@@ -449,6 +476,31 @@ export function getPreferredAudioSessionType() {
   return session?.type || "";
 }
 
+function hasActivePageMediaPlayback() {
+  if (typeof document === "undefined") {
+    return false;
+  }
+
+  const mediaElements = document.querySelectorAll("audio, video");
+  for (const element of mediaElements) {
+    try {
+      if (
+        !element.paused &&
+        !element.ended &&
+        Number(element.readyState || 0) >= 2 &&
+        !element.muted &&
+        Number(element.volume || 0) > 0
+      ) {
+        return true;
+      }
+    } catch {
+      // Ignore stale or inaccessible media elements.
+    }
+  }
+
+  return false;
+}
+
 export function setPreferredAudioSessionType(nextType) {
   const session = getNavigatorAudioSession();
   if (!session || !SUPPORTED_AUDIO_SESSION_TYPES.has(nextType)) {
@@ -467,6 +519,14 @@ export function setPreferredAudioSessionType(nextType) {
   }
 
   return previousType;
+}
+
+export function setPlaybackFriendlyAudioSessionType({
+  preferMixing = true,
+} = {}) {
+  const nextType =
+    preferMixing && hasActivePageMediaPlayback() ? "ambient" : "playback";
+  return setPreferredAudioSessionType(nextType);
 }
 
 export function restorePreferredAudioSessionType(previousType) {
@@ -492,24 +552,113 @@ export async function preloadCachedAudioAssets(sources = []) {
   );
 }
 
-export function duckPageMedia(stateRef, duckVolume = 0.18) {
-  if (typeof document === "undefined" || !stateRef) {
+function clearTrackedMediaResumeState(item) {
+  if (!item) {
     return;
+  }
+
+  if (Array.isArray(item.resumeTimerIds)) {
+    for (const timerId of item.resumeTimerIds) {
+      window.clearTimeout(timerId);
+    }
+  }
+  item.resumeTimerIds = [];
+
+  if (item.pauseListener && item.element?.removeEventListener) {
+    try {
+      item.element.removeEventListener("pause", item.pauseListener);
+    } catch {
+      // Ignore stale media listeners during cleanup.
+    }
+  }
+  item.pauseListener = null;
+}
+
+function resumeTrackedMediaItem(
+  item,
+  retryDelaysMs = [0, 140, 420],
+  { keepAlive = false, ignoreRestored = false } = {},
+) {
+  if (!item?.wasPlaying || !item?.element || typeof window === "undefined") {
+    return;
+  }
+
+  const mediaElement = item.element;
+  const retryDelays = Array.isArray(retryDelaysMs)
+    ? retryDelaysMs
+    : [0, 140, 420];
+
+  const attemptResume = () => {
+    try {
+      if (item.restored && !ignoreRestored) {
+        return;
+      }
+
+      if (!mediaElement.paused || mediaElement.ended) {
+        return;
+      }
+
+      const resumePromise = mediaElement.play?.();
+      if (resumePromise && typeof resumePromise.catch === "function") {
+        resumePromise.catch(() => {});
+      }
+    } catch {
+      // Ignore resume failures and let the next retry try again.
+    }
+  };
+
+  if (!keepAlive) {
+    clearTrackedMediaResumeState(item);
+  }
+
+  for (const delayMs of retryDelays) {
+    if (delayMs <= 0) {
+      attemptResume();
+      continue;
+    }
+
+    const timerId = window.setTimeout(attemptResume, delayMs);
+    if (!Array.isArray(item.resumeTimerIds)) {
+      item.resumeTimerIds = [];
+    }
+    item.resumeTimerIds.push(timerId);
+  }
+}
+
+export function duckPageMedia(stateRef, duckVolume = 0.18, options = {}) {
+  if (typeof document === "undefined" || !stateRef) {
+    return false;
   }
 
   if (Array.isArray(stateRef.current) && stateRef.current.length > 0) {
-    return;
+    return true;
   }
 
+  const excludedElements = new Set(
+    Array.isArray(options.excludedElements) ? options.excludedElements : [],
+  );
   const tracked = [];
   const mediaElements = document.querySelectorAll("audio, video");
 
   mediaElements.forEach((element) => {
+    if (excludedElements.has(element)) {
+      return;
+    }
+
     try {
+      const wasPlaying = Boolean(
+        !element.paused &&
+          !element.ended &&
+          Number(element.readyState || 0) >= 2,
+      );
       tracked.push({
         element,
         volume: typeof element.volume === "number" ? element.volume : 1,
         muted: Boolean(element.muted),
+        wasPlaying,
+        restored: false,
+        pauseListener: null,
+        resumeTimerIds: [],
       });
 
       if (!element.muted) {
@@ -520,7 +669,26 @@ export function duckPageMedia(stateRef, duckVolume = 0.18) {
     }
   });
 
+  for (const item of tracked) {
+    if (!item?.wasPlaying || !item.element?.addEventListener) {
+      continue;
+    }
+
+    const handlePauseDuringDuck = () => {
+      resumeTrackedMediaItem(item, [24, 120, 320], { keepAlive: true });
+    };
+
+    item.pauseListener = handlePauseDuringDuck;
+
+    try {
+      item.element.addEventListener("pause", handlePauseDuringDuck);
+    } catch {
+      item.pauseListener = null;
+    }
+  }
+
   stateRef.current = tracked;
+  return tracked.length > 0;
 }
 
 export function restorePageMedia(stateRef) {
@@ -530,8 +698,11 @@ export function restorePageMedia(stateRef) {
 
   for (const item of stateRef.current) {
     try {
+      item.restored = true;
+      clearTrackedMediaResumeState(item);
       item.element.muted = item.muted;
       item.element.volume = item.volume;
+      resumeTrackedMediaItem(item, [0, 140, 420], { ignoreRestored: true });
     } catch {
       // Ignore stale media elements removed from the page.
     }
