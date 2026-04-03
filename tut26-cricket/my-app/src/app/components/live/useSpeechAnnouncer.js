@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   isUiAudioUnlocked,
   restorePreferredAudioSessionType,
+  setPreferredAudioSessionType,
   setPlaybackFriendlyAudioSessionType,
   subscribeUiAudioUnlock,
 } from "../../lib/page-audio";
@@ -654,9 +655,11 @@ export default function useSpeechAnnouncer(settings) {
 
   const ensureSpeechAudioSession = useCallback(() => {
     const previousType =
-      setPlaybackFriendlyAudioSessionType({
-        preferMixing: true,
-      }) || "";
+      platformRef.current.isIOS && platformRef.current.isSafari
+        ? setPreferredAudioSessionType("transient") || ""
+        : setPlaybackFriendlyAudioSessionType({
+            preferMixing: true,
+          }) || "";
     if (!audioSessionTypeRef.current) {
       audioSessionTypeRef.current = previousType;
     }
@@ -824,6 +827,7 @@ export default function useSpeechAnnouncer(settings) {
   const runSequence = useCallback(
     async (sequence, token = sequenceTokenRef.current) => {
       if (!sequence?.items?.length || !canUseSpeechSynthesis()) {
+        restoreSpeechAudioSession();
         setStatus((current) => (current === "unsupported" ? current : "ready"));
         return false;
       }
@@ -839,6 +843,7 @@ export default function useSpeechAnnouncer(settings) {
             sequenceTokenRef.current,
           );
         }
+        restoreSpeechAudioSession();
         setStatus((current) => (current === "unsupported" ? current : "ready"));
         return true;
       }
@@ -885,7 +890,6 @@ export default function useSpeechAnnouncer(settings) {
         }
 
         utteranceRef.current = null;
-        restoreSpeechAudioSession();
         const pauseAfterMs =
           nextItem.pauseAfterMs ?? sequence.pauseAfterMs ?? 0;
         const nextSequence = {

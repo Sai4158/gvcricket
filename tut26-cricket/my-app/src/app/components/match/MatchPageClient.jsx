@@ -230,6 +230,8 @@ export default function MatchPageClient({
   const contentStartRef = useRef(null);
   const announcementDuckRef = useRef([]);
   const announcementRestoreTimerRef = useRef(null);
+  const speechEffectPlayerDuckRef = useRef([]);
+  const speechEffectPlayerRestoreTimerRef = useRef(null);
   const micMonitorDuckingRef = useRef(false);
   const speechPlaybackActiveRef = useRef(false);
   const soundEffectPlaybackActiveRef = useRef(false);
@@ -283,6 +285,15 @@ export default function MatchPageClient({
     restorePageMedia(announcementDuckRef);
   }, []);
 
+  const clearSpeechEffectPlayerDuck = useCallback(() => {
+    if (speechEffectPlayerRestoreTimerRef.current) {
+      window.clearTimeout(speechEffectPlayerRestoreTimerRef.current);
+      speechEffectPlayerRestoreTimerRef.current = null;
+    }
+
+    restorePageMedia(speechEffectPlayerDuckRef);
+  }, []);
+
   const scheduleAnnouncementDuckRestore = useCallback(
     (delayMs = 220) => {
       if (announcementRestoreTimerRef.current) {
@@ -303,6 +314,24 @@ export default function MatchPageClient({
       }, Math.max(0, delayMs));
     },
     [clearAnnouncementDuck],
+  );
+
+  const scheduleSpeechEffectPlayerDuckRestore = useCallback(
+    (delayMs = 220) => {
+      if (speechEffectPlayerRestoreTimerRef.current) {
+        window.clearTimeout(speechEffectPlayerRestoreTimerRef.current);
+        speechEffectPlayerRestoreTimerRef.current = null;
+      }
+
+      speechEffectPlayerRestoreTimerRef.current = window.setTimeout(() => {
+        speechEffectPlayerRestoreTimerRef.current = null;
+        if (micMonitorDuckingRef.current || speechPlaybackActiveRef.current) {
+          return;
+        }
+        clearSpeechEffectPlayerDuck();
+      }, Math.max(0, delayMs));
+    },
+    [clearSpeechEffectPlayerDuck],
   );
 
   const duckAnnouncementMedia = useCallback(() => {
@@ -329,28 +358,76 @@ export default function MatchPageClient({
     });
   }, []);
 
+  const duckSpeechEffectPlayerMedia = useCallback(() => {
+    if (typeof document === "undefined" || micMonitorDuckingRef.current) {
+      return false;
+    }
+
+    if (speechEffectPlayerRestoreTimerRef.current) {
+      window.clearTimeout(speechEffectPlayerRestoreTimerRef.current);
+      speechEffectPlayerRestoreTimerRef.current = null;
+    }
+
+    if (
+      Array.isArray(speechEffectPlayerDuckRef.current) &&
+      speechEffectPlayerDuckRef.current.length
+    ) {
+      return true;
+    }
+
+    const targetElements = Array.from(
+      document.querySelectorAll('[data-gv-umpire-effects-player="true"]'),
+    );
+    if (!targetElements.length) {
+      return false;
+    }
+
+    const targetSet = new Set(targetElements);
+    return duckPageMedia(speechEffectPlayerDuckRef, 0.12, {
+      excludedElements: Array.from(document.querySelectorAll("audio, video")).filter(
+        (element) => !targetSet.has(element),
+      ),
+    });
+  }, []);
+
   const speakWithAnnouncementDuck = useCallback(
     (text, options = {}) => {
       duckAnnouncementMedia();
+      duckSpeechEffectPlayerMedia();
       const spoke = speak(text, options);
       if (!spoke) {
         scheduleAnnouncementDuckRestore(120);
+        scheduleSpeechEffectPlayerDuckRestore(120);
       }
       return spoke;
     },
-    [duckAnnouncementMedia, scheduleAnnouncementDuckRestore, speak],
+    [
+      duckAnnouncementMedia,
+      duckSpeechEffectPlayerMedia,
+      scheduleAnnouncementDuckRestore,
+      scheduleSpeechEffectPlayerDuckRestore,
+      speak,
+    ],
   );
 
   const speakSequenceWithAnnouncementDuck = useCallback(
     (items, options = {}) => {
       duckAnnouncementMedia();
+      duckSpeechEffectPlayerMedia();
       const spoke = speakSequence(items, options);
       if (!spoke) {
         scheduleAnnouncementDuckRestore(120);
+        scheduleSpeechEffectPlayerDuckRestore(120);
       }
       return spoke;
     },
-    [duckAnnouncementMedia, scheduleAnnouncementDuckRestore, speakSequence],
+    [
+      duckAnnouncementMedia,
+      duckSpeechEffectPlayerMedia,
+      scheduleAnnouncementDuckRestore,
+      scheduleSpeechEffectPlayerDuckRestore,
+      speakSequence,
+    ],
   );
   const beginAnnouncementSoundEffectDuck = useCallback(() => {
     duckAnnouncementMedia();
@@ -563,7 +640,14 @@ export default function MatchPageClient({
         window.clearTimeout(announcementRestoreTimerRef.current);
         announcementRestoreTimerRef.current = null;
       }
+      clearSpeechEffectPlayerDuck();
       return;
+    }
+
+    if (status === "speaking") {
+      duckSpeechEffectPlayerMedia();
+    } else {
+      scheduleSpeechEffectPlayerDuckRestore(220);
     }
 
     if (status === "speaking" || isAnySoundEffectActive) {
@@ -574,11 +658,14 @@ export default function MatchPageClient({
     scheduleAnnouncementDuckRestore(220);
   }, [
     duckAnnouncementMedia,
+    duckSpeechEffectPlayerMedia,
+    clearSpeechEffectPlayerDuck,
     isAnySoundEffectActive,
     micMonitor.isActive,
     micMonitor.isPaused,
     micMonitor.isStarting,
     scheduleAnnouncementDuckRestore,
+    scheduleSpeechEffectPlayerDuckRestore,
     status,
   ]);
   const {
@@ -746,8 +833,9 @@ export default function MatchPageClient({
       shouldResumeAfterSoundEffectRef.current = false;
       walkieAnnouncementPauseActiveRef.current = false;
       clearAnnouncementDuck();
+      clearSpeechEffectPlayerDuck();
     };
-  }, [clearAnnouncementDuck]);
+  }, [clearAnnouncementDuck, clearSpeechEffectPlayerDuck]);
 
   const cancelBoundarySequence = useCallback(
     ({ stopEffect = false } = {}) => {
@@ -1336,9 +1424,15 @@ export default function MatchPageClient({
     cancelBoundarySequence({ stopEffect: true });
     stop();
     scheduleAnnouncementDuckRestore(120);
+    scheduleSpeechEffectPlayerDuckRestore(120);
     setActiveCommentaryPreviewId("");
     setActiveCommentaryAction("");
-  }, [cancelBoundarySequence, scheduleAnnouncementDuckRestore, stop]);
+  }, [
+    cancelBoundarySequence,
+    scheduleAnnouncementDuckRestore,
+    scheduleSpeechEffectPlayerDuckRestore,
+    stop,
+  ]);
 
   const ensureUmpireScoreFeedbackEnabled = useCallback(() => {
     if (!umpireSettings.enabled) {
