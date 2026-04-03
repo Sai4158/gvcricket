@@ -74,6 +74,18 @@ export default function LiveNowBanner({ liveMatch }) {
   const shouldReduceMotion = prefersReducedMotion || useDesktopLiteMotion;
   const [fetchedLiveMatch, setFetchedLiveMatch] = useState(null);
   const currentLiveMatch = liveMatch || fetchedLiveMatch;
+  const bannerHref = currentLiveMatch
+    ? currentLiveMatch.isLive === false
+      ? `/result/${currentLiveMatch.matchId}`
+      : `/session/${currentLiveMatch.sessionId}/view`
+    : "";
+  const bannerEyebrow = currentLiveMatch?.isLive === false ? "Latest Match" : "Live Now";
+  const bannerStatusText =
+    currentLiveMatch?.isLive === false
+      ? `${currentLiveMatch.score}/${currentLiveMatch.outs} - View latest score`
+      : `${currentLiveMatch?.score}/${currentLiveMatch?.outs} - View score now`;
+  const pendingLabel =
+    currentLiveMatch?.isLive === false ? "Opening latest score..." : "Opening live score...";
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") {
@@ -144,8 +156,8 @@ export default function LiveNowBanner({ liveMatch }) {
     return (
       <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex justify-start px-4 pr-20 pt-5 md:justify-center md:px-6 md:pr-6 md:pt-7">
         <PendingLink
-          href={`/session/${currentLiveMatch.sessionId}/view`}
-          pendingLabel="Opening live score..."
+          href={bannerHref}
+          pendingLabel={pendingLabel}
           pendingClassName="pending-shimmer"
           primeAudioOnClick
           className="liquid-glass home-desktop-lite-card pointer-events-auto flex w-full max-w-[calc(100vw-5rem)] items-center justify-between gap-3 rounded-[26px] px-3.5 py-2.5 text-white shadow-[0_18px_34px_rgba(0,0,0,0.2)] transition hover:border-white/28 md:max-w-md md:gap-4 md:px-4 md:py-3"
@@ -166,15 +178,13 @@ export default function LiveNowBanner({ liveMatch }) {
                 </div>
                 <div className="min-w-0 text-left">
                   <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300 md:text-[11px] md:tracking-[0.34em] md:text-amber-100">
-                    Live Now
+                    {bannerEyebrow}
                   </div>
                   <div className="truncate text-[14px] font-semibold leading-tight text-white md:text-[15px]">
                     {currentLiveMatch.teamAName} vs {currentLiveMatch.teamBName}
                   </div>
                   <div className="text-[11px] text-white/74 md:text-xs">
-                    {pending
-                      ? "Opening live score..."
-                      : `${currentLiveMatch.score}/${currentLiveMatch.outs} - View score now`}
+                    {pending ? pendingLabel : bannerStatusText}
                   </div>
                 </div>
               </div>
@@ -206,8 +216,8 @@ export default function LiveNowBanner({ liveMatch }) {
       className="pointer-events-none absolute inset-x-0 top-0 z-40 flex justify-start px-4 pr-20 pt-5 md:justify-center md:px-6 md:pr-6 md:pt-7"
     >
       <PendingLink
-        href={`/session/${currentLiveMatch.sessionId}/view`}
-        pendingLabel="Opening live score..."
+        href={bannerHref}
+        pendingLabel={pendingLabel}
         pendingClassName="pending-shimmer"
         primeAudioOnClick
         className="liquid-glass home-desktop-lite-card pointer-events-auto flex w-full max-w-[calc(100vw-5rem)] items-center justify-between gap-3 rounded-[26px] px-3.5 py-2.5 text-white shadow-[0_18px_34px_rgba(0,0,0,0.2)] transition hover:border-white/28 md:max-w-md md:gap-4 md:px-4 md:py-3"
@@ -228,15 +238,13 @@ export default function LiveNowBanner({ liveMatch }) {
               </div>
               <div className="min-w-0 text-left">
                 <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300 md:text-[11px] md:tracking-[0.34em] md:text-amber-100">
-                  Live Now
+                  {bannerEyebrow}
                 </div>
                 <div className="truncate text-[14px] font-semibold leading-tight text-white md:text-[15px]">
                   {currentLiveMatch.teamAName} vs {currentLiveMatch.teamBName}
                 </div>
                 <div className="text-[11px] text-white/74 md:text-xs">
-                  {pending
-                    ? "Opening live score..."
-                    : `${currentLiveMatch.score}/${currentLiveMatch.outs} - View score now`}
+                  {pending ? pendingLabel : bannerStatusText}
                 </div>
               </div>
             </div>

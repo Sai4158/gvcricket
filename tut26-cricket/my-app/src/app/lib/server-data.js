@@ -10,7 +10,6 @@ import {
 import { getMatchAccessCookieName, hasValidMatchAccess } from "./match-access";
 import { serializePublicMatch, serializePublicSession } from "./public-data";
 import { hasCompleteTossState, hydrateLegacyTossState, normalizeLegacyTossState } from "./match-toss";
-import { HOME_LIVE_BANNER_MATCH_FILTER } from "./home-live-banner";
 
 const SERVER_DATA_CACHE_TTL_MS = 15000;
 const PUBLIC_SESSION_FIELDS =
@@ -485,50 +484,49 @@ export async function loadMatchAccessData(matchId) {
 }
 
 export async function loadHomeLiveBannerData() {
-  await connectDB();
+  const { sessions } = await loadSessionsIndexPageData();
+  const visibleSessions = Array.isArray(sessions) ? sessions : [];
 
-  const match = await Match.findOne(HOME_LIVE_BANNER_MATCH_FILTER)
-    .select(SESSION_MATCH_SUMMARY_FIELDS)
-    .sort({ updatedAt: -1, _id: -1 })
-    .lean();
-
-  if (!match) {
+  if (!visibleSessions.length) {
     return null;
   }
 
-  const session = match.sessionId
-    ? await loadFallbackSession(match.sessionId, PUBLIC_SESSION_FIELDS)
-    : await Session.findOne({ match: match._id }).select(PUBLIC_SESSION_FIELDS).lean();
+  const sessionsByRecentUpdate = [...visibleSessions].sort((left, right) => {
+    const leftUpdatedAt = new Date(left?.updatedAt || left?.createdAt || 0).getTime();
+    const rightUpdatedAt = new Date(right?.updatedAt || right?.createdAt || 0).getTime();
+    return rightUpdatedAt - leftUpdatedAt;
+  });
 
-  if (!session) {
+  const latestLiveSession = sessionsByRecentUpdate.find((session) => session?.isLive);
+  const latestScoredSession = sessionsByRecentUpdate.find((session) => {
+    const score = Number(session?.score || 0);
+    const outs = Number(session?.outs || 0);
+    const result = String(session?.result || "").trim();
+    return score > 0 || outs > 0 || Boolean(result);
+  });
+  const selectedSession =
+    latestLiveSession || latestScoredSession || sessionsByRecentUpdate[0] || null;
+
+  if (!selectedSession) {
     return null;
   }
 
-  const teamAName =
-    session.teamAName ||
-    match.teamAName ||
-    (Array.isArray(session.teamA) ? session.teamA[0] : "") ||
-    (Array.isArray(match.teamA) ? match.teamA[0] : "") ||
-    "Team A";
-  const teamBName =
-    session.teamBName ||
-    match.teamBName ||
-    (Array.isArray(session.teamB) ? session.teamB[0] : "") ||
-    (Array.isArray(match.teamB) ? match.teamB[0] : "") ||
-    "Team B";
-
-  const publicMatch = serializePublicMatch(match, session);
-  const publicSession = serializePublicSession(session);
+  const matchId = getPublicId(selectedSession.match);
+  const isLive = Boolean(selectedSession.isLive);
 
   return {
-    sessionId: getPublicId(session._id),
-    matchId: getPublicId(match._id),
-    teamAName,
-    teamBName,
-    score: Number(match.score || 0),
-    outs: Number(match.outs || 0),
-    matchImageUrl: publicMatch?.matchImageUrl || publicSession?.matchImageUrl || "",
-    updatedAt: getIsoTimestamp(match.updatedAt, session.updatedAt, session.createdAt),
+    sessionId: getPublicId(selectedSession._id),
+    matchId,
+    teamAName: selectedSession.teamAName || "Team A",
+    teamBName: selectedSession.teamBName || "Team B",
+    score: Number(selectedSession.score || 0),
+    outs: Number(selectedSession.outs || 0),
+    isLive,
+    matchImageUrl: selectedSession.matchImageUrl || "",
+    updatedAt: getIsoTimestamp(
+      selectedSession.updatedAt,
+      selectedSession.createdAt
+    ),
   };
 }
 
