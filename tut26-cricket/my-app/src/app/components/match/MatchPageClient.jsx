@@ -60,6 +60,7 @@ import {
   writeCachedSoundEffectsOrder,
 } from "../../lib/sound-effects-client";
 import { applyMatchAction } from "../../lib/match-engine";
+import { duckPageMedia, restorePageMedia } from "../../lib/page-audio";
 
 function createSoundEffectRequestId() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -279,26 +280,7 @@ export default function MatchPageClient({
       announcementRestoreTimerRef.current = null;
     }
 
-    if (!Array.isArray(announcementDuckRef.current) || !announcementDuckRef.current.length) {
-      return;
-    }
-
-    for (const item of announcementDuckRef.current) {
-      try {
-        item.element.muted = item.muted;
-        item.element.volume = item.volume;
-        if (item.wasPlaying && item.element.paused && !item.element.ended) {
-          const resumePromise = item.element.play?.();
-          if (resumePromise && typeof resumePromise.catch === "function") {
-            resumePromise.catch(() => {});
-          }
-        }
-      } catch {
-        // Ignore stale media elements removed from the page.
-      }
-    }
-
-    announcementDuckRef.current = [];
+    restorePageMedia(announcementDuckRef);
   }, []);
 
   const scheduleAnnouncementDuckRestore = useCallback(
@@ -333,43 +315,18 @@ export default function MatchPageClient({
       announcementRestoreTimerRef.current = null;
     }
 
-    if (Array.isArray(announcementDuckRef.current) && announcementDuckRef.current.length) {
+    if (
+      Array.isArray(announcementDuckRef.current) &&
+      announcementDuckRef.current.length
+    ) {
       return true;
     }
 
-    const excludedElements = new Set(
-      document.querySelectorAll('[data-gv-umpire-effects-player="true"]'),
-    );
-    const tracked = [];
-    const mediaElements = document.querySelectorAll("audio, video");
-
-    mediaElements.forEach((element) => {
-      if (excludedElements.has(element)) {
-        return;
-      }
-
-      try {
-        tracked.push({
-          element,
-          volume: typeof element.volume === "number" ? element.volume : 1,
-          muted: Boolean(element.muted),
-          wasPlaying: Boolean(
-            !element.paused &&
-              !element.ended &&
-              Number(element.readyState || 0) >= 2,
-          ),
-        });
-
-        if (!element.muted) {
-          element.volume = Math.min(element.volume, 0.18);
-        }
-      } catch {
-        // Ignore media elements the browser refuses to adjust.
-      }
+    return duckPageMedia(announcementDuckRef, 0.18, {
+      excludedElements: Array.from(
+        document.querySelectorAll('[data-gv-umpire-effects-player="true"]'),
+      ),
     });
-
-    announcementDuckRef.current = tracked;
-    return true;
   }, []);
 
   const speakWithAnnouncementDuck = useCallback(

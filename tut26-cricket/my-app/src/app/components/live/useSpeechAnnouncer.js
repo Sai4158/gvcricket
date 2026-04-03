@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   isUiAudioUnlocked,
+  restorePreferredAudioSessionType,
+  setPreferredAudioSessionType,
   subscribeUiAudioUnlock,
 } from "../../lib/page-audio";
 
@@ -644,6 +646,7 @@ export default function useSpeechAnnouncer(settings) {
   const voicesPromiseRef = useRef(null);
   const selectedVoiceRef = useRef(null);
   const loggedVoicesSignatureRef = useRef("");
+  const audioSessionTypeRef = useRef("");
   const announcerEnabled = Boolean(
     settings?.enabled && !settings?.muted && settings?.mode !== "silent",
   );
@@ -657,6 +660,22 @@ export default function useSpeechAnnouncer(settings) {
     }
   }, []);
 
+  const ensureSpeechAudioSession = useCallback(() => {
+    const previousType = setPreferredAudioSessionType("playback") || "";
+    if (!audioSessionTypeRef.current) {
+      audioSessionTypeRef.current = previousType;
+    }
+  }, []);
+
+  const restoreSpeechAudioSession = useCallback(() => {
+    if (!audioSessionTypeRef.current) {
+      return;
+    }
+
+    restorePreferredAudioSessionType(audioSessionTypeRef.current);
+    audioSessionTypeRef.current = "";
+  }, []);
+
   const hardStop = useCallback(() => {
     clearStepTimer();
     currentSequenceRef.current = null;
@@ -668,8 +687,9 @@ export default function useSpeechAnnouncer(settings) {
       window.speechSynthesis.cancel();
     }
 
+    restoreSpeechAudioSession();
     setStatus((current) => (current === "unsupported" ? current : "ready"));
-  }, [clearStepTimer]);
+  }, [clearStepTimer, restoreSpeechAudioSession]);
 
   const rememberPendingSequence = useCallback((sequence, options = {}) => {
     if (!sequence?.items?.length) {
@@ -870,6 +890,7 @@ export default function useSpeechAnnouncer(settings) {
         }
 
         utteranceRef.current = null;
+        restoreSpeechAudioSession();
         const pauseAfterMs =
           nextItem.pauseAfterMs ?? sequence.pauseAfterMs ?? 0;
         const nextSequence = {
@@ -897,6 +918,7 @@ export default function useSpeechAnnouncer(settings) {
           utteranceRef.current = null;
           currentSequenceRef.current = null;
           queuedSequencesRef.current = [];
+          restoreSpeechAudioSession();
           setStatus((current) =>
             current === "unsupported" ? current : "ready",
           );
@@ -908,6 +930,7 @@ export default function useSpeechAnnouncer(settings) {
           currentSequenceRef.current = null;
           queuedSequencesRef.current = [];
           isPrimedRef.current = false;
+          restoreSpeechAudioSession();
           rememberPendingSequence(sequence);
           setStatus("waiting_for_gesture");
           return;
@@ -941,6 +964,7 @@ export default function useSpeechAnnouncer(settings) {
         utteranceRef.current = null;
         currentSequenceRef.current = null;
         queuedSequencesRef.current = [];
+        restoreSpeechAudioSession();
         setStatus("blocked");
       };
 
@@ -960,15 +984,24 @@ export default function useSpeechAnnouncer(settings) {
         if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
           window.speechSynthesis.cancel();
         }
+        ensureSpeechAudioSession();
         window.speechSynthesis.speak(utterance);
       } catch {
+        restoreSpeechAudioSession();
         setStatus("blocked");
         return false;
       }
 
       return true;
     },
-    [clearStepTimer, ensureVoicesReady, rememberPendingSequence, voice],
+    [
+      clearStepTimer,
+      ensureSpeechAudioSession,
+      ensureVoicesReady,
+      rememberPendingSequence,
+      restoreSpeechAudioSession,
+      voice,
+    ],
   );
 
   const queueSequence = useCallback(

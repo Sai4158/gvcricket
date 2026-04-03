@@ -455,7 +455,7 @@ export default function MatchSoundEffectsPanel({
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search sound effects"
-                className="w-full rounded-[22px] border border-white/10 bg-white/[0.04] py-3 pl-10 pr-11 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-emerald-300/24 focus:bg-white/[0.06]"
+                className="w-full rounded-[22px] border border-white/10 bg-white/[0.04] py-3 pl-10 pr-11 text-base text-white outline-none transition placeholder:text-zinc-500 focus:border-emerald-300/24 focus:bg-white/[0.06] sm:text-sm"
                 aria-label="Search sound effects"
               />
               {hasSearchQuery ? (

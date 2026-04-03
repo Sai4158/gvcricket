@@ -519,19 +519,61 @@ export async function preloadCachedAudioAssets(sources = []) {
   );
 }
 
-export function duckPageMedia(stateRef, duckVolume = 0.18) {
-  if (typeof document === "undefined" || !stateRef) {
+function resumeTrackedMediaItem(item, retryDelaysMs = [0, 140, 420]) {
+  if (!item?.wasPlaying || !item?.element) {
     return;
+  }
+
+  const mediaElement = item.element;
+  const retryDelays = Array.isArray(retryDelaysMs)
+    ? retryDelaysMs
+    : [0, 140, 420];
+
+  const attemptResume = () => {
+    try {
+      if (!mediaElement.paused || mediaElement.ended) {
+        return;
+      }
+
+      const resumePromise = mediaElement.play?.();
+      if (resumePromise && typeof resumePromise.catch === "function") {
+        resumePromise.catch(() => {});
+      }
+    } catch {
+      // Ignore resume failures and let the next retry try again.
+    }
+  };
+
+  for (const delayMs of retryDelays) {
+    if (delayMs <= 0) {
+      attemptResume();
+      continue;
+    }
+
+    window.setTimeout(attemptResume, delayMs);
+  }
+}
+
+export function duckPageMedia(stateRef, duckVolume = 0.18, options = {}) {
+  if (typeof document === "undefined" || !stateRef) {
+    return false;
   }
 
   if (Array.isArray(stateRef.current) && stateRef.current.length > 0) {
-    return;
+    return true;
   }
 
+  const excludedElements = new Set(
+    Array.isArray(options.excludedElements) ? options.excludedElements : [],
+  );
   const tracked = [];
   const mediaElements = document.querySelectorAll("audio, video");
 
   mediaElements.forEach((element) => {
+    if (excludedElements.has(element)) {
+      return;
+    }
+
     try {
       const wasPlaying = Boolean(
         !element.paused &&
@@ -554,6 +596,7 @@ export function duckPageMedia(stateRef, duckVolume = 0.18) {
   });
 
   stateRef.current = tracked;
+  return tracked.length > 0;
 }
 
 export function restorePageMedia(stateRef) {
@@ -565,12 +608,7 @@ export function restorePageMedia(stateRef) {
     try {
       item.element.muted = item.muted;
       item.element.volume = item.volume;
-      if (item.wasPlaying && item.element.paused && !item.element.ended) {
-        const resumePromise = item.element.play?.();
-        if (resumePromise && typeof resumePromise.catch === "function") {
-          resumePromise.catch(() => {});
-        }
-      }
+      resumeTrackedMediaItem(item);
     } catch {
       // Ignore stale media elements removed from the page.
     }

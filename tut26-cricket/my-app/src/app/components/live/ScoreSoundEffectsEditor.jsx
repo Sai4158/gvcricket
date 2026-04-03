@@ -277,7 +277,7 @@ function SoundPickerSheet({
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
                     placeholder="Search sounds"
-                    className="w-full rounded-2xl border border-white/10 bg-[rgba(18,18,24,0.96)] py-3 pl-10 pr-11 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-emerald-300/24 focus:bg-white/5"
+                    className="w-full rounded-2xl border border-white/10 bg-[rgba(18,18,24,0.96)] py-3 pl-10 pr-11 text-base text-white outline-none transition placeholder:text-white/35 focus:border-emerald-300/24 focus:bg-white/5 sm:text-sm"
                     aria-label={`Search ${eventLabel} sounds`}
                   />
                   {hasSearchQuery ? (
