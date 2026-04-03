@@ -561,44 +561,36 @@ function getSpeechProfile(voice, options, platform) {
 
   const defaultRate = isIOSSafari
     ? isAppleNatural
-      ? 0.8
-      : 0.79
+      ? 0.72
+      : 0.71
     : isAppleNatural
-      ? 0.84
+      ? 0.76
       : isGoogleNatural
         ? platform?.isChrome
-          ? 0.82
-          : 0.84
+          ? 0.74
+          : 0.76
         : isMicrosoftNatural
-          ? 0.84
+          ? 0.75
           : isLegacyVoice
-            ? 0.82
-            : 0.86;
+            ? 0.74
+            : 0.78;
 
-  const defaultPitch = isIOSSafari
-    ? 1
-    : isAppleNatural
-      ? 1
-      : isGoogleNatural
-        ? 0.97
-        : isLegacyVoice
-          ? 0.94
-          : 0.98;
+  const defaultPitch = 1;
   const requestedRate = Number(options.rate);
   const safeRequestedRate = Number.isFinite(requestedRate)
     ? requestedRate
     : null;
   const maxRate = isIOSSafari
-    ? 0.8
+    ? 0.72
     : isGoogleNatural
-      ? 0.82
+      ? 0.74
       : isMicrosoftNatural
-        ? 0.84
+        ? 0.75
         : isAppleNatural
-          ? 0.84
+          ? 0.76
           : isLegacyVoice
-            ? 0.82
-            : 0.86;
+            ? 0.74
+            : 0.78;
   const effectiveRate =
     safeRequestedRate === null
       ? defaultRate
@@ -608,7 +600,7 @@ function getSpeechProfile(voice, options, platform) {
     rate: effectiveRate || defaultRate,
     pitch: Number(options.pitch ?? defaultPitch) || defaultPitch,
     volume: Number(options.volume ?? 1) || 1,
-    preDelayMs: options.preDelayMs ?? (isIOSSafari ? 60 : 0),
+    preDelayMs: options.preDelayMs ?? (isIOSSafari ? 90 : 0),
   };
 }
 

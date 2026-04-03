@@ -266,7 +266,7 @@ export default function MatchPageClient({
 
   useEffect(() => {
     micMonitorDuckingRef.current = Boolean(
-      micMonitor.isActive || micMonitor.isPaused || micMonitor.isStarting,
+      micMonitor.isStarting || (micMonitor.isActive && !micMonitor.isPaused),
     );
   }, [micMonitor.isActive, micMonitor.isPaused, micMonitor.isStarting]);
 
@@ -322,7 +322,7 @@ export default function MatchPageClient({
       return true;
     }
 
-    return duckPageMedia(announcementDuckRef, 0.18, {
+    return duckPageMedia(announcementDuckRef, 0.12, {
       excludedElements: Array.from(
         document.querySelectorAll('[data-gv-umpire-effects-player="true"]'),
       ),

@@ -519,8 +519,34 @@ export async function preloadCachedAudioAssets(sources = []) {
   );
 }
 
-function resumeTrackedMediaItem(item, retryDelaysMs = [0, 140, 420]) {
-  if (!item?.wasPlaying || !item?.element) {
+function clearTrackedMediaResumeState(item) {
+  if (!item) {
+    return;
+  }
+
+  if (Array.isArray(item.resumeTimerIds)) {
+    for (const timerId of item.resumeTimerIds) {
+      window.clearTimeout(timerId);
+    }
+  }
+  item.resumeTimerIds = [];
+
+  if (item.pauseListener && item.element?.removeEventListener) {
+    try {
+      item.element.removeEventListener("pause", item.pauseListener);
+    } catch {
+      // Ignore stale media listeners during cleanup.
+    }
+  }
+  item.pauseListener = null;
+}
+
+function resumeTrackedMediaItem(
+  item,
+  retryDelaysMs = [0, 140, 420],
+  { keepAlive = false, ignoreRestored = false } = {},
+) {
+  if (!item?.wasPlaying || !item?.element || typeof window === "undefined") {
     return;
   }
 
@@ -531,6 +557,10 @@ function resumeTrackedMediaItem(item, retryDelaysMs = [0, 140, 420]) {
 
   const attemptResume = () => {
     try {
+      if (item.restored && !ignoreRestored) {
+        return;
+      }
+
       if (!mediaElement.paused || mediaElement.ended) {
         return;
       }
@@ -544,13 +574,21 @@ function resumeTrackedMediaItem(item, retryDelaysMs = [0, 140, 420]) {
     }
   };
 
+  if (!keepAlive) {
+    clearTrackedMediaResumeState(item);
+  }
+
   for (const delayMs of retryDelays) {
     if (delayMs <= 0) {
       attemptResume();
       continue;
     }
 
-    window.setTimeout(attemptResume, delayMs);
+    const timerId = window.setTimeout(attemptResume, delayMs);
+    if (!Array.isArray(item.resumeTimerIds)) {
+      item.resumeTimerIds = [];
+    }
+    item.resumeTimerIds.push(timerId);
   }
 }
 
@@ -585,6 +623,9 @@ export function duckPageMedia(stateRef, duckVolume = 0.18, options = {}) {
         volume: typeof element.volume === "number" ? element.volume : 1,
         muted: Boolean(element.muted),
         wasPlaying,
+        restored: false,
+        pauseListener: null,
+        resumeTimerIds: [],
       });
 
       if (!element.muted) {
@@ -594,6 +635,24 @@ export function duckPageMedia(stateRef, duckVolume = 0.18, options = {}) {
       // Ignore media elements the browser refuses to adjust.
     }
   });
+
+  for (const item of tracked) {
+    if (!item?.wasPlaying || !item.element?.addEventListener) {
+      continue;
+    }
+
+    const handlePauseDuringDuck = () => {
+      resumeTrackedMediaItem(item, [24, 120, 320], { keepAlive: true });
+    };
+
+    item.pauseListener = handlePauseDuringDuck;
+
+    try {
+      item.element.addEventListener("pause", handlePauseDuringDuck);
+    } catch {
+      item.pauseListener = null;
+    }
+  }
 
   stateRef.current = tracked;
   return tracked.length > 0;
@@ -606,9 +665,11 @@ export function restorePageMedia(stateRef) {
 
   for (const item of stateRef.current) {
     try {
+      item.restored = true;
+      clearTrackedMediaResumeState(item);
       item.element.muted = item.muted;
       item.element.volume = item.volume;
-      resumeTrackedMediaItem(item);
+      resumeTrackedMediaItem(item, [0, 140, 420], { ignoreRestored: true });
     } catch {
       // Ignore stale media elements removed from the page.
     }

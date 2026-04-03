@@ -349,7 +349,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         return false;
       }
 
-      duckPageMedia(announcementDuckRef, 0.18);
+      duckPageMedia(announcementDuckRef, 0.12);
       if (announcementRestoreTimerRef.current) {
         window.clearTimeout(announcementRestoreTimerRef.current);
       }
@@ -524,7 +524,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
     volume: 0.95,
     onBeforePlay: () => {
       soundEffectPlayingRef.current = true;
-      clearAnnouncementTimers();
+      if (announcementRestoreTimerRef.current) {
+        window.clearTimeout(announcementRestoreTimerRef.current);
+        announcementRestoreTimerRef.current = null;
+      }
+      duckPageMedia(announcementDuckRef, 0.12);
       const interruptedQueue = interruptAndCapture();
       if (interruptedQueue?.length) {
         interruptedAnnouncementQueueRef.current = interruptedQueue;
