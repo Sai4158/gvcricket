@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  getScoreSoundEffectMapSignature,
   getScoreSoundEffectEventKey,
   getScoreSoundEffectPreviewInput,
+  normalizeScoreSoundEffectMap,
   SCORE_SOUND_EFFECT_KEYS,
+  shouldHydrateScoreSoundEffectMapFromRemote,
 } from "../src/app/lib/score-sound-effects.js";
 
 test("score sound effect mapping covers every supported scoring control", () => {
@@ -70,4 +73,33 @@ test("score sound effect mapping covers every supported scoring control", () => 
 
   assert.equal(getScoreSoundEffectEventKey(5, false, null), "");
   assert.equal(getScoreSoundEffectPreviewInput("unknown"), null);
+});
+
+test("remote score sound map hydration does not overwrite unsaved local changes", () => {
+  const remoteMap = normalizeScoreSoundEffectMap({
+    dot: "boom.mp3",
+    out: "get_out.mp3",
+  });
+  const remoteSignature = getScoreSoundEffectMapSignature(remoteMap);
+
+  assert.equal(
+    shouldHydrateScoreSoundEffectMapFromRemote(remoteMap, "", false),
+    true,
+  );
+  assert.equal(
+    shouldHydrateScoreSoundEffectMapFromRemote(remoteMap, remoteSignature, false),
+    false,
+  );
+  assert.equal(
+    shouldHydrateScoreSoundEffectMapFromRemote(remoteMap, "", true),
+    false,
+  );
+  assert.equal(
+    shouldHydrateScoreSoundEffectMapFromRemote(
+      normalizeScoreSoundEffectMap(),
+      "",
+      false,
+    ),
+    false,
+  );
 });

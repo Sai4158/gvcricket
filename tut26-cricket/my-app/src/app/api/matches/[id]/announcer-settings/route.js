@@ -10,9 +10,9 @@ import {
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { parseJsonRequest } from "../../../../lib/request-security";
 import {
-  EMPTY_SCORE_SOUND_EFFECT_MAP,
   RANDOM_SCORE_EFFECT_ID,
   SCORE_SOUND_EFFECT_KEYS,
+  normalizeScoreSoundEffectMap,
 } from "../../../../lib/score-sound-effects";
 import AnnouncerSettings from "../../../../../models/AnnouncerSettings";
 import Match from "../../../../../models/Match";
@@ -46,16 +46,6 @@ const announcerSettingsPatchSchema = z
     scoreSoundEffectMap: scoreSoundEffectMapSchema,
   })
   .strict();
-
-function normalizeScoreSoundEffectMap(input = {}) {
-  return SCORE_SOUND_EFFECT_KEYS.reduce(
-    (map, key) => ({
-      ...map,
-      [key]: String(input?.[key] || "").trim(),
-    }),
-    { ...EMPTY_SCORE_SOUND_EFFECT_MAP }
-  );
-}
 
 async function hasMatchAccess(matchId, accessVersion) {
   const cookieStore = await cookies();

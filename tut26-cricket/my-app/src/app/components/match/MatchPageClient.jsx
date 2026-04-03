@@ -21,10 +21,13 @@ import {
 } from "../../lib/live-announcements";
 import {
   EMPTY_SCORE_SOUND_EFFECT_MAP,
+  getScoreSoundEffectMapSignature,
   getScoreSoundEffectEventKey,
   getScoreSoundEffectPreviewInput,
+  normalizeScoreSoundEffectMap,
   RANDOM_SCORE_EFFECT_ID,
   SCORE_SOUND_EFFECT_KEYS,
+  shouldHydrateScoreSoundEffectMapFromRemote,
 } from "../../lib/score-sound-effects";
 import { getWalkieRemoteSpeakerState } from "../../lib/walkie-ui";
 import { getTotalDismissalsAllowed } from "../../lib/team-utils";
@@ -64,28 +67,6 @@ function createSoundEffectRequestId() {
   }
 
   return `sound-effect:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function normalizeScoreSoundEffectMap(input = {}) {
-  return SCORE_SOUND_EFFECT_KEYS.reduce(
-    (map, key) => ({
-      ...map,
-      [key]: String(input?.[key] || "").trim(),
-    }),
-    { ...EMPTY_SCORE_SOUND_EFFECT_MAP }
-  );
-}
-
-function getScoreSoundEffectMapSignature(input = {}) {
-  return SCORE_SOUND_EFFECT_KEYS.map(
-    (key) => `${key}:${String(input?.[key] || "").trim()}`
-  ).join("|");
-}
-
-function hasAssignedScoreSoundEffectMap(input = {}) {
-  return SCORE_SOUND_EFFECT_KEYS.some((key) =>
-    Boolean(String(input?.[key] || "").trim())
-  );
 }
 
 const IPL_HORN_EFFECT = {
@@ -217,7 +198,13 @@ export default function MatchPageClient({
   const lastPersistedAnnouncerSettingsRef = useRef("");
   const lastPersistedScoreSoundEffectMapRef = useRef("");
   const scoreSoundEffectMapSyncReadyRef = useRef(false);
+  const scoreSoundEffectMapDirtyRef = useRef(false);
+  const scoreSoundEffectMapPersistInFlightRef = useRef(false);
+  const currentScoreSoundEffectMapRef = useRef({
+    ...EMPTY_SCORE_SOUND_EFFECT_MAP,
+  });
   const currentScoreSoundEffectMapSignatureRef = useRef("");
+  const isMountedRef = useRef(true);
   const contentStartRef = useRef(null);
   const announcementDuckRef = useRef([]);
   const announcementRestoreTimerRef = useRef(null);
@@ -248,6 +235,12 @@ export default function MatchPageClient({
     interruptAndCapture,
   } =
     useSpeechAnnouncer(umpireSettings);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     micMonitorDuckingRef.current = Boolean(
@@ -616,17 +609,44 @@ export default function MatchPageClient({
       umpireSettings.playScoreSoundEffects,
     ]
   );
+  const normalizedScoreSoundEffectMap = useMemo(
+    () => normalizeScoreSoundEffectMap(umpireSettings.scoreSoundEffectMap || {}),
+    [umpireSettings.scoreSoundEffectMap],
+  );
   const scoreSoundEffectMapSignature = useMemo(
-    () =>
-      getScoreSoundEffectMapSignature(
-        normalizeScoreSoundEffectMap(umpireSettings.scoreSoundEffectMap || {})
-      ),
-    [umpireSettings.scoreSoundEffectMap]
+    () => getScoreSoundEffectMapSignature(normalizedScoreSoundEffectMap),
+    [normalizedScoreSoundEffectMap],
   );
 
   useEffect(() => {
+    currentScoreSoundEffectMapRef.current = normalizedScoreSoundEffectMap;
     currentScoreSoundEffectMapSignatureRef.current = scoreSoundEffectMapSignature;
-  }, [scoreSoundEffectMapSignature]);
+  }, [normalizedScoreSoundEffectMap, scoreSoundEffectMapSignature]);
+  const [scoreSoundEffectMapSaveNonce, setScoreSoundEffectMapSaveNonce] =
+    useState(0);
+  const queueScoreSoundEffectMapSave = useCallback(() => {
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    setScoreSoundEffectMapSaveNonce((value) => value + 1);
+  }, []);
+  const updateUmpireScoreSoundSettings = useCallback(
+    (key, value) => {
+      if (key !== "scoreSoundEffectMap") {
+        updateUmpireSetting(key, value);
+        return;
+      }
+
+      const normalizedValue = normalizeScoreSoundEffectMap(value || {});
+      scoreSoundEffectMapDirtyRef.current = true;
+      currentScoreSoundEffectMapRef.current = normalizedValue;
+      currentScoreSoundEffectMapSignatureRef.current =
+        getScoreSoundEffectMapSignature(normalizedValue);
+      updateUmpireSetting(key, normalizedValue);
+    },
+    [updateUmpireSetting],
+  );
   const liveUpdatedLabel = useLiveRelativeTime(lastUpdatedAt);
   const isLiveMatch = Boolean(match?.isOngoing && !match?.result);
   const tossPending = Boolean(match && !match.tossReady);
@@ -2139,6 +2159,8 @@ export default function MatchPageClient({
   useEffect(() => {
     if (authStatus !== "granted" || !match?._id) {
       scoreSoundEffectMapSyncReadyRef.current = false;
+      scoreSoundEffectMapDirtyRef.current = false;
+      scoreSoundEffectMapPersistInFlightRef.current = false;
       lastPersistedScoreSoundEffectMapRef.current = "";
       return;
     }
@@ -2172,8 +2194,16 @@ export default function MatchPageClient({
 
         lastPersistedScoreSoundEffectMapRef.current = remoteSignature;
         if (
-          hasAssignedScoreSoundEffectMap(remoteScoreSoundEffectMap) &&
-          remoteSignature !== currentScoreSoundEffectMapSignatureRef.current
+          scoreSoundEffectMapDirtyRef.current &&
+          remoteSignature === currentScoreSoundEffectMapSignatureRef.current
+        ) {
+          scoreSoundEffectMapDirtyRef.current = false;
+        } else if (
+          shouldHydrateScoreSoundEffectMapFromRemote(
+            remoteScoreSoundEffectMap,
+            currentScoreSoundEffectMapSignatureRef.current,
+            scoreSoundEffectMapDirtyRef.current,
+          )
         ) {
           updateUmpireSetting("scoreSoundEffectMap", remoteScoreSoundEffectMap);
         }
@@ -2182,6 +2212,7 @@ export default function MatchPageClient({
       } finally {
         if (!cancelled) {
           scoreSoundEffectMapSyncReadyRef.current = true;
+          queueScoreSoundEffectMapSave();
         }
       }
     })();
@@ -2193,6 +2224,7 @@ export default function MatchPageClient({
     authStatus,
     match?._id,
     matchId,
+    queueScoreSoundEffectMapSave,
     updateUmpireSetting,
   ]);
 
@@ -2200,22 +2232,22 @@ export default function MatchPageClient({
     if (
       authStatus !== "granted" ||
       !match?._id ||
-      !scoreSoundEffectMapSyncReadyRef.current
+      !scoreSoundEffectMapSyncReadyRef.current ||
+      scoreSoundEffectMapPersistInFlightRef.current
     ) {
       return;
     }
 
-    if (lastPersistedScoreSoundEffectMapRef.current === scoreSoundEffectMapSignature) {
+    const requestSignature = currentScoreSoundEffectMapSignatureRef.current;
+
+    if (lastPersistedScoreSoundEffectMapRef.current === requestSignature) {
+      scoreSoundEffectMapDirtyRef.current = false;
       return;
     }
 
-    let cancelled = false;
-    const normalizedScoreSoundEffectMap = normalizeScoreSoundEffectMap(
-      umpireSettings.scoreSoundEffectMap || {}
-    );
-    const nextSignature =
-      getScoreSoundEffectMapSignature(normalizedScoreSoundEffectMap);
-    lastPersistedScoreSoundEffectMapRef.current = nextSignature;
+    let didPersistLatestKnownValue = false;
+    const mapToPersist = currentScoreSoundEffectMapRef.current;
+    scoreSoundEffectMapPersistInFlightRef.current = true;
 
     void (async () => {
       try {
@@ -2225,29 +2257,40 @@ export default function MatchPageClient({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            scoreSoundEffectMap: normalizedScoreSoundEffectMap,
+            scoreSoundEffectMap: mapToPersist,
           }),
         });
 
-        if (!response.ok && !cancelled) {
+        if (!response.ok) {
           lastPersistedScoreSoundEffectMapRef.current = "";
+          return;
         }
+
+        lastPersistedScoreSoundEffectMapRef.current = requestSignature;
+        if (currentScoreSoundEffectMapSignatureRef.current === requestSignature) {
+          scoreSoundEffectMapDirtyRef.current = false;
+        }
+        didPersistLatestKnownValue = true;
       } catch {
-        if (!cancelled) {
-          lastPersistedScoreSoundEffectMapRef.current = "";
+        lastPersistedScoreSoundEffectMapRef.current = "";
+      } finally {
+        scoreSoundEffectMapPersistInFlightRef.current = false;
+        if (
+          didPersistLatestKnownValue &&
+          lastPersistedScoreSoundEffectMapRef.current !==
+            currentScoreSoundEffectMapSignatureRef.current
+        ) {
+          queueScoreSoundEffectMapSave();
         }
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
   }, [
     authStatus,
     match?._id,
     matchId,
     scoreSoundEffectMapSignature,
-    umpireSettings.scoreSoundEffectMap,
+    scoreSoundEffectMapSaveNonce,
+    queueScoreSoundEffectMapSave,
   ]);
 
   if (authStatus !== "granted") {
@@ -2497,7 +2540,7 @@ export default function MatchPageClient({
               onReorder={handleReorderSoundEffects}
               scoreSoundSettings={{
                 settings: umpireSettings,
-                updateSetting: updateUmpireSetting,
+                updateSetting: updateUmpireScoreSoundSettings,
                 showScoreSoundEffectsToggle: true,
                 showSpectatorBroadcastToggle: true,
                 showScoreEffectAssignments: true,

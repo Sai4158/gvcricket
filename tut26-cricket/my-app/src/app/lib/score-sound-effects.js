@@ -115,6 +115,44 @@ export const EMPTY_SCORE_SOUND_EFFECT_MAP = SCORE_SOUND_EFFECT_EVENTS.reduce(
   {},
 );
 
+export function normalizeScoreSoundEffectMap(input = {}) {
+  return SCORE_SOUND_EFFECT_KEYS.reduce(
+    (map, key) => ({
+      ...map,
+      [key]: String(input?.[key] || "").trim(),
+    }),
+    { ...EMPTY_SCORE_SOUND_EFFECT_MAP },
+  );
+}
+
+export function getScoreSoundEffectMapSignature(input = {}) {
+  return SCORE_SOUND_EFFECT_KEYS.map(
+    (key) => `${key}:${String(input?.[key] || "").trim()}`,
+  ).join("|");
+}
+
+export function hasAssignedScoreSoundEffectMap(input = {}) {
+  return SCORE_SOUND_EFFECT_KEYS.some((key) =>
+    Boolean(String(input?.[key] || "").trim()),
+  );
+}
+
+export function shouldHydrateScoreSoundEffectMapFromRemote(
+  remoteMap = {},
+  currentSignature = "",
+  hasUnsavedLocalChanges = false,
+) {
+  if (hasUnsavedLocalChanges) {
+    return false;
+  }
+
+  if (!hasAssignedScoreSoundEffectMap(remoteMap)) {
+    return false;
+  }
+
+  return getScoreSoundEffectMapSignature(remoteMap) !== currentSignature;
+}
+
 export function getScoreSoundEffectEventKey(
   runs,
   isOut = false,
