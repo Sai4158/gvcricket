@@ -296,7 +296,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
     url: sessionId ? `/api/live/sessions/${sessionId}` : null,
     event: "session",
     enabled: Boolean(sessionId),
-    disconnectWhenHidden: false,
     onMessage: (payload) => {
       if (
         payload.updatedAt &&
