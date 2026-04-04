@@ -72,6 +72,14 @@ function createSoundEffectRequestId() {
   return `sound-effect:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function createScoreActionId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return `score:${crypto.randomUUID()}`;
+  }
+
+  return `score:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
+}
+
 const IPL_HORN_EFFECT = {
   id: "ipl_theme_song.mp3",
   fileName: "ipl_theme_song.mp3",
@@ -1415,6 +1423,7 @@ export default function MatchPageClient({
     const shouldBroadcastScoreEffect =
       umpireSettings.broadcastScoreSoundEffects !== false &&
       !shouldSuppressScoreEffectForInningsEnd;
+    const scoreActionId = createScoreActionId();
     const configuredScoreEffect =
       shouldPlayLocalScoreEffect || shouldBroadcastScoreEffect
         ? await resolveConfiguredScoreSoundEffect(runs, isOut, extraType)
@@ -1426,7 +1435,9 @@ export default function MatchPageClient({
       }
 
       if (!shouldPlayLocalScoreEffect && shouldBroadcastScoreEffect) {
-        handleScoreEvent(runs, isOut, extraType);
+        handleScoreEvent(runs, isOut, extraType, {
+          actionId: scoreActionId,
+        });
         void fetch(`/api/matches/${matchId}/sound-effects`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1434,6 +1445,7 @@ export default function MatchPageClient({
           body: JSON.stringify({
             effectId: configuredScoreEffect.id,
             clientRequestId: createSoundEffectRequestId(),
+            sourceActionId: scoreActionId,
             resumeAnnouncements: false,
             trigger: "score_boundary",
             preAnnouncementText: String(scorePreview.leadItem?.text || "").trim(),
@@ -1478,7 +1490,9 @@ export default function MatchPageClient({
           configuredEffectDurationMs +
           followUpDelayMs;
       }
-      handleScoreEvent(runs, isOut, extraType);
+      handleScoreEvent(runs, isOut, extraType, {
+        actionId: scoreActionId,
+      });
 
       if (shouldBroadcastScoreEffect) {
         localSoundEffectRequestIdRef.current = clientRequestId;
@@ -1489,6 +1503,7 @@ export default function MatchPageClient({
           body: JSON.stringify({
             effectId: configuredScoreEffect.id,
             clientRequestId,
+            sourceActionId: scoreActionId,
             resumeAnnouncements: false,
             trigger: "score_boundary",
             preAnnouncementText: leadText,
@@ -1544,7 +1559,9 @@ export default function MatchPageClient({
     }
 
     announceUmpireAction(runs, isOut, extraType);
-    handleScoreEvent(runs, isOut, extraType);
+    handleScoreEvent(runs, isOut, extraType, {
+      actionId: scoreActionId,
+    });
   };
 
   const handleManualScoreAnnouncement = useCallback(() => {

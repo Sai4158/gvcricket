@@ -600,7 +600,7 @@ export function buildSpectatorOverCompleteAnnouncement(match) {
   return parts.join(" ");
 }
 
-export function createScoreLiveEvent(matchBefore, matchAfter, ball) {
+export function createScoreLiveEvent(matchBefore, matchAfter, ball, options = {}) {
   const activeInningsKey =
     matchAfter.innings === "first" ? "innings1" : "innings2";
   const history = matchAfter[activeInningsKey]?.history ?? [];
@@ -625,6 +625,7 @@ export function createScoreLiveEvent(matchBefore, matchAfter, ball) {
     overCompleted,
     targetChased,
     result: matchAfter.result || "",
+    actionId: String(options.actionId || "").trim(),
     createdAt: new Date().toISOString(),
   };
 }
@@ -678,7 +679,7 @@ export function createMatchCorrectionLiveEvent(matchBefore, matchAfter, patch) {
   };
 }
 
-export function createMatchEndLiveEvent(match, resultText) {
+export function createMatchEndLiveEvent(match, resultText, options = {}) {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     type: "match_end",
@@ -687,6 +688,8 @@ export function createMatchEndLiveEvent(match, resultText) {
     outs: match?.outs ?? 0,
     battingTeam: getBattingTeamBundle(match).name,
     result: resultText,
+    ball: options?.ball || null,
+    actionId: String(options?.actionId || "").trim(),
     createdAt: new Date().toISOString(),
   };
 }
@@ -712,6 +715,7 @@ export function createSoundEffectLiveEvent(match, effect, options = {}) {
     effectSrc: effect?.src || "",
     action,
     clientRequestId: options.clientRequestId || "",
+    sourceActionId: String(options.sourceActionId || "").trim(),
     resumeAnnouncements: Boolean(options.resumeAnnouncements),
     trigger: options.trigger === "score_boundary" ? "score_boundary" : "manual",
     preAnnouncementText: String(options.preAnnouncementText || "").trim(),

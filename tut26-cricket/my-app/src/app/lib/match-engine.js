@@ -348,13 +348,30 @@ function scoreBall(match, action) {
   if (isTargetChased(nextMatch)) {
     nextMatch.isOngoing = false;
     nextMatch.result = buildWinByWicketsText(nextMatch, nextMatch.outs);
-    markLiveEvent(nextMatch, createMatchEndLiveEvent(nextMatch, nextMatch.result));
+    markLiveEvent(
+      nextMatch,
+      createMatchEndLiveEvent(nextMatch, nextMatch.result, {
+        ball,
+        actionId: action.actionId,
+      }),
+    );
   } else if (nextMatch.innings === "second" && isCurrentInningsComplete(nextMatch)) {
     nextMatch.isOngoing = false;
     nextMatch.result = buildMatchResult(nextMatch);
-    markLiveEvent(nextMatch, createMatchEndLiveEvent(nextMatch, nextMatch.result));
+    markLiveEvent(
+      nextMatch,
+      createMatchEndLiveEvent(nextMatch, nextMatch.result, {
+        ball,
+        actionId: action.actionId,
+      }),
+    );
   } else {
-    markLiveEvent(nextMatch, createScoreLiveEvent(match, nextMatch, ball));
+    markLiveEvent(
+      nextMatch,
+      createScoreLiveEvent(match, nextMatch, ball, {
+        actionId: action.actionId,
+      }),
+    );
   }
   appendActionHistory(nextMatch, action, snapshot);
   appendProcessedActionId(nextMatch, action.actionId);

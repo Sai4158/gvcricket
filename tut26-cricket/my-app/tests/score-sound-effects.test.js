@@ -9,6 +9,12 @@ import {
   SCORE_SOUND_EFFECT_KEYS,
   shouldHydrateScoreSoundEffectMapFromRemote,
 } from "../src/app/lib/score-sound-effects.js";
+import {
+  createMatchEndLiveEvent,
+  createScoreLiveEvent,
+  createSoundEffectLiveEvent,
+} from "../src/app/lib/live-announcements.js";
+import { serializePublicMatch } from "../src/app/lib/public-data.js";
 
 test("score sound effect mapping covers every supported scoring control", () => {
   const cases = [
@@ -102,4 +108,80 @@ test("remote score sound map hydration does not overwrite unsaved local changes"
     ),
     false,
   );
+});
+
+test("score and sound effect live events preserve their shared action id", () => {
+  const actionId = "score:test-action-1";
+  const baseMatch = {
+    innings1: { score: 12, history: [] },
+  };
+  const nextMatch = {
+    ...baseMatch,
+    innings: "second",
+    score: 13,
+    outs: 1,
+    result: "",
+    innings2: { team: "Beta", history: [] },
+    teamAName: "Alpha",
+    teamBName: "Beta",
+  };
+  const ball = { runs: 1, isOut: false, extraType: null };
+
+  const scoreEvent = createScoreLiveEvent(baseMatch, nextMatch, ball, {
+    actionId,
+  });
+  const matchEndEvent = createMatchEndLiveEvent(nextMatch, "Beta won by 1 wicket.", {
+    actionId,
+    ball,
+  });
+  const soundEvent = createSoundEffectLiveEvent(
+    nextMatch,
+    {
+      id: "crowd.mp3",
+      fileName: "crowd.mp3",
+      label: "Crowd",
+      src: "/audio/effects/crowd.mp3",
+    },
+    {
+      sourceActionId: actionId,
+      trigger: "score_boundary",
+    },
+  );
+
+  assert.equal(scoreEvent.actionId, actionId);
+  assert.equal(matchEndEvent.actionId, actionId);
+  assert.deepEqual(matchEndEvent.ball, ball);
+  assert.equal(soundEvent.sourceActionId, actionId);
+});
+
+test("public match payload exposes normalized score sound effect map", () => {
+  const publicMatch = serializePublicMatch({
+    _id: "match-1",
+    teamA: [],
+    teamB: [],
+    teamAName: "Alpha",
+    teamBName: "Beta",
+    overs: 2,
+    sessionId: "session-1",
+    tossWinner: "Alpha",
+    tossDecision: "bat",
+    score: 0,
+    outs: 0,
+    isOngoing: true,
+    innings: "first",
+    result: "",
+    innings1: { team: "Alpha", score: 0, history: [] },
+    innings2: { team: "Beta", score: 0, history: [] },
+    balls: [],
+    announcer: {
+      scoreSoundEffectMap: {
+        dot: "dot.mp3",
+        four: "four.mp3",
+      },
+    },
+  });
+
+  assert.equal(publicMatch.announcerScoreSoundEffectMap.dot, "dot.mp3");
+  assert.equal(publicMatch.announcerScoreSoundEffectMap.four, "four.mp3");
+  assert.equal(publicMatch.announcerScoreSoundEffectMap.six, "");
 });

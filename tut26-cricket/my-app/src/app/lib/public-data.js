@@ -3,6 +3,7 @@ import { getPublicMatchImagePath } from "./match-image-secure";
 import { getPublicMatchImages } from "./match-image-gallery";
 import { isSafeMatchImageUrl } from "./match-image";
 import { hasCompleteTossState, normalizeLegacyTossState } from "./match-toss";
+import { normalizeScoreSoundEffectMap } from "./score-sound-effects";
 
 function getPublicMatchImagesWithFallback(match, fallbackState = null) {
   const matchId = String(match?._id || "");
@@ -33,6 +34,11 @@ export function serializePublicMatch(
   const match = normalizeLegacyTossState(rawMatch, fallbackState);
   const includeActionHistory = Boolean(options.includeActionHistory);
   const publicImages = getPublicMatchImagesWithFallback(match, fallbackState);
+  const announcerScoreSoundEffectMap = normalizeScoreSoundEffectMap(
+    match?.announcer?.scoreSoundEffectMap ||
+      fallbackState?.announcer?.scoreSoundEffectMap ||
+      {},
+  );
 
   return {
     _id: String(match._id),
@@ -63,6 +69,7 @@ export function serializePublicMatch(
       match.announcerScoreSoundEffectsEnabled !== false,
     announcerBroadcastScoreSoundEffectsEnabled:
       match.announcerBroadcastScoreSoundEffectsEnabled !== false,
+    announcerScoreSoundEffectMap,
     lastLiveEvent: match.lastLiveEvent || null,
     lastEventType: match.lastEventType || "",
     lastEventText: match.lastEventText || "",

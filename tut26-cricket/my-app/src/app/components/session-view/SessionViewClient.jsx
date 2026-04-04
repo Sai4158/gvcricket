@@ -35,6 +35,7 @@ import TeamInningsDetail from "./TeamInningsDetail";
 import LiquidSportText from "../home/LiquidSportText";
 import {
   buildCurrentScoreAnnouncement,
+  buildSpectatorBallAnnouncement,
   buildLiveScoreAnnouncementSequence,
 } from "../../lib/live-announcements";
 import { addBallToHistory } from "../../lib/match-scoring";
@@ -51,6 +52,10 @@ import { getWalkieRemoteSpeakerState } from "../../lib/walkie-ui";
 import { getTeamBundle } from "../../lib/team-utils";
 import { duckPageMedia, restorePageMedia } from "../../lib/page-audio";
 import { buildShareUrl } from "../../lib/site-metadata";
+import {
+  getScoreSoundEffectEventKey,
+  RANDOM_SCORE_EFFECT_ID,
+} from "../../lib/score-sound-effects";
 import { ModalBase } from "../match/MatchBaseModals";
 import LoadingButton from "../shared/LoadingButton";
 import OptionalFeatureBoundary from "../shared/OptionalFeatureBoundary";
@@ -144,6 +149,9 @@ function getSessionStreamPayloadSignature(payload) {
     liveEvent?.id || "",
     liveEvent?.type || "",
     liveEvent?.createdAt || "",
+    match?.announcerBroadcastScoreSoundEffectsEnabled !== false ? "1" : "0",
+    match?.announcerScoreSoundEffectsEnabled !== false ? "1" : "0",
+    JSON.stringify(match?.announcerScoreSoundEffectMap || {}),
     Array.isArray(match?.balls) ? match.balls.length : 0,
   ]);
 }
@@ -228,6 +236,7 @@ const HOLD_BUTTON_INTERACTION_PROPS = {
 
 const ANNOUNCER_GESTURE_READ_DELAY_MS = 2000;
 const SIX_PRE_EFFECT_DELAY_MS = 1000;
+const SCORE_EFFECT_FALLBACK_BUFFER_MS = 180;
 
 function isSixBoundaryScoreEvent(event) {
   return Boolean(
@@ -236,6 +245,89 @@ function isSixBoundaryScoreEvent(event) {
     !event?.ball?.extraType &&
     Number(event?.ball?.runs) === 6,
   );
+}
+
+function estimateSpeechLeadDelayMs(text, rate = 1) {
+  const words = String(text || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+  const safeRate = Math.max(0.7, Number(rate) || 1);
+  const estimatedMs = Math.round(
+    (Math.max(words, 1) / (180 * safeRate)) * 60000 + 250,
+  );
+  return Math.max(1600, Math.min(2600, estimatedMs));
+}
+
+function estimateBoundaryLeadDelayMs(text, rate = 1) {
+  return estimateSpeechLeadDelayMs(text, rate) + SIX_PRE_EFFECT_DELAY_MS;
+}
+
+function getDerivedScoreSoundEffectDelayMs(
+  event,
+  announcerEnabled,
+  announcerMode,
+) {
+  if (!event?.ball || !announcerEnabled || announcerMode === "silent") {
+    return 0;
+  }
+
+  const leadText = buildSpectatorBallAnnouncement({
+    ...event,
+    type: "score_update",
+  });
+  const baseDelayMs = leadText
+    ? estimateBoundaryLeadDelayMs(leadText, 0.78)
+    : 0;
+  const effectKey = getScoreSoundEffectEventKey(
+    event?.ball?.runs,
+    event?.ball?.isOut,
+    event?.ball?.extraType,
+  );
+
+  if (effectKey === "wide_plus_one") {
+    return baseDelayMs + SIX_PRE_EFFECT_DELAY_MS;
+  }
+
+  return baseDelayMs;
+}
+
+function buildFallbackSoundEffectFromId(effectId = "") {
+  const safeId = String(effectId || "").trim();
+  if (!safeId || safeId === RANDOM_SCORE_EFFECT_ID) {
+    return null;
+  }
+
+  const normalizedFileName = safeId.split("/").pop() || safeId;
+  const label = normalizedFileName
+    .replace(/\.[^.]+$/, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return {
+    id: safeId,
+    fileName: normalizedFileName,
+    label: label || normalizedFileName,
+    src: `/audio/effects/${encodeURIComponent(normalizedFileName)}`,
+  };
+}
+
+function resolveSpectatorScoreSoundEffect(match, liveEvent) {
+  const effectKey = getScoreSoundEffectEventKey(
+    liveEvent?.ball?.runs,
+    liveEvent?.ball?.isOut,
+    liveEvent?.ball?.extraType,
+  );
+  if (!effectKey) {
+    return null;
+  }
+
+  const configuredEffectId = String(
+    match?.announcerScoreSoundEffectMap?.[effectKey] || "",
+  ).trim();
+
+  return buildFallbackSoundEffectFromId(configuredEffectId);
 }
 
 export default function SessionViewClient({ sessionId, initialData }) {
@@ -288,6 +380,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
       ? initialData.match.lastLiveEvent.id || ""
       : "",
   );
+  const pendingDerivedScoreSoundRef = useRef(null);
+  const handledDerivedScoreSoundActionIdsRef = useRef(new Map());
   const pendingResultNavigationRef = useRef("");
   const router = useRouter();
   const { startNavigation } = useRouteFeedback();
@@ -438,6 +532,52 @@ export default function SessionViewClient({ sessionId, initialData }) {
       announcementRestoreTimerRef.current = null;
     }
     restorePageMedia(announcementDuckRef);
+  }, []);
+
+  const pruneHandledDerivedScoreSoundActionIds = useCallback(() => {
+    const now = Date.now();
+    for (const [actionId, recordedAt] of handledDerivedScoreSoundActionIdsRef.current) {
+      if (now - Number(recordedAt || 0) > 30_000) {
+        handledDerivedScoreSoundActionIdsRef.current.delete(actionId);
+      }
+    }
+  }, []);
+
+  const markDerivedScoreSoundActionHandled = useCallback((actionId = "") => {
+    const safeActionId = String(actionId || "").trim();
+    if (!safeActionId) {
+      return;
+    }
+
+    pruneHandledDerivedScoreSoundActionIds();
+    handledDerivedScoreSoundActionIdsRef.current.set(safeActionId, Date.now());
+  }, [pruneHandledDerivedScoreSoundActionIds]);
+
+  const hasHandledDerivedScoreSoundAction = useCallback((actionId = "") => {
+    const safeActionId = String(actionId || "").trim();
+    if (!safeActionId) {
+      return false;
+    }
+
+    pruneHandledDerivedScoreSoundActionIds();
+    return handledDerivedScoreSoundActionIdsRef.current.has(safeActionId);
+  }, [pruneHandledDerivedScoreSoundActionIds]);
+
+  const clearPendingDerivedScoreSound = useCallback((actionId = "") => {
+    const pending = pendingDerivedScoreSoundRef.current;
+    if (!pending) {
+      return false;
+    }
+
+    if (actionId && pending.actionId !== String(actionId || "").trim()) {
+      return false;
+    }
+
+    if (pending.timerId) {
+      window.clearTimeout(pending.timerId);
+    }
+    pendingDerivedScoreSoundRef.current = null;
+    return true;
   }, []);
 
   const hasSpectatorPlaybackInFlight = useCallback(
@@ -613,13 +753,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
     activeBoundarySoundEffectRef.current = false;
     shouldResumeAfterSoundEffectRef.current = false;
     skipNextBoundaryLeadRef.current = false;
+    clearPendingDerivedScoreSound();
     if (pendingSoundEffectTimerRef.current) {
       window.clearTimeout(pendingSoundEffectTimerRef.current);
       pendingSoundEffectTimerRef.current = null;
     }
     stop();
     stopLiveSoundEffect();
-  }, [stop, stopLiveSoundEffect]);
+  }, [clearPendingDerivedScoreSound, stop, stopLiveSoundEffect]);
 
   const showTemporaryWalkieNotice = useCallback((message, duration = 2600) => {
     setLocalWalkieNotice(message);
@@ -683,6 +824,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
       window.clearTimeout(pendingSoundEffectTimerRef.current);
       pendingSoundEffectTimerRef.current = null;
     }
+    clearPendingDerivedScoreSound();
+    handledDerivedScoreSoundActionIdsRef.current.clear();
     activeBoundarySoundEffectRef.current = false;
     pendingManualScoreAnnouncementRef.current = null;
     lastAnnouncedEventRef.current = "";
@@ -700,7 +843,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     clearAnnouncementTimers();
     stop();
     stopLiveSoundEffect();
-  }, [clearAnnouncementTimers, match?._id, stop, stopLiveSoundEffect]);
+  }, [clearAnnouncementTimers, clearPendingDerivedScoreSound, match?._id, stop, stopLiveSoundEffect]);
 
   useEffect(() => {
     const nextMatchId = match?._id || "";
@@ -709,11 +852,18 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
 
     previousSoundEffectMatchIdRef.current = nextMatchId;
+    handledDerivedScoreSoundActionIdsRef.current.clear();
+    clearPendingDerivedScoreSound();
     lastHandledSoundEffectEventRef.current =
       match?.lastLiveEvent?.type === "sound_effect"
         ? match.lastLiveEvent.id || ""
         : "";
-  }, [match?._id, match?.lastLiveEvent?.id, match?.lastLiveEvent?.type]);
+  }, [
+    clearPendingDerivedScoreSound,
+    match?._id,
+    match?.lastLiveEvent?.id,
+    match?.lastLiveEvent?.type,
+  ]);
 
   useEffect(() => {
     if (!match?._id || !isLiveMatch) {
@@ -1018,6 +1168,16 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
 
     lastHandledSoundEffectEventRef.current = liveEvent.id;
+    const sourceActionId = String(liveEvent.sourceActionId || "").trim();
+    if (sourceActionId) {
+      clearPendingDerivedScoreSound(sourceActionId);
+      if (
+        liveEvent.trigger === "score_boundary" &&
+        hasHandledDerivedScoreSoundAction(sourceActionId)
+      ) {
+        return;
+      }
+    }
     if (
       liveEvent.trigger === "score_boundary" &&
       settings.playScoreSoundEffects === false
@@ -1044,6 +1204,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
     const playIncomingSoundEffect = () => {
       void playLiveSoundEffect(effectToPlay, { userGesture: false }).then(
         (played) => {
+          if (played && sourceActionId) {
+            markDerivedScoreSoundActionHandled(sourceActionId);
+          }
           if (!played) {
             resumeSpectatorAnnouncementsAfterSoundEffect();
           }
@@ -1107,7 +1270,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
   }, [
     cancelBoundarySoundEffectSequence,
     clearAnnouncementTimers,
+    clearPendingDerivedScoreSound,
+    hasHandledDerivedScoreSoundAction,
     interruptAndCapture,
+    markDerivedScoreSoundActionHandled,
     match?.lastLiveEvent,
     playLiveSoundEffect,
     resumeSpectatorAnnouncementsAfterSoundEffect,
@@ -1117,6 +1283,86 @@ export default function SessionViewClient({ sessionId, initialData }) {
     speakSequenceWithDuck,
     stop,
     stopLiveSoundEffect,
+  ]);
+
+  useEffect(() => {
+    const liveEvent = match?.lastLiveEvent;
+    const sourceActionId = String(liveEvent?.actionId || "").trim();
+    const shouldHandleDerivedScoreSound = Boolean(
+      liveEvent?.id &&
+        sourceActionId &&
+        (liveEvent.type === "score_update" ||
+          liveEvent.type === "target_chased" ||
+          liveEvent.type === "match_end") &&
+        liveEvent.ball &&
+        isLiveMatch &&
+        settings.playScoreSoundEffects !== false &&
+        match?.announcerBroadcastScoreSoundEffectsEnabled !== false,
+    );
+
+    if (!shouldHandleDerivedScoreSound) {
+      return;
+    }
+
+    if (hasHandledDerivedScoreSoundAction(sourceActionId)) {
+      return;
+    }
+
+    const derivedEffect = resolveSpectatorScoreSoundEffect(match, liveEvent);
+    if (!derivedEffect?.src) {
+      return;
+    }
+
+    clearPendingDerivedScoreSound();
+    const delayMs =
+      getDerivedScoreSoundEffectDelayMs(
+        liveEvent,
+        settings.enabled,
+        settings.mode,
+      ) + SCORE_EFFECT_FALLBACK_BUFFER_MS;
+    const timerId = window.setTimeout(() => {
+      pendingDerivedScoreSoundRef.current = null;
+      if (hasHandledDerivedScoreSoundAction(sourceActionId)) {
+        return;
+      }
+
+      void playLiveSoundEffect(derivedEffect, { userGesture: false }).then(
+        (played) => {
+          if (played) {
+            markDerivedScoreSoundActionHandled(sourceActionId);
+            return;
+          }
+
+          resumeSpectatorAnnouncementsAfterSoundEffect();
+        },
+      );
+    }, Math.max(0, delayMs));
+
+    pendingDerivedScoreSoundRef.current = {
+      actionId: sourceActionId,
+      effectId: derivedEffect.id,
+      timerId,
+    };
+
+    return () => {
+      if (
+        pendingDerivedScoreSoundRef.current?.timerId === timerId
+      ) {
+        window.clearTimeout(timerId);
+        pendingDerivedScoreSoundRef.current = null;
+      }
+    };
+  }, [
+    clearPendingDerivedScoreSound,
+    hasHandledDerivedScoreSoundAction,
+    isLiveMatch,
+    markDerivedScoreSoundActionHandled,
+    match,
+    playLiveSoundEffect,
+    resumeSpectatorAnnouncementsAfterSoundEffect,
+    settings.enabled,
+    settings.mode,
+    settings.playScoreSoundEffects,
   ]);
 
   useEffect(() => {
@@ -1140,13 +1386,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
         window.clearTimeout(pendingSoundEffectTimerRef.current);
         pendingSoundEffectTimerRef.current = null;
       }
+      clearPendingDerivedScoreSound();
       clearAnnouncementTimers();
       if (walkieNoticeTimerRef.current) {
         window.clearTimeout(walkieNoticeTimerRef.current);
         walkieNoticeTimerRef.current = null;
       }
     };
-  }, [clearAnnouncementTimers]);
+  }, [clearAnnouncementTimers, clearPendingDerivedScoreSound]);
 
   useEffect(() => {
     const walkieEnabled = Boolean(walkie.snapshot?.enabled);

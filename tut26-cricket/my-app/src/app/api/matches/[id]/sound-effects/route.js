@@ -45,6 +45,13 @@ const soundEffectRequestSchema = z
       .max(120)
       .regex(/^[a-zA-Z0-9._:-]+$/, "clientRequestId is invalid.")
       .optional(),
+    sourceActionId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .regex(/^[a-zA-Z0-9:_-]+$/, "sourceActionId is invalid.")
+      .optional(),
     action: z.enum(["play", "stop"]).optional(),
     resumeAnnouncements: z.boolean().optional(),
     trigger: z.enum(["manual", "score_boundary"]).optional(),
@@ -149,6 +156,7 @@ export async function POST(req, { params }) {
     const liveEvent = createSoundEffectLiveEvent(match, effect, {
       action: parsedRequest.value.action === "stop" ? "stop" : "play",
       clientRequestId: parsedRequest.value.clientRequestId || "",
+      sourceActionId: parsedRequest.value.sourceActionId || "",
       resumeAnnouncements: Boolean(parsedRequest.value.resumeAnnouncements),
       trigger:
         parsedRequest.value.trigger === "score_boundary"

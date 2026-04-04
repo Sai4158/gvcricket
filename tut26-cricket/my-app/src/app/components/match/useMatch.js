@@ -752,7 +752,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     };
   }, [clearRetryTimer]);
 
-  const handleScoreEvent = useCallback((runs, isOut = false, extraType = null) => {
+  const handleScoreEvent = useCallback((runs, isOut = false, extraType = null, options = {}) => {
     if (!match || match.result || !hasAccess) return;
     if (tossPending) {
       setError(null);
@@ -763,7 +763,8 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
     triggerHapticFeedback();
     sendAction({
-      actionId: createActionId("score"),
+      actionId:
+        String(options?.actionId || "").trim() || createActionId("score"),
       type: "score_ball",
       runs,
       isOut,
