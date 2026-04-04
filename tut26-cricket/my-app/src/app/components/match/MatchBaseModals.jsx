@@ -15,6 +15,26 @@ function parseWinnerName(resultText) {
   return match ? match[1] : "";
 }
 
+function formatRequiredRunRateDisplay(target, overs) {
+  const safeTarget = Number(target || 0);
+  const safeOvers = Number(overs || 0);
+
+  if (safeTarget <= 0 || safeOvers <= 0) {
+    return "—";
+  }
+
+  const requiredRate = safeTarget / safeOvers;
+  if (!Number.isFinite(requiredRate) || requiredRate <= 0) {
+    return "—";
+  }
+
+  if (requiredRate < 1) {
+    return "Under 1";
+  }
+
+  return requiredRate.toFixed(2);
+}
+
 export function ModalBase({
   children,
   title,
@@ -224,8 +244,7 @@ export function InningsEndModal({ match, onNext }) {
       ? `${Math.floor(firstInningsLegalBalls / 6)}.${firstInningsLegalBalls % 6}`
       : "0.0";
   const inningsOvers = Number(match?.overs || 0);
-  const requiredRunRate =
-    inningsOvers > 0 ? (target / inningsOvers).toFixed(2) : "0.00";
+  const requiredRunRate = formatRequiredRunRateDisplay(target, inningsOvers);
   const winnerName = parseWinnerName(match?.result);
   const confettiPieces = [
     "left-[8%] top-5 bg-emerald-400/80",

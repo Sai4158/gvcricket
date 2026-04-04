@@ -14,6 +14,8 @@ import { countLegalBalls } from "../../lib/match-scoring";
 import {
   buildCurrentScoreAnnouncement,
   buildLiveScoreAnnouncementSequence,
+  buildUmpireSecondInningsStartSequence,
+  buildUmpireStageAnnouncement,
   buildUmpireAnnouncement,
   buildSpectatorScoreAnnouncement,
   createScoreLiveEvent,
@@ -80,6 +82,54 @@ const SCORE_PRE_EFFECT_RATE = 0.8;
 const SCORE_PRE_EFFECT_GAP_MS = 1000;
 const WIDE_PLUS_ONE_EXTRA_DELAY_MS = 1000;
 const ENTRY_SCORE_SOUND_EFFECTS_MODAL = "entryScoreSoundEffects";
+const STAGE_CARD_REVEAL_TIMEOUT_MS = 10000;
+
+function getMatchEndStageState(match, fallbackMatchId = "") {
+  if (!match) {
+    return {
+      firstInningsComplete: false,
+      matchFinished: false,
+      showInningsEnd: false,
+      key: "",
+    };
+  }
+
+  const firstInningsHistory = match?.innings1?.history ?? [];
+  const firstInningsLegalBalls = countLegalBalls(firstInningsHistory);
+  const firstInningsOversDone =
+    match?.innings === "first" &&
+    firstInningsLegalBalls >= Number(match?.overs || 0) * 6;
+  const maxWickets = getTotalDismissalsAllowed(match);
+  const firstInningsAllOut =
+    match?.innings === "first" &&
+    maxWickets > 0 &&
+    Number(match?.outs || 0) >= maxWickets;
+  const firstInningsComplete = Boolean(
+    match?.innings === "first" && (firstInningsOversDone || firstInningsAllOut),
+  );
+  const matchFinished = Boolean(match?.result) || Boolean(
+    match?.innings === "second" && !match?.isOngoing,
+  );
+
+  let key = "";
+  if (matchFinished) {
+    key = `result:${match?._id || fallbackMatchId}:${
+      String(match?.result || "").trim() ||
+      `${Number(match?.score || 0)}:${Number(match?.outs || 0)}`
+    }`;
+  } else if (firstInningsComplete) {
+    key = `innings:${match?._id || fallbackMatchId}:${
+      Number(match?.innings1?.score ?? match?.score ?? 0)
+    }:${Number(match?.innings1?.outs ?? match?.outs ?? 0)}`;
+  }
+
+  return {
+    firstInningsComplete,
+    matchFinished,
+    showInningsEnd: firstInningsComplete || matchFinished,
+    key,
+  };
+}
 
 function estimateSpeechLeadDelayMs(text, rate = 1) {
   const words = String(text || "")
@@ -93,6 +143,16 @@ function estimateSpeechLeadDelayMs(text, rate = 1) {
 
 function estimateBoundaryLeadDelayMs(text, rate = 1) {
   return estimateSpeechLeadDelayMs(text, rate) + SCORE_PRE_EFFECT_GAP_MS;
+}
+
+function estimateSpeechSequenceDelayMs(items = []) {
+  const safeItems = Array.isArray(items) ? items : [];
+  const estimatedMs = safeItems.reduce((total, item) => {
+    const text = String(item?.text || "").trim();
+    const rate = Number(item?.rate || 0.82) || 0.82;
+    return total + estimateSpeechLeadDelayMs(text, rate) + Math.max(0, Number(item?.pauseAfterMs || 0));
+  }, 0);
+  return Math.max(1200, Math.min(7000, estimatedMs || 1200));
 }
 
 function getConfiguredScoreEffectDelayMs(
@@ -203,6 +263,17 @@ export default function MatchPageClient({
   const [soundEffectDurations, setSoundEffectDurations] = useState({});
   const [activeCommentaryAction, setActiveCommentaryAction] = useState("");
   const [activeCommentaryPreviewId, setActiveCommentaryPreviewId] = useState("");
+  const [stageContinuePrompt, setStageContinuePrompt] = useState(null);
+  const initialStageStateRef = useRef(
+    getMatchEndStageState(initialMatch, matchId),
+  );
+  const [visibleStageCardKey, setVisibleStageCardKey] = useState(
+    initialStageStateRef.current.key,
+  );
+  const [stageCardRevealDeadlineMs, setStageCardRevealDeadlineMs] = useState(null);
+  const [stageCardCountdownNow, setStageCardCountdownNow] = useState(() =>
+    Date.now(),
+  );
   const localAnnouncementIdRef = useRef(0);
   const lastWalkieRequestSignatureRef = useRef("");
   const umpireAnnouncementTimerRef = useRef(null);
@@ -245,6 +316,9 @@ export default function MatchPageClient({
   const speechPlaybackActiveRef = useRef(false);
   const soundEffectPlaybackActiveRef = useRef(false);
   const entryScoreSoundPromptShownRef = useRef(false);
+  const endStageAnnouncementKeyRef = useRef("");
+  const stageCardRevealVersionRef = useRef(0);
+  const stageCardPlaybackBlockUntilRef = useRef(0);
   const handleHeroMenuScroll = useCallback(() => {
     contentStartRef.current?.scrollIntoView({
       behavior: "smooth",
@@ -642,6 +716,48 @@ export default function MatchPageClient({
   const isAnySoundEffectActive =
     activeSoundEffectStatus === "loading" || activeSoundEffectStatus === "playing";
 
+  const flushDeferredUmpireAnnouncement = useCallback(() => {
+    if (
+      walkieAnnouncementPauseActiveRef.current ||
+      soundEffectPlayingRef.current ||
+      activeBoundarySequenceRef.current ||
+      umpireAnnouncementTimerRef.current ||
+      pendingUmpireAnnouncementRef.current?.items?.length ||
+      status === "speaking" ||
+      isAnySoundEffectActive
+    ) {
+      return false;
+    }
+
+    const deferredAnnouncement = deferredUmpireAnnouncementRef.current;
+    if (
+      !deferredAnnouncement?.items?.length ||
+      !umpireSettings.enabled ||
+      umpireSettings.mode === "silent"
+    ) {
+      return false;
+    }
+
+    deferredUmpireAnnouncementRef.current = null;
+    localAnnouncementIdRef.current += 1;
+    speakSequenceWithAnnouncementDuck(deferredAnnouncement.items, {
+      key:
+        deferredAnnouncement.options?.key ||
+        `umpire-deferred-${localAnnouncementIdRef.current}`,
+      priority: Number(deferredAnnouncement.options?.priority || 2),
+      interrupt: true,
+      minGapMs: 0,
+      userGesture: true,
+    });
+    return true;
+  }, [
+    isAnySoundEffectActive,
+    speakSequenceWithAnnouncementDuck,
+    status,
+    umpireSettings.enabled,
+    umpireSettings.mode,
+  ]);
+
   useEffect(() => {
     soundEffectPlaybackActiveRef.current = isAnySoundEffectActive;
   }, [isAnySoundEffectActive]);
@@ -996,6 +1112,41 @@ export default function MatchPageClient({
     umpireSettings.mode,
   ]);
 
+  const queueOrSpeakUmpireSequence = useCallback((sequence, keyPrefix) => {
+    if (!sequence?.items?.length || !umpireSettings.enabled || umpireSettings.mode === "silent") {
+      return false;
+    }
+
+    if (
+      walkieAnnouncementPauseActiveRef.current ||
+      soundEffectPlayingRef.current ||
+      activeBoundarySequenceRef.current ||
+      umpireAnnouncementTimerRef.current ||
+      pendingUmpireAnnouncementRef.current?.items?.length ||
+      status === "speaking" ||
+      isAnySoundEffectActive
+    ) {
+      queueDeferredUmpireAnnouncement({
+        items: sequence.items,
+        options: {
+          key: keyPrefix,
+          priority: sequence.priority || 2,
+        },
+      });
+      return false;
+    }
+
+    speakImmediateUmpireSequence(sequence, keyPrefix);
+    return true;
+  }, [
+    isAnySoundEffectActive,
+    queueDeferredUmpireAnnouncement,
+    speakImmediateUmpireSequence,
+    status,
+    umpireSettings.enabled,
+    umpireSettings.mode,
+  ]);
+
   const buildUmpireScorePreview = useCallback((runs, isOut = false, extraType = null) => {
     if (!match) {
       return {
@@ -1004,6 +1155,7 @@ export default function MatchPageClient({
         sequence: { items: [], priority: 2 },
         leadItem: null,
         followUpItems: [],
+        endsFirstInnings: false,
       };
     }
     let nextMatch = match;
@@ -1033,7 +1185,23 @@ export default function MatchPageClient({
       buildUmpireAnnouncement(event, umpireSettings.mode) ||
       baseSequence.items?.[0]?.text ||
       "";
-    const sequence = {
+    const nextInningsHistory = nextMatch?.innings1?.history ?? [];
+    const nextLegalBalls = countLegalBalls(nextInningsHistory);
+    const nextOversDone =
+      nextMatch?.innings === "first" &&
+      nextLegalBalls >= Number(nextMatch?.overs || 0) * 6;
+    const nextMaxWickets = getTotalDismissalsAllowed(nextMatch || match);
+    const nextAllOut =
+      nextMatch?.innings === "first" &&
+      nextMaxWickets > 0 &&
+      Number(nextMatch?.outs || 0) >= nextMaxWickets;
+    const endsFirstInnings = Boolean(
+      nextMatch?.innings === "first" &&
+        !nextMatch?.result &&
+        (nextOversDone || nextAllOut)
+    );
+
+    let sequence = {
       ...baseSequence,
       items: umpireLeadText
         ? [
@@ -1048,10 +1216,31 @@ export default function MatchPageClient({
           ]
         : baseSequence.items || [],
     };
+
+    if (endsFirstInnings) {
+      const inningsStageText =
+        buildUmpireStageAnnouncement(nextMatch || match) ||
+        "First innings complete.";
+      const inningsCompleteItem = {
+        text: inningsStageText,
+        pauseAfterMs: 0,
+        rate: 0.79,
+      };
+
+      sequence = {
+        ...sequence,
+        items: sequence.items?.length
+          ? [sequence.items[0], inningsCompleteItem]
+          : [inningsCompleteItem],
+        priority: 4,
+        restoreAfterMs: 2200,
+      };
+    }
+
     const leadItem = sequence.items?.[0] || null;
     const followUpItems = sequence.items?.slice(1) || [];
 
-    if (!followUpItems.length) {
+    if (!followUpItems.length && !endsFirstInnings) {
       const followUpText =
         buildSpectatorScoreAnnouncement(event, nextMatch || match) ||
         buildCurrentScoreAnnouncement(nextMatch || match);
@@ -1070,6 +1259,7 @@ export default function MatchPageClient({
       sequence,
       leadItem,
       followUpItems,
+      endsFirstInnings,
     };
   }, [match, umpireSettings.mode]);
 
@@ -1154,7 +1344,11 @@ export default function MatchPageClient({
       return;
     }
 
-    const { sequence } = buildUmpireScorePreview(runs, isOut, extraType);
+    const { sequence, nextMatch, endsFirstInnings } = buildUmpireScorePreview(
+      runs,
+      isOut,
+      extraType,
+    );
     const shouldSkipBoundaryLead =
       skipNextBoundaryLeadRef.current &&
       !isOut &&
@@ -1168,6 +1362,11 @@ export default function MatchPageClient({
       : sequence.items;
 
     if (!sequenceItems.length) return;
+
+    if (endsFirstInnings || nextMatch?.result) {
+      stageCardPlaybackBlockUntilRef.current =
+        Date.now() + 140 + estimateSpeechSequenceDelayMs(sequenceItems);
+    }
 
     pendingUmpireAnnouncementRef.current = {
       ...sequence,
@@ -1191,15 +1390,22 @@ export default function MatchPageClient({
       cancelBoundarySequence({ stopEffect: true });
     }
 
+    const scorePreview = buildUmpireScorePreview(runs, isOut, extraType);
+    const shouldSuppressScoreEffectForInningsEnd =
+      scorePreview.endsFirstInnings;
+    const shouldDelayStageCardForScoreFlow = Boolean(
+      scorePreview.endsFirstInnings || scorePreview.nextMatch?.result,
+    );
     const shouldPlayLocalScoreEffect =
-      umpireSettings.playScoreSoundEffects !== false;
+      umpireSettings.playScoreSoundEffects !== false &&
+      !shouldSuppressScoreEffectForInningsEnd;
     const shouldBroadcastScoreEffect =
-      umpireSettings.broadcastScoreSoundEffects !== false;
+      umpireSettings.broadcastScoreSoundEffects !== false &&
+      !shouldSuppressScoreEffectForInningsEnd;
     const configuredScoreEffect =
       shouldPlayLocalScoreEffect || shouldBroadcastScoreEffect
         ? await resolveConfiguredScoreSoundEffect(runs, isOut, extraType)
         : null;
-    const scorePreview = buildUmpireScorePreview(runs, isOut, extraType);
 
     if (configuredScoreEffect) {
       if (shouldPlayLocalScoreEffect) {
@@ -1243,9 +1449,22 @@ export default function MatchPageClient({
         leadText,
         leadRate,
       );
+      const followUpDelayMs = scorePreview.followUpItems.length
+        ? estimateSpeechSequenceDelayMs(scorePreview.followUpItems)
+        : 0;
+      const configuredEffectDurationMs = shouldPlayLocalScoreEffect
+        ? getEstimatedConfiguredScoreEffectDurationMs(configuredScoreEffect.id)
+        : 0;
       const clientRequestId = createSoundEffectRequestId();
       boundarySequenceVersionRef.current = boundarySequenceVersion;
       activeBoundarySequenceRef.current = true;
+      if (shouldDelayStageCardForScoreFlow && shouldPlayLocalScoreEffect) {
+        stageCardPlaybackBlockUntilRef.current =
+          Date.now() +
+          leadDelayMs +
+          configuredEffectDurationMs +
+          followUpDelayMs;
+      }
       handleScoreEvent(runs, isOut, extraType);
 
       if (shouldBroadcastScoreEffect) {
@@ -2510,6 +2729,411 @@ export default function MatchPageClient({
     queueScoreSoundEffectMapSave,
   ]);
 
+  const activeInningsKey = match?.innings === "second" ? "innings2" : "innings1";
+  const oversHistory = match?.[activeInningsKey]?.history ?? [];
+  const currentOverNumber = oversHistory.at(-1)?.overNumber ?? 1;
+  const firstInningsOversPlayed = Math.max(
+    1,
+    Math.ceil(countLegalBalls(match?.innings1?.history ?? []) / 6)
+  );
+  const {
+    showInningsEnd,
+    key: stageCardKey,
+  } = getMatchEndStageState(match, matchId);
+  const showVisibleInningsEndCard = Boolean(
+    showInningsEnd && visibleStageCardKey === stageCardKey,
+  );
+  const showPendingMatchOverCountdown = Boolean(
+    match?.result && showInningsEnd && !showVisibleInningsEndCard,
+  );
+
+  const getEstimatedConfiguredScoreEffectDurationMs = useCallback(
+    (effectId = "") => {
+      const safeEffectId = String(effectId || "").trim();
+      const durationSeconds = Number(soundEffectDurations?.[safeEffectId] || 0);
+
+      if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
+        return Math.round(durationSeconds * 1000) + 250;
+      }
+
+      return 2200;
+    },
+    [soundEffectDurations],
+  );
+
+  const getRemainingActiveSoundEffectMs = useCallback(() => {
+    if (!(soundEffectPlayingRef.current || isAnySoundEffectActive)) {
+      return 0;
+    }
+
+    const effectId = String(activeSoundEffectId || "").trim();
+    const durationSeconds = Number(soundEffectDurations?.[effectId] || 0);
+    const currentTimeSeconds = Number(activeSoundEffectCurrentTime || 0);
+
+    if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
+      return Math.max(
+        0,
+        Math.round((durationSeconds - currentTimeSeconds) * 1000) + 250,
+      );
+    }
+
+    return activeSoundEffectStatus === "loading" ? 2400 : 2200;
+  }, [
+    activeSoundEffectCurrentTime,
+    activeSoundEffectId,
+    activeSoundEffectStatus,
+    isAnySoundEffectActive,
+    soundEffectDurations,
+  ]);
+
+  const estimateStageCardRevealDelayMs = useCallback(() => {
+    let estimateMs = Math.max(
+      0,
+      stageCardPlaybackBlockUntilRef.current - Date.now(),
+    );
+    const remainingSoundEffectMs = getRemainingActiveSoundEffectMs();
+
+    if (pendingUmpireAnnouncementRef.current?.items?.length) {
+      estimateMs = Math.max(
+        estimateMs,
+        estimateSpeechSequenceDelayMs(pendingUmpireAnnouncementRef.current.items),
+      );
+    }
+    if (deferredUmpireAnnouncementRef.current?.items?.length) {
+      estimateMs = Math.max(
+        estimateMs,
+        estimateSpeechSequenceDelayMs(deferredUmpireAnnouncementRef.current.items),
+      );
+    }
+    if (status === "speaking") {
+      estimateMs = Math.max(estimateMs, 2600);
+    }
+    if (umpireAnnouncementTimerRef.current) {
+      estimateMs = Math.max(estimateMs, 1800);
+    }
+    if (activeBoundarySequenceRef.current) {
+      estimateMs = Math.max(estimateMs, 2800);
+    }
+    if (remainingSoundEffectMs > 0) {
+      estimateMs = Math.max(estimateMs, remainingSoundEffectMs);
+    }
+    if (walkieAnnouncementPauseActiveRef.current) {
+      estimateMs = Math.max(estimateMs, 3200);
+    }
+
+    return Math.max(
+      1800,
+      Math.min(STAGE_CARD_REVEAL_TIMEOUT_MS, estimateMs || 2200),
+    );
+  }, [getRemainingActiveSoundEffectMs, status]);
+
+  const pendingStageCardEffectiveDeadlineMs = useMemo(() => {
+    if (!showPendingMatchOverCountdown) {
+      return null;
+    }
+
+    const playbackBlockUntilMs =
+      stageCardPlaybackBlockUntilRef.current > stageCardCountdownNow
+        ? stageCardPlaybackBlockUntilRef.current
+        : 0;
+    const revealDeadlineMs = Number.isFinite(stageCardRevealDeadlineMs)
+      ? Number(stageCardRevealDeadlineMs)
+      : 0;
+    const nextDeadlineMs = Math.max(revealDeadlineMs, playbackBlockUntilMs);
+
+    return nextDeadlineMs > 0 ? nextDeadlineMs : null;
+  }, [
+    showPendingMatchOverCountdown,
+    stageCardCountdownNow,
+    stageCardRevealDeadlineMs,
+  ]);
+
+  const pendingStageCardCountdownLabel = useMemo(() => {
+    if (!showPendingMatchOverCountdown || !pendingStageCardEffectiveDeadlineMs) {
+      return "";
+    }
+
+    const msRemaining =
+      pendingStageCardEffectiveDeadlineMs - stageCardCountdownNow;
+    if (msRemaining <= 500) {
+      return "Results card opening...";
+    }
+
+    const secondsRemaining = Math.max(1, Math.ceil(msRemaining / 1000));
+    return `Results card in about ${secondsRemaining}s`;
+  }, [
+    pendingStageCardEffectiveDeadlineMs,
+    showPendingMatchOverCountdown,
+    stageCardCountdownNow,
+  ]);
+
+  const waitForUmpirePlaybackToSettle = useCallback(
+    (timeoutMs = 5000) =>
+      new Promise((resolve) => {
+        const startedAt = Date.now();
+
+        const poll = () => {
+          const isBusy = Boolean(
+            walkieAnnouncementPauseActiveRef.current ||
+              soundEffectPlayingRef.current ||
+              activeBoundarySequenceRef.current ||
+              umpireAnnouncementTimerRef.current ||
+              pendingUmpireAnnouncementRef.current?.items?.length ||
+              deferredUmpireAnnouncementRef.current?.items?.length ||
+              status === "speaking" ||
+              isAnySoundEffectActive
+          );
+
+          if (!isBusy || Date.now() - startedAt >= timeoutMs) {
+            resolve();
+            return;
+          }
+
+          window.setTimeout(poll, 80);
+        };
+
+        poll();
+      }),
+    [isAnySoundEffectActive, status],
+  );
+
+  const hasPendingStageContinueSpeech = useCallback(
+    () =>
+      Boolean(
+        walkieAnnouncementPauseActiveRef.current ||
+          soundEffectPlayingRef.current ||
+          activeBoundarySequenceRef.current ||
+          umpireAnnouncementTimerRef.current ||
+          pendingUmpireAnnouncementRef.current?.items?.length ||
+          deferredUmpireAnnouncementRef.current?.items?.length ||
+          status === "speaking" ||
+          isAnySoundEffectActive,
+      ),
+    [isAnySoundEffectActive, status],
+  );
+
+  useEffect(() => {
+    stageCardRevealVersionRef.current += 1;
+    const revealVersion = stageCardRevealVersionRef.current;
+
+    if (!showInningsEnd || !stageCardKey) {
+      stageCardPlaybackBlockUntilRef.current = 0;
+      setStageCardRevealDeadlineMs(null);
+      setVisibleStageCardKey("");
+      return;
+    }
+
+    if (visibleStageCardKey === stageCardKey) {
+      stageCardPlaybackBlockUntilRef.current = 0;
+      setStageCardRevealDeadlineMs(null);
+      return;
+    }
+
+    const hasPlaybackInFlight = Boolean(
+      walkieAnnouncementPauseActiveRef.current ||
+        soundEffectPlayingRef.current ||
+        activeBoundarySequenceRef.current ||
+        umpireAnnouncementTimerRef.current ||
+        pendingUmpireAnnouncementRef.current?.items?.length ||
+        deferredUmpireAnnouncementRef.current?.items?.length ||
+        status === "speaking" ||
+        isAnySoundEffectActive
+    );
+
+    if (!hasPlaybackInFlight) {
+      stageCardPlaybackBlockUntilRef.current = 0;
+      setStageCardRevealDeadlineMs(null);
+      setVisibleStageCardKey(stageCardKey);
+      return;
+    }
+
+    setStageCardRevealDeadlineMs(Date.now() + estimateStageCardRevealDelayMs());
+
+    void (async () => {
+      await waitForUmpirePlaybackToSettle(STAGE_CARD_REVEAL_TIMEOUT_MS);
+      if (stageCardRevealVersionRef.current !== revealVersion) {
+        return;
+      }
+      stageCardPlaybackBlockUntilRef.current = 0;
+      setStageCardRevealDeadlineMs(null);
+      setVisibleStageCardKey(stageCardKey);
+    })();
+  }, [
+    estimateStageCardRevealDelayMs,
+    isAnySoundEffectActive,
+    showInningsEnd,
+    stageCardKey,
+    status,
+    visibleStageCardKey,
+    waitForUmpirePlaybackToSettle,
+  ]);
+
+  useEffect(() => {
+    if (!showPendingMatchOverCountdown || !pendingStageCardEffectiveDeadlineMs) {
+      return undefined;
+    }
+
+    setStageCardCountdownNow(Date.now());
+    const countdownTimer = window.setInterval(() => {
+      setStageCardCountdownNow(Date.now());
+    }, 250);
+
+    return () => {
+      window.clearInterval(countdownTimer);
+    };
+  }, [pendingStageCardEffectiveDeadlineMs, showPendingMatchOverCountdown]);
+
+  useEffect(() => {
+    if (stageContinuePrompt && !hasPendingStageContinueSpeech()) {
+      setStageContinuePrompt(null);
+    }
+  }, [hasPendingStageContinueSpeech, isAnySoundEffectActive, stageContinuePrompt, status]);
+
+  useEffect(() => {
+    if (!showVisibleInningsEndCard || !match?.result) {
+      if (!showVisibleInningsEndCard) {
+        endStageAnnouncementKeyRef.current = "";
+      }
+      return;
+    }
+
+    const text = buildUmpireStageAnnouncement(match);
+    if (!text) {
+      return;
+    }
+
+    const nextKey = match.result
+      ? `result:${match._id || matchId}:${match.result}`
+      : `innings:${match._id || matchId}:${match?.innings1?.score ?? match.score}:${match?.innings1?.outs ?? match.outs}`;
+
+    if (endStageAnnouncementKeyRef.current === nextKey) {
+      return;
+    }
+
+    endStageAnnouncementKeyRef.current = nextKey;
+    const stageSequence = {
+      items: [
+        {
+          text,
+          pauseAfterMs: 0,
+          rate: 0.82,
+        },
+      ],
+      priority: 4,
+    };
+    queueOrSpeakUmpireSequence(stageSequence, "umpire-match-over-modal");
+  }, [
+    match,
+    matchId,
+    queueOrSpeakUmpireSequence,
+    showVisibleInningsEndCard,
+  ]);
+
+  useEffect(() => {
+    void flushDeferredUmpireAnnouncement();
+  }, [flushDeferredUmpireAnnouncement]);
+
+  const handleAnnouncedNextInningsOrEnd = useCallback(async (options = {}) => {
+    const force = Boolean(options?.force);
+    setStageContinuePrompt(null);
+
+    if (force) {
+      cancelBoundarySequence({ stopEffect: true });
+    }
+
+    if (match?.result && !match?.isOngoing) {
+      const matchOverText = buildUmpireStageAnnouncement(match);
+      const matchOverSequence = {
+        items: matchOverText
+          ? [
+              {
+                text: matchOverText,
+                pauseAfterMs: 0,
+                rate: 0.82,
+              },
+            ]
+          : [],
+        priority: 4,
+      };
+      const hasAnnouncementInFlight = Boolean(
+        walkieAnnouncementPauseActiveRef.current ||
+          soundEffectPlayingRef.current ||
+          activeBoundarySequenceRef.current ||
+          umpireAnnouncementTimerRef.current ||
+          pendingUmpireAnnouncementRef.current?.items?.length ||
+          deferredUmpireAnnouncementRef.current?.items?.length ||
+          status === "speaking" ||
+          isAnySoundEffectActive
+      );
+
+      if (hasAnnouncementInFlight && !force) {
+        await waitForUmpirePlaybackToSettle(
+          estimateSpeechSequenceDelayMs(matchOverSequence.items),
+        );
+      }
+
+      router.push(`/result/${matchId}`);
+      return match;
+    }
+
+    const shouldAnnounceSecondInningsStart = Boolean(
+      match &&
+        match.innings === "first" &&
+        !match.result &&
+        showInningsEnd
+    );
+
+    const updatedMatch = await handleNextInningsOrEnd();
+
+    if (
+      !shouldAnnounceSecondInningsStart ||
+      !updatedMatch ||
+      updatedMatch.result ||
+      updatedMatch.innings !== "second"
+    ) {
+      return updatedMatch;
+    }
+
+    const secondInningsSequence =
+      buildUmpireSecondInningsStartSequence(updatedMatch);
+    queueOrSpeakUmpireSequence(
+      secondInningsSequence,
+      "umpire-second-innings-start",
+    );
+    return updatedMatch;
+  }, [
+    cancelBoundarySequence,
+    isAnySoundEffectActive,
+    handleNextInningsOrEnd,
+    match,
+    matchId,
+    queueOrSpeakUmpireSequence,
+    router,
+    showInningsEnd,
+    status,
+    waitForUmpirePlaybackToSettle,
+  ]);
+
+  const handleProtectedNextInningsOrEnd = useCallback(async () => {
+    if (hasPendingStageContinueSpeech()) {
+      setStageContinuePrompt({
+        mode: match?.result && !match?.isOngoing ? "result" : "innings",
+      });
+      return null;
+    }
+
+    return handleAnnouncedNextInningsOrEnd();
+  }, [
+    handleAnnouncedNextInningsOrEnd,
+    hasPendingStageContinueSpeech,
+    match?.isOngoing,
+    match?.result,
+  ]);
+
+  const handleForceContinuePastSpeech = useCallback(async () => {
+    return handleAnnouncedNextInningsOrEnd({ force: true });
+  }, [handleAnnouncedNextInningsOrEnd]);
+
   if (authStatus !== "granted") {
     if (authStatus === "checking") return <Splash>Checking umpire access...</Splash>;
     return (
@@ -2557,23 +3181,6 @@ export default function MatchPageClient({
     );
   }
   if (tossPending) return <Splash>Opening toss...</Splash>;
-
-  const activeInningsKey = match.innings === "first" ? "innings1" : "innings2";
-  const oversHistory = match[activeInningsKey]?.history ?? [];
-  const currentOverNumber = oversHistory.at(-1)?.overNumber ?? 1;
-  const firstInningsOversPlayed = Math.max(
-    1,
-    Math.ceil(countLegalBalls(match.innings1.history) / 6)
-  );
-  const legalBalls = countLegalBalls(oversHistory);
-  const oversDone = legalBalls >= match.overs * 6;
-  const maxWickets = getTotalDismissalsAllowed(match);
-  const isAllOut = maxWickets > 0 && match.outs >= maxWickets;
-  const firstInningsComplete =
-    match.innings === "first" && (oversDone || isAllOut);
-  const matchFinished =
-    Boolean(match.result) || (match.innings === "second" && !match.isOngoing);
-  const showInningsEnd = firstInningsComplete || matchFinished;
   const controlsDisabled =
     isUpdating || showInningsEnd || Boolean(match.result) || tossPending;
   const showCompactUmpireWalkie = Boolean(
@@ -2631,6 +3238,11 @@ export default function MatchPageClient({
                 <div className="bg-green-900/50 text-green-300 p-4 rounded-xl text-center mb-4 ring-1 ring-green-500">
                   <h3 className="font-bold text-xl">Match Over</h3>
                   <p>{match.result}</p>
+                  {showPendingMatchOverCountdown && pendingStageCardCountdownLabel ? (
+                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-green-200/80">
+                      {pendingStageCardCountdownLabel}
+                    </p>
+                  ) : null}
                 </div>
               )}
               <MatchHeader
@@ -2836,7 +3448,7 @@ export default function MatchPageClient({
       </main>
       <OptionalFeatureBoundary label="Optional match tools unavailable right now.">
         <MatchModalLayer
-          showInningsEnd={showInningsEnd}
+          showInningsEnd={showVisibleInningsEndCard}
           match={match}
           modalType={modal.type}
           isUpdating={isUpdating}
@@ -2847,6 +3459,15 @@ export default function MatchPageClient({
                   enabled: entryScoreSoundEffectsEnabled,
                   onChange: setEntryScoreSoundEffectsEnabled,
                   onSave: handleEntryScoreSoundPromptSave,
+                }
+              : null
+          }
+          stageContinuePromptProps={
+            stageContinuePrompt
+              ? {
+                  mode: stageContinuePrompt.mode,
+                  onStay: () => setStageContinuePrompt(null),
+                  onForceContinue: handleForceContinuePastSpeech,
                 }
               : null
           }
@@ -2951,7 +3572,7 @@ export default function MatchPageClient({
           currentOverNumber={currentOverNumber}
           firstInningsOversPlayed={firstInningsOversPlayed}
           infoText={infoText}
-          onNext={handleNextInningsOrEnd}
+          onNext={handleProtectedNextInningsOrEnd}
           onUpdate={handleAnnouncedPatchUpdate}
           onImageUploaded={replaceMatch}
           onScoreEvent={handleAnnouncedScoreEvent}

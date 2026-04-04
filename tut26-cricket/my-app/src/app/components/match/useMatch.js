@@ -792,13 +792,13 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       setError(null);
       startNavigation("Opening toss...");
       router.replace(`/toss/${matchId}`);
-      return;
+      return null;
     }
 
     if (match.result && !match.isOngoing) {
       startNavigation("Opening result...");
       router.push(`/result/${matchId}`);
-      return;
+      return match;
     }
 
     const updatedMatch = await sendAction({
@@ -810,6 +810,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       startNavigation("Opening result...");
       router.push(`/result/${matchId}`);
     }
+    return updatedMatch || null;
   }, [hasAccess, match, matchId, router, sendAction, startNavigation, tossPending]);
 
   return {

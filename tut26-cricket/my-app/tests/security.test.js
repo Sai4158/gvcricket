@@ -47,6 +47,8 @@ import { countLegalBalls, buildWinByWicketsText } from "../src/app/lib/match-sco
 import {
   buildCurrentScoreAnnouncement,
   buildLiveScoreAnnouncementSequence,
+  buildUmpireSecondInningsStartSequence,
+  buildUmpireStageAnnouncement,
   buildUmpireAnnouncement,
   buildUmpireTapAnnouncement,
   createManualScoreAnnouncementLiveEvent,
@@ -1634,6 +1636,147 @@ test("umpire tap announcer keeps score-button speech short and direct", () => {
   assert.equal(buildUmpireTapAnnouncement(dotBallEvent, "simple"), "Dot ball.");
   assert.equal(buildUmpireTapAnnouncement(outEvent, "simple"), "Out.");
   assert.equal(buildUmpireTapAnnouncement(undoEvent, "simple"), "Undo.");
+});
+
+test("umpire stage announcer covers innings break and final result copy", () => {
+  const inningsBreakMatch = {
+    ...buildBaseMatch(),
+    innings: "first",
+    score: 48,
+    outs: 3,
+    innings1: {
+      team: "AGGAM",
+      score: 48,
+      outs: 3,
+      history: [],
+    },
+    innings2: {
+      team: "TEAM RED",
+      score: 0,
+      outs: 0,
+      history: [],
+    },
+    result: "",
+  };
+
+  assert.equal(
+    buildUmpireStageAnnouncement(inningsBreakMatch),
+    "First innings complete. Aggam posted 48 for 3. Target is 49. Team Red need 49 to win. Required rate is 24 point 5 runs per over. Good luck, Aggam and Team Red."
+  );
+
+  const matchOver = {
+    ...inningsBreakMatch,
+    innings: "second",
+    score: 50,
+    outs: 4,
+    result: "TEAM RED won by 2 wickets.",
+  };
+
+  assert.equal(
+    buildUmpireStageAnnouncement(matchOver),
+    "Match over. Congratulations Team Red. Team Red won by 2 wickets. Final score is 50 for 4."
+  );
+});
+
+test("spectator innings-change speech stays in sync with team-aware stage copy", () => {
+  const match = {
+    ...buildBaseMatch(),
+    innings: "second",
+    score: 0,
+    outs: 0,
+    overs: 2,
+    innings1: {
+      team: "AGGAM",
+      score: 26,
+      outs: 3,
+      history: [],
+    },
+    innings2: {
+      team: "TEAM RED",
+      score: 0,
+      outs: 0,
+      history: [],
+    },
+  };
+  const event = {
+    id: "evt-innings-change",
+    type: "innings_change",
+  };
+
+  assert.equal(
+    buildSpectatorAnnouncement(event, match, "full"),
+    "First innings complete. Aggam posted 26 for 3.",
+  );
+  assert.equal(
+    buildSpectatorScoreAnnouncement(event, match),
+    "Target is 27. Team Red need 27 to win. Required rate is 13 point 5 runs per over. Good luck, Aggam and Team Red.",
+  );
+});
+
+test("second innings start sequence announces target, rate, and team names", () => {
+  const secondInningsMatch = {
+    ...buildBaseMatch(),
+    innings: "second",
+    score: 0,
+    outs: 0,
+    innings1: {
+      team: "TEAM BLUE",
+      score: 42,
+      outs: 3,
+      history: [],
+    },
+    innings2: {
+      team: "AGGAM",
+      score: 0,
+      outs: 0,
+      history: [],
+    },
+    overs: 4,
+    result: "",
+  };
+
+  const sequence = buildUmpireSecondInningsStartSequence(secondInningsMatch);
+
+  assert.equal(sequence.priority, 4);
+  assert.deepEqual(
+    sequence.items.map((item) => item.text),
+    [
+      "Second innings starts now.",
+      "Team Blue posted 42 for 3.",
+      "Target is 43. Aggam need 43 to win. Required rate is 10 point 75 runs per over.",
+      "Good luck, Team Blue and Aggam.",
+    ]
+  );
+});
+
+test("second innings start sequence avoids awkward zero-zero rate speech", () => {
+  const secondInningsMatch = {
+    ...buildBaseMatch(),
+    innings: "second",
+    score: 0,
+    outs: 0,
+    innings1: {
+      team: "Team Blue",
+      score: 0,
+      outs: 0,
+      history: [],
+    },
+    innings2: {
+      team: "Team Red",
+      score: 0,
+      outs: 0,
+      history: [],
+    },
+    overs: 12,
+    result: "",
+  };
+
+  const sequence = buildUmpireSecondInningsStartSequence(secondInningsMatch);
+
+  assert.equal(
+    sequence.items[2]?.text,
+    "Target is 1. Team Red need 1 to win. Required rate is under 1 run per over.",
+  );
 });
 
 test("wide and no-ball extras use given wording in announcer text", () => {

@@ -265,6 +265,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
       : "",
   );
   const soundEffectPlaybackCutoffRef = useRef(0);
+  const pendingResultNavigationRef = useRef("");
   const router = useRouter();
   const { startNavigation } = useRouteFeedback();
   const sessionData = data?.session;
@@ -421,6 +422,39 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
     restorePageMedia(announcementDuckRef);
   }, []);
+
+  const hasSpectatorPlaybackInFlight = useCallback(
+    () =>
+      Boolean(
+        pendingSoundEffectTimerRef.current ||
+          soundEffectPlayingRef.current ||
+          activeBoundarySoundEffectRef.current ||
+          announcerStatus === "speaking",
+      ),
+    [announcerStatus],
+  );
+
+  const waitForSpectatorPlaybackToSettle = useCallback(
+    (timeoutMs = 6000) =>
+      new Promise((resolve) => {
+        const startedAt = Date.now();
+
+        const poll = () => {
+          if (
+            !hasSpectatorPlaybackInFlight() ||
+            Date.now() - startedAt >= timeoutMs
+          ) {
+            resolve();
+            return;
+          }
+
+          window.setTimeout(poll, 80);
+        };
+
+        poll();
+      }),
+    [hasSpectatorPlaybackInFlight],
+  );
 
   const resumeSpectatorAnnouncementsAfterSoundEffect = useCallback(() => {
     soundEffectPlayingRef.current = false;
@@ -1246,10 +1280,47 @@ export default function SessionViewClient({ sessionId, initialData }) {
   ]);
 
   useEffect(() => {
-    if (match?.result) {
-      router.push(`/result/${match._id}`);
+    if (!match?._id || !match?.result) {
+      pendingResultNavigationRef.current = "";
+      return undefined;
     }
-  }, [match, router]);
+
+    const targetPath = `/result/${match._id}`;
+    if (pendingResultNavigationRef.current === targetPath) {
+      return undefined;
+    }
+
+    pendingResultNavigationRef.current = targetPath;
+    let cancelled = false;
+
+    void (async () => {
+      if (
+        settings.enabled &&
+        settings.mode !== "silent" &&
+        hasSpectatorPlaybackInFlight()
+      ) {
+        await waitForSpectatorPlaybackToSettle();
+      }
+
+      if (cancelled || pendingResultNavigationRef.current !== targetPath) {
+        return;
+      }
+
+      router.push(targetPath);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    hasSpectatorPlaybackInFlight,
+    match?._id,
+    match?.result,
+    router,
+    settings.enabled,
+    settings.mode,
+    waitForSpectatorPlaybackToSettle,
+  ]);
 
   useEffect(() => {
     if (activePanel !== "mic") {

@@ -23,6 +23,7 @@ export default function MatchModalLayer({
   isUpdating,
   micMonitor,
   entryScoreSoundPromptProps,
+  stageContinuePromptProps,
   commentaryProps,
   walkieProps,
   currentOverNumber,
@@ -65,12 +66,47 @@ export default function MatchModalLayer({
 
   return (
     <AnimatePresence>
-      {showInningsEnd && <InningsEndModal match={match} onNext={onNext} />}
+      {showInningsEnd && (
+        <InningsEndModal key="innings-end" match={match} onNext={onNext} />
+      )}
+      {stageContinuePromptProps ? (
+        <ModalBase
+          key="stage-continue-prompt"
+          title="Please Wait"
+          onExit={stageContinuePromptProps.onStay}
+          panelClassName="max-w-sm"
+        >
+          <div className="space-y-4 text-center">
+            <div className="rounded-2xl border border-amber-300/12 bg-amber-500/[0.07] px-4 py-4">
+              <p className="text-sm font-semibold text-white">
+                Announcement is still continuing.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={stageContinuePromptProps.onForceContinue}
+                className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
+              >
+                Force Continue
+              </button>
+              <button
+                type="button"
+                onClick={stageContinuePromptProps.onStay}
+                className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black transition hover:bg-emerald-400"
+              >
+                Stay
+              </button>
+            </div>
+          </div>
+        </ModalBase>
+      ) : null}
       {modalType === "history" && (
-        <HistoryModal match={match} onClose={onClose} />
+        <HistoryModal key="history" match={match} onClose={onClose} />
       )}
       {modalType === "editTeams" && (
         <EditTeamsModal
+          key="edit-teams"
           match={match}
           onUpdate={onUpdate}
           onClose={onClose}
@@ -79,6 +115,7 @@ export default function MatchModalLayer({
       )}
       {modalType === "out" && (
         <RunInputModal
+          key="out"
           title="OUT"
           onConfirm={(runs) => {
             onScoreEvent(runs, true);
@@ -89,6 +126,7 @@ export default function MatchModalLayer({
       )}
       {modalType === "noball" && (
         <RunInputModal
+          key="noball"
           title="No Ball"
           onConfirm={(runs) => {
             onScoreEvent(runs, false, "noball");
@@ -99,6 +137,7 @@ export default function MatchModalLayer({
       )}
       {modalType === "wide" && (
         <RunInputModal
+          key="wide"
           title="Wide"
           onConfirm={(runs) => {
             onScoreEvent(runs, false, "wide");
@@ -109,6 +148,7 @@ export default function MatchModalLayer({
       )}
       {modalType === "editOvers" && (
         <EditOversModal
+          key="edit-overs"
           currentOvers={match.overs}
           currentLegalBalls={countLegalBalls(
             match[match.innings === "second" ? "innings2" : "innings1"]
@@ -129,6 +169,7 @@ export default function MatchModalLayer({
       )}
       {modalType === "image" && (
         <OptionalFeatureBoundary
+          key="image"
           fallback={modalFallback("Image unavailable right now.")}
         >
           <MatchImageModal
@@ -140,6 +181,7 @@ export default function MatchModalLayer({
       )}
       {modalType === "commentary" && commentaryProps ? (
         <OptionalFeatureBoundary
+          key="commentary"
           fallback={modalFallback("Commentary controls unavailable right now.")}
         >
           <ModalBase title="" onExit={onClose} hideHeader>
@@ -149,6 +191,7 @@ export default function MatchModalLayer({
       ) : null}
       {modalType === "walkie" && walkieProps ? (
         <OptionalFeatureBoundary
+          key="walkie"
           fallback={modalFallback("Walkie unavailable right now.")}
         >
           <ModalBase title="Walkie-Talkie" onExit={onClose}>
@@ -158,6 +201,7 @@ export default function MatchModalLayer({
       ) : null}
       {modalType === "mic" && (
         <OptionalFeatureBoundary
+          key="mic"
           fallback={modalFallback("Live mic unavailable right now.")}
         >
           <LiveMicModal
@@ -167,9 +211,12 @@ export default function MatchModalLayer({
           />
         </OptionalFeatureBoundary>
       )}
-      {modalType === "rules" && <RulesModal onClose={onClose} />}
+      {modalType === "rules" && (
+        <RulesModal key="rules" onClose={onClose} />
+      )}
       {modalType === "entryScoreSoundEffects" && entryScoreSoundPromptProps ? (
         <ModalBase
+          key="entry-score-sound-effects"
           title=""
           onExit={() => {}}
           hideHeader
@@ -221,7 +268,7 @@ export default function MatchModalLayer({
         </ModalBase>
       ) : null}
       {infoText && (
-        <ModalBase title="Rule Info" onExit={onInfoClose}>
+        <ModalBase key="rule-info" title="Rule Info" onExit={onInfoClose}>
           <p className="text-center text-zinc-300">{infoText}</p>
         </ModalBase>
       )}

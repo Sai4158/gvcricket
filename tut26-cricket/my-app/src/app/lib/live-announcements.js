@@ -5,12 +5,156 @@ function safeNumber(value) {
   return Number(value || 0);
 }
 
+function normalizeSpeechToken(token) {
+  const safeToken = String(token || "");
+  const match = safeToken.match(/^([^A-Za-z0-9]*)([A-Za-z0-9][A-Za-z0-9'-]*)([^A-Za-z0-9]*)$/);
+  if (!match) {
+    return safeToken;
+  }
+
+  const [, prefix, core, suffix] = match;
+  const normalizedCore = core
+    .split(/([-'])/)
+    .map((part) => {
+      if (!/^[A-Z]{3,}$/.test(part) || !/[AEIOUY]/.test(part)) {
+        return part;
+      }
+
+      return `${part.charAt(0)}${part.slice(1).toLowerCase()}`;
+    })
+    .join("");
+
+  return `${prefix}${normalizedCore}${suffix}`;
+}
+
+function normalizeSpeechName(value) {
+  const safeValue = String(value || "").trim().replace(/\s+/g, " ");
+  if (!safeValue) {
+    return "";
+  }
+
+  return safeValue
+    .split(" ")
+    .map((part) => normalizeSpeechToken(part))
+    .join(" ");
+}
+
+function normalizeSpeechResultText(resultText) {
+  const result = String(resultText || "").trim();
+  if (!result) {
+    return "";
+  }
+
+  const winnerMatch = result.match(/^(.+?) won by (.+)\.$/i);
+  if (!winnerMatch) {
+    return result;
+  }
+
+  const [, winnerName, margin] = winnerMatch;
+  return `${normalizeSpeechName(winnerName)} won by ${margin}.`;
+}
+
 function pluralizeRuns(value) {
   return `${value} run${value === 1 ? "" : "s"}`;
 }
 
 function scoreLine(score, outs) {
   return `${score} for ${outs}`;
+}
+
+function buildRequiredRateAnnouncementLine(target, overs) {
+  const safeTarget = safeNumber(target);
+  const safeOvers = safeNumber(overs);
+  if (safeTarget <= 0 || safeOvers <= 0) {
+    return "";
+  }
+
+  const requiredRate = safeTarget / safeOvers;
+  if (!Number.isFinite(requiredRate) || requiredRate <= 0) {
+    return "";
+  }
+
+  if (requiredRate < 1) {
+    return "Required rate is under 1 run per over.";
+  }
+
+  const roundedRate = Math.round(requiredRate * 100) / 100;
+  const fixedRate = roundedRate.toFixed(2);
+  const [wholePart, decimalPart = ""] = fixedRate.split(".");
+
+  if (decimalPart === "00") {
+    return `Required rate is ${wholePart} ${
+      wholePart === "1" ? "run" : "runs"
+    } per over.`;
+  }
+
+  const trimmedDecimal = decimalPart.replace(/0+$/, "");
+  return `Required rate is ${wholePart} point ${trimmedDecimal} runs per over.`;
+}
+
+function formatOversForAnnouncement(legalBalls) {
+  const safeBalls = safeNumber(legalBalls);
+  if (safeBalls <= 0) {
+    return "";
+  }
+
+  const overs = Math.floor(safeBalls / 6);
+  const balls = safeBalls % 6;
+
+  if (overs <= 0) {
+    return `${balls} ball${balls === 1 ? "" : "s"}`;
+  }
+
+  if (balls === 0) {
+    return `${overs} over${overs === 1 ? "" : "s"}`;
+  }
+
+  return `${overs} over${overs === 1 ? "" : "s"} and ${balls} ball${
+    balls === 1 ? "" : "s"
+  }`;
+}
+
+function buildUmpireFirstInningsTransitionDetails(match) {
+  if (!match) {
+    return {
+      firstInningsTeam: "Innings 1",
+      secondInningsTeam: "The chasing side",
+      scoreLineText: "",
+      oversLine: "",
+      targetLine: "",
+      chaseLine: "",
+      requiredRateLine: "",
+      goodLuckLine: "Good luck to both teams.",
+    };
+  }
+
+  const firstInningsTeam =
+    normalizeSpeechName(match?.innings1?.team) || "Innings 1";
+  const secondInningsTeam =
+    normalizeSpeechName(match?.innings2?.team) || "The chasing side";
+  const firstInningsScore = safeNumber(match?.innings1?.score ?? match?.score);
+  const firstInningsOuts = safeNumber(match?.innings1?.outs ?? match?.outs);
+  const target = firstInningsScore + 1;
+  const inningsHistory = match?.innings1?.history ?? [];
+  const oversSummary = formatOversForAnnouncement(countLegalBalls(inningsHistory));
+  const goodLuckLine =
+    firstInningsTeam && secondInningsTeam
+      ? `Good luck, ${firstInningsTeam} and ${secondInningsTeam}.`
+      : "Good luck to both teams.";
+
+  return {
+    firstInningsTeam,
+    secondInningsTeam,
+    scoreLineText: `${firstInningsTeam} posted ${scoreLine(
+      firstInningsScore,
+      firstInningsOuts,
+    )}.`,
+    oversLine: oversSummary ? `They batted for ${oversSummary}.` : "",
+    targetLine: `Target is ${target}.`,
+    chaseLine: `${secondInningsTeam} need ${target} to win.`,
+    requiredRateLine: buildRequiredRateAnnouncementLine(target, match?.overs),
+    goodLuckLine,
+  };
 }
 
 function getActiveInningsKey(match) {
@@ -315,16 +459,16 @@ function buildResultLine(resultText) {
   const result = String(resultText || "").trim();
   if (!result) return "";
   const winnerMatch = result.match(/^(.+?) won by (.+)\.$/i);
-  if (!winnerMatch) return result;
+  if (!winnerMatch) return normalizeSpeechResultText(result);
   const [, winnerName, margin] = winnerMatch;
-  return `${winnerName} wins by ${margin}.`;
+  return `${normalizeSpeechName(winnerName)} wins by ${margin}.`;
 }
 
 function getWinnerName(resultText) {
   const result = String(resultText || "").trim();
   if (!result) return "";
   const winnerMatch = result.match(/^(.+?) won by /i);
-  return winnerMatch ? winnerMatch[1] : "";
+  return winnerMatch ? normalizeSpeechName(winnerMatch[1]) : "";
 }
 
 function buildWinnerCelebrationLine(resultText) {
@@ -392,19 +536,13 @@ export function buildSpectatorScoreAnnouncement(event, match) {
   }
 
   if (event.type === "innings_change") {
-    const target = safeNumber(match?.innings1?.score) + 1;
-    const runsNeeded = Math.max(0, target - safeNumber(match?.score));
-    const requiredRate =
-      safeNumber(match?.overs) > 0
-        ? (target / safeNumber(match?.overs)).toFixed(2)
-        : "0.00";
+    const transition = buildUmpireFirstInningsTransitionDetails(match);
 
     return [
-      runsNeeded > 0
-        ? `${runsNeeded} runs needed from ${formatRemainingOvers(match)}.`
-        : "",
-      `Required rate is ${requiredRate} per over.`,
-      "Best of luck to both teams.",
+      transition.targetLine,
+      transition.chaseLine,
+      transition.requiredRateLine,
+      transition.goodLuckLine,
     ]
       .filter(Boolean)
       .join(" ");
@@ -612,18 +750,12 @@ export function buildSpectatorAnnouncement(event, match, mode = "full") {
   }
 
   if (event.type === "innings_change") {
-    const firstInningsTeam = match?.innings1?.team || "Innings 1";
-    const chaseTeam = match?.innings2?.team || getBattingTeamBundle(match).name;
-    const firstInningsScore = scoreLine(
-      safeNumber(match?.innings1?.score),
-      safeNumber(match?.innings1?.outs),
-    );
-    const target = safeNumber(match?.innings1?.score) + 1;
+    const transition = buildUmpireFirstInningsTransitionDetails(match);
 
     return [
       "First innings complete.",
-      `${firstInningsTeam} finished on ${firstInningsScore}.`,
-      `${chaseTeam} needs ${target} to win.`,
+      transition.scoreLineText,
+      transition.oversLine,
     ]
       .filter(Boolean)
       .join(" ");
@@ -739,6 +871,99 @@ export function buildCurrentScoreAnnouncement(match) {
   parts.push(buildCurrentOverRemainingLine(match));
 
   return parts.join(" ");
+}
+
+export function buildUmpireStageAnnouncement(match) {
+  if (!match) {
+    return "";
+  }
+
+  if (match.result) {
+    const winnerName = getWinnerName(match.result);
+
+    return [
+      "Match over.",
+      winnerName ? `Congratulations ${winnerName}.` : "",
+      normalizeSpeechResultText(match.result),
+      `Final score is ${scoreLine(safeNumber(match.score), safeNumber(match.outs))}.`,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  if (match.innings !== "first") {
+    return "";
+  }
+
+  const transition = buildUmpireFirstInningsTransitionDetails(match);
+
+  return [
+    "First innings complete.",
+    transition.scoreLineText,
+    transition.oversLine,
+    transition.targetLine,
+    transition.chaseLine,
+    transition.requiredRateLine,
+    transition.goodLuckLine,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+export function buildUmpireSecondInningsStartSequence(match) {
+  if (!match || match.innings !== "second") {
+    return {
+      items: [],
+      priority: 0,
+      restoreAfterMs: 0,
+    };
+  }
+
+  const transition = buildUmpireFirstInningsTransitionDetails({
+    ...match,
+    innings2: {
+      ...(match?.innings2 || {}),
+      team:
+        match?.innings2?.team ||
+        getBattingTeamBundle(match).name ||
+        "The batting team",
+    },
+  });
+
+  return {
+    items: [
+      {
+        text: "Second innings starts now.",
+        pauseAfterMs: 120,
+        rate: 0.81,
+      },
+      {
+        text: [transition.scoreLineText, transition.oversLine]
+          .filter(Boolean)
+          .join(" "),
+        pauseAfterMs: 160,
+        rate: 0.79,
+      },
+      {
+        text: [ 
+          transition.targetLine,
+          transition.chaseLine,
+          transition.requiredRateLine,
+        ]
+          .filter(Boolean)
+          .join(" "),
+        pauseAfterMs: 0,
+        rate: 0.79,
+      },
+      {
+        text: transition.goodLuckLine,
+        pauseAfterMs: 0,
+        rate: 0.8,
+      },
+    ],
+    priority: 4,
+    restoreAfterMs: 3600,
+  };
 }
 
 export function buildUmpireAnnouncement(event, mode = "simple") {
