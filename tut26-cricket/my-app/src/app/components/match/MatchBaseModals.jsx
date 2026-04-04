@@ -40,6 +40,8 @@ export function ModalBase({
   title,
   onExit,
   hideHeader = false,
+  closeOnBackdrop = true,
+  showCloseButton = Boolean(!hideHeader && onExit),
   panelClassName = "",
   bodyClassName = "",
 }) {
@@ -65,7 +67,7 @@ export function ModalBase({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onExit}
+      onClick={closeOnBackdrop && onExit ? onExit : undefined}
     >
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
@@ -87,7 +89,7 @@ export function ModalBase({
         <div className={bodyClasses}>
           {children}
         </div>
-        {!hideHeader ? (
+        {!hideHeader && showCloseButton ? (
           <button
             onClick={onExit}
             className="press-feedback absolute right-3 top-3 z-20 rounded-full p-2 text-zinc-500 transition-colors hover:text-white"
@@ -259,7 +261,9 @@ export function InningsEndModal({ match, onNext }) {
   return (
     <ModalBase
       title={match.result ? "Match Over" : "Innings Over"}
-      onExit={onNext}
+      onExit={undefined}
+      closeOnBackdrop={false}
+      showCloseButton={false}
       panelClassName="max-w-md"
     >
       <div className="relative overflow-hidden rounded-[28px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_26%),linear-gradient(180deg,rgba(18,18,24,0.98),rgba(9,10,14,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">

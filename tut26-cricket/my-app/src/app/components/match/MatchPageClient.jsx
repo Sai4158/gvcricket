@@ -1281,13 +1281,17 @@ export default function MatchPageClient({
     return randomPool[Math.floor(Math.random() * randomPool.length)] || null;
   }, [getAvailableScoreSoundEffectPool]);
 
-  const findConfiguredScoreSoundEffect = useCallback((runs, isOut = false, extraType = null) => {
+  const findConfiguredScoreSoundEffectFromMap = useCallback((
+    configuredMap,
+    runs,
+    isOut = false,
+    extraType = null,
+  ) => {
     const effectKey = getScoreSoundEffectEventKey(runs, isOut, extraType);
     if (!effectKey) {
       return null;
     }
 
-    const configuredMap = umpireSettings.scoreSoundEffectMap || {};
     const configuredEffectId =
       typeof configuredMap?.[effectKey] === "string" ? configuredMap[effectKey] : "";
     const effectId = String(configuredEffectId || "").trim();
@@ -1308,7 +1312,16 @@ export default function MatchPageClient({
         ? IPL_HORN_EFFECT
         : buildFallbackSoundEffectFromId(effectId))
     );
-  }, [pickRandomScoreSoundEffect, soundEffectFiles, umpireSettings.scoreSoundEffectMap]);
+  }, [pickRandomScoreSoundEffect, soundEffectFiles]);
+
+  const findConfiguredScoreSoundEffect = useCallback((runs, isOut = false, extraType = null) => (
+    findConfiguredScoreSoundEffectFromMap(
+      umpireSettings.scoreSoundEffectMap || {},
+      runs,
+      isOut,
+      extraType,
+    )
+  ), [findConfiguredScoreSoundEffectFromMap, umpireSettings.scoreSoundEffectMap]);
 
   const announceConfiguredScoreFollowUp = useCallback((followUpItems = []) => {
     if (!umpireSettings.enabled || umpireSettings.mode === "silent" || !followUpItems.length) {
@@ -1806,9 +1819,63 @@ export default function MatchPageClient({
     });
   }, []);
 
+  const hydrateRemoteScoreSoundEffectMap = useCallback(async () => {
+    if (!matchId) {
+      return normalizeScoreSoundEffectMap(
+        currentScoreSoundEffectMapRef.current || {},
+      );
+    }
+
+    try {
+      const response = await fetch(`/api/matches/${matchId}/announcer-settings`, {
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const payload = await response.json().catch(() => null);
+      const remoteScoreSoundEffectMap = normalizeScoreSoundEffectMap(
+        payload?.scoreSoundEffectMap || {},
+      );
+      const remoteSignature =
+        getScoreSoundEffectMapSignature(remoteScoreSoundEffectMap);
+
+      lastPersistedScoreSoundEffectMapRef.current = remoteSignature;
+      if (
+        scoreSoundEffectMapDirtyRef.current &&
+        remoteSignature === currentScoreSoundEffectMapSignatureRef.current
+      ) {
+        scoreSoundEffectMapDirtyRef.current = false;
+      } else if (
+        shouldHydrateScoreSoundEffectMapFromRemote(
+          remoteScoreSoundEffectMap,
+          currentScoreSoundEffectMapSignatureRef.current,
+          scoreSoundEffectMapDirtyRef.current,
+        )
+      ) {
+        updateUmpireSetting("scoreSoundEffectMap", remoteScoreSoundEffectMap);
+      }
+
+      return remoteScoreSoundEffectMap;
+    } catch {
+      return null;
+    }
+  }, [matchId, updateUmpireSetting]);
+
   const resolveConfiguredScoreSoundEffect = useCallback(
     async (runs, isOut = false, extraType = null) => {
-      let nextEffect = findConfiguredScoreSoundEffect(runs, isOut, extraType);
+      let configuredMap = umpireSettings.scoreSoundEffectMap || {};
+      let nextEffect = findConfiguredScoreSoundEffectFromMap(
+        configuredMap,
+        runs,
+        isOut,
+        extraType,
+      );
       if (nextEffect) {
         return nextEffect;
       }
@@ -1818,25 +1885,61 @@ export default function MatchPageClient({
         return null;
       }
 
-      const configuredEffectId = String(
-        umpireSettings.scoreSoundEffectMap?.[effectKey] || "",
-      ).trim();
+      let configuredEffectId = String(configuredMap?.[effectKey] || "").trim();
+      if (!configuredEffectId && authStatus === "granted") {
+        const remoteScoreSoundEffectMap =
+          await hydrateRemoteScoreSoundEffectMap();
+        if (remoteScoreSoundEffectMap) {
+          configuredMap = remoteScoreSoundEffectMap;
+          configuredEffectId = String(
+            remoteScoreSoundEffectMap?.[effectKey] || "",
+          ).trim();
+          nextEffect = findConfiguredScoreSoundEffectFromMap(
+            configuredMap,
+            runs,
+            isOut,
+            extraType,
+          );
+          if (nextEffect) {
+            return nextEffect;
+          }
+        }
+      }
+
       if (!configuredEffectId) {
         return null;
       }
 
-      if (configuredEffectId === RANDOM_SCORE_EFFECT_ID) {
-        return findConfiguredScoreSoundEffect(runs, isOut, extraType);
+      if (
+        configuredEffectId === RANDOM_SCORE_EFFECT_ID ||
+        !soundEffectFiles.length
+      ) {
+        try {
+          await loadSoundEffectsLibrary({ silent: true });
+        } catch {
+          // Fall back to the direct file source below if library warm-up fails.
+        }
+        nextEffect = findConfiguredScoreSoundEffectFromMap(
+          configuredMap,
+          runs,
+          isOut,
+          extraType,
+        );
+        if (nextEffect) {
+          return nextEffect;
+        }
       }
 
-      if (configuredEffectId === IPL_HORN_EFFECT.id) {
-        return IPL_HORN_EFFECT;
-      }
-
-      return nextEffect;
+      return configuredEffectId === IPL_HORN_EFFECT.id
+        ? IPL_HORN_EFFECT
+        : buildFallbackSoundEffectFromId(configuredEffectId);
     },
     [
-      findConfiguredScoreSoundEffect,
+      authStatus,
+      findConfiguredScoreSoundEffectFromMap,
+      hydrateRemoteScoreSoundEffectMap,
+      loadSoundEffectsLibrary,
+      soundEffectFiles.length,
       umpireSettings.scoreSoundEffectMap,
     ],
   );
@@ -2606,43 +2709,11 @@ export default function MatchPageClient({
 
     void (async () => {
       try {
-        const response = await fetch(`/api/matches/${matchId}/announcer-settings`, {
-          cache: "no-store",
-          headers: {
-            Accept: "application/json",
-          },
-        });
-
-        if (!response.ok) {
-          return;
-        }
-
-        const payload = await response.json().catch(() => null);
-        const remoteScoreSoundEffectMap = normalizeScoreSoundEffectMap(
-          payload?.scoreSoundEffectMap || {}
-        );
-        const remoteSignature =
-          getScoreSoundEffectMapSignature(remoteScoreSoundEffectMap);
-
         if (cancelled) {
           return;
         }
 
-        lastPersistedScoreSoundEffectMapRef.current = remoteSignature;
-        if (
-          scoreSoundEffectMapDirtyRef.current &&
-          remoteSignature === currentScoreSoundEffectMapSignatureRef.current
-        ) {
-          scoreSoundEffectMapDirtyRef.current = false;
-        } else if (
-          shouldHydrateScoreSoundEffectMapFromRemote(
-            remoteScoreSoundEffectMap,
-            currentScoreSoundEffectMapSignatureRef.current,
-            scoreSoundEffectMapDirtyRef.current,
-          )
-        ) {
-          updateUmpireSetting("scoreSoundEffectMap", remoteScoreSoundEffectMap);
-        }
+        await hydrateRemoteScoreSoundEffectMap();
       } catch {
         // Keep local settings and fall back to the next save.
       } finally {
@@ -2658,10 +2729,10 @@ export default function MatchPageClient({
     };
   }, [
     authStatus,
+    hydrateRemoteScoreSoundEffectMap,
     match?._id,
     matchId,
     queueScoreSoundEffectMapSave,
-    updateUmpireSetting,
   ]);
 
   useEffect(() => {
@@ -2746,6 +2817,18 @@ export default function MatchPageClient({
   const showPendingMatchOverCountdown = Boolean(
     match?.result && showInningsEnd && !showVisibleInningsEndCard,
   );
+
+  useEffect(() => {
+    if (!showInningsEnd) {
+      return;
+    }
+
+    setModal((current) =>
+      current.type === ENTRY_SCORE_SOUND_EFFECTS_MODAL
+        ? { type: null }
+        : current,
+    );
+  }, [showInningsEnd]);
 
   const getEstimatedConfiguredScoreEffectDurationMs = useCallback(
     (effectId = "") => {
