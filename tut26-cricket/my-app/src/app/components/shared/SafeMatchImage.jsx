@@ -38,8 +38,9 @@ export default function SafeMatchImage({
 
   const shouldBypassOptimization =
     imageProps.unoptimized ??
-    (imageSrc !== GV_MATCH_FALLBACK_IMAGE &&
-      (isSafeRemoteMatchImageUrl(imageSrc) || isSafeMatchImageUrl(imageSrc)));
+    (imageSrc === GV_MATCH_FALLBACK_IMAGE ||
+      (imageSrc !== GV_MATCH_FALLBACK_IMAGE &&
+        (isSafeRemoteMatchImageUrl(imageSrc) || isSafeMatchImageUrl(imageSrc))));
 
   return (
     <Image

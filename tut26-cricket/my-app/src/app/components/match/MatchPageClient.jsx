@@ -2599,10 +2599,6 @@ export default function MatchPageClient({
       return;
     }
 
-    if (!hasWalkieAudience) {
-      return;
-    }
-
     const prepared = await walkie.prepareToTalk();
     if (prepared === false) {
       return;
@@ -3292,7 +3288,6 @@ export default function MatchPageClient({
   const canGridHoldWalkie = Boolean(
     isLiveMatch &&
       walkie.snapshot?.enabled &&
-      hasWalkieAudience &&
       !umpireRemoteSpeakerState.isRemoteTalking
   );
   const canGridHoldMic = Boolean(
@@ -3367,7 +3362,7 @@ export default function MatchPageClient({
                   quickTalkEnabled={Boolean(
                     !umpireRemoteSpeakerState.isRemoteTalking &&
                       (
-                        hasWalkieAudience ||
+                        walkie.snapshot?.enabled ||
                         walkie.claiming ||
                         walkie.preparingToTalk ||
                         walkie.isSelfTalking ||

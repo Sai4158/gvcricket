@@ -37,6 +37,7 @@ export default function SiteFooter({
           width={220}
           height={220}
           priority={false}
+          unoptimized
           className="h-auto w-[150px] object-contain drop-shadow-[0_16px_40px_rgba(0,0,0,0.42)] sm:w-[180px]"
         />
       </HomeScrollFade>

@@ -54,8 +54,9 @@ export default function NotFound() {
           <Image
             src="/gvLogo.png"
             alt="GV Cricket"
-            width={1800}
-            height={1800}
+            width={560}
+            height={560}
+            unoptimized
             className="mx-auto h-[22rem] w-[22rem] object-contain drop-shadow-[0_0_42px_rgba(220,38,38,0.2)] sm:h-[28rem] sm:w-[28rem]"
             priority
           />
