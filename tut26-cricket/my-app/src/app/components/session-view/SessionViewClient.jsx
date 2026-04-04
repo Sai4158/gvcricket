@@ -125,6 +125,29 @@ function PaMicSpeakerIcon() {
   );
 }
 
+function getSessionStreamPayloadSignature(payload) {
+  const session = payload?.session || null;
+  const match = payload?.match || null;
+  const liveEvent = match?.lastLiveEvent || null;
+
+  return JSON.stringify([
+    payload?.updatedAt || "",
+    session?._id || "",
+    session?.updatedAt || "",
+    match?._id || "",
+    match?.updatedAt || "",
+    match?.innings || "",
+    match?.score ?? "",
+    match?.outs ?? "",
+    match?.result || "",
+    match?.lastEventType || "",
+    liveEvent?.id || "",
+    liveEvent?.type || "",
+    liveEvent?.createdAt || "",
+    Array.isArray(match?.balls) ? match.balls.length : 0,
+  ]);
+}
+
 function IosGlassSwitch({ checked, onChange, label, disabled = false }) {
   return (
     <button
@@ -245,7 +268,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const walkiePreferenceHydratingRef = useRef(false);
   const initialWalkieStateResolvedRef = useRef(false);
   const micPrepareRequestedRef = useRef(false);
-  const lastStreamUpdateRef = useRef(initialData?.updatedAt || "");
+  const lastStreamPayloadSignatureRef = useRef(
+    getSessionStreamPayloadSignature(initialData),
+  );
   const announcerAutoEnabledMatchRef = useRef("");
   const announcerInitialSummaryRef = useRef("");
   const announcerGestureReplayRef = useRef("");
@@ -264,7 +289,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
       ? initialData.match.lastLiveEvent.id || ""
       : "",
   );
-  const soundEffectPlaybackCutoffRef = useRef(0);
   const pendingResultNavigationRef = useRef("");
   const router = useRouter();
   const { startNavigation } = useRouteFeedback();
@@ -297,14 +321,12 @@ export default function SessionViewClient({ sessionId, initialData }) {
     event: "session",
     enabled: Boolean(sessionId),
     onMessage: (payload) => {
-      if (
-        payload.updatedAt &&
-        payload.updatedAt === lastStreamUpdateRef.current
-      ) {
+      const nextPayloadSignature = getSessionStreamPayloadSignature(payload);
+      if (nextPayloadSignature === lastStreamPayloadSignatureRef.current) {
         return;
       }
 
-      lastStreamUpdateRef.current = payload.updatedAt || "";
+      lastStreamPayloadSignatureRef.current = nextPayloadSignature;
       setData(payload);
       setStreamError("");
     },
@@ -333,10 +355,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
     autoConnectAudio: spectatorWalkieEnabled,
     signalingActive: spectatorWalkieSignalActive,
   });
-
-  useEffect(() => {
-    soundEffectPlaybackCutoffRef.current = Date.now();
-  }, []);
 
   const speakSequenceWithDuck = useCallback(
     (items, options = {}, restoreAfterMs = 2600) => {
@@ -1000,13 +1018,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
 
     lastHandledSoundEffectEventRef.current = liveEvent.id;
-    const createdAtMs = Date.parse(String(liveEvent.createdAt || ""));
-    if (
-      Number.isFinite(createdAtMs) &&
-      createdAtMs < soundEffectPlaybackCutoffRef.current
-    ) {
-      return;
-    }
     if (
       liveEvent.trigger === "score_boundary" &&
       settings.playScoreSoundEffects === false

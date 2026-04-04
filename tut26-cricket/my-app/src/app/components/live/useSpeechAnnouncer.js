@@ -564,8 +564,8 @@ function getSpeechProfile(voice, options, platform) {
 
   const defaultRate = isIOSSafari
     ? isAppleNatural
-      ? 0.74
-      : 0.73
+      ? 0.7
+      : 0.69
     : isAppleNatural
       ? 0.8
       : isGoogleNatural
@@ -583,6 +583,12 @@ function getSpeechProfile(voice, options, platform) {
   const safeRequestedRate = Number.isFinite(requestedRate)
     ? requestedRate
     : null;
+  const normalizedRequestedRate =
+    safeRequestedRate === null
+      ? null
+      : isIOSSafari
+        ? safeRequestedRate * 0.88
+        : safeRequestedRate;
   const requestedPitch = Number(options.pitch);
   const safeRequestedPitch = Number.isFinite(requestedPitch)
     ? requestedPitch
@@ -592,7 +598,7 @@ function getSpeechProfile(voice, options, platform) {
     ? requestedVolume
     : null;
   const maxRate = isIOSSafari
-    ? 0.78
+    ? 0.72
     : isGoogleNatural
       ? 0.82
       : isMicrosoftNatural
@@ -603,9 +609,9 @@ function getSpeechProfile(voice, options, platform) {
             ? 0.78
             : 0.82;
   const effectiveRate =
-    safeRequestedRate === null
+    normalizedRequestedRate === null
       ? defaultRate
-      : Math.min(safeRequestedRate, maxRate);
+      : Math.min(normalizedRequestedRate, maxRate);
 
   return {
     rate: effectiveRate || defaultRate,
