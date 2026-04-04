@@ -263,7 +263,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const previousEnabledRef = useRef(false);
   const previousWalkieEnabledRef = useRef(false);
   const previousWalkieRequestStateRef = useRef("idle");
-  const lastWalkieSpeakerAnnouncementRef = useRef("");
   const walkiePreferenceScopeRef = useRef(initialWalkiePreferenceScope);
   const walkiePreferenceHydratingRef = useRef(false);
   const initialWalkieStateResolvedRef = useRef(false);
@@ -320,6 +319,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     url: sessionId ? `/api/live/sessions/${sessionId}` : null,
     event: "session",
     enabled: Boolean(sessionId),
+    disconnectWhenHidden: false,
     onMessage: (payload) => {
       const nextPayloadSignature = getSessionStreamPayloadSignature(payload);
       if (nextPayloadSignature === lastStreamPayloadSignatureRef.current) {
@@ -1246,50 +1246,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
   });
 
   useEffect(() => {
-    const transmissionId = String(walkie.snapshot?.transmissionId || "");
-    const isRemoteUmpireTalking = Boolean(
-      spectatorWalkieEnabled &&
-        walkie.snapshot?.enabled &&
-        walkieRemoteSpeakerState.isRemoteTalking &&
-        walkie.snapshot?.activeSpeakerRole === "umpire" &&
-        transmissionId,
-    );
-
-    if (!isRemoteUmpireTalking) {
-      return;
-    }
-
-    if (lastWalkieSpeakerAnnouncementRef.current === transmissionId) {
-      return;
-    }
-
-    lastWalkieSpeakerAnnouncementRef.current = transmissionId;
-    speakSequenceWithDuck(
-      [
-        {
-          text: "Umpire wants to talk.",
-          pauseAfterMs: 0,
-          rate: 0.9,
-        },
-      ],
-      {
-        key: `spectator-walkie-speaker-${transmissionId}`,
-        priority: 5,
-        interrupt: true,
-        ignoreEnabled: true,
-      },
-      900,
-    );
-  }, [
-    speakSequenceWithDuck,
-    spectatorWalkieEnabled,
-    walkie.snapshot?.enabled,
-    walkie.snapshot?.activeSpeakerRole,
-    walkie.snapshot?.transmissionId,
-    walkieRemoteSpeakerState.isRemoteTalking,
-  ]);
-
-  useEffect(() => {
     if (!match?._id || !match?.result) {
       pendingResultNavigationRef.current = "";
       return undefined;
@@ -1760,10 +1716,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const walkiePendingRequest = Boolean(walkieUi.pendingRequest);
   const walkieNeedsLocalEnableNotice = Boolean(walkieUi.needsLocalEnableNotice);
   const walkieLoading = Boolean(
-    walkie.preparingToTalk ||
-    walkie.claiming ||
     walkie.recoveringAudio ||
-    walkie.recoveringSignaling,
+    walkie.recoveringSignaling ||
+    (!walkie.talkPathPrimed &&
+      (walkie.preparingToTalk || walkie.claiming)),
   );
   const speakerCardTalking =
     quickSpeakerTalking || (micMonitor.isActive && !micMonitor.isPaused);
@@ -2453,6 +2409,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
               canEnable={false}
               canRequestEnable={walkie.canRequestEnable}
               canTalk={walkie.canTalk}
+              talkPathPrimed={walkie.talkPathPrimed}
               claiming={walkie.claiming}
               preparingToTalk={walkie.preparingToTalk}
               updatingEnabled={walkie.updatingEnabled}

@@ -5,6 +5,7 @@ const WalkieParticipantSchema = new mongoose.Schema(
     id: { type: String, required: true },
     role: { type: String, enum: ["umpire", "spectator", "director"], required: true },
     name: { type: String, default: "", trim: true },
+    ready: { type: Boolean, default: true },
     connectedAt: { type: Date, default: Date.now },
     lastSeenAt: { type: Date, default: Date.now },
   },

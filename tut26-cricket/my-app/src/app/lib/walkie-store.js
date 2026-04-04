@@ -50,6 +50,7 @@ function participantView(participant) {
     id: participant.id,
     role: participant.role,
     name: participant.name,
+    ready: participant.ready !== false,
     connectedAt: participant.connectedAt instanceof Date
       ? participant.connectedAt.toISOString()
       : new Date(participant.connectedAt).toISOString(),
@@ -59,9 +60,10 @@ function participantView(participant) {
 function buildSnapshot(doc) {
   const participants = Array.isArray(doc.participants) ? doc.participants : [];
   const pendingRequests = Array.isArray(doc.pendingRequests) ? doc.pendingRequests : [];
-  const spectators = participants.filter((item) => item.role === "spectator");
-  const umpires = participants.filter((item) => item.role === "umpire");
-  const directors = participants.filter((item) => item.role === "director");
+  const readyParticipants = participants.filter((item) => item.ready !== false);
+  const spectators = readyParticipants.filter((item) => item.role === "spectator");
+  const umpires = readyParticipants.filter((item) => item.role === "umpire");
+  const directors = readyParticipants.filter((item) => item.role === "director");
 
   return {
     enabled: Boolean(doc.enabled),
@@ -188,16 +190,19 @@ export async function registerPersistentWalkieParticipant(
   const participantId = String(participant.id);
   const existing = doc.participants.find((item) => item.id === participantId);
   const nextNow = nowDate();
+  const ready = participant.ready !== false;
 
   if (existing) {
     existing.role = participant.role;
     existing.name = displayNameForRole(participant.role, participant.name);
+    existing.ready = ready;
     existing.lastSeenAt = nextNow;
   } else {
     doc.participants.push({
       id: participantId,
       role: participant.role,
       name: displayNameForRole(participant.role, participant.name),
+      ready,
       connectedAt: nextNow,
       lastSeenAt: nextNow,
     });
@@ -228,6 +233,7 @@ export async function heartbeatPersistentWalkieParticipant(
   participantId,
   role,
   name = "",
+  ready = true,
   attempt = 0
 ) {
   const doc = await touchAndCleanState(matchId, attempt);
@@ -237,8 +243,10 @@ export async function heartbeatPersistentWalkieParticipant(
       id: participantId,
       role,
       name,
+      ready,
     }, attempt);
   }
+  participant.ready = ready !== false;
   participant.lastSeenAt = nowDate();
   touchIdleExpiry(doc);
   try {
@@ -253,6 +261,7 @@ export async function heartbeatPersistentWalkieParticipant(
         participantId,
         role,
         name,
+        ready,
         attempt + 1
       );
     }
@@ -532,12 +541,16 @@ export async function claimPersistentWalkieSpeaker(
     return { ok: false, status: 409, message: "Walkie-talkie is off." };
   }
 
-  const umpireCount = doc.participants.filter((item) => item.role === "umpire").length;
   const listenerCount = doc.participants.filter(
-    (item) => item.role === "spectator" || item.role === "director"
+    (item) =>
+      item.ready !== false &&
+      (item.role === "spectator" || item.role === "director")
+  ).length;
+  const umpireReadyCount = doc.participants.filter(
+    (item) => item.ready !== false && item.role === "umpire"
   ).length;
 
-  if ((role === "spectator" || role === "director") && umpireCount === 0) {
+  if ((role === "spectator" || role === "director") && umpireReadyCount === 0) {
     return { ok: false, status: 409, message: "No umpire audio available." };
   }
   if (role === "umpire" && listenerCount === 0) {
@@ -595,6 +608,60 @@ export async function claimPersistentWalkieSpeaker(
   publishWalkieStateUpdate(matchId);
 
   return { ok: true, snapshot: buildSnapshot(doc) };
+}
+
+export async function unregisterPersistentWalkieParticipant(
+  matchId,
+  participantId,
+  attempt = 0
+) {
+  const targetParticipantId = String(participantId || "");
+  if (!targetParticipantId) {
+    return null;
+  }
+
+  const doc = await touchAndCleanState(matchId, attempt);
+  const existing = doc.participants.find((item) => item.id === targetParticipantId);
+  if (!existing) {
+    return buildSnapshot(doc);
+  }
+
+  existing.ready = false;
+  existing.lastSeenAt = nowDate();
+
+  if (doc.activeSpeakerId === targetParticipantId) {
+    doc.activeSpeakerRole = "";
+    doc.activeSpeakerId = "";
+    doc.activeSpeakerName = "";
+    doc.lockStartedAt = null;
+    doc.expiresAt = null;
+    doc.transmissionId = "";
+    doc.lastNotification = newNotification(
+      "transmission_ended",
+      "Transmission ended."
+    );
+  }
+
+  doc.version += 1;
+  touchIdleExpiry(doc);
+  try {
+    await doc.save();
+  } catch (error) {
+    if (
+      isRetryableWalkieStateError(error) &&
+      attempt < WALKIE_STATE_RETRY_LIMIT - 1
+    ) {
+      return unregisterPersistentWalkieParticipant(
+        matchId,
+        targetParticipantId,
+        attempt + 1
+      );
+    }
+    throw error;
+  }
+  publishWalkieStateUpdate(matchId);
+  await clearPersistentWalkieMessages(matchId, targetParticipantId);
+  return buildSnapshot(doc);
 }
 
 export async function releasePersistentWalkieSpeaker(

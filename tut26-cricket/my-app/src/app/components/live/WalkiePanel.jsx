@@ -521,6 +521,7 @@ export default function WalkiePanel({
   canEnable,
   canRequestEnable,
   canTalk,
+  talkPathPrimed = false,
   isSelfTalking,
   isFinishing,
   claiming = false,
@@ -548,8 +549,10 @@ export default function WalkiePanel({
   const spectatorCount = Number(snapshot?.spectatorCount || 0);
   const directorCount = Number(snapshot?.directorCount || 0);
   const hasRemoteAudience = spectatorCount + directorCount > 0;
-  const walkieActionPending = Boolean(claiming || preparingToTalk || updatingEnabled);
   const walkieRecovering = Boolean(recoveringAudio || recoveringSignaling);
+  const walkieActionPending = Boolean(
+    updatingEnabled || (!talkPathPrimed && (claiming || preparingToTalk))
+  );
   const remoteSpeakerState = getWalkieRemoteSpeakerState({
     snapshot,
     isSelfTalking,

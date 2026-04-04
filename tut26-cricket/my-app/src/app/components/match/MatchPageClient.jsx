@@ -893,11 +893,11 @@ export default function MatchPageClient({
     isSelfTalking: walkie.isSelfTalking,
   });
   const isLocalWalkieInteractionActive = Boolean(
-    walkie.claiming ||
-      walkie.preparingToTalk ||
-      walkie.updatingEnabled ||
+    walkie.updatingEnabled ||
       walkie.isSelfTalking ||
-      walkie.isFinishing
+      walkie.isFinishing ||
+      (!walkie.talkPathPrimed &&
+        (walkie.claiming || walkie.preparingToTalk))
   );
   const hasWalkieAudience = Boolean(
     Number(walkie.snapshot?.spectatorCount || 0) +
@@ -2603,9 +2603,12 @@ export default function MatchPageClient({
       return;
     }
 
-    if (walkie.canTalk) {
-      await walkie.startTalking();
+    const prepared = await walkie.prepareToTalk();
+    if (prepared === false) {
+      return;
     }
+
+    await walkie.startTalking();
   };
 
   const handleMicHoldStart = useCallback(async () => {
@@ -3179,10 +3182,18 @@ export default function MatchPageClient({
 
     const secondInningsSequence =
       buildUmpireSecondInningsStartSequence(updatedMatch);
-    queueOrSpeakUmpireSequence(
-      secondInningsSequence,
-      "umpire-second-innings-start",
-    );
+
+    if (force) {
+      speakImmediateUmpireSequence(
+        secondInningsSequence,
+        "umpire-second-innings-start",
+      );
+    } else {
+      queueOrSpeakUmpireSequence(
+        secondInningsSequence,
+        "umpire-second-innings-start",
+      );
+    }
     return updatedMatch;
   }, [
     cancelBoundarySequence,
@@ -3190,6 +3201,7 @@ export default function MatchPageClient({
     handleNextInningsOrEnd,
     match,
     matchId,
+    speakImmediateUmpireSequence,
     queueOrSpeakUmpireSequence,
     router,
     showInningsEnd,
@@ -3364,11 +3376,11 @@ export default function MatchPageClient({
                   )}
                   quickTalkActive={walkie.isSelfTalking}
                   quickTalkPending={Boolean(
-                    walkie.claiming ||
-                      walkie.preparingToTalk ||
-                      walkie.updatingEnabled ||
+                    walkie.updatingEnabled ||
                       walkie.recoveringAudio ||
-                      walkie.recoveringSignaling
+                      walkie.recoveringSignaling ||
+                      (!walkie.talkPathPrimed &&
+                        (walkie.claiming || walkie.preparingToTalk))
                   )}
                   quickTalkFinishing={walkie.isFinishing}
                   quickTalkCountdown={walkie.countdown}
@@ -3496,7 +3508,7 @@ export default function MatchPageClient({
             onWalkie={() => setModal({ type: "walkie" })}
             onMic={() => setModal({ type: "mic" })}
             onShare={handleCopyShareLink}
-            onWalkiePressStart={canGridHoldWalkie ? walkie.prepareToTalk : undefined}
+            onWalkiePressStart={undefined}
             onWalkieHoldStart={canGridHoldWalkie ? handleWalkieHoldStart : undefined}
             onWalkieHoldEnd={canGridHoldWalkie ? () => walkie.stopTalking() : undefined}
             onMicHoldStart={canGridHoldMic ? handleMicHoldStart : undefined}
@@ -3509,11 +3521,11 @@ export default function MatchPageClient({
             isWalkieTalking={Boolean(walkie.isSelfTalking)}
             isWalkieFinishing={Boolean(walkie.isFinishing)}
             isWalkieLoading={Boolean(
-              walkie.claiming ||
-                walkie.preparingToTalk ||
-                walkie.recoveringAudio ||
+              walkie.recoveringAudio ||
                 walkie.recoveringSignaling ||
-                walkie.updatingEnabled
+                walkie.updatingEnabled ||
+                (!walkie.talkPathPrimed &&
+                  (walkie.claiming || walkie.preparingToTalk))
             )}
             isWalkieBusyByOther={Boolean(umpireRemoteSpeakerState.isRemoteTalking)}
             walkieBusyLabel={umpireRemoteSpeakerState.roleLabel}
@@ -3627,6 +3639,7 @@ export default function MatchPageClient({
                   canEnable: walkie.canEnable,
                   canRequestEnable: false,
                   canTalk: walkie.canTalk,
+                  talkPathPrimed: walkie.talkPathPrimed,
                   claiming: walkie.claiming,
                   preparingToTalk: walkie.preparingToTalk,
                   updatingEnabled: walkie.updatingEnabled,

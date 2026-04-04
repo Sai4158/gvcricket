@@ -459,6 +459,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     url: matchId && hasAccess ? `/api/live/matches/${matchId}` : null,
     event: "match",
     enabled: Boolean(matchId && hasAccess),
+    disconnectWhenHidden: false,
     onMessage: (payload) => {
       if (payload.updatedAt && payload.updatedAt === lastStreamUpdateRef.current) {
         return;

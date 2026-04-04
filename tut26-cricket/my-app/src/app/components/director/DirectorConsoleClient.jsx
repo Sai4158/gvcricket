@@ -4195,11 +4195,11 @@ export default function DirectorConsoleClient({
     directorWalkieUi.needsLocalEnableNotice,
   );
   const directorWalkieLoading = Boolean(
-    walkie.claiming ||
-    walkie.preparingToTalk ||
     walkie.recoveringAudio ||
     walkie.recoveringSignaling ||
-    walkie.updatingEnabled,
+    walkie.updatingEnabled ||
+    (!walkie.talkPathPrimed &&
+      (walkie.claiming || walkie.preparingToTalk)),
   );
   const directorRemoteSpeakerState = getWalkieRemoteSpeakerState({
     snapshot: walkie.snapshot,

@@ -640,6 +640,9 @@ export function shouldMaintainWalkieAudioTransport({
   if (!pageVisible && autoConnectAudio) {
     return true;
   }
+  if (!pageVisible && !autoConnectAudio && !remoteSpeakerActive && !listeningGraceActive) {
+    return false;
+  }
   if (autoConnectAudio && remoteSpeakerActive) {
     return true;
   }
@@ -658,7 +661,7 @@ export function shouldMaintainWalkieSignaling({
   return Boolean(
     enabled &&
       matchId &&
-      (signalingActive || manualSignalingActive)
+      (manualSignalingActive || signalingActive)
   );
 }
 
@@ -820,10 +823,39 @@ export default function useWalkieTalkie({
   const shouldMaintainSignaling = shouldMaintainWalkieSignaling({
     enabled,
     matchId,
-    pageVisible: isPageVisible,
     signalingActive,
     manualSignalingActive,
   });
+  const talkPathPrimed = Boolean(
+    keepReadyForTalk &&
+      shouldMaintainAudioTransport &&
+      !recoveringAudio &&
+      !recoveringSignaling &&
+      !needsAudioUnlock
+  );
+  const persistentReadyState = Boolean(
+    enabled &&
+      (
+        isSelfTalking ||
+        isFinishing ||
+        manualAudioReady ||
+        (role === "umpire" ? snapshot.enabled : autoConnectAudio)
+      )
+  );
+  const shouldMaintainWalkiePresence = Boolean(
+    enabled &&
+      matchId &&
+      participantId &&
+      (
+        isPageVisible ||
+        shouldMaintainSignaling ||
+        persistentReadyState ||
+        hasOwnPendingRequest ||
+        requestState === "pending" ||
+        isSelfTalking ||
+        isFinishing
+      )
+  );
   const nonUmpireUi = getNonUmpireWalkieUiState({
     sharedEnabled: snapshot.enabled,
     localEnabled: autoConnectAudio,
@@ -1801,8 +1833,17 @@ export default function useWalkieTalkie({
     return applyAuthoritativeSnapshot(payload?.walkie);
   }, [applyAuthoritativeSnapshot, matchId]);
 
+  const getStartGateSnapshot = useCallback(async () => {
+    const authoritative =
+      (await syncPersistentWalkieState().catch(() => null)) ||
+      authoritativeSnapshotRef.current ||
+      normalizeAuthoritativeWalkieSnapshot(snapshotRef.current);
+
+    return authoritative || EMPTY;
+  }, [syncPersistentWalkieState]);
+
   useEffect(() => {
-    if (!enabled || !matchId || !participantId || !isPageVisible) {
+    if (!shouldMaintainWalkiePresence) {
       return undefined;
     }
 
@@ -1810,6 +1851,7 @@ export default function useWalkieTalkie({
       role,
       participantId,
       name: defaultDisplayName(role, displayName),
+      ready: persistentReadyState ? "1" : "0",
     });
     const source = new EventSource(`/api/live/walkie/${matchId}?${params.toString()}`);
 
@@ -1906,9 +1948,10 @@ export default function useWalkieTalkie({
     applyAuthoritativeSnapshot,
     displayName,
     enabled,
-    isPageVisible,
     matchId,
     participantId,
+    persistentReadyState,
+    shouldMaintainWalkiePresence,
     role,
     scheduleRequestReset,
     syncPersistentWalkieState,
@@ -2337,10 +2380,12 @@ export default function useWalkieTalkie({
         return false;
       }
 
+      const gateSnapshot = await getStartGateSnapshot();
+
       if (
         role === "umpire" &&
-        Number(snapshotRef.current.spectatorCount || 0) +
-          Number(snapshotRef.current.directorCount || 0) <=
+        Number(gateSnapshot.spectatorCount || 0) +
+          Number(gateSnapshot.directorCount || 0) <=
           0
       ) {
         setManualAudioReady(false);
@@ -2383,6 +2428,7 @@ export default function useWalkieTalkie({
     ensurePublishedTrack,
     ensureTrack,
     enableManualSignaling,
+    getStartGateSnapshot,
     isSafari,
     joinRtc,
     role,
@@ -2631,10 +2677,17 @@ export default function useWalkieTalkie({
           return false;
         }
 
+        const gateSnapshot = await getStartGateSnapshot();
+        if (!gateSnapshot.enabled) {
+          cancelPendingStartRef.current = false;
+          setError("Walkie-talkie is off.");
+          return false;
+        }
+
         if (
           role === "umpire" &&
-          Number(snapshotRef.current.spectatorCount || 0) +
-            Number(snapshotRef.current.directorCount || 0) <=
+          Number(gateSnapshot.spectatorCount || 0) +
+            Number(gateSnapshot.directorCount || 0) <=
             0
         ) {
           cancelPendingStartRef.current = false;
@@ -2644,13 +2697,13 @@ export default function useWalkieTalkie({
         }
 
         if (
-          snapshotRef.current.activeSpeakerId &&
-          snapshotRef.current.activeSpeakerId !== selfId &&
-          new Date(snapshotRef.current.expiresAt || 0).getTime() > Date.now()
+          gateSnapshot.activeSpeakerId &&
+          gateSnapshot.activeSpeakerId !== selfId &&
+          new Date(gateSnapshot.expiresAt || 0).getTime() > Date.now()
         ) {
           cancelPendingStartRef.current = false;
           setError("Channel is busy.");
-          updateNotice(`${snapshotRef.current.activeSpeakerName || "Someone"} is talking.`);
+          updateNotice(`${gateSnapshot.activeSpeakerName || "Someone"} is talking.`);
           return false;
         }
 
@@ -2690,6 +2743,7 @@ export default function useWalkieTalkie({
         let lastError = null;
         for (let attempt = 1; attempt <= 3; attempt += 1) {
           let claimedSpeaker = false;
+          let preparedTransport = false;
           updateNotice(TALK_RETRY_MESSAGES[Math.min(attempt - 1, TALK_RETRY_MESSAGES.length - 1)]);
           const publishReadyPromise = preparePromiseRef.current
             ? preparePromiseRef.current.then(async (prepared) => {
@@ -2700,6 +2754,17 @@ export default function useWalkieTalkie({
               })
             : ensurePublishedTrack();
           try {
+            const { track } = await publishReadyPromise;
+            preparedTransport = true;
+
+            if (cancelPendingStartRef.current) {
+              cancelPendingStartRef.current = false;
+              setClaiming(false);
+              stopConnectingCueLoop();
+              await cleanupTransport();
+              return false;
+            }
+
             const claimResponse = await requestJson(`/api/matches/${matchId}/walkie/claim`, {
               participantId: selfId,
               role,
@@ -2711,8 +2776,6 @@ export default function useWalkieTalkie({
             if (!claimedSpeaker) {
               throw new Error("Could not claim walkie channel.");
             }
-
-            const { track } = await publishReadyPromise;
             if (typeof track.setMuted === "function") {
               await track.setMuted(false);
             }
@@ -2779,7 +2842,9 @@ export default function useWalkieTalkie({
               await syncPersistentWalkieState().catch(() => {});
               await cleanupTransport();
             }
-            if (!claimedSpeaker && retryableStartError) {
+            if (!claimedSpeaker && preparedTransport) {
+              await cleanupTransport();
+            } else if (!claimedSpeaker && retryableStartError) {
               await cleanupTransport();
             }
             if (!retryableStartError) {
@@ -2830,6 +2895,7 @@ export default function useWalkieTalkie({
       ensureParticipantId,
       ensurePublishedTrack,
       enableManualSignaling,
+      getStartGateSnapshot,
       isSafari,
       manualAudioReady,
       matchId,
@@ -2944,24 +3010,40 @@ export default function useWalkieTalkie({
       } catch (requestError) {
         const message = walkieMessageFor(requestError, "Could not request walkie.");
         const cooldownSeconds = parseWalkieCooldownSeconds(message);
+        const refreshedState = await syncPersistentWalkieState().catch(() => null);
+        const hasRefreshedOwnPendingRequest = Boolean(
+          refreshedState?.pendingRequests?.some(
+            (item) => item?.participantId === selfId
+          )
+        );
 
         if (message === "Walkie-talkie is already on.") {
-          await syncPersistentWalkieState().catch(() => {
+          if (!refreshedState) {
+            await syncPersistentWalkieState().catch(() => {
+              applyMetadataState({
+                enabled: true,
+                pendingRequests: [],
+              });
+            });
+          } else {
             applyMetadataState({
               enabled: true,
               pendingRequests: [],
             });
-          });
+          }
           setRequestState("accepted");
           updateNotice("Walkie-talkie is live.");
           scheduleRequestReset();
           return true;
         }
 
-        if (message === "Request already sent. Waiting for the umpire.") {
-          await syncPersistentWalkieState().catch(() => {});
+        if (
+          message === "Request already sent. Waiting for the umpire." ||
+          hasRefreshedOwnPendingRequest
+        ) {
           setRequestState("pending");
           updateNotice("Waiting for umpire approval.");
+          setCooldown(cooldownSeconds);
           return true;
         }
 
@@ -3877,6 +3959,7 @@ export default function useWalkieTalkie({
     canRequestEnable,
     hasOwnPendingRequest,
     canTalk,
+    talkPathPrimed,
     hasRemoteAudience,
     nonUmpireUi,
     requestCooldownLeft,

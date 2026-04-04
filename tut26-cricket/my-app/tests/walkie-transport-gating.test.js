@@ -302,6 +302,17 @@ test("walkie signaling stays off unless the session truly needs a live signaling
       matchId: "match-1",
       pageVisible: false,
       signalingActive: true,
+      manualSignalingActive: false,
+    }),
+    true
+  );
+
+  assert.equal(
+    shouldMaintainWalkieSignaling({
+      enabled: true,
+      matchId: "match-1",
+      pageVisible: false,
+      signalingActive: true,
       manualSignalingActive: true,
     }),
     true
