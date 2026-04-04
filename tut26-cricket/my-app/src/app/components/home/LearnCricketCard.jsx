@@ -234,6 +234,7 @@ export default function LearnCricketCard() {
                     width={220}
                     height={220}
                     sizes="220px"
+                    unoptimized
                     className="h-auto w-[190px] object-contain drop-shadow-[0_10px_28px_rgba(0,0,0,0.42)] transition-transform duration-500 group-hover:scale-[1.04] xl:w-[210px]"
                   />
                 </div>
@@ -302,6 +303,7 @@ export default function LearnCricketCard() {
                       width={220}
                       height={220}
                       sizes="220px"
+                      unoptimized
                       className="h-auto w-[210px] object-contain drop-shadow-[0_10px_28px_rgba(0,0,0,0.42)] transition-transform duration-500 group-hover:scale-[1.04]"
                     />
                   </div>

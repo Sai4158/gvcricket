@@ -275,7 +275,7 @@ function SessionCard({
                   isLive ? "animate-pulse bg-rose-400" : "bg-emerald-400"
                 }`}
               />
-              {statusMeta.badge}
+              <span suppressHydrationWarning>{statusMeta.badge}</span>
             </span>
             {hasScoreCard ? (
               <div className="pointer-events-none absolute right-0 top-[3.1rem] text-right">
@@ -319,7 +319,10 @@ function SessionCard({
                   {teamLine}
                 </p>
               ) : null}
-              <p className="mt-2 text-[13px] font-medium tracking-[0.01em] text-zinc-400">
+              <p
+                className="mt-2 text-[13px] font-medium tracking-[0.01em] text-zinc-400"
+                suppressHydrationWarning
+              >
                 {dateLabel}
               </p>
             </div>

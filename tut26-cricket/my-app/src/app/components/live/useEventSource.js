@@ -21,6 +21,7 @@ export default function useEventSource({
   const onMessageRef = useRef(onMessage);
   const onErrorRef = useRef(onError);
   const [isPageVisible, setIsPageVisible] = useState(readPageVisibility);
+  const [reconnectTick, setReconnectTick] = useState(0);
 
   useEffect(() => {
     onMessageRef.current = onMessage;
@@ -48,6 +49,37 @@ export default function useEventSource({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [disconnectWhenHidden]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const bumpReconnect = () => {
+      setReconnectTick((current) => current + 1);
+    };
+
+    const handleOnline = () => {
+      bumpReconnect();
+    };
+
+    const connection =
+      navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    const handleConnectionChange = () => {
+      if (navigator.onLine === false) {
+        return;
+      }
+      bumpReconnect();
+    };
+
+    window.addEventListener("online", handleOnline);
+    connection?.addEventListener?.("change", handleConnectionChange);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      connection?.removeEventListener?.("change", handleConnectionChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (!enabled || !url || (disconnectWhenHidden && !isPageVisible)) {
@@ -86,5 +118,5 @@ export default function useEventSource({
       source.removeEventListener("error", errorHandler);
       source.close();
     };
-  }, [disconnectWhenHidden, enabled, event, isPageVisible, url]);
+  }, [disconnectWhenHidden, enabled, event, isPageVisible, reconnectTick, url]);
 }

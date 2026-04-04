@@ -51,7 +51,13 @@ async function api(
     method = "GET",
     body,
     useCookies = true,
-  }: { method?: string; body?: unknown; useCookies?: boolean } = {}
+    headers: extraHeaders = {},
+  }: {
+    method?: string;
+    body?: unknown;
+    useCookies?: boolean;
+    headers?: Record<string, string>;
+  } = {}
 ) {
   const response = await fetch(`${base}${path}`, {
     method,
@@ -59,6 +65,7 @@ async function api(
       ...(body ? { "Content-Type": "application/json" } : {}),
       ...(method !== "GET" ? { Origin: base, Referer: `${base}/` } : {}),
       ...(useCookies && jar.size ? { Cookie: cookieHeader() } : {}),
+      ...extraHeaders,
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -182,6 +189,7 @@ async function cleanup() {
 
 async function main() {
   const results: string[] = [];
+  const directorAuthRunKey = `director-e2e-${Date.now()}`;
 
   const noAuthSessions = await api("/api/director/sessions", { useCookies: false });
   results.push(`DIRECTOR_SESSIONS_NOAUTH=${noAuthSessions.response.status}`);
@@ -190,6 +198,7 @@ async function main() {
     method: "POST",
     body: { pin: "1111" },
     useCookies: false,
+    headers: { "X-Forwarded-For": `${directorAuthRunKey}-bad-1` },
   });
   results.push(`DIRECTOR_BAD_PIN=${badPin.response.status}`);
 
@@ -197,6 +206,7 @@ async function main() {
     method: "POST",
     body: { pin: "" },
     useCookies: false,
+    headers: { "X-Forwarded-For": `${directorAuthRunKey}-bad-2` },
   });
   results.push(`DIRECTOR_EMPTY_PIN=${emptyPin.response.status}`);
 
@@ -204,6 +214,7 @@ async function main() {
     method: "POST",
     body: { pin: "00a0" },
     useCookies: false,
+    headers: { "X-Forwarded-For": `${directorAuthRunKey}-bad-3` },
   });
   results.push(`DIRECTOR_INVALID_PIN=${invalidPin.response.status}`);
 
@@ -252,6 +263,7 @@ async function main() {
     method: "POST",
     body: { pin: " 0000 " },
     useCookies: false,
+    headers: { "X-Forwarded-For": `${directorAuthRunKey}-good` },
   });
   results.push(`DIRECTOR_GOOD_PIN=${directorOk.response.status}`);
   const directorCookie = cookieHeader();

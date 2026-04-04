@@ -377,6 +377,7 @@ export default function ResultInsightsSections({ match }) {
                 alt="GV Cricket logo"
                 width={168}
                 height={168}
+                unoptimized
                 className="h-auto w-28 object-contain sm:w-36"
               />
             </div>

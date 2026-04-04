@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  startTransition,
   useCallback,
   useEffect,
   useMemo,
@@ -379,13 +378,11 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       const nextMatch = applyQueuedFallbackState(body);
       matchRef.current = nextMatch;
       lastStreamUpdateRef.current = body.updatedAt || lastStreamUpdateRef.current;
-      startTransition(() => {
-        setMatch(nextMatch);
-        setLastUpdatedAt(
-          nextMatch?.updatedAt || body.updatedAt || new Date().toISOString(),
-        );
-        setError(null);
-      });
+      setMatch(nextMatch);
+      setLastUpdatedAt(
+        nextMatch?.updatedAt || body.updatedAt || new Date().toISOString(),
+      );
+      setError(null);
 
       return body;
     } catch {
@@ -462,6 +459,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     url: matchId && hasAccess ? `/api/live/matches/${matchId}` : null,
     event: "match",
     enabled: Boolean(matchId && hasAccess),
+    disconnectWhenHidden: false,
     onMessage: (payload) => {
       if (payload.updatedAt && payload.updatedAt === lastStreamUpdateRef.current) {
         return;
@@ -470,12 +468,10 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       lastStreamUpdateRef.current = payload.updatedAt || "";
       const nextMatch = applyQueuedFallbackState(payload.match || null);
       matchRef.current = nextMatch;
-      startTransition(() => {
-        setMatch(nextMatch);
-        setLastUpdatedAt(nextMatch?.updatedAt || payload.updatedAt || "");
-        setError(null);
-        setIsLoading(false);
-      });
+      setMatch(nextMatch);
+      setLastUpdatedAt(nextMatch?.updatedAt || payload.updatedAt || "");
+      setError(null);
+      setIsLoading(false);
     },
     onError: () => {
       if (!match) {
@@ -585,12 +581,10 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
           matchRef.current = nextMatch;
           lastStreamUpdateRef.current =
             body.match.updatedAt || lastStreamUpdateRef.current;
-          startTransition(() => {
-            setMatch(nextMatch);
-            setLastUpdatedAt(
-              nextMatch?.updatedAt || body.match.updatedAt || new Date().toISOString(),
-            );
-          });
+          setMatch(nextMatch);
+          setLastUpdatedAt(
+            nextMatch?.updatedAt || body.match.updatedAt || new Date().toISOString(),
+          );
         } else {
           updateQueuedActions(
             removeQueuedActionById(
@@ -641,11 +635,9 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       const optimisticMatch = applyMatchAction(baseMatch, action);
       const nextOptimisticMatch = normalizeOptimisticMatch(optimisticMatch);
       matchRef.current = nextOptimisticMatch;
-      startTransition(() => {
-        setMatch(nextOptimisticMatch);
-        setLastUpdatedAt(nextOptimisticMatch.updatedAt || new Date().toISOString());
-        setError(null);
-      });
+      setMatch(nextOptimisticMatch);
+      setLastUpdatedAt(nextOptimisticMatch.updatedAt || new Date().toISOString());
+      setError(null);
     } catch (caughtError) {
       if (caughtError instanceof MatchEngineError) {
         setError(caughtError);
@@ -698,10 +690,8 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
       matchRef.current = body;
       lastStreamUpdateRef.current = body.updatedAt || lastStreamUpdateRef.current;
-      startTransition(() => {
-        setMatch(body);
-        setLastUpdatedAt(body.updatedAt || new Date().toISOString());
-      });
+      setMatch(body);
+      setLastUpdatedAt(body.updatedAt || new Date().toISOString());
       setError(null);
       return body;
     } catch (caughtError) {
@@ -762,7 +752,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     };
   }, [clearRetryTimer]);
 
-  const handleScoreEvent = useCallback((runs, isOut = false, extraType = null) => {
+  const handleScoreEvent = useCallback((runs, isOut = false, extraType = null, options = {}) => {
     if (!match || match.result || !hasAccess) return;
     if (tossPending) {
       setError(null);
@@ -773,7 +763,8 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
     triggerHapticFeedback();
     sendAction({
-      actionId: createActionId("score"),
+      actionId:
+        String(options?.actionId || "").trim() || createActionId("score"),
       type: "score_ball",
       runs,
       isOut,
@@ -803,13 +794,13 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       setError(null);
       startNavigation("Opening toss...");
       router.replace(`/toss/${matchId}`);
-      return;
+      return null;
     }
 
     if (match.result && !match.isOngoing) {
       startNavigation("Opening result...");
       router.push(`/result/${matchId}`);
-      return;
+      return match;
     }
 
     const updatedMatch = await sendAction({
@@ -821,6 +812,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       startNavigation("Opening result...");
       router.push(`/result/${matchId}`);
     }
+    return updatedMatch || null;
   }, [hasAccess, match, matchId, router, sendAction, startNavigation, tossPending]);
 
   return {
@@ -835,10 +827,8 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       matchRef.current = nextMatch;
       lastStreamUpdateRef.current =
         nextMatch?.updatedAt || lastStreamUpdateRef.current;
-      startTransition(() => {
-        setMatch(nextMatch);
-        setLastUpdatedAt(nextMatch?.updatedAt || new Date().toISOString());
-      });
+      setMatch(nextMatch);
+      setLastUpdatedAt(nextMatch?.updatedAt || new Date().toISOString());
     },
     handleScoreEvent,
     handleUndo,

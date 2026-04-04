@@ -64,6 +64,7 @@ function HeroDesktopScene({
                 width={500}
                 height={400}
                 priority
+                unoptimized
                 sizes="(max-width: 640px) 86vw, (max-width: 768px) 400px, 580px"
                 className="mb-5 h-auto w-[330px] max-w-[86vw] object-contain sm:w-[400px] md:w-[580px]"
               />
@@ -222,6 +223,7 @@ function HeroAnimatedScene({
                   width={500}
                   height={400}
                   priority
+                  unoptimized
                   sizes="(max-width: 640px) 86vw, (max-width: 768px) 400px, 580px"
                   className="mb-5 h-auto w-[330px] max-w-[86vw] object-contain sm:w-[400px] md:w-[580px]"
                 />

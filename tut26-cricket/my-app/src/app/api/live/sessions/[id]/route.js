@@ -17,14 +17,12 @@ export const maxDuration = 300;
 export const preferredRegion = ["iad1"];
 
 const STREAM_HEARTBEAT_INTERVAL_MS = 15_000;
-const STREAM_CATCHUP_INTERVAL_MS = 180_000;
-const STREAM_FALLBACK_POLL_INTERVAL_MS = 5_000;
 const LIVE_SESSION_SNAPSHOT_CACHE_TTL_MS = 1_000;
 const STREAM_BOOTSTRAP_PAD = "0".repeat(64);
 const LIVE_SESSION_FIELDS =
-  "_id name date overs isLive isDraft match tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastEventType lastEventText createdAt updatedAt";
+  "_id name date overs isLive isDraft match tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcer announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastEventType lastEventText createdAt updatedAt";
 const LIVE_MATCH_FIELDS =
-  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText createdAt updatedAt";
+  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcer announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText createdAt updatedAt";
 const globalSessionSnapshotCache =
   globalThis.__gvLiveSessionSnapshotCache || new Map();
 
@@ -92,6 +90,7 @@ async function readLiveSessionSnapshot(sessionId) {
     payload,
     serialized: JSON.stringify(payload),
     matchId: match?._id ? String(match._id) : "",
+    updatedAt: getLatestIsoTimestamp(match?.updatedAt, session?.updatedAt),
   };
 }
 
@@ -134,6 +133,24 @@ function encodeEvent(event, data) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
+function getLatestIsoTimestamp(...values) {
+  let latest = 0;
+
+  for (const value of values) {
+    const timestamp =
+      value instanceof Date
+        ? value.getTime()
+        : typeof value === "number"
+          ? value
+          : Date.parse(String(value || ""));
+    if (Number.isFinite(timestamp) && timestamp > latest) {
+      latest = timestamp;
+    }
+  }
+
+  return new Date(latest || Date.now()).toISOString();
+}
+
 export async function GET(request, { params }) {
   const { id } = await params;
   const encoder = new TextEncoder();
@@ -143,13 +160,13 @@ export async function GET(request, { params }) {
   let cleanupSession = () => {};
   let cleanupMatch = () => {};
   let heartbeat = null;
-  let catchup = null;
   let currentMatchId = "";
   let closed = false;
   let didCleanup = false;
   let lastSerializedPayload = "";
-  let catchupDone = false;
-  let liveUpdatesReady = false;
+  let pushPending = false;
+  let pushPendingForce = false;
+  let pushLoopPromise = null;
 
   const finalize = () => {
     if (didCleanup) {
@@ -163,10 +180,6 @@ export async function GET(request, { params }) {
     if (heartbeat) {
       clearTimeout(heartbeat);
       heartbeat = null;
-    }
-    if (catchup) {
-      clearTimeout(catchup);
-      catchup = null;
     }
   };
 
@@ -214,18 +227,6 @@ export async function GET(request, { params }) {
     }, delay);
   };
 
-  const scheduleCatchup = (delay = 1200) => {
-    if (closed) {
-      return;
-    }
-    if (catchup) {
-      clearTimeout(catchup);
-    }
-    catchup = setTimeout(() => {
-      void catchupLoop();
-    }, delay);
-  };
-
   const pushSessionPayload = async ({ force = false } = {}) => {
     if (closed) {
       return null;
@@ -234,6 +235,7 @@ export async function GET(request, { params }) {
       payload,
       serialized: nextSerializedPayload,
       matchId: nextMatchId,
+      updatedAt: nextUpdatedAt,
     } = await getCachedLiveSessionSnapshot(id, { force });
     if (closed) {
       return null;
@@ -246,7 +248,7 @@ export async function GET(request, { params }) {
       if (currentMatchId) {
         cleanupMatch = subscribeToMatch(currentMatchId, async () => {
           try {
-            await pushSessionPayload({ force: true });
+            await requestSessionPush({ force: true });
           } catch (error) {
             console.error("Session SSE match push failed:", error);
           }
@@ -254,7 +256,7 @@ export async function GET(request, { params }) {
       }
     }
 
-    if (!force && nextSerializedPayload === lastSerializedPayload) {
+    if (nextSerializedPayload === lastSerializedPayload) {
       return payload;
     }
 
@@ -263,13 +265,35 @@ export async function GET(request, { params }) {
     if (
       !(await send("session", {
         ...payload,
-        updatedAt: new Date().toISOString(),
+        updatedAt: nextUpdatedAt,
       }))
     ) {
       return null;
     }
 
     return payload;
+  };
+
+  const requestSessionPush = async ({ force = false } = {}) => {
+    pushPending = true;
+    pushPendingForce = pushPendingForce || force;
+
+    if (pushLoopPromise) {
+      return pushLoopPromise;
+    }
+
+    pushLoopPromise = (async () => {
+      while (!closed && pushPending) {
+        const nextForce = pushPendingForce;
+        pushPending = false;
+        pushPendingForce = false;
+        await pushSessionPayload({ force: nextForce });
+      }
+    })().finally(() => {
+      pushLoopPromise = null;
+    });
+
+    return pushLoopPromise;
   };
 
   const heartbeatLoop = async () => {
@@ -290,29 +314,19 @@ export async function GET(request, { params }) {
     scheduleHeartbeat();
   };
 
-  const catchupLoop = async () => {
-    if (closed) {
-      return;
-    }
-
-    try {
-      await pushSessionPayload({ force: !catchupDone });
-    } catch (error) {
-      console.error("Session SSE catchup failed:", error);
-    }
-
-    catchupDone = true;
-    scheduleCatchup(
-      liveUpdatesReady
-        ? STREAM_CATCHUP_INTERVAL_MS
-        : STREAM_FALLBACK_POLL_INTERVAL_MS
-    );
-  };
-
   void (async () => {
     try {
       await connectDB();
-      await pushSessionPayload();
+
+      cleanupSession = subscribeToSession(id, async () => {
+        try {
+          await requestSessionPush({ force: true });
+        } catch (error) {
+          console.error("Session SSE session push failed:", error);
+        }
+      });
+
+      await requestSessionPush();
       await send("ping", {
         ok: true,
         ts: Date.now(),
@@ -320,25 +334,10 @@ export async function GET(request, { params }) {
         pad: STREAM_BOOTSTRAP_PAD,
       });
 
-      cleanupSession = subscribeToSession(id, async () => {
-        try {
-          await pushSessionPayload({ force: true });
-        } catch (error) {
-          console.error("Session SSE session push failed:", error);
-        }
-      });
-
-      try {
-        await ensureLiveUpdates();
-        if (!closed) {
-          liveUpdatesReady = true;
-        }
-      } catch (error) {
-        console.error("Session change streams unavailable.", error);
-      }
-
       scheduleHeartbeat();
-      scheduleCatchup(liveUpdatesReady ? STREAM_CATCHUP_INTERVAL_MS : 1200);
+      void ensureLiveUpdates().catch((error) => {
+        console.error("Session change streams unavailable.", error);
+      });
     } catch (error) {
       await send("error", { message: "Live updates are temporarily unavailable." });
       await stopStream();

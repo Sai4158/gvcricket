@@ -12,6 +12,7 @@ import {
 } from "../../../../lib/match-access";
 import {
   publishMatchUpdate,
+  publishSessionUpdate,
 } from "../../../../lib/live-updates";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { parseJsonRequest } from "../../../../lib/request-security";
@@ -43,6 +44,13 @@ const soundEffectRequestSchema = z
       .min(8)
       .max(120)
       .regex(/^[a-zA-Z0-9._:-]+$/, "clientRequestId is invalid.")
+      .optional(),
+    sourceActionId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .regex(/^[a-zA-Z0-9:_-]+$/, "sourceActionId is invalid.")
       .optional(),
     action: z.enum(["play", "stop"]).optional(),
     resumeAnnouncements: z.boolean().optional(),
@@ -148,6 +156,7 @@ export async function POST(req, { params }) {
     const liveEvent = createSoundEffectLiveEvent(match, effect, {
       action: parsedRequest.value.action === "stop" ? "stop" : "play",
       clientRequestId: parsedRequest.value.clientRequestId || "",
+      sourceActionId: parsedRequest.value.sourceActionId || "",
       resumeAnnouncements: Boolean(parsedRequest.value.resumeAnnouncements),
       trigger:
         parsedRequest.value.trigger === "score_boundary"
@@ -175,6 +184,7 @@ export async function POST(req, { params }) {
     }
 
     publishMatchUpdate(updatedMatch._id);
+    publishSessionUpdate(updatedMatch.sessionId);
 
     await writeAuditLog({
       action: "match_sound_effect",

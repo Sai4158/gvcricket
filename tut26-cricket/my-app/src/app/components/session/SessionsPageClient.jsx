@@ -411,6 +411,40 @@ export default function SessionsPageClient({
     );
   }, []);
 
+  const mergeSessionUpdateIntoList = useCallback((updatedSession) => {
+    if (!updatedSession?._id) {
+      return;
+    }
+
+    setSessions((current) =>
+      current.map((session) =>
+        session._id === updatedSession._id
+          ? {
+              ...session,
+              ...updatedSession,
+            }
+          : session
+      )
+    );
+  }, []);
+
+  const removeSessionsFromList = useCallback((sessionIds) => {
+    const normalizedIds = Array.isArray(sessionIds)
+      ? sessionIds.map((value) => String(value || "")).filter(Boolean)
+      : [];
+    if (!normalizedIds.length) {
+      return;
+    }
+
+    const removedIdSet = new Set(normalizedIds);
+    setSessions((current) =>
+      current.filter((session) => !removedIdSet.has(String(session._id || "")))
+    );
+    setTotalCount((current) =>
+      Math.max(0, Number(current || 0) - removedIdSet.size)
+    );
+  }, []);
+
   const handleOpenImageActions = useCallback((session, image) => {
     if (!session?.match) {
       return;
@@ -523,8 +557,11 @@ export default function SessionsPageClient({
     router.replace("/");
   }, [router, startNavigation]);
 
-  const reloadSessionsFromServer = useCallback(async () => {
-    const response = await fetch("/api/sessions", {
+  const reloadSessionsFromServer = useCallback(async ({ forceFresh = false } = {}) => {
+    const requestUrl = forceFresh
+      ? `/api/sessions?fresh=1&t=${Date.now()}`
+      : "/api/sessions";
+    const response = await fetch(requestUrl, {
       cache: "no-store",
       headers: {
         "Cache-Control": "no-store",
@@ -663,7 +700,10 @@ export default function SessionsPageClient({
         ),
       ].filter(Boolean);
 
-      await reloadSessionsFromServer();
+      mergeSessionUpdateIntoList({
+        ...previousSession,
+        ...payload,
+      });
 
       closeSessionManager();
       setActionSummary({
@@ -675,12 +715,13 @@ export default function SessionsPageClient({
         items: changedItems,
         tone: "success",
       });
+      void reloadSessionsFromServer({ forceFresh: true }).catch(() => {});
     } catch (error) {
       setManageError(error.message || "Could not update session.");
     } finally {
       setManageSubmitting(false);
     }
-  }, [closeSessionManager, manageForm.name, manageForm.teamAName, manageForm.teamBName, manageSessionContext, manageSubmitting, reloadSessionsFromServer, sessions]);
+  }, [closeSessionManager, manageForm.name, manageForm.teamAName, manageForm.teamBName, manageSessionContext, manageSubmitting, mergeSessionUpdateIntoList, reloadSessionsFromServer, sessions]);
 
   const handleManageSessionDelete = useCallback(async () => {
     if (!manageSessionContext?.sessionId || manageSubmitting) {
@@ -716,7 +757,7 @@ export default function SessionsPageClient({
         throw new Error(payload.message || "Could not delete session.");
       }
 
-      await reloadSessionsFromServer();
+      removeSessionsFromList([manageSessionContext.sessionId]);
       setPage(1);
       closeSessionManager();
       setActionSummary({
@@ -732,12 +773,13 @@ export default function SessionsPageClient({
           : [],
         tone: "danger",
       });
+      void reloadSessionsFromServer({ forceFresh: true }).catch(() => {});
     } catch (error) {
       setManageError(error.message || "Could not delete session.");
     } finally {
       setManageSubmitting(false);
     }
-  }, [closeSessionManager, manageSessionContext, manageSubmitting, reloadSessionsFromServer, sessions]);
+  }, [closeSessionManager, manageSessionContext, manageSubmitting, reloadSessionsFromServer, removeSessionsFromList, sessions]);
 
   const handleBulkDeleteSessions = useCallback(
     async (pin) => {
@@ -773,7 +815,7 @@ export default function SessionsPageClient({
         : [];
       const removedIds = deletedIds.length ? deletedIds : selectedSessionIds;
 
-      await reloadSessionsFromServer();
+      removeSessionsFromList(removedIds);
       setPage(1);
       clearSelectionMode();
       setBulkDeletePromptOpen(false);
@@ -787,8 +829,9 @@ export default function SessionsPageClient({
           .slice(0, 6),
         tone: "danger",
       });
+      void reloadSessionsFromServer({ forceFresh: true }).catch(() => {});
     },
-    [clearSelectionMode, reloadSessionsFromServer, selectedSessionIds, sessions]
+    [clearSelectionMode, reloadSessionsFromServer, removeSessionsFromList, selectedSessionIds, sessions]
   );
 
   const handleDeleteSessionImage = useCallback(

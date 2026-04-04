@@ -559,49 +559,65 @@ function getSpeechProfile(voice, options, platform) {
   const isGoogleNatural = voiceName.includes("google");
   const isLegacyVoice =
     voiceName.includes("zira") || voiceName.includes("david");
+  const isNaturalVoice =
+    isAppleNatural || isMicrosoftNatural || isGoogleNatural;
 
   const defaultRate = isIOSSafari
     ? isAppleNatural
-      ? 0.72
-      : 0.71
+      ? 0.7
+      : 0.69
     : isAppleNatural
-      ? 0.76
+      ? 0.8
       : isGoogleNatural
         ? platform?.isChrome
-          ? 0.74
-          : 0.76
+          ? 0.79
+          : 0.8
         : isMicrosoftNatural
-          ? 0.75
+          ? 0.79
           : isLegacyVoice
-            ? 0.74
-            : 0.78;
+            ? 0.76
+            : 0.8;
 
-  const defaultPitch = 1;
+  const defaultPitch = isNaturalVoice ? 1.02 : isLegacyVoice ? 0.98 : 1;
   const requestedRate = Number(options.rate);
   const safeRequestedRate = Number.isFinite(requestedRate)
     ? requestedRate
     : null;
+  const normalizedRequestedRate =
+    safeRequestedRate === null
+      ? null
+      : isIOSSafari
+        ? safeRequestedRate * 0.88
+        : safeRequestedRate;
+  const requestedPitch = Number(options.pitch);
+  const safeRequestedPitch = Number.isFinite(requestedPitch)
+    ? requestedPitch
+    : null;
+  const requestedVolume = Number(options.volume);
+  const safeRequestedVolume = Number.isFinite(requestedVolume)
+    ? requestedVolume
+    : null;
   const maxRate = isIOSSafari
     ? 0.72
     : isGoogleNatural
-      ? 0.74
+      ? 0.82
       : isMicrosoftNatural
-        ? 0.75
+        ? 0.82
         : isAppleNatural
-          ? 0.76
+          ? 0.82
           : isLegacyVoice
-            ? 0.74
-            : 0.78;
+            ? 0.78
+            : 0.82;
   const effectiveRate =
-    safeRequestedRate === null
+    normalizedRequestedRate === null
       ? defaultRate
-      : Math.min(safeRequestedRate, maxRate);
+      : Math.min(normalizedRequestedRate, maxRate);
 
   return {
     rate: effectiveRate || defaultRate,
-    pitch: Number(options.pitch ?? defaultPitch) || defaultPitch,
-    volume: Number(options.volume ?? 1) || 1,
-    preDelayMs: options.preDelayMs ?? (isIOSSafari ? 90 : 0),
+    pitch: safeRequestedPitch ?? defaultPitch,
+    volume: safeRequestedVolume ?? 1,
+    preDelayMs: options.preDelayMs ?? (isIOSSafari ? 70 : 0),
   };
 }
 

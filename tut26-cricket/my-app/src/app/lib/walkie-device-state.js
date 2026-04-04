@@ -1,7 +1,7 @@
 export const NON_UMPIRE_WALKIE_LOCAL_ENABLE_NOTICE =
   "Turn on walkie to listen and respond.";
 export const NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT =
-  "Walkie-talkie is on. Umpire wants to talk. Tap and hold to talk.";
+  "Walkie-talkie is on. Tap and hold to talk.";
 export const NON_UMPIRE_WALKIE_ACCEPTED_ANNOUNCEMENT =
   "Walkie-talkie accepted. Tap and hold to talk.";
 const WALKIE_DEVICE_PREFERENCE_STORAGE_PREFIX = "gv-walkie-device-preference-v1";

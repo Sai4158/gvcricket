@@ -14,7 +14,6 @@ import {
   subscribeToWalkieState,
 } from "../../../../lib/walkie-live-updates";
 import {
-  clearPersistentWalkieMessages,
   getPersistentWalkieSnapshot,
   registerPersistentWalkieParticipant,
   heartbeatPersistentWalkieParticipant,
@@ -69,6 +68,8 @@ export async function GET(request, { params }) {
   const role = request.nextUrl.searchParams.get("role") || "spectator";
   const participantId = request.nextUrl.searchParams.get("participantId") || "";
   const name = sanitizePlainText(request.nextUrl.searchParams.get("name") || "").slice(0, 48);
+  const readyParam = request.nextUrl.searchParams.get("ready");
+  const ready = readyParam === null ? true : readyParam === "1" || readyParam === "true";
   const participantToken = createWalkieParticipantToken(id, participantId, role);
 
   if (!/^[a-zA-Z0-9._:-]{8,80}$/.test(participantId)) {
@@ -156,7 +157,6 @@ export async function GET(request, { params }) {
       cleanupMessages();
       cleanupState = () => {};
       cleanupMessages = () => {};
-      void clearPersistentWalkieMessages(id, participantId).catch(() => {});
       if (heartbeat) {
         clearTimeout(heartbeat);
         heartbeat = null;
@@ -264,7 +264,13 @@ export async function GET(request, { params }) {
       }
 
       try {
-        const current = await heartbeatPersistentWalkieParticipant(id, participantId, role, name);
+        const current = await heartbeatPersistentWalkieParticipant(
+          id,
+          participantId,
+          role,
+          name,
+          ready
+        );
         if (closed) {
           return;
         }
@@ -341,6 +347,7 @@ export async function GET(request, { params }) {
         id: participantId,
         role,
         name,
+        ready,
       });
       const initialStatePayload = buildStatePayload(
         registration.snapshot,
