@@ -108,9 +108,15 @@ function WalkieInlineTalkButton({
       }}
       onPointerUp={(event) => {
         event.currentTarget.releasePointerCapture?.(event.pointerId);
+        pointerIdRef.current = null;
+        void endHold();
       }}
       onPointerCancel={(event) => {
         event.currentTarget.releasePointerCapture?.(event.pointerId);
+        pointerIdRef.current = null;
+        void endHold();
+      }}
+      onLostPointerCapture={() => {
         pointerIdRef.current = null;
         void endHold();
       }}
@@ -432,9 +438,15 @@ export function WalkieTalkButton({
         }}
         onPointerUp={(event) => {
           event.currentTarget.releasePointerCapture?.(event.pointerId);
+          pointerIdRef.current = null;
+          void endHold();
         }}
         onPointerCancel={(event) => {
           event.currentTarget.releasePointerCapture?.(event.pointerId);
+          pointerIdRef.current = null;
+          void endHold();
+        }}
+        onLostPointerCapture={() => {
           pointerIdRef.current = null;
           void endHold();
         }}

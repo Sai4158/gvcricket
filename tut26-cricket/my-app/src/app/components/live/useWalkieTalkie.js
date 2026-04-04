@@ -835,12 +835,9 @@ export default function useWalkieTalkie({
   );
   const persistentReadyState = Boolean(
     enabled &&
-      (
-        isSelfTalking ||
-        isFinishing ||
-        manualAudioReady ||
-        (role === "umpire" ? snapshot.enabled : autoConnectAudio)
-      )
+      snapshot.enabled &&
+      participantId &&
+      (role === "umpire" ? true : autoConnectAudio)
   );
   const shouldMaintainWalkiePresence = Boolean(
     enabled &&
