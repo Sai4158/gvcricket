@@ -14,12 +14,10 @@ import {
   subscribeToWalkieState,
 } from "../../../../lib/walkie-live-updates";
 import {
-  clearPersistentWalkieMessages,
   getPersistentWalkieSnapshot,
   registerPersistentWalkieParticipant,
   heartbeatPersistentWalkieParticipant,
   takePersistentWalkieMessages,
-  unregisterPersistentWalkieParticipant,
 } from "../../../../lib/walkie-store";
 import { getCachedWalkieMatch } from "../../../../lib/walkie-match-cache";
 import { sanitizePlainText } from "../../../../lib/validators";
@@ -159,8 +157,6 @@ export async function GET(request, { params }) {
       cleanupMessages();
       cleanupState = () => {};
       cleanupMessages = () => {};
-      void unregisterPersistentWalkieParticipant(id, participantId).catch(() => {});
-      void clearPersistentWalkieMessages(id, participantId).catch(() => {});
       if (heartbeat) {
         clearTimeout(heartbeat);
         heartbeat = null;

@@ -3864,12 +3864,23 @@ export default function useWalkieTalkie({
       }
     };
 
+    const connection =
+      navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    const handleConnectionChange = () => {
+      if (navigator.onLine === false) {
+        return;
+      }
+      requestRecovery();
+    };
+
     window.addEventListener("online", requestRecovery);
     document.addEventListener("visibilitychange", handleVisibility);
+    connection?.addEventListener?.("change", handleConnectionChange);
 
     return () => {
       window.removeEventListener("online", requestRecovery);
       document.removeEventListener("visibilitychange", handleVisibility);
+      connection?.removeEventListener?.("change", handleConnectionChange);
     };
   }, [shouldMaintainAudioTransport]);
 
