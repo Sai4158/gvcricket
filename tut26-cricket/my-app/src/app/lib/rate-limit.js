@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Rate Limit logic.
+ * Main exports: enforceRateLimit.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 const globalStore = globalThis.__gvRateLimitStore || new Map();
 globalThis.__gvRateLimitStore = globalStore;
 

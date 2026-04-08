@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Walkie Agora Runtime logic.
+ * Main exports: filterAgoraWalkieRequests, parseAgoraWalkieMetadata, serializeAgoraWalkieMetadata, upsertAgoraWalkieRequest, removeAgoraWalkieRequest, buildAgoraWalkieSnapshot, WALKIE_CHANNEL_TYPE, WALKIE_CONTROL_LOCK_NAME, WALKIE_SPEAKER_LOCK_NAME, WALKIE_SPEAKER_TTL_SECONDS, WALKIE_CONTROL_TTL_SECONDS, WALKIE_REQUEST_MAX_AGE_MS, WALKIE_METADATA_KEYS.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 export const WALKIE_CHANNEL_TYPE = "MESSAGE";
 export const WALKIE_CONTROL_LOCK_NAME = "gv-walkie-control";
 export const WALKIE_SPEAKER_LOCK_NAME = "gv-walkie-speaker";

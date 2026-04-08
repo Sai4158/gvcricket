@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Score Sound Effects logic.
+ * Main exports: normalizeScoreSoundEffectMap, getScoreSoundEffectMapSignature, hasAssignedScoreSoundEffectMap, shouldHydrateScoreSoundEffectMapFromRemote, getScoreSoundEffectEventKey, getScoreSoundEffectPreviewInput, RANDOM_SCORE_EFFECT_ID, SCORE_SOUND_EFFECT_EVENTS, SCORE_SOUND_EFFECT_KEYS, EMPTY_SCORE_SOUND_EFFECT_MAP.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 export const RANDOM_SCORE_EFFECT_ID = "__random__";
 
 export const SCORE_SOUND_EFFECT_EVENTS = [

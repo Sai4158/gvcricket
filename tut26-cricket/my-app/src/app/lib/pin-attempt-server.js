@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Pin Attempt Server logic.
+ * Main exports: enforceSmartPinRateLimit.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 import {
   PIN_BURST_BLOCK_MS,
   PIN_BURST_TRIGGER_ATTEMPTS,

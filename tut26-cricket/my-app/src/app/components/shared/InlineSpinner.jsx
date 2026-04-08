@@ -1,5 +1,14 @@
 "use client";
 
+
+/**
+ * File overview:
+ * Purpose: UI component for Shared screens and flows.
+ * Main exports: InlineSpinner.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: README.md
+ */
 export default function InlineSpinner({
   className = "",
   size = "sm",

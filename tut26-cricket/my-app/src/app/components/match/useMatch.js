@@ -1,5 +1,14 @@
 "use client";
 
+
+/**
+ * File overview:
+ * Purpose: React hook for Match behavior and browser state.
+ * Main exports: useMatch, triggerMatchHapticFeedback, isMatchNetworkError, replayQueuedMatchActions.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: reads or writes browser storage.
+ * Read next: README.md
+ */
 import {
   useCallback,
   useEffect,

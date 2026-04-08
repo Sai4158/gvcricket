@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Validators logic.
+ * Main exports: sanitizePlainText, validateSessionCreatePayload, validateSetupMatchPayload, validatePinPayload, validateSessionPatchPayload, validateSessionDraftDeletePayload, validateMatchPatchPayload, validateMatchActionPayload, validateWalkieTogglePayload, validateWalkieClaimPayload, validateWalkieReleasePayload, validateWalkieRequestPayload, validateWalkieSignalPayload, optionalStringSchema, requiredNameSchema, playerNameSchema, playerArraySchema, oversSchema, sessionCreateSchema, setupMatchSchema, createMatchSchema, sessionDraftDeleteSchema, pinPayloadSchema, secretPinPayloadSchema, sessionPatchObjectSchema, sessionPatchSchema, matchPatchObjectSchema, walkieToggleSchema, walkieClaimSchema, walkieReleaseSchema, walkieRequestSchema, walkieRespondSchema, walkieSignalSchema, matchPatchSchema, matchActionSchema.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 import sanitizeHtml from "sanitize-html";
 import { z } from "zod";
 import { isSafeMatchImageUrl } from "./match-image";

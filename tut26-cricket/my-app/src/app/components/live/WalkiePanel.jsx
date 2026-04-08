@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: UI component for Live screens and flows.
+ * Main exports: WalkiePanel, WalkieNotice, WalkieRequestQueue, WalkieTalkButton.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: README.md
+ */
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FaLock,

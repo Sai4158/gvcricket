@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: API route handler for Api requests.
+ * Main exports: module side effects only.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: none.
+ * Read next: ../../../../docs/ONBOARDING.md
+ */
 import { jsonError, jsonRateLimit } from "../../lib/api-response";
 import { writeAuditLog } from "../../lib/audit-log";
 import { connectDB } from "../../lib/db";

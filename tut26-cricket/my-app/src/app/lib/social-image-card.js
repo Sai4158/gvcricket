@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Social Image Card logic.
+ * Main exports: createLogoOnlySocialImage, SOCIAL_IMAGE_SIZE.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 /* eslint-disable @next/next/no-img-element */
 import path from "node:path";
 import { readFileSync } from "node:fs";

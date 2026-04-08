@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Db logic.
+ * Main exports: module side effects only.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: registers or reuses a Mongoose model.
+ * Read next: README.md
+ */
 import mongoose from "mongoose";
 
 const MONGODB_URI = process.env.MONGODB_URI;

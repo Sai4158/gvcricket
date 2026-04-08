@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: UI component for Session screens and flows.
+ * Main exports: InfoModal.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: README.md
+ */
+
 import { motion } from "framer-motion";
 import { FaEye, FaLock, FaTimes } from "react-icons/fa";
 import { FaTowerBroadcast } from "react-icons/fa6";

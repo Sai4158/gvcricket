@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Developer script for Typecheck maintenance work.
+ * Main exports: module side effects only.
+ * Major callers: Repo maintenance commands.
+ * Side effects: none.
+ * Read next: ../README.md
+ */
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";

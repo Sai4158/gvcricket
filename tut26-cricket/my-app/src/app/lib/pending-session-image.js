@@ -1,5 +1,14 @@
 "use client";
 
+
+/**
+ * File overview:
+ * Purpose: Shared helper module for Pending Session Image logic.
+ * Main exports: getPendingSessionImageNoticeKey, getPendingSessionImage, clearPendingSessionImage, getPendingSessionImageNotice, setPendingSessionImageNotice, clearPendingSessionImageNotice.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: reads or writes browser storage.
+ * Read next: README.md
+ */
 const PENDING_SESSION_IMAGE_KEY = "gv-pending-session-image";
 
 export function getPendingSessionImageNoticeKey(sessionId) {

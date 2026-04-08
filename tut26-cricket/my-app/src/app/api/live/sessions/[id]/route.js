@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: API route handler for Api requests.
+ * Main exports: runtime, dynamic, maxDuration, preferredRegion.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: none.
+ * Read next: ../../../../../../docs/ONBOARDING.md
+ */
 import { connectDB } from "../../../../lib/db";
 import {
   ensureLiveUpdates,

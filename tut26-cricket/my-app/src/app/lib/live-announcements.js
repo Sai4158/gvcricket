@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Live Announcements logic.
+ * Main exports: getSpectatorAnnouncementPriority, buildSpectatorBallAnnouncement, buildSpectatorScoreAnnouncement, buildSpectatorOverCompleteAnnouncement, createScoreLiveEvent, createUndoLiveEvent, createMatchCorrectionLiveEvent, createMatchEndLiveEvent, createSoundEffectLiveEvent, createManualScoreAnnouncementLiveEvent, buildSpectatorAnnouncement, buildLiveScoreAnnouncementSequence, buildCurrentScoreAnnouncement, buildUmpireStageAnnouncement, buildUmpireSecondInningsStartSequence, buildUmpireAnnouncement, buildUmpireTapAnnouncement.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 import { countLegalBalls } from "./match-scoring";
 import { getBattingTeamBundle } from "./team-utils";
 

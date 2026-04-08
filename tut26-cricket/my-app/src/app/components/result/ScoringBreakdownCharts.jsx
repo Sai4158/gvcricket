@@ -1,5 +1,14 @@
 "use client";
 
+
+/**
+ * File overview:
+ * Purpose: UI component for Result screens and flows.
+ * Main exports: ScoringBreakdownCharts.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: README.md
+ */
 import { FaChartPie } from "react-icons/fa";
 import { Cell, Legend, Pie, PieChart, Tooltip } from "recharts";
 import CustomTooltip from "./CustomTooltip";

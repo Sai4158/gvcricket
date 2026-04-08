@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Api Response logic.
+ * Main exports: jsonError, jsonRateLimit.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 import { NextResponse } from "next/server";
 
 export function jsonError(message, status, extras = {}) {

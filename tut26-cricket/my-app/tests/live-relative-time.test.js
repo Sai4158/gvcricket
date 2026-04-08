@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Automated test coverage for Live Relative Time.Test behavior and regressions.
+ * Main exports: module side effects only.
+ * Major callers: `npm test` and focused test runs.
+ * Side effects: runs assertions and test-side setup/teardown only.
+ * Read next: README.md
+ */
 import test from "node:test";
 import assert from "node:assert/strict";
 

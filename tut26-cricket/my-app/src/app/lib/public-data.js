@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Public Data logic.
+ * Main exports: serializePublicMatch, serializePublicSession.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 import { getTeamBundle } from "./team-utils";
 import { getPublicMatchImagePath } from "./match-image-secure";
 import { getPublicMatchImages } from "./match-image-gallery";

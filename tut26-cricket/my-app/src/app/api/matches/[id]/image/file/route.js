@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: API route handler for Api requests.
+ * Main exports: runtime.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: performs network requests.
+ * Read next: ../../../../../../../docs/ONBOARDING.md
+ */
 import { connectDB } from "../../../../../lib/db";
 import { jsonError } from "../../../../../lib/api-response";
 import {

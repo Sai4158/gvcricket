@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Page Audio logic.
+ * Main exports: isIOSSafari, isUiAudioUnlocked, subscribeUiAudioUnlock, getPreferredAudioSessionType, setPreferredAudioSessionType, setPlaybackFriendlyAudioSessionType, restorePreferredAudioSessionType, duckPageMedia, restorePageMedia, playUiTone.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: performs network requests.
+ * Read next: README.md
+ */
 let sharedUiAudioContext = null;
 let sharedUiAudioUnlocked = false;
 

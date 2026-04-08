@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Source module for Not Found.
+ * Main exports: NotFound.
+ * Major callers: Adjacent modules in the same feature area.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: README.md
+ */
 // src/app/not-found.jsx
 "use client";
 

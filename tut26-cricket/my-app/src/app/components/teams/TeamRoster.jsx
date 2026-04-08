@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: UI component for Teams screens and flows.
+ * Main exports: TeamRoster, createDefaultRoster.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ../README.md
+ */
+
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FaCheck, FaMinus, FaPen, FaPlus, FaTrash } from "react-icons/fa";

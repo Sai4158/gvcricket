@@ -1,4 +1,13 @@
 "use client";
+
+/**
+ * File overview:
+ * Purpose: UI component for Toss screens and flows.
+ * Main exports: TossStatePanels.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ../README.md
+ */
 import { useMemo } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { FaCircle } from "react-icons/fa";

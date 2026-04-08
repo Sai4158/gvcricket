@@ -1,5 +1,14 @@
 "use client";
 
+
+/**
+ * File overview:
+ * Purpose: React hook for Match behavior and browser state.
+ * Main exports: useMatchAccess.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: reads or writes browser storage.
+ * Read next: README.md
+ */
 import { useEffect, useState } from "react";
 import {
   buildPinRateLimitMessage,

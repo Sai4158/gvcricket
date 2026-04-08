@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Match Image logic.
+ * Main exports: getMatchImageLimits, isAllowedMatchImageMime, validateMatchImageBuffer, buildPublicMatchImageUrl, isSafeRemoteMatchImageUrl, buildInlineMatchImageDataUrl, isInlineMatchImageDataUrl, isSafeMatchImageUrl, normalizeMatchImageMetadata.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 const SAFE_IMAGE_HOSTS = new Set(["i.ibb.co", "ibb.co"]);
 const MAX_MATCH_IMAGE_BYTES = 5 * 1024 * 1024;
 const INTERNAL_MATCH_IMAGE_PATH =

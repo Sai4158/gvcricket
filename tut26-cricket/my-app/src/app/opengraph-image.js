@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Social image generator for Opengraph Image.
+ * Main exports: OpenGraphImage, runtime, alt, size, contentType.
+ * Major callers: Adjacent modules in the same feature area.
+ * Side effects: none.
+ * Read next: README.md
+ */
 import {
   createLogoOnlySocialImage,
   SOCIAL_IMAGE_SIZE,

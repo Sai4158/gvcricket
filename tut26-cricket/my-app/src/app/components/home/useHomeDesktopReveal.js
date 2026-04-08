@@ -1,5 +1,14 @@
 "use client";
 
+
+/**
+ * File overview:
+ * Purpose: React hook for Home behavior and browser state.
+ * Main exports: useHomeDesktopReveal.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: README.md
+ */
 import { useEffect, useRef, useState } from "react";
 
 const observerRegistry = new Map();

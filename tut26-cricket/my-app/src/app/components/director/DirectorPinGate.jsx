@@ -1,5 +1,14 @@
 "use client";
 
+
+/**
+ * File overview:
+ * Purpose: UI component for Director screens and flows.
+ * Main exports: DirectorPinGate.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: README.md
+ */
 import Link from "next/link";
 import { useState } from "react";
 import { FaArrowLeft, FaBroadcastTower, FaInfoCircle } from "react-icons/fa";

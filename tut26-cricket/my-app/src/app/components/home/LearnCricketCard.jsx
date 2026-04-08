@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: UI component for Home screens and flows.
+ * Main exports: LearnCricketCard.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: README.md
+ */
+
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
 import {

@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: App Router page entry for Session.
+ * Main exports: dynamic.
+ * Major callers: Next.js App Router.
+ * Side effects: none.
+ * Read next: ../../../../../docs/ONBOARDING.md
+ */
 import SessionViewClient from "../../../components/session-view/SessionViewClient";
 import {
   absoluteUrl,

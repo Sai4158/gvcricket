@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Match Scoring logic.
+ * Main exports: countLegalBalls, addBallToHistory, buildWinByWicketsText, syncTeamNamesAcrossMatch.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 import { getBattingTeamBundle, getTotalDismissalsAllowed } from "./team-utils";
 
 export function countLegalBalls(history = []) {

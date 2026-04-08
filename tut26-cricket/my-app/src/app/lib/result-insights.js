@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Result Insights logic.
+ * Main exports: getBallDisplayLabel, buildInningsInsights, buildResultInsights.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 import {
   calculateTrackedPlayerStats,
   hasTrackedPlayerStats,

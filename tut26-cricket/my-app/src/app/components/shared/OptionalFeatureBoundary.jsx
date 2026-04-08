@@ -1,5 +1,14 @@
 "use client";
 
+
+/**
+ * File overview:
+ * Purpose: UI component for Shared screens and flows.
+ * Main exports: default export.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: README.md
+ */
 import { Component } from "react";
 
 function DefaultFallback({ label = "Feature unavailable." }) {

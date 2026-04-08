@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: App Router page entry for Session.
+ * Main exports: revalidate, metadata.
+ * Major callers: Next.js App Router.
+ * Side effects: none.
+ * Read next: ../README.md
+ */
 import SessionsPageClient from "../components/session/SessionsPageClient";
 import { absoluteUrl, siteConfig } from "../lib/site-metadata";
 import { loadSessionsIndexPageData } from "../lib/server-data";

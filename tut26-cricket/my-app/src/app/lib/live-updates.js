@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Live Updates logic.
+ * Main exports: publishMatchUpdate, publishSessionUpdate, subscribeToMatch, subscribeToSession, getMatchSubscriberCount, getSessionSubscriberCount.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: registers or reuses a Mongoose model.
+ * Read next: README.md
+ */
 import { EventEmitter } from "node:events";
 import mongoose from "mongoose";
 import { connectDB } from "./db";

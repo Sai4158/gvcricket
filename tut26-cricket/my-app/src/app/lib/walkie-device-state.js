@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Walkie Device State logic.
+ * Main exports: buildWalkieDevicePreferenceKey, readWalkieDevicePreference, writeWalkieDevicePreference, didSharedWalkieEnable, didSharedWalkieDisable, getNonUmpireWalkieToggleAction, getNonUmpireWalkieUiState, NON_UMPIRE_WALKIE_LOCAL_ENABLE_NOTICE, NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT, NON_UMPIRE_WALKIE_ACCEPTED_ANNOUNCEMENT.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: reads or writes browser storage.
+ * Read next: README.md
+ */
 export const NON_UMPIRE_WALKIE_LOCAL_ENABLE_NOTICE =
   "Turn on walkie to listen and respond.";
 export const NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT =

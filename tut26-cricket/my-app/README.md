@@ -2,6 +2,12 @@
 
 GV Cricket 2.0 is a modern cricket scoring app for running a match from setup to result in one clean flow.
 
+## Repo guides
+
+- `docs/ONBOARDING.md` for the fastest repo walkthrough
+- `docs/ARCHITECTURE.md` for structure and ownership
+- `docs/MODULE_MAP.md` for the high-level map
+
 It is built for:
 - umpires who need fast live scoring
 - spectators who want instant score updates

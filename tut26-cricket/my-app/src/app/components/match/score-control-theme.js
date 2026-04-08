@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: UI component for Match screens and flows.
+ * Main exports: getScoreControlToneClasses, scoreControlFont.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 import { Rajdhani } from "next/font/google";
 
 export const scoreControlFont = Rajdhani({

@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: App Router page entry for Rules.
+ * Main exports: RulesPage, metadata.
+ * Major callers: Next.js App Router.
+ * Side effects: none.
+ * Read next: ../README.md
+ */
 import Link from "next/link";
 import { FaArrowLeft } from "react-icons/fa";
 import { absoluteUrl, siteConfig } from "../lib/site-metadata";

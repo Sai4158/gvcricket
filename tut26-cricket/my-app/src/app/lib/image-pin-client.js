@@ -1,5 +1,14 @@
 "use client";
 
+
+/**
+ * File overview:
+ * Purpose: Shared helper module for Image Pin Client logic.
+ * Main exports: module side effects only.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: README.md
+ */
 import { getImagePinCheckPayload } from "./image-pin-policy";
 import {
   buildPinRequestError,

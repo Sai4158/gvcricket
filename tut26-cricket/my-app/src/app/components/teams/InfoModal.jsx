@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: UI component for Teams screens and flows.
+ * Main exports: TeamsInfoModal.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ../README.md
+ */
+
 import { motion } from "framer-motion";
 import { FaTimes } from "react-icons/fa";
 

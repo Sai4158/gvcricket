@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Agora Channels logic.
+ * Main exports: buildAgoraRtcChannelName, buildAgoraSignalingChannelName, buildAgoraUserId, buildAgoraRtcUserId.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 const AGORA_CHANNEL_PART_MAX = 48;
 const AGORA_USER_ID_MAX = 64;
 

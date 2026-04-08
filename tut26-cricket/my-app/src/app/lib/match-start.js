@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Match Start logic.
+ * Main exports: isValidMatchId, getStartedMatchFromPayload, getStartedMatchId.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 export function isValidMatchId(value) {
   return /^[a-f0-9]{24}$/i.test(String(value || ""));
 }

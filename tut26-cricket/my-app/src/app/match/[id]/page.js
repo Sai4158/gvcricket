@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: App Router page entry for Match.
+ * Main exports: dynamic, metadata.
+ * Major callers: Next.js App Router.
+ * Side effects: none.
+ * Read next: ../../../../docs/ONBOARDING.md
+ */
 import MatchPageClient from "../../components/match/MatchPageClient";
 import { absoluteUrl, siteConfig } from "../../lib/site-metadata";
 import { loadMatchAccessData } from "../../lib/server-data";

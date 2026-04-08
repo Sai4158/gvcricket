@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Audit Log logic.
+ * Main exports: module side effects only.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 import { connectDB } from "./db";
 import AuditLog from "../../models/AuditLog";
 

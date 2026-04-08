@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Match Stats logic.
+ * Main exports: hasTrackedPlayerStats, calculateInningsSummary, calculateTrackedPlayerStats.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 import { countLegalBalls } from "./match-scoring";
 
 export function hasTrackedPlayerStats(innings) {

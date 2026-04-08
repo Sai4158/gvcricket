@@ -1,5 +1,14 @@
 "use client";
 
+
+/**
+ * File overview:
+ * Purpose: UI component for Result screens and flows.
+ * Main exports: CustomTooltip.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: README.md
+ */
 export default function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
 

@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Source module for Sitemap.
+ * Main exports: default export.
+ * Major callers: Adjacent modules in the same feature area.
+ * Side effects: none.
+ * Read next: README.md
+ */
 import Match from "../models/Match";
 import Session from "../models/Session";
 import { connectDB } from "./lib/db";

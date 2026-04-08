@@ -1,5 +1,14 @@
 "use client";
 
+
+/**
+ * File overview:
+ * Purpose: UI component for Toss screens and flows.
+ * Main exports: CoinHeads, CoinTails, SpinningCoin.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ../README.md
+ */
 function CoinShell({
   rimStroke,
   frontFill,

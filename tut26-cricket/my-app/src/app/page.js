@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: App Router page entry for Page.
+ * Main exports: dynamic, metadata.
+ * Major callers: Next.js App Router.
+ * Side effects: none.
+ * Read next: README.md
+ */
 import nextDynamic from "next/dynamic";
 import HeroSection from "./components/home/HeroSection";
 import HomeHeader from "./components/home/HomeHeader";

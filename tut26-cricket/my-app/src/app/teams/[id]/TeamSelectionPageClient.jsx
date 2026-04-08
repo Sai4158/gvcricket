@@ -1,5 +1,14 @@
 "use client";
 
+
+/**
+ * File overview:
+ * Purpose: Source module for TeamSelectionPageClient.
+ * Main exports: TeamSelectionPageClient.
+ * Major callers: Adjacent modules in the same feature area.
+ * Side effects: reads or writes browser storage.
+ * Read next: ../../../../docs/ONBOARDING.md
+ */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";

@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Source module for Next.Config.
+ * Main exports: default export.
+ * Major callers: Adjacent modules in the same feature area.
+ * Side effects: reads server request metadata.
+ * Read next: README.md
+ */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildSecurityHeaders } from "./security-headers.mjs";

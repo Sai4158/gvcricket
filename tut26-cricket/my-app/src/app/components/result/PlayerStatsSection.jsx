@@ -1,5 +1,14 @@
 "use client";
 
+
+/**
+ * File overview:
+ * Purpose: UI component for Result screens and flows.
+ * Main exports: PlayerStatsSection.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: README.md
+ */
 import {
   calculateTrackedPlayerStats,
   hasTrackedPlayerStats,

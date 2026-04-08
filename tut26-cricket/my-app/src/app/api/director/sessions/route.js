@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: API route handler for Api requests.
+ * Main exports: module side effects only.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: reads server request metadata.
+ * Read next: ../../../../../docs/ONBOARDING.md
+ */
 import { cookies } from "next/headers";
 import { jsonError } from "../../../lib/api-response";
 import {

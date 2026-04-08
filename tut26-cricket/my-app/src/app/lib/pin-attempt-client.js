@@ -1,5 +1,14 @@
 "use client";
 
+
+/**
+ * File overview:
+ * Purpose: Shared helper module for Pin Attempt Client logic.
+ * Main exports: buildPinRateLimitMessage, getClientPinRateLimitState, clearClientPinRateLimit, registerClientPinFailure, getPinRequestRetryAfterMs, buildPinRequestError, useClientPinRateLimit.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: reads or writes browser storage.
+ * Read next: README.md
+ */
 import { useCallback, useEffect, useState } from "react";
 import {
   PIN_BURST_BLOCK_MS,

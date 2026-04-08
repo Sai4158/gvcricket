@@ -1,5 +1,14 @@
 "use client";
 
+
+/**
+ * File overview:
+ * Purpose: UI component for Shared screens and flows.
+ * Main exports: SiteFooter.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: README.md
+ */
 import Image from "next/image";
 import BackToTopButton from "../home/BackToTopButton";
 import HomeScrollFade from "../home/HomeScrollFade";

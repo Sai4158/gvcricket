@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Team Utils logic.
+ * Main exports: getTeamBundle, buildTeamUpdate, getTeamByName, getBattingTeamBundle, getPlayerCount, getTotalDismissalsAllowed.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 const TEAM_LABELS = {
   teamA: "Team A",
   teamB: "Team B",

@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Automated test coverage for Director E2e Smoke behavior and regressions.
+ * Main exports: module side effects only.
+ * Major callers: `npm test` and focused test runs.
+ * Side effects: runs assertions and test-side setup/teardown only.
+ * Read next: README.md
+ */
 import fs from "node:fs";
 import path from "node:path";
 import mongoose from "mongoose";

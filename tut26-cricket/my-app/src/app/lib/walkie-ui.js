@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Shared helper module for Walkie Ui logic.
+ * Main exports: getWalkieRoleLabel, getWalkieRemoteSpeakerState.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: README.md
+ */
 export function getWalkieRoleLabel(role = "") {
   if (role === "umpire") return "Umpire";
   if (role === "director") return "Director";

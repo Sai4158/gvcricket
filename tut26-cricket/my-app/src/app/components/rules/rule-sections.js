@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: UI component for Rules screens and flows.
+ * Main exports: ruleSections, appGuideSections, appGuideIcon.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ../README.md
+ */
 import {
   FaBalanceScale,
   FaGamepad,

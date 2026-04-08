@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: Social image generator for Session.
+ * Main exports: runtime, alt, size, contentType.
+ * Major callers: Adjacent modules in the same feature area.
+ * Side effects: none.
+ * Read next: ../../../../../docs/ONBOARDING.md
+ */
 import {
   createLogoOnlySocialImage,
   SOCIAL_IMAGE_SIZE,

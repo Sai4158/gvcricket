@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: API route handler for Api requests.
+ * Main exports: runtime.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: performs network requests.
+ * Read next: ../../../../../../docs/ONBOARDING.md
+ */
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { jsonError, jsonRateLimit } from "../../../../lib/api-response";

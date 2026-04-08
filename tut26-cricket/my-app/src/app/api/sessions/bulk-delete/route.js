@@ -1,3 +1,11 @@
+/**
+ * File overview:
+ * Purpose: API route handler for Api requests.
+ * Main exports: module side effects only.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: registers or reuses a Mongoose model.
+ * Read next: ../../../../../docs/ONBOARDING.md
+ */
 import mongoose from "mongoose";
 import { z } from "zod";
 import Session from "../../../../models/Session";
