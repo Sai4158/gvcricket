@@ -4,7 +4,7 @@
  * Main exports: caching helpers, YouTube resolvers, and pure display/state helpers.
  * Major callers: DirectorConsoleClient and director-focused tests.
  * Side effects: reads browser storage and may load the YouTube iframe API.
- * Read next: ./DirectorConsoleClient.jsx
+ * Read next: ./README.md
  */
 
 import { countLegalBalls } from "../../../lib/match-scoring";

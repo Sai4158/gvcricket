@@ -4,7 +4,7 @@
  * Main exports: createWalkieRtmSignalingApi.
  * Major callers: useWalkieTalkieRuntime.
  * Side effects: logs in to Agora RTM, subscribes to channels, and tears signaling down.
- * Read next: ./request-enable-flow.js
+ * Read next: ./runtime-ui.js
  */
 
 import {

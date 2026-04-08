@@ -4,7 +4,7 @@
  * Main exports: EMPTY_WALKIE_SNAPSHOT, mergeWalkieSnapshots, token validation helpers.
  * Major callers: useWalkieTalkie and walkie-focused tests.
  * Side effects: none.
- * Read next: ./useWalkieTalkie.js
+ * Read next: ../README.md
  */
 
 import { filterAgoraWalkieRequests } from "../../../lib/walkie-agora-runtime";

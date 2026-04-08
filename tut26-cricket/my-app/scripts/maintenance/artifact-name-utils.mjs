@@ -43,9 +43,13 @@ const normalizeLogLeafName = (fileName) => {
     next = `${next}.log`;
   }
 
-  return next
+  next = next
     .replace(/-result(?=\.[^.]+$)/i, "")
     .replace(/-report(?=\.[^.]+$)/i, "");
+
+  next = next.replace(/^home(?=\d{3,5}\.(err|out)\.log$)/i, "home-start-");
+
+  return next;
 };
 
 const normalizeWalkieReportLeafName = (fileName) => {
@@ -78,6 +82,7 @@ const normalizeStressReportLeafName = (fileName) => {
   if (!/^walkie-stress-/i.test(next)) {
     next = next.replace(/^stress-/i, "walkie-stress-");
   }
+  next = next.replace(/^walkie-stress-stress(?=\.txt$)/i, "walkie-stress");
   return next;
 };
 

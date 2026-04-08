@@ -25,9 +25,16 @@ These files keep import paths stable and hand work off to smaller internal folde
   - `DirectorConsoleScreen.jsx`: director console implementation
   - `DirectorConsoleChrome.jsx`: reusable director console UI shell pieces
   - `director-console-utils.js`: pure director helpers
+  - `hooks/useDirectorAuth.js`: PIN and director-mode access flow
+  - `hooks/useDirectorSessionSelection.js`: session loading, auto-manage, and picker state
+  - `hooks/useDirectorWalkieControls.js`: director walkie preferences and request flow
+  - `hooks/useDirectorAudioLibrary.js`: sound-effect deck cache and reorder logic
+  - `hooks/useDirectorMusicDeck.js`: loudspeaker and YouTube deck runtime
+  - `panels/*.jsx`: render-only director panels for loudspeaker, walkie, effects, score announcing, and YouTube playback
 - `src/app/components/match/page`
   - `MatchPageScreen.jsx`: umpire screen implementation
   - `match-page-helpers.js`: stage flow, sound effect, and local cache helpers
+  - `hooks/*.js`: split match runtime hooks for stage flow, sound effects, and walkie interruptions
 - `src/app/components/session-view/page`
   - `SessionViewScreen.jsx`: spectator live-view implementation
   - `SessionViewIcons.jsx`: shared spectator icons and switch UI
@@ -91,5 +98,5 @@ These files keep import paths stable and hand work off to smaller internal folde
 ## Repo support layer
 
 - `scripts/maintenance`: maintenance scripts
-- `scripts/verification`: verification and audit scripts
+- `scripts/verification`: verification, audit, and logged-start scripts
 - `artifacts`: generated logs and local reports

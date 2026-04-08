@@ -43,6 +43,9 @@ If you want the real implementation, open the internal folder README after the w
 - Run tests with `npm test`
 - Run type checks with `npm run typecheck`
 - Build the production app with `npm run build`
+- Normalize artifact names with `npm run artifacts:normalize`
+- Move stray root logs into `artifacts` with `npm run artifacts:adopt-root`
+- Confirm the repo root is clean with `npm run verify:root`
 
 ## How to debug safely
 
@@ -56,4 +59,4 @@ If you want the real implementation, open the internal folder README after the w
 
 - Start from the route file, then follow the main component import.
 - Inside a feature folder, read the README before opening the largest file.
-- In large screens, look for adjacent helper modules or internal folders first. They usually explain the feature faster than the main screen file.
+- In large screens, look for adjacent `hooks`, `panels`, or helper modules first. They usually explain the feature faster than the main screen file.

@@ -13,6 +13,8 @@ Director console UI lives here.
 - `console/DirectorConsoleScreen.jsx`: main director console implementation
 - `console/DirectorConsoleChrome.jsx`: reusable director shell pieces
 - `console/director-console-utils.js`: pure director helpers
+- `console/hooks`: split runtime hooks for auth, session selection, walkie, audio library, and music deck behavior
+- `console/panels`: render-only panels that keep the screen shell readable
 
 ## Use this folder when
 
@@ -25,4 +27,12 @@ Director console UI lives here.
 
 ```bash
 npm test
+```
+
+Need artifact cleanup after a local run:
+
+```bash
+npm run artifacts:normalize
+npm run artifacts:adopt-root
+npm run verify:root
 ```

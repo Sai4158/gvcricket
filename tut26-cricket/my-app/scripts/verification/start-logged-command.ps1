@@ -1,10 +1,10 @@
 <#
-.SYNOPSIS
-Starts a local command and writes readable stdout and stderr logs under artifacts/logs.
-
-.DESCRIPTION
-Use this helper for manual Windows checks when you need persistent logs without creating
-hidden or tmp-prefixed files in the repo root.
+File overview:
+Purpose: Starts a local Windows command and writes readable stdout and stderr logs under artifacts/logs.
+Main exports: script side effects only.
+Major callers: manual local verification and maintenance runs.
+Side effects: creates log files under artifacts/logs and starts the requested process.
+Read next: ../README.md
 #>
 
 param(

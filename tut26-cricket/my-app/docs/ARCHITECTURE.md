@@ -13,7 +13,7 @@ GV Cricket is a Next.js App Router application for live cricket scoring. The rep
 1. App Router entry files in `src/app/**/page.*`, `layout.js`, or `src/app/api/**/route.js` receive the request.
 2. Route files stay thin: they load data, enforce access, and pass control to a stable public wrapper component or helper.
 3. Stable public wrappers live in feature folders such as `src/app/components/director/DirectorConsoleClient.jsx` and `src/app/components/match/MatchPageClient.jsx`.
-4. Large implementations are split behind those wrappers into internal folders such as `director/console`, `match/page`, `session-view/page`, `live/walkie`, and `home/how-it-works`.
+4. Large implementations are split behind those wrappers into internal folders such as `director/console`, `director/console/hooks`, `director/console/panels`, `match/page`, `match/page/hooks`, `session-view/page`, `live/walkie`, and `home/how-it-works`.
 5. Shared server-side loading and cross-feature rules live in `src/app/lib`.
 6. Mongoose models in `src/models` define persisted session, match, settings, and audit records.
 7. Tests in `tests` validate pure helpers, live flows, security rules, and regression coverage by domain.
@@ -50,8 +50,8 @@ GV Cricket is a Next.js App Router application for live cricket scoring. The rep
 
 ## Repo support layers
 
-- `scripts/maintenance`: repo maintenance scripts such as file-header refresh
-- `scripts/verification`: typecheck, route probes, and repo cleanliness checks
+- `scripts/maintenance`: repo maintenance scripts such as file-header refresh and artifact normalization
+- `scripts/verification`: typecheck, route probes, logged local starts, and repo cleanliness checks
 - `artifacts`: generated local logs and reports. New runtime logs should go here, not the repo root
 
 ## Start here by task

@@ -4,7 +4,7 @@
  * Main exports: stage-state helpers, sound-effect helpers, and local storage cache helpers.
  * Major callers: MatchPageClient.
  * Side effects: reads and writes localStorage for audio duration caching.
- * Read next: ./MatchPageClient.jsx
+ * Read next: ./README.md
  */
 
 import {
