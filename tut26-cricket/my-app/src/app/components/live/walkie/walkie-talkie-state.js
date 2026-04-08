@@ -33,7 +33,7 @@ export function nowIso() {
   return new Date().toISOString();
 }
 
-function normalizeAuthoritativeWalkieSnapshot(snapshot) {
+export function normalizeAuthoritativeWalkieSnapshot(snapshot) {
   if (!snapshot) {
     return null;
   }

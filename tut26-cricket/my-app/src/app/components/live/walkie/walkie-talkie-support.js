@@ -52,7 +52,7 @@ export function isWalkieNetworkError(error) {
   );
 }
 
-function isRtmPublishDisconnectedError(error) {
+export function isRtmPublishDisconnectedError(error) {
   const rawCode = String(error?.code || "");
   const rawName = String(error?.name || "");
   const rawMessage = String(error?.message || "");

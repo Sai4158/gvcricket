@@ -1,75 +1,86 @@
 # GV Cricket 2.0
 
-GV Cricket 2.0 is a modern cricket scoring app for running a match from setup to result in one clean flow.
+GV Cricket 2.0 is a Next.js cricket scoring app that keeps session setup, toss, live umpire scoring, spectator updates, director controls, and results in one flow.
 
-## Repo guides
+## Start here
 
-- `docs/ONBOARDING.md` for the fastest repo walkthrough
-- `docs/ARCHITECTURE.md` for structure and ownership
-- `docs/MODULE_MAP.md` for the high-level map
+Read these files in order if you are new to the repo:
 
-It is built for:
-- umpires who need fast live scoring
-- spectators who want instant score updates
-- directors who want audio, walkie-talkie, and match control tools
+1. `docs/ONBOARDING.md`
+2. `docs/COMMANDS.md`
+3. `docs/ARCHITECTURE.md`
+4. `docs/MODULE_MAP.md`
+5. `tests/README.md`
 
-## Features
+## Main entry points
 
-- 🏏 Fast ball-by-ball umpire scoring
-- 📣 Live spectator score announcer
-- 🎙️ Loudspeaker and commentary tools
-- 📻 Walkie-Talkie for live match communication
-- 🎛️ Director Console for audio and session control
-- 🪙 Toss flow with batting and bowling selection
-- 👥 Team setup with editable player lists
-- 🖼️ Match cover image and branded match pages
-- 📊 Result insights, scorecards, and saved match history
-- 🔄 Live updates across umpire, spectator, and result views
+- `/` -> `src/app/page.js`
+- `/session` -> `src/app/session/page.js`
+- `/toss/[id]` -> `src/app/toss/[id]/page.js`
+- `/match/[id]` -> `src/app/match/[id]/page.js`
+- `/session/[id]/view` -> `src/app/session/[id]/view/page.jsx`
+- `/director` -> `src/app/director/page.jsx`
+- `/result/[id]` -> `src/app/result/[id]/page.jsx`
 
-## How it works
+The route files stay thin. Most work happens in stable public wrappers under `src/app/components/**`, which delegate into smaller internal folders such as `director/console`, `match/page`, `session-view/page`, `live/walkie`, and `home/how-it-works`.
 
-1. Create a session
-2. Add team names, players, and overs
-3. Complete the toss
-4. Start the real live match
-5. Score each ball in umpire mode
-6. Share the live score with spectators
-7. Finish the match and view the result page
+## Run these commands
 
-## Main views
+```bash
+npm install
+npm run dev
+npm run lint
+npm test
+npm run typecheck
+npm run build
+```
 
-- **Home**  
-  Product overview, live match entry points, and highlight sections.
+Useful maintenance and verification commands:
 
-- **Session setup**  
-  Create the session, define teams, players, and overs.
+```bash
+npm run docs:headers
+npm run verify:audit
+npm run verify:root
+```
 
-- **Toss**  
-  Decide the toss winner and choose bat or bowl.
+See `docs/COMMANDS.md` for the full command guide.
 
-- **Umpire mode**  
-  Score runs, wickets, wides, no balls, undo actions, and manage the match live.
+## Folder map
 
-- **Spectator view**  
-  Follow the live score, hear score announcements, and use walkie-talkie when enabled.
+- `src/app`: App Router pages, layouts, and API routes
+- `src/app/components`: browser-facing feature UI, grouped by feature
+- `src/app/lib`: shared domain logic, serializers, validation, audio, and server loaders
+- `src/models`: Mongoose models
+- `tests`: domain-organized test suites
+- `scripts/maintenance`: repo maintenance scripts
+- `scripts/verification`: typecheck, audit, and cleanliness checks
+- `artifacts`: generated local logs and reports
 
-- **Director Console**  
-  Manage music, sound effects, audio playback, walkie, and session-level control tools.
+## Artifacts
 
-- **Results**  
-  View final scores, winner summary, charts, insights, and saved match details.
+Generated logs and reports belong in `artifacts`, not the repo root.
+
+- `artifacts/logs/dev`
+- `artifacts/logs/e2e`
+- `artifacts/logs/audit`
+- `artifacts/logs/checks`
+- `artifacts/reports/smoke`
+- `artifacts/reports/stress`
+- `artifacts/reports/walkie`
+
+See `artifacts/README.md` for what goes where.
+
+## Product areas
+
+- Umpires: live scoring, undo, commentary, and scoring controls
+- Spectators: live score view, speech announcements, and optional walkie access
+- Directors: music, sound effects, loudspeaker tools, walkie controls, and session management
 
 ## Stack
 
-- **Next.js** for the app framework
-- **React** for the UI
-- **MongoDB + Mongoose** for persistence
-- **Server-Sent Events (SSE)** for live updates
-- **Framer Motion** for motion and UI polish
-- **Tailwind CSS** for styling
-
-## Notes
-
-- Built to be simple, fast, and mobile-friendly
-- Designed for live cricket scoring with synced match views
-- Keeps umpire, spectator, result, and director flows connected in one system
+- Next.js App Router
+- React
+- MongoDB with Mongoose
+- Server-Sent Events
+- Framer Motion
+- Tailwind CSS

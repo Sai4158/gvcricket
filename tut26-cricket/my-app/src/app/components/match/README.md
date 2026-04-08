@@ -2,8 +2,27 @@
 
 This folder owns the umpire scoring experience.
 
-- `MatchPageClient.jsx` is the main screen.
-- Extracted helper modules next to it should contain stage logic, sound-effect helpers, or focused UI sections.
-- `useMatch.js` owns optimistic match updates and queue behavior.
+## Start here
 
-Start here when changing live scoring controls.
+- Stable public entry: `MatchPageClient.jsx`
+- Real implementation folder: `page`
+
+## Main entry
+
+- `MatchPageClient.jsx`: stable wrapper used by routes and callers
+- `page/MatchPageScreen.jsx`: main umpire screen implementation
+- `page/match-page-helpers.js`: stage logic, sound-effect helpers, and cache helpers
+- `useMatch.js`: optimistic match updates and queue behavior
+
+## Use this folder when
+
+- Changing live scoring controls
+- Changing match-stage prompts
+- Changing umpire sound effects or announcements
+- Changing walkie behavior inside the umpire screen
+
+## Run this command
+
+```bash
+npm test
+```

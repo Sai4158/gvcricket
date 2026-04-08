@@ -11,7 +11,14 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "tsx --test tests",
-    "typecheck": "node scripts/typecheck.mjs"
+    "typecheck": "node scripts/verification/typecheck.mjs",
+    "docs:headers": "node scripts/maintenance/add-file-headers.mjs",
+    "verify:lint": "npm run lint",
+    "verify:test": "npm test",
+    "verify:typecheck": "npm run typecheck",
+    "verify:build": "npm run build",
+    "verify:audit": "powershell -ExecutionPolicy Bypass -File .\\scripts\\verification\\audit-probes.ps1",
+    "verify:root": "node scripts/verification/check-root-cleanliness.mjs"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^4.22.0",

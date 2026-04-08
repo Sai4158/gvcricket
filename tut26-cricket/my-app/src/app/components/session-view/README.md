@@ -2,8 +2,27 @@
 
 This folder owns the spectator live-score experience.
 
-- `SessionViewClient.jsx` is the main screen shell.
-- `SessionViewIcons.jsx` holds small presentational controls.
-- `session-view-helpers.js` holds stream-signature and announcer timing helpers.
+## Start here
 
-Start here when changing live spectator playback, follow-mode behavior, or walkie access for viewers.
+- Stable public entry: `SessionViewClient.jsx`
+- Real implementation folder: `page`
+
+## Main entry
+
+- `SessionViewClient.jsx`: stable wrapper used by routes and callers
+- `page/SessionViewScreen.jsx`: spectator live-view implementation
+- `page/SessionViewIcons.jsx`: shared spectator controls
+- `page/session-view-helpers.js`: stream-signature, announcer timing, and score-effect helpers
+
+## Use this folder when
+
+- Changing live spectator playback
+- Changing follow-mode behavior
+- Changing spectator walkie access
+- Changing spectator announcer timing
+
+## Run this command
+
+```bash
+npm test
+```

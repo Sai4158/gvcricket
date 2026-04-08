@@ -37,6 +37,7 @@ import {
   EMPTY_WALKIE_SNAPSHOT,
   isTokenFresh,
   mergeWalkieSnapshots,
+  normalizeAuthoritativeWalkieSnapshot,
   nowIso,
   validateWalkieTokenPayload,
   withTokenExpiry,
@@ -54,6 +55,7 @@ import {
   clearTimer,
   isExpectedWalkieTransportError,
   isRtcUidConflictError,
+  isRtmPublishDisconnectedError,
   isWalkieNetworkError,
   loadRtc,
   loadRtm,
@@ -71,6 +73,11 @@ import {
   walkieConsole,
   walkieMessageFor,
 } from "./walkie-talkie-support";
+import { createWalkieTokenLifecycleApi } from "./token-lifecycle";
+import { createWalkiePresenceSnapshotApi } from "./presence-snapshot";
+import { createWalkieRtcTransportApi } from "./rtc-transport";
+import { createWalkieRtmSignalingApi } from "./rtm-signaling";
+import { createWalkieRuntimeUiApi } from "./runtime-ui";
 
 export {
   classifyWalkieSignalingSetupError,
@@ -170,6 +177,7 @@ export default function useWalkieTalkie({
   const respondPromiseRef = useRef(null);
   const refreshSignalPromiseRef = useRef(null);
   const refreshSignalHandlerRef = useRef(null);
+  const stopTalkingHandlerRef = useRef(null);
   const lastRefreshRequestIdRef = useRef("");
   const lastAcceptedRequestIdRef = useRef("");
   const lastDismissedRequestIdRef = useRef("");
@@ -302,980 +310,180 @@ export default function useWalkieTalkie({
   shouldMaintainSignalingRef.current = shouldMaintainSignaling;
   pageVisibleRef.current = isPageVisible;
 
-  const setManualSignalingActive = useCallback((nextActive) => {
-    const next = Boolean(nextActive);
-    if (manualSignalingActiveRef.current === next) {
-      return;
-    }
-    manualSignalingActiveRef.current = next;
-    shouldMaintainSignalingRef.current = shouldMaintainWalkieSignaling({
-      enabled,
-      matchId,
-      pageVisible: pageVisibleRef.current,
-      signalingActive: signalingPropActiveRef.current,
-      manualSignalingActive: next,
-    });
-    setManualSignalingActiveState(next);
-  }, [enabled, matchId]);
-
-  const enableManualSignaling = useCallback(() => {
-    if (!enabled || !matchId) {
-      return;
-    }
-    setManualSignalingActive(true);
-  }, [enabled, matchId, setManualSignalingActive]);
-
-  const dismissNotice = useCallback(() => {
-    noticeRef.current = "";
-    setNotice("");
-  }, []);
-
-  const updateNotice = useCallback((next) => {
-    const safe = String(next || "");
-    if (noticeRef.current === safe) return;
-    noticeRef.current = safe;
-    setNotice(safe);
-  }, []);
-
-  const stopConnectingCueLoop = useCallback(() => {
-    clearTimer(connectCueLoopTimerRef);
-  }, []);
-
-  const startConnectingCueLoop = useCallback(() => {
-    if (typeof window === "undefined" || connectCueLoopTimerRef.current) {
-      return;
-    }
-
-    const playConnectPattern = () => {
-      playUiTone({ frequency: 880, durationMs: 180, type: "sine", volume: 0.09 });
-      window.setTimeout(() => {
-        playUiTone({ frequency: 980, durationMs: 180, type: "sine", volume: 0.095 });
-      }, 170);
-      window.setTimeout(() => {
-        playUiTone({ frequency: 1080, durationMs: 180, type: "sine", volume: 0.1 });
-      }, 340);
-    };
-
-    const loop = () => {
-      playConnectPattern();
-      connectCueLoopTimerRef.current = window.setTimeout(loop, 980);
-    };
-
-    loop();
-  }, []);
-
-  const stopRemoteAudioPlayback = useCallback((uid = "") => {
-    const safeUid = String(uid || "");
-    if (!safeUid) {
-      return;
-    }
-
-    const track = remoteAudioTracksRef.current.get(safeUid);
-    if (!track) {
-      remoteAudioPlayingRef.current.delete(safeUid);
-      return;
-    }
-
-    try {
-      track.stop?.();
-    } catch {
-    }
-    remoteAudioPlayingRef.current.delete(safeUid);
-  }, []);
-
-  const stopAllRemoteAudioPlayback = useCallback(() => {
-    for (const uid of remoteAudioPlayingRef.current) {
-      stopRemoteAudioPlayback(uid);
-    }
-    remoteAudioPlayingRef.current.clear();
-  }, [stopRemoteAudioPlayback]);
-
-  const playRemoteAudioTrack = useCallback(
-    (uid = "") => {
-      const safeUid = String(uid || "");
-      if (!safeUid || remoteAudioPlayingRef.current.has(safeUid)) {
-        return;
-      }
-
-      const track = remoteAudioTracksRef.current.get(safeUid);
-      if (!track) {
-        return;
-      }
-
-      try {
-        track.setVolume?.(100);
-      } catch {
-      }
-
-      try {
-        track.play?.();
-        remoteAudioPlayingRef.current.add(safeUid);
-      } catch (playError) {
-        setNeedsAudioUnlock(isSafari);
-        updateNotice("Enable Audio if Safari blocks walkie playback.");
-        walkieConsole("error", "RTC remote playback failed", {
-          stage: "rtc-playback",
-          message: messageFor(playError, "Remote playback failed."),
-        });
-      }
-    },
-    [isSafari, updateNotice]
+  const {
+    dismissNotice,
+    enableManualSignaling,
+    scheduleRequestReset,
+    setCooldown,
+    setManualSignalingActive,
+    startConnectingCueLoop,
+    stopConnectingCueLoop,
+    updateNotice,
+  } = useMemo(
+    () =>
+      createWalkieRuntimeUiApi({
+        connectCueLoopTimerRef,
+        cooldownTimerRef,
+        enabled,
+        manualSignalingActiveRef,
+        matchId,
+        noticeRef,
+        pageVisibleRef,
+        requestResetMs: REQUEST_RESET_MS,
+        requestResetRef,
+        setManualSignalingActiveState,
+        setNotice,
+        setRequestCooldownLeft,
+        setRequestState,
+        shouldMaintainSignalingRef,
+        signalingPropActiveRef,
+      }),
+    [enabled, matchId],
   );
 
-  const syncRemoteAudioPlayback = useCallback(() => {
-    const shouldPlay = shouldPlayWalkieRemoteAudio({
-      participantId: participantIdRef.current,
-      snapshot: snapshotRef.current,
-      isSelfTalking,
-      isFinishing,
-    });
-
-    for (const [uid] of remoteAudioTracksRef.current) {
-      if (shouldPlay) {
-        playRemoteAudioTrack(uid);
-      } else {
-        stopRemoteAudioPlayback(uid);
-      }
-    }
-  }, [isFinishing, isSelfTalking, playRemoteAudioTrack, stopRemoteAudioPlayback]);
-
-  const subscribeRemoteAudioUser = useCallback(
-    async (client, user) => {
-      const uid = String(user?.uid || "");
-      if (!client || !uid) {
-        return false;
-      }
-
-      try {
-        if (!user.audioTrack) {
-          await client.subscribe(user, "audio");
-        }
-
-        const track = user.audioTrack;
-        if (track) {
-          try {
-            track.setVolume?.(100);
-          } catch {
-          }
-          remoteAudioTracksRef.current.set(uid, track);
-        }
-
-        syncRemoteAudioPlayback();
-        return true;
-      } catch (subscribeError) {
-        setNeedsAudioUnlock(isSafari);
-        updateNotice("Enable Audio if Safari blocks walkie playback.");
-        walkieConsole("error", "RTC remote subscribe failed", {
-          stage: "rtc-subscribe",
-          uid,
-          message: messageFor(subscribeError, "Remote subscribe failed."),
-        });
-        return false;
-      }
-    },
-    [isSafari, syncRemoteAudioPlayback, updateNotice]
+  const {
+    ensureAudioUnlock,
+    ensureParticipantId,
+    ensureParticipantToken,
+    ensureRtcSessionId,
+    fetchRtcToken,
+    fetchSignalingToken,
+    resetRtcSessionForReload,
+    rotateRtcSessionId,
+    startCountdown,
+  } = useMemo(
+    () =>
+      createWalkieTokenLifecycleApi({
+        countdownTimerRef,
+        ensureRtcTokenFreshBufferMs: RTC_TOKEN_REFRESH_BUFFER_MS,
+        ensureSignalTokenFreshBufferMs: SIGNAL_TOKEN_REFRESH_BUFFER_MS,
+        isSafari,
+        matchId,
+        participantId,
+        participantIdRef,
+        participantTokenRef,
+        role,
+        rtcSessionIdRef,
+        rtcTokenPromiseRef,
+        rtcTokenRef,
+        setCountdown,
+        setHasWalkieToken,
+        setNeedsAudioUnlock,
+        setParticipantId,
+        signalTokenPromiseRef,
+        signalTokenRef,
+        signalingChannelRef,
+        signalingUserIdRef,
+      }),
+    [isSafari, matchId, participantId, role],
   );
 
-  const syncExistingRemoteAudioUsers = useCallback(
-    async (client = rtcClientRef.current) => {
-      if (!client) {
-        return;
-      }
-
-      const remoteUsers = Array.isArray(client.remoteUsers) ? client.remoteUsers : [];
-      const audioUsers = remoteUsers.filter(
-        (user) => Boolean(user?.hasAudio || user?.audioTrack)
-      );
-
-      if (!audioUsers.length) {
-        syncRemoteAudioPlayback();
-        return;
-      }
-
-      await Promise.allSettled(
-        audioUsers.map((user) => subscribeRemoteAudioUser(client, user))
-      );
-      syncRemoteAudioPlayback();
-    },
-    [subscribeRemoteAudioUser, syncRemoteAudioPlayback]
+  const {
+    applyAuthoritativeSnapshot,
+    applyMetadataState,
+    applyPresenceSnapshot,
+    broadcastMetadataState,
+    getStartGateSnapshot,
+    publishWalkieMessage,
+    reconcileActiveSpeaker,
+    refreshPresenceSnapshot,
+    refreshRuntimeState,
+    resolveActiveSpeaker,
+    schedulePresenceRefresh,
+    syncMetadataState,
+    syncPersistentWalkieState,
+    syncSnapshot,
+  } = useMemo(
+    () =>
+      createWalkiePresenceSnapshotApi({
+        activeSpeakerRef,
+        activeSpeakerSourceRef,
+        applyStateDelayMs: PRESENCE_REFRESH_DEBOUNCE_MS,
+        authoritativeSnapshotRef,
+        cleanupSignalingHandlerRef,
+        ensureRtmSessionHandlerRef,
+        matchId,
+        metadataStateRef,
+        participantsRef,
+        presenceRefreshInFlightRef,
+        presenceRefreshPendingRef,
+        presenceRefreshTimerRef,
+        role,
+        rtmClientRef,
+        rtmLoggedInRef,
+        rtmReadyPromiseRef,
+        rtmSubscribedRef,
+        setSnapshot,
+        signalingChannelRef,
+        snapshotRef,
+      }),
+    [matchId, role],
   );
 
-  const syncSnapshot = useCallback(() => {
-    const runtimeSnapshot = buildAgoraWalkieSnapshot({
-      enabled: metadataStateRef.current.enabled,
-      pendingRequests: metadataStateRef.current.pendingRequests,
-      participants: participantsRef.current,
-      activeSpeaker: activeSpeakerRef.current,
-    });
-    const next = mergeWalkieSnapshots({
-      authoritativeSnapshot: authoritativeSnapshotRef.current,
-      runtimeSnapshot,
-      runtimeSubscribed: rtmSubscribedRef.current,
-      runtimePresenceAvailable: participantsRef.current.size > 0,
-      activeSpeakerSource: activeSpeakerSourceRef.current,
-    });
-    snapshotRef.current = next;
-    setSnapshot(next);
-  }, []);
-
-  const applyAuthoritativeSnapshot = useCallback(
-    (nextSnapshot) => {
-      const normalized = normalizeAuthoritativeWalkieSnapshot(nextSnapshot);
-      if (!normalized) {
-        return null;
-      }
-
-      authoritativeSnapshotRef.current = normalized;
-      activeSpeakerSourceRef.current = "authoritative";
-      metadataStateRef.current = {
-        enabled: normalized.enabled,
-        pendingRequests: normalized.pendingRequests,
-      };
-      activeSpeakerRef.current = buildLocalSpeakerFromSnapshot(normalized);
-      syncSnapshot();
-      return normalized;
-    },
-    [syncSnapshot]
-  );
-
-  const scheduleRequestReset = useCallback(() => {
-    clearTimer(requestResetRef);
-    requestResetRef.current = window.setTimeout(() => {
-      setRequestState((current) => (current === "pending" ? current : "idle"));
-      requestResetRef.current = null;
-    }, REQUEST_RESET_MS);
-  }, []);
-
-  const setCooldown = useCallback((seconds) => {
-    clearTimer(cooldownTimerRef, window.clearInterval);
-    const next = Math.max(0, Number(seconds || 0));
-    setRequestCooldownLeft(next);
-    if (!next) return;
-    const until = Date.now() + next * 1000;
-    cooldownTimerRef.current = window.setInterval(() => {
-      const left = Math.max(0, Math.ceil((until - Date.now()) / 1000));
-      setRequestCooldownLeft(left);
-      if (!left) clearTimer(cooldownTimerRef, window.clearInterval);
-    }, 250);
-  }, []);
-
-  const ensureParticipantId = useCallback(() => {
-    if (participantId) return participantId;
-    const next = storageParticipantId(matchId, role, walkieConsole);
-    if (next) setParticipantId(next);
-    return next;
-  }, [matchId, participantId, role]);
-
-  const ensureRtcSessionId = useCallback(() => {
-    const participant = ensureParticipantId();
-    if (!matchId || !role || !participant) return "";
-    if (rtcSessionIdRef.current) return rtcSessionIdRef.current;
-    const key = `gv-walkie:${matchId}:${role}:${participant}:rtc-session`;
-    const existing = readSessionValue(key);
-    if (existing) {
-      rtcSessionIdRef.current = existing;
-      return existing;
-    }
-    const next = (crypto?.randomUUID?.() || `rtc${Math.random().toString(36).slice(2, 14)}`)
-      .replace(/-/g, "")
-      .slice(0, 16);
-    writeSessionValue(key, next);
-    rtcSessionIdRef.current = next;
-    return next;
-  }, [ensureParticipantId, matchId, role]);
-
-  const rotateRtcSessionId = useCallback(() => {
-    const participant = ensureParticipantId();
-    if (!matchId || !role || !participant) return "";
-    const key = `gv-walkie:${matchId}:${role}:${participant}:rtc-session`;
-    const next = (crypto?.randomUUID?.() || `rtc${Math.random().toString(36).slice(2, 14)}`)
-      .replace(/-/g, "")
-      .slice(0, 16);
-    writeSessionValue(key, next);
-    rtcSessionIdRef.current = next;
-    return next;
-  }, [ensureParticipantId, matchId, role]);
-
-  const resetRtcSessionForReload = useCallback(() => {
-    const participant = participantIdRef.current || ensureParticipantId();
-    if (!matchId || !role || !participant) {
-      return;
-    }
-
-    clearStoredWalkieToken("rtc", matchId, role, participant);
-    rtcTokenRef.current = null;
-    rtcTokenPromiseRef.current = null;
-    rotateRtcSessionId();
-  }, [ensureParticipantId, matchId, role, rotateRtcSessionId]);
-
-  const ensureAudioUnlock = useCallback(async () => {
-    if (!isSafari) return true;
-    const primed = await primeUiAudio();
-    setNeedsAudioUnlock(!primed);
-    return primed;
-  }, [isSafari]);
-
-  const fetchRtcToken = useCallback(async () => {
-    if (isTokenFresh(rtcTokenRef.current, RTC_TOKEN_REFRESH_BUFFER_MS)) {
-      return rtcTokenRef.current;
-    }
-    if (rtcTokenPromiseRef.current) {
-      return rtcTokenPromiseRef.current;
-    }
-    const id = ensureParticipantId();
-    const rtcSessionId = ensureRtcSessionId();
-    if (!matchId || !id) throw new Error("Walkie is not ready yet.");
-    const cached = readStoredWalkieToken("rtc", matchId, role, id, parseJson);
-    if (isTokenFresh(cached, RTC_TOKEN_REFRESH_BUFFER_MS)) {
-      const next = validateWalkieTokenPayload(cached, "RTC");
-      rtcTokenRef.current = next;
-      return next;
-    }
-    rtcTokenPromiseRef.current = requestJson("/api/agora/rtc-token", {
-      matchId,
-      participantId: id,
-      rtcSessionId,
-      role,
-    })
-      .then((payload) => {
-        const next = withTokenExpiry(validateWalkieTokenPayload(payload, "RTC"));
-        rtcTokenRef.current = next;
-        writeStoredWalkieToken("rtc", matchId, role, id, next);
-        walkieConsole("info", "RTC token ready", {
-          channelName: next.channelName,
-          userId: next.userId,
-          expiresInSeconds: next.expiresInSeconds || 0,
-        });
-        return next;
-      })
-      .finally(() => {
-        rtcTokenPromiseRef.current = null;
-      });
-    return rtcTokenPromiseRef.current;
-  }, [ensureParticipantId, ensureRtcSessionId, matchId, role]);
-
-  const fetchSignalingToken = useCallback(async () => {
-    if (
-      isTokenFresh(signalTokenRef.current, SIGNAL_TOKEN_REFRESH_BUFFER_MS) &&
-      signalTokenRef.current?.participantToken
-    ) {
-      return signalTokenRef.current;
-    }
-    if (signalTokenPromiseRef.current) {
-      return signalTokenPromiseRef.current;
-    }
-    const id = ensureParticipantId();
-    if (!matchId || !id) throw new Error("Walkie is not ready yet.");
-    const cached = readStoredWalkieToken("signal", matchId, role, id, parseJson);
-    if (
-      isTokenFresh(cached, SIGNAL_TOKEN_REFRESH_BUFFER_MS) &&
-      cached?.participantToken
-    ) {
-      const next = validateWalkieTokenPayload(cached, "Signaling");
-      signalTokenRef.current = next;
-      participantTokenRef.current = String(next.participantToken || "");
-      signalingUserIdRef.current = next?.userId || buildAgoraUserId(matchId, id, role);
-      signalingChannelRef.current =
-        next?.channelName || buildAgoraSignalingChannelName(matchId);
-      setHasWalkieToken(Boolean(next?.token));
-      return next;
-    }
-    clearStoredWalkieToken("signal", matchId, role, id);
-    signalTokenPromiseRef.current = requestJson("/api/agora/signaling-token", {
-      matchId,
-      participantId: id,
-      role,
-    })
-      .then((payload) => {
-        const next = withTokenExpiry(validateWalkieTokenPayload(payload, "Signaling"));
-        signalTokenRef.current = next;
-        participantTokenRef.current = String(next.participantToken || "");
-        writeStoredWalkieToken("signal", matchId, role, id, next);
-        signalingUserIdRef.current = next?.userId || buildAgoraUserId(matchId, id, role);
-        signalingChannelRef.current =
-          next?.channelName || buildAgoraSignalingChannelName(matchId);
-        setHasWalkieToken(Boolean(next?.token));
-        walkieConsole("info", "Signaling token ready", {
-          channelName: signalingChannelRef.current,
-          userId: signalingUserIdRef.current,
-          expiresInSeconds: next.expiresInSeconds || 0,
-        });
-        return next;
-      })
-      .finally(() => {
-        signalTokenPromiseRef.current = null;
-      });
-    return signalTokenPromiseRef.current;
-  }, [ensureParticipantId, matchId, role]);
-
-  const ensureParticipantToken = useCallback(async () => {
-    if (participantTokenRef.current) {
-      return participantTokenRef.current;
-    }
-
-    if (signalTokenRef.current?.participantToken) {
-      participantTokenRef.current = String(signalTokenRef.current.participantToken || "");
-      return participantTokenRef.current;
-    }
-
-    const payload = await fetchSignalingToken();
-    participantTokenRef.current = String(payload?.participantToken || "");
-    return participantTokenRef.current;
-  }, [fetchSignalingToken]);
-
-  const startCountdown = useCallback((expiresAt) => {
-    clearTimer(countdownTimerRef, window.clearInterval);
-    const left = () =>
-      Math.max(0, Math.ceil((new Date(expiresAt || Date.now()).getTime() - Date.now()) / 1000));
-    setCountdown(left());
-    countdownTimerRef.current = window.setInterval(() => {
-      const next = left();
-      setCountdown(next);
-      if (!next) clearTimer(countdownTimerRef, window.clearInterval);
-    }, 250);
-  }, []);
-
-  const ensureRtcClient = useCallback(async () => {
-    if (rtcClientRef.current) return rtcClientRef.current;
-    const AgoraRTC = await loadRtc();
-    const client = AgoraRTC.createClient({ mode: "live", codec: "vp8" });
-    client.on("user-published", async (user, mediaType) => {
-      if (mediaType !== "audio") return;
-      await subscribeRemoteAudioUser(client, user);
-    });
-    client.on("user-unpublished", (user, mediaType) => {
-      if (mediaType === "audio") {
-        const uid = String(user.uid || "");
-        stopRemoteAudioPlayback(uid);
-        remoteAudioTracksRef.current.delete(uid);
-      }
-    });
-    client.on("user-left", (user) => {
-      const uid = String(user?.uid || "");
-      stopRemoteAudioPlayback(uid);
-      remoteAudioTracksRef.current.delete(uid);
-    });
-    client.on("connection-state-change", (state) => {
-      if (rtcClientRef.current !== client) {
-        return;
-      }
-      if (state === "CONNECTED") {
-        setRecoveringAudio(false);
-        clearTimer(audioRetryTimerRef);
-        void syncExistingRemoteAudioUsers(client);
-      } else if (
-        snapshotRef.current.enabled &&
-        (state === "CONNECTING" || state === "RECONNECTING")
-      ) {
-        setRecoveringAudio(true);
-      }
-      if (state === "DISCONNECTED" && snapshotRef.current.enabled) {
-        rtcJoinedRef.current = false;
-        rtcPublishedRef.current = false;
-        publishPromiseRef.current = null;
-        setRecoveringAudio(true);
-        updateNotice("Retrying audio...");
-        setAudioReconnectTick((current) => current + 1);
-      }
-      walkieConsole("info", "RTC connection state", { state });
-    });
-    rtcClientRef.current = client;
-    return client;
-  }, [
+  const {
+    cleanupLocalTrack,
+    cleanupTransport,
+    ensurePublishedTrack,
+    ensureRtcClient,
+    ensureTrack,
+    joinRtc,
+    muteRtcTrack,
+    playRemoteAudioTrack,
+    resetRtcRuntimeState,
+    stopAllRemoteAudioPlayback,
     stopRemoteAudioPlayback,
     subscribeRemoteAudioUser,
     syncExistingRemoteAudioUsers,
-    updateNotice,
-  ]);
-
-  const joinRtc = useCallback(async () => {
-    if (!enabled || !snapshotRef.current.enabled) return null;
-    if (rtcJoinedRef.current && rtcClientRef.current) return rtcClientRef.current;
-    if (rtcJoinPromiseRef.current) return rtcJoinPromiseRef.current;
-    rtcJoinPromiseRef.current = (async () => {
-      let token = await fetchRtcToken();
-      let lastError = null;
-      for (let attempt = 1; attempt <= 3; attempt += 1) {
-        try {
-          const client = await ensureRtcClient();
-          await client.setClientRole("audience");
-          await client.join(token.appId, token.channelName, token.token, token.userId);
-          rtcJoinedRef.current = true;
-          await syncExistingRemoteAudioUsers(client);
-          walkieConsole("info", "RTC joined", {
-            channelName: token.channelName,
-            userId: token.userId,
-          });
-          return client;
-        } catch (joinError) {
-          lastError = joinError;
-          clearStoredWalkieToken(
-            "rtc",
-            matchId,
-            role,
-            participantIdRef.current || ensureParticipantId()
-          );
-          if (isRtcUidConflictError(joinError)) {
-            rotateRtcSessionId();
-            const failedClient = rtcClientRef.current;
-            rtcClientRef.current = null;
-            rtcJoinedRef.current = false;
-            rtcPublishedRef.current = false;
-            if (failedClient) {
-              try {
-                await failedClient.leave?.();
-              } catch {
-              }
-            }
-          }
-          rtcTokenRef.current = null;
-          if (attempt < 3) {
-            token = await fetchRtcToken();
-          }
-        }
-      }
-      throw lastError || new Error("Could not join walkie audio.");
-    })().finally(() => {
-      rtcJoinPromiseRef.current = null;
-    });
-    return rtcJoinPromiseRef.current;
-  }, [
-    enabled,
-    ensureParticipantId,
-    ensureRtcClient,
-    fetchRtcToken,
-    matchId,
-    role,
-    rotateRtcSessionId,
-    syncExistingRemoteAudioUsers,
-  ]);
-
-  const ensureTrack = useCallback(async () => {
-    if (rtcTrackRef.current) return rtcTrackRef.current;
-    if (trackPromiseRef.current) return trackPromiseRef.current;
-    trackPromiseRef.current = (async () => {
-      const AgoraRTC = await loadRtc();
-      const track = await AgoraRTC.createMicrophoneAudioTrack({
-        AEC: true,
-        AGC: true,
-        ANS: true,
-        encoderConfig: {
-          sampleRate: 48000,
-          stereo: false,
-          bitrate: 48,
-        },
-      });
-      const mediaTrack = track.getMediaStreamTrack?.();
-      if (mediaTrack) mediaTrack.contentHint = "speech";
-      if (typeof track.setMuted === "function") await track.setMuted(true);
-      rtcTrackRef.current = track;
-      return track;
-    })().finally(() => {
-      trackPromiseRef.current = null;
-    });
-    return trackPromiseRef.current;
-  }, []);
-
-  const muteRtcTrack = useCallback(async () => {
-    const track = rtcTrackRef.current;
-    if (track && typeof track.setMuted === "function") {
-      try {
-        await track.setMuted(true);
-      } catch {
-      }
-    }
-  }, []);
-
-  const resetRtcRuntimeState = useCallback(async (client = null) => {
-    const targetClient = client || rtcClientRef.current || null;
-    rtcJoinedRef.current = false;
-    rtcPublishedRef.current = false;
-    rtcJoinPromiseRef.current = null;
-    publishPromiseRef.current = null;
-
-    if (targetClient && rtcClientRef.current === targetClient) {
-      rtcClientRef.current = null;
-    }
-
-    if (targetClient) {
-      try {
-        await targetClient.leave?.();
-      } catch {
-      }
-    }
-  }, []);
-
-  const ensurePublishedTrack = useCallback(async () => {
-    if (!rtcPublishedRef.current) {
-      if (!publishPromiseRef.current) {
-        publishPromiseRef.current = (async () => {
-          const trackPromise = ensureTrack();
-          const [rtcClient, track] = await Promise.all([joinRtc(), trackPromise]);
-          if (!rtcClient || !track) {
-            throw new Error("Walkie audio is unavailable.");
-          }
-
-          await waitForRtcConnected(rtcClient, 1500);
-          if (rtcClient.connectionState !== "CONNECTED") {
-            throw new Error("Walkie audio is still connecting.");
-          }
-
-          try {
-            await rtcClient.setClientRole("host");
-            await waitForRtcConnected(rtcClient, 600);
-            if (rtcClient.connectionState !== "CONNECTED") {
-              throw new Error("Walkie audio is still connecting.");
-            }
-
-            if (!rtcPublishedRef.current) {
-              if (typeof track.setMuted === "function") {
-                await track.setMuted(true);
-              }
-              await rtcClient.publish([track]);
-              rtcPublishedRef.current = true;
-              await wait(80);
-            }
-          } catch (publishError) {
-            if (
-              rtcClient.connectionState !== "CONNECTED" ||
-              isExpectedWalkieTransportError(publishError)
-            ) {
-              await resetRtcRuntimeState(rtcClient);
-              throw new Error("Walkie audio is still connecting.");
-            }
-            throw publishError;
-          }
-
-          return { rtcClient, track };
-        })().finally(() => {
-          publishPromiseRef.current = null;
-        });
-      }
-      return publishPromiseRef.current;
-    }
-
-    const trackPromise = ensureTrack();
-    const [rtcClient, track] = await Promise.all([joinRtc(), trackPromise]);
-    return { rtcClient, track };
-  }, [ensureTrack, joinRtc, resetRtcRuntimeState]);
-
-  const unpublishRtc = useCallback(async () => {
-    const client = rtcClientRef.current;
-    const track = rtcTrackRef.current;
-    if (client && rtcPublishedRef.current && track) {
-      try {
-        await client.unpublish([track]);
-      } catch {
-      }
-    }
-    await muteRtcTrack();
-    if (client && rtcJoinedRef.current) {
-      try {
-        await client.setClientRole("audience");
-      } catch {
-      }
-    }
-    rtcPublishedRef.current = false;
-  }, [muteRtcTrack]);
-
-  const cleanupLocalTrack = useCallback(async () => {
-    await unpublishRtc();
-    const track = rtcTrackRef.current;
-    rtcTrackRef.current = null;
-    if (track) {
-      try {
-        track.stop();
-        track.close();
-      } catch {
-      }
-    }
-    trackPromiseRef.current = null;
-    publishPromiseRef.current = null;
-  }, [unpublishRtc]);
-
-  const cleanupTransport = useCallback(async () => {
-    clearTimer(releaseTimerRef);
-    clearTimer(finishTimerRef, window.clearInterval);
-    clearTimer(countdownTimerRef, window.clearInterval);
-    clearTimer(cooldownTimerRef, window.clearInterval);
-    stopAllRemoteAudioPlayback();
-    remoteAudioTracksRef.current.clear();
-    await cleanupLocalTrack();
-    const client = rtcClientRef.current;
-    rtcClientRef.current = null;
-    if (client && rtcJoinedRef.current) {
-      try {
-        await client.leave();
-      } catch {
-      }
-    }
-    rtcJoinedRef.current = false;
-    rtcPublishedRef.current = false;
-    rtcTokenRef.current = null;
-    rtcJoinPromiseRef.current = null;
-    rtcTokenPromiseRef.current = null;
-  }, [cleanupLocalTrack, stopAllRemoteAudioPlayback]);
-
-  const resolveActiveSpeaker = useCallback((owner, ttlSeconds = WALKIE_SPEAKER_TTL_SECONDS) => {
-    if (!owner) {
-      activeSpeakerSourceRef.current = "runtime";
-      activeSpeakerRef.current = null;
-      syncSnapshot();
-      return;
-    }
-    const participant = participantsRef.current.get(owner);
-    const now = Date.now();
-    activeSpeakerSourceRef.current = "runtime";
-    activeSpeakerRef.current = {
-      owner,
-      participantId: participant?.participantId || "",
-      role: participant?.role || "",
-      name: participant?.name || "",
-      lockStartedAt: nowIso(),
-      expiresAt: new Date(now + Number(ttlSeconds || WALKIE_SPEAKER_TTL_SECONDS) * 1000).toISOString(),
-      transmissionId:
-        activeSpeakerRef.current?.owner === owner && activeSpeakerRef.current?.transmissionId
-          ? activeSpeakerRef.current.transmissionId
-          : `agora:${owner}:${now}`,
-    };
-    syncSnapshot();
-  }, [syncSnapshot]);
-
-  const reconcileActiveSpeaker = useCallback(
-    (participants = participantsRef.current) => {
-      const current = activeSpeakerRef.current;
-      if (!current?.owner) {
-        syncSnapshot();
-        return;
-      }
-
-      const expiresAtMs = Date.parse(current.expiresAt || "");
-      if (
-        !participants.has(current.owner) ||
-        (Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now())
-      ) {
-        activeSpeakerSourceRef.current = "runtime";
-        activeSpeakerRef.current = null;
-        syncSnapshot();
-        return;
-      }
-
-      const participant = participants.get(current.owner);
-      activeSpeakerSourceRef.current = "runtime";
-      activeSpeakerRef.current = {
-        ...current,
-        participantId: participant?.participantId || current.participantId || "",
-        role: participant?.role || current.role || "",
-        name: participant?.name || current.name || "",
-      };
-      syncSnapshot();
-    },
-    [syncSnapshot]
+    syncRemoteAudioPlayback,
+    unpublishRtc,
+  } = useMemo(
+    () =>
+      createWalkieRtcTransportApi({
+        audioRetryTimerRef,
+        countdownTimerRef,
+        cooldownTimerRef,
+        enabled,
+        ensureParticipantId,
+        fetchRtcToken,
+        finishTimerRef,
+        isFinishing,
+        isSafari,
+        isSelfTalking,
+        matchId,
+        participantIdRef,
+        publishPromiseRef,
+        releaseTimerRef,
+        remoteAudioPlayingRef,
+        remoteAudioTracksRef,
+        role,
+        rotateRtcSessionId,
+        rtcClientRef,
+        rtcJoinPromiseRef,
+        rtcJoinedRef,
+        rtcPublishedRef,
+        rtcTokenPromiseRef,
+        rtcTokenRef,
+        rtcTrackRef,
+        setAudioReconnectTick,
+        setNeedsAudioUnlock,
+        setRecoveringAudio,
+        snapshotRef,
+        trackPromiseRef,
+        updateNotice,
+      }),
+    [
+      enabled,
+      ensureParticipantId,
+      fetchRtcToken,
+      isFinishing,
+      isSafari,
+      isSelfTalking,
+      matchId,
+      role,
+      rotateRtcSessionId,
+      updateNotice,
+    ],
   );
-
-  const applyPresenceSnapshot = useCallback(
-    (occupants) => {
-      const next = new Map();
-      for (const occupant of occupants || []) {
-        const state = occupant?.states || {};
-        const nextRole =
-          state.role === "umpire"
-            ? "umpire"
-            : state.role === "director"
-            ? "director"
-            : state.role === "spectator"
-            ? "spectator"
-            : "";
-        next.set(String(occupant.userId || ""), {
-          userId: String(occupant.userId || ""),
-          participantId: String(state.participantId || ""),
-          role: nextRole,
-          name: defaultDisplayName(nextRole || role, state.name || ""),
-        });
-      }
-      participantsRef.current = next;
-      reconcileActiveSpeaker(next);
-    },
-    [reconcileActiveSpeaker, role]
-  );
-
-  const applyMetadataState = useCallback(
-    (nextState) => {
-      metadataStateRef.current = {
-        enabled: Boolean(nextState?.enabled),
-        pendingRequests: filterAgoraWalkieRequests(nextState?.pendingRequests),
-      };
-      syncSnapshot();
-    },
-    [syncSnapshot]
-  );
-
-  const publishWalkieMessage = useCallback(
-    async (payload, { client = rtmClientRef.current, bestEffort = false } = {}) => {
-      const message =
-        typeof payload === "string" ? payload : JSON.stringify(payload);
-      let activeClient = client;
-      let lastError = null;
-
-      for (let attempt = 1; attempt <= 2; attempt += 1) {
-        try {
-          if (!activeClient || !rtmLoggedInRef.current || !rtmSubscribedRef.current) {
-            activeClient = await ensureRtmSessionHandlerRef.current?.();
-          }
-
-          const channelName = signalingChannelRef.current;
-          if (!activeClient || !channelName) {
-            throw new Error("Walkie signaling is reconnecting.");
-          }
-
-          await activeClient.publish(channelName, message);
-          return true;
-        } catch (publishError) {
-          lastError = publishError;
-          if (!isRtmPublishDisconnectedError(publishError) || attempt >= 2) {
-            if (bestEffort) {
-              walkieConsole("warn", "Walkie publish skipped", {
-                stage: "rtm-publish",
-                message: messageFor(
-                  publishError,
-                  "Walkie message could not be sent.",
-                ),
-              });
-              return false;
-            }
-            throw publishError;
-          }
-
-          rtmReadyPromiseRef.current = null;
-          try {
-            await cleanupSignalingHandlerRef.current?.();
-          } catch {
-            // Retry with a fresh RTM session below.
-          }
-          activeClient = null;
-        }
-      }
-
-      if (bestEffort) {
-        return false;
-      }
-      throw lastError || new Error("Walkie signaling is reconnecting.");
-    },
-    [],
-  );
-
-  const broadcastMetadataState = useCallback(
-    async (client = rtmClientRef.current, nextState = metadataStateRef.current) => {
-      if (!client || !signalingChannelRef.current) return;
-      const normalized = {
-        enabled: Boolean(nextState?.enabled),
-        pendingRequests: filterAgoraWalkieRequests(nextState?.pendingRequests),
-      };
-      await publishWalkieMessage(
-        {
-          type: "walkie-sync-state",
-          enabled: normalized.enabled,
-          pendingRequests: normalized.pendingRequests,
-        },
-        { client, bestEffort: true },
-      );
-    },
-    [publishWalkieMessage]
-  );
-
-  const refreshPresenceSnapshot = useCallback(
-    async (client = rtmClientRef.current) => {
-      if (!client || !signalingChannelRef.current) return;
-      const response = await client.presence.getOnlineUsers(
-        signalingChannelRef.current,
-        WALKIE_CHANNEL_TYPE,
-        {
-          includedUserId: true,
-          includedState: true,
-        }
-      );
-      applyPresenceSnapshot(response?.occupants || []);
-    },
-    [applyPresenceSnapshot]
-  );
-
-  const schedulePresenceRefresh = useCallback(
-    (client = rtmClientRef.current, delayMs = PRESENCE_REFRESH_DEBOUNCE_MS) => {
-      if (!client || !signalingChannelRef.current) {
-        return;
-      }
-
-      presenceRefreshPendingRef.current = true;
-      if (presenceRefreshTimerRef.current) {
-        return;
-      }
-
-      presenceRefreshTimerRef.current = window.setTimeout(async () => {
-        presenceRefreshTimerRef.current = null;
-        if (presenceRefreshInFlightRef.current) {
-          schedulePresenceRefresh(client, delayMs);
-          return;
-        }
-
-        presenceRefreshPendingRef.current = false;
-        presenceRefreshInFlightRef.current = true;
-        try {
-          await refreshPresenceSnapshot(client);
-        } finally {
-          presenceRefreshInFlightRef.current = false;
-          if (presenceRefreshPendingRef.current) {
-            schedulePresenceRefresh(client, delayMs);
-          }
-        }
-      }, Math.max(0, Number(delayMs || 0)));
-    },
-    [refreshPresenceSnapshot]
-  );
-
-  const refreshRuntimeState = useCallback(
-    async (client = rtmClientRef.current) => {
-      try {
-        await refreshPresenceSnapshot(client);
-      } catch (presenceError) {
-        walkieConsole("error", "Walkie presence refresh failed", {
-          stage: "presence-refresh",
-          message: messageFor(presenceError, "Walkie presence refresh failed."),
-        });
-      }
-    },
-    [refreshPresenceSnapshot]
-  );
-
-  const syncMetadataState = useCallback(
-    async (nextState, client = rtmClientRef.current) => {
-      const normalized = {
-        enabled: Boolean(nextState?.enabled),
-        pendingRequests: filterAgoraWalkieRequests(nextState?.pendingRequests),
-      };
-      applyMetadataState(normalized);
-      await broadcastMetadataState(client, normalized);
-      return normalized;
-    },
-    [applyMetadataState, broadcastMetadataState]
-  );
-
-  const syncPersistentWalkieState = useCallback(async () => {
-    if (!matchId) {
-      return null;
-    }
-
-    const payload = await requestWalkieState(`/api/matches/${matchId}/walkie`);
-    return applyAuthoritativeSnapshot(payload?.walkie);
-  }, [applyAuthoritativeSnapshot, matchId]);
-
-  const getStartGateSnapshot = useCallback(async () => {
-    const authoritative =
-      (await syncPersistentWalkieState().catch(() => null)) ||
-      authoritativeSnapshotRef.current ||
-      normalizeAuthoritativeWalkieSnapshot(snapshotRef.current);
-
-    return authoritative || EMPTY_WALKIE_SNAPSHOT;
-  }, [syncPersistentWalkieState]);
 
   useEffect(() => {
     if (!shouldMaintainWalkiePresence) {
@@ -1393,412 +601,104 @@ export default function useWalkieTalkie({
     updateNotice,
   ]);
 
-  const ensureRtmSession = useCallback(async () => {
-    if (
-      !enabled ||
-      !matchId ||
-      (!signalingPropActiveRef.current && !manualSignalingActiveRef.current)
-    ) {
-      throw new Error("Walkie is not available.");
-    }
-    if (rtmCleanupPromiseRef.current) {
-      await rtmCleanupPromiseRef.current.catch(() => {});
-    }
-    if (rtmClientRef.current && rtmLoggedInRef.current && rtmSubscribedRef.current) {
-      return rtmClientRef.current;
-    }
-    if (rtmReadyPromiseRef.current) {
-      return rtmReadyPromiseRef.current;
-    }
-    rtmReadyPromiseRef.current = (async () => {
-      const generation = signalingGenerationRef.current;
-      const token = await fetchSignalingToken();
-      const AgoraRTM = await loadRtm();
-      const RTM = AgoraRTM?.RTM || AgoraRTM;
-      if (!RTM) {
-        throw new Error("Agora signaling is unavailable.");
-      }
-      if (
-        generation !== signalingGenerationRef.current ||
-        !shouldMaintainSignalingRef.current
-      ) {
-        throw new Error("Walkie signaling changed before setup completed.");
-      }
-      const id = ensureParticipantId();
-      const userId = token?.userId || buildAgoraUserId(matchId, id, role);
-      const channelName = token?.channelName || buildAgoraSignalingChannelName(matchId);
-      if (!token?.token) {
-        throw new Error("Signaling token missing.");
-      }
-      if (!token?.appId) {
-        throw new Error("Signaling app id missing.");
-      }
-      signalingUserIdRef.current = userId;
-      signalingChannelRef.current = channelName;
-
-      if (rtmClientRef.current && (!rtmLoggedInRef.current || !rtmSubscribedRef.current)) {
-        walkieConsole("warn", "Discarding partial signaling client", {
-          stage: "rtm-reset",
-          loggedIn: rtmLoggedInRef.current,
-          subscribed: rtmSubscribedRef.current,
-        });
-        try {
-          await rtmClientRef.current.logout?.();
-        } catch {
-        }
-        rtmClientRef.current = null;
-        rtmListenersRef.current = null;
-        rtmLoggedInRef.current = false;
-        rtmSubscribedRef.current = false;
-      }
-
-      if (!rtmClientRef.current) {
-        const client = new RTM(token.appId, userId, {
-          logUpload: false,
-          logLevel: "none",
-          presenceTimeout: 20,
-          useStringUserId: true,
-        });
-
-        const onStatus = (event) => {
-          if (event?.reason === "TOKEN_EXPIRED") {
-            setError("Walkie connection expired. Reconnecting...");
-          }
-        };
-
-        const onPresence = (event) => {
-          if (event?.channelName !== signalingChannelRef.current) return;
-          if (Array.isArray(event?.snapshot) && event.snapshot.length) {
-            applyPresenceSnapshot(
-              event.snapshot.map((item) => ({
-                userId: item.userId,
-                states: item.states,
-              }))
-            );
-            return;
-          }
-          schedulePresenceRefresh(client);
-        };
-
-        const onLock = () => {};
-
-        const onMessage = (event) => {
-          if (
-            event?.channelType === WALKIE_CHANNEL_TYPE &&
-            event?.channelName !== signalingChannelRef.current
-          ) {
-            return;
-          }
-          const payload =
-            typeof event?.message === "string" ? parseJson(event.message) : null;
-          if (!payload?.type) return;
-
-          if (payload.type === "walkie-request") {
-            applyMetadataState({
-              enabled: metadataStateRef.current.enabled,
-              pendingRequests: upsertAgoraWalkieRequest(
-                metadataStateRef.current.pendingRequests,
-                {
-                  requestId: String(payload.requestId || ""),
-                  participantId: String(payload.participantId || ""),
-                  role:
-                    payload.role === "director"
-                      ? "director"
-                      : payload.role === "spectator"
-                      ? "spectator"
-                      : "",
-                  name: String(payload.name || ""),
-                  signalingUserId: String(payload.signalingUserId || ""),
-                  requestedAt: String(payload.requestedAt || nowIso()),
-                  expiresAt: String(
-                    payload.expiresAt ||
-                      new Date(Date.now() + WALKIE_REQUEST_MAX_AGE_MS).toISOString()
-                  ),
-                }
-              ),
-            });
-            if (role === "umpire") {
-              updateNotice(`${payload.name || "Someone"} wants to use walkie-talkie.`);
-            }
-            return;
-          }
-
-          if (payload.type === "walkie-request-accepted") {
-            applyMetadataState({
-              enabled: true,
-              pendingRequests: removeAgoraWalkieRequest(
-                metadataStateRef.current.pendingRequests,
-                String(payload.requestId || "")
-              ),
-            });
-            if (payload.participantId === participantIdRef.current) {
-              const requestId = String(payload.requestId || "");
-              if (requestId && lastAcceptedRequestIdRef.current === requestId) {
-                return;
-              }
-              lastAcceptedRequestIdRef.current = requestId;
-              setRequestState("accepted");
-              updateNotice("Walkie-talkie is live.");
-              scheduleRequestReset();
-            }
-            return;
-          }
-
-          if (payload.type === "walkie-request-dismissed") {
-            applyMetadataState({
-              enabled: metadataStateRef.current.enabled,
-              pendingRequests: removeAgoraWalkieRequest(
-                metadataStateRef.current.pendingRequests,
-                String(payload.requestId || "")
-              ),
-            });
-            if (payload.participantId === participantIdRef.current) {
-              const requestId = String(payload.requestId || "");
-              if (requestId && lastDismissedRequestIdRef.current === requestId) {
-                return;
-              }
-              lastDismissedRequestIdRef.current = requestId;
-              setRequestState("dismissed");
-              updateNotice("Walkie request dismissed.");
-              scheduleRequestReset();
-            }
-            return;
-          }
-
-          if (payload.type === "walkie-sync-state") {
-            applyMetadataState({
-              enabled: Boolean(payload.enabled),
-              pendingRequests: payload.pendingRequests,
-            });
-            return;
-          }
-
-          if (payload.type === "walkie-sync-request") {
-            if (
-              metadataStateRef.current.enabled ||
-              metadataStateRef.current.pendingRequests.length > 0 ||
-              role === "umpire"
-            ) {
-              void broadcastMetadataState(client, metadataStateRef.current);
-            }
-            return;
-          }
-
-          if (payload.type === "walkie-enabled") {
-            const nextPendingRequests = Array.isArray(payload.pendingRequests)
-              ? payload.pendingRequests
-              : payload.enabled
-              ? metadataStateRef.current.pendingRequests
-              : [];
-            applyMetadataState({
-              enabled: Boolean(payload.enabled),
-              pendingRequests: nextPendingRequests,
-            });
-            updateNotice(payload.enabled ? "Walkie-talkie is live." : "Walkie-talkie is off.");
-            return;
-          }
-
-          if (payload.type === "walkie-refresh-request") {
-            const requestId = String(payload.requestId || "");
-            const sourceParticipantId = String(payload.participantId || "");
-            if (
-              (requestId && requestId === lastRefreshRequestIdRef.current) ||
-              sourceParticipantId === participantIdRef.current
-            ) {
-              return;
-            }
-            lastRefreshRequestIdRef.current = requestId;
-            updateNotice(payload.message || `${payload.name || "Someone"} refreshed walkie signal.`);
-            void refreshSignalHandlerRef.current?.({
-              propagate: false,
-              source: "remote",
-            });
-            return;
-          }
-
-          if (payload.type === "walkie-speaker-started") {
-            activeSpeakerSourceRef.current = "runtime";
-            activeSpeakerRef.current = {
-              owner: String(payload.userId || payload.signalingUserId || ""),
-              participantId: String(payload.participantId || ""),
-              role:
-                payload.role === "umpire"
-                  ? "umpire"
-                  : payload.role === "director"
-                  ? "director"
-                  : payload.role === "spectator"
-                  ? "spectator"
-                  : "",
-              name: String(payload.name || ""),
-              lockStartedAt: String(payload.lockStartedAt || nowIso()),
-              expiresAt: String(
-                payload.expiresAt ||
-                  new Date(Date.now() + WALKIE_SPEAKER_TTL_SECONDS * 1000).toISOString()
-              ),
-              transmissionId: String(payload.transmissionId || ""),
-            };
-            syncSnapshot();
-            if (payload.participantId !== participantIdRef.current) {
-              playWalkieCue("start");
-              updateNotice(payload.message || `${payload.name || "Someone"} is talking.`);
-            }
-            return;
-          }
-
-          if (payload.type === "walkie-speaker-ended") {
-            const transmissionId = String(payload.transmissionId || "");
-            const wasRemoteSpeaker = Boolean(
-              activeSpeakerRef.current?.participantId &&
-                activeSpeakerRef.current.participantId !== participantIdRef.current
-            );
-            if (
-              !transmissionId ||
-              transmissionId === String(activeSpeakerRef.current?.transmissionId || "")
-            ) {
-              activeSpeakerSourceRef.current = "runtime";
-              activeSpeakerRef.current = null;
-              syncSnapshot();
-            }
-            if (wasRemoteSpeaker) {
-              playWalkieCue("end");
-            }
-            updateNotice(payload.message || "Channel is free.");
-          }
-        };
-
-        const onTokenWillExpire = async () => {
-          try {
-            clearStoredWalkieToken("signal", matchId, role, participantIdRef.current || id);
-            signalTokenRef.current = null;
-            const next = await fetchSignalingToken();
-            await client.renewToken(next.token);
-          } catch (renewError) {
-            walkieConsole("error", "Signaling token renew failed", {
-              stage: "rtm-renew",
-              message: messageFor(renewError, "Could not renew signaling token."),
-            });
-          }
-        };
-
-        client.addEventListener("status", onStatus);
-        client.addEventListener("presence", onPresence);
-        client.addEventListener("message", onMessage);
-        client.addEventListener("tokenPrivilegeWillExpire", onTokenWillExpire);
-
-        rtmListenersRef.current = {
-          onStatus,
-          onPresence,
-          onMessage,
-          onTokenWillExpire,
-        };
-        rtmClientRef.current = client;
-      }
-
-      const client = rtmClientRef.current;
-      await client
-        .updateConfig?.({
-          logUpload: false,
-          logLevel: "none",
-        })
-        .catch(() => {});
-
-      if (!rtmLoggedInRef.current) {
-        walkieConsole("info", "Signaling login starting", {
-          channelName,
-          userId,
-        });
-        await client.login({ token: token.token });
-        rtmLoggedInRef.current = true;
-        walkieConsole("info", "Signaling login ready", {
-          channelName,
-          userId,
-        });
-      }
-
-      if (!rtmSubscribedRef.current) {
-        await client.subscribe(channelName, {
-          withMessage: true,
-          withPresence: true,
-        });
-        rtmSubscribedRef.current = true;
-        walkieConsole("info", "Signaling subscribed", { channelName });
-      }
-
-      await client.presence.setState(channelName, WALKIE_CHANNEL_TYPE, {
-        participantId: id,
+  const {
+    cleanupSignaling,
+    ensureRtmSession,
+    refreshSignal,
+  } = useMemo(
+    () =>
+      createWalkieRtmSignalingApi({
+        activeSpeakerRef,
+        activeSpeakerSourceRef,
+        applyAuthoritativeSnapshot,
+        applyMetadataState,
+        applyPresenceSnapshot,
+        audioRetryTimerRef,
+        autoConnectAudio,
+        authoritativeSnapshotRef,
+        broadcastMetadataState,
+        cancelPendingStartRef,
+        cleanupSignalingHandlerRef,
+        cleanupTransport,
+        displayName,
+        enabled,
+        ensureParticipantId,
+        ensureRtmSessionHandlerRef,
+        fetchSignalingToken,
+        lastAcceptedRequestIdRef,
+        lastDismissedRequestIdRef,
+        lastRefreshRequestIdRef,
+        lastSyncRequestAtRef,
+        manualSignalingActiveRef,
+        matchId,
+        metadataStateRef,
+        mountedRef,
+        participantIdRef,
+        participantTokenRef,
+        participantsRef,
+        presenceRefreshInFlightRef,
+        presenceRefreshPendingRef,
+        presenceRefreshTimerRef,
+        publishWalkieMessage,
+        refreshRuntimeState,
+        refreshSignalPromiseRef,
+        refreshSignalHandlerRef,
+        remoteAudioLingerTimerRef,
+        requestResetRef,
+        resetRtcSessionForReload,
         role,
-        name: defaultDisplayName(role, displayName),
-      });
-
-      await refreshRuntimeState(client);
-      if (Number(authoritativeSnapshotRef.current?.version || 0) <= 0) {
-        try {
-          await syncPersistentWalkieState();
-        } catch (syncError) {
-          walkieConsole("warn", "Walkie persistent state sync skipped", {
-            stage: "persistent-sync",
-            message: messageFor(
-              syncError,
-              "Walkie persistent state could not be loaded."
-            ),
-          });
-        }
-      }
-      const now = Date.now();
-      const shouldRequestSync =
-        now - lastSyncRequestAtRef.current >= SIGNALING_SYNC_REQUEST_MIN_GAP_MS;
-      if (shouldRequestSync) {
-        lastSyncRequestAtRef.current = now;
-        try {
-          await publishWalkieMessage(
-            {
-              type: "walkie-sync-request",
-            },
-            { client, bestEffort: true },
-          );
-        } catch (syncRequestError) {
-          walkieConsole("warn", "Walkie sync request skipped", {
-            stage: "rtm-sync-request",
-            message: messageFor(
-              syncRequestError,
-              "Walkie sync request could not be sent."
-            ),
-          });
-        }
-      }
-      signalingRecoverableFailuresRef.current = 0;
-      setRecoveringSignaling(false);
-      setHasWalkieToken(true);
-      walkieConsole("info", "Walkie signaling ready", {
-        channelName,
-        userId,
-        enabled: metadataStateRef.current.enabled,
-      });
-      return client;
-    })().finally(() => {
-      rtmReadyPromiseRef.current = null;
-    });
-    return rtmReadyPromiseRef.current;
-  }, [
-    applyMetadataState,
-    applyPresenceSnapshot,
-    broadcastMetadataState,
-    displayName,
-    enabled,
-    ensureParticipantId,
-    fetchSignalingToken,
-    matchId,
-    refreshRuntimeState,
-    role,
-    schedulePresenceRefresh,
-    scheduleRequestReset,
-    syncPersistentWalkieState,
-    syncSnapshot,
-    updateNotice,
-    publishWalkieMessage,
-  ]);
-
-  ensureRtmSessionHandlerRef.current = ensureRtmSession;
+        rtmCleanupPromiseRef,
+        rtmClientRef,
+        rtmListenersRef,
+        rtmLoggedInRef,
+        rtmReadyPromiseRef,
+        rtmSubscribedRef,
+        schedulePresenceRefresh,
+        scheduleRequestReset,
+        setError,
+        setHasWalkieToken,
+        setRecoveringAudio,
+        setRecoveringSignaling,
+        setRequestState,
+        setSignalingReconnectTick,
+        shouldMaintainSignalingRef,
+        signalTokenPromiseRef,
+        signalTokenRef,
+        signalingChannelRef,
+        signalingGenerationRef,
+        signalingPropActiveRef,
+        signalingRecoverableFailuresRef,
+        signalingRetryTimerRef,
+        signalingUserIdRef,
+        startTalkingPromiseRef,
+        stopTalkingHandlerRef,
+        syncPersistentWalkieState,
+        syncSnapshot,
+        updateNotice,
+      }),
+    [
+      applyAuthoritativeSnapshot,
+      applyMetadataState,
+      applyPresenceSnapshot,
+      autoConnectAudio,
+      broadcastMetadataState,
+      cleanupTransport,
+      displayName,
+      enabled,
+      ensureParticipantId,
+      fetchSignalingToken,
+      matchId,
+      publishWalkieMessage,
+      refreshRuntimeState,
+      resetRtcSessionForReload,
+      role,
+      schedulePresenceRefresh,
+      scheduleRequestReset,
+      syncPersistentWalkieState,
+      syncSnapshot,
+      updateNotice,
+    ],
+  );
 
   const prepareToTalk = useCallback(async () => {
     if (preparePromiseRef.current) {
@@ -1869,78 +769,6 @@ export default function useWalkieTalkie({
     role,
     updateNotice,
   ]);
-
-  const cleanupSignaling = useCallback(async () => {
-    if (rtmCleanupPromiseRef.current) {
-      await rtmCleanupPromiseRef.current.catch(() => {});
-      return;
-    }
-    clearTimer(requestResetRef);
-    clearTimer(presenceRefreshTimerRef);
-    presenceRefreshInFlightRef.current = false;
-    presenceRefreshPendingRef.current = false;
-    signalingGenerationRef.current += 1;
-    const cleanupTask = (async () => {
-      const client = rtmClientRef.current;
-      const listeners = rtmListenersRef.current;
-      const channelName = signalingChannelRef.current;
-      rtmReadyPromiseRef.current = null;
-      signalTokenRef.current = null;
-      signalTokenPromiseRef.current = null;
-      signalingUserIdRef.current = "";
-      signalingChannelRef.current = "";
-      if (client) {
-        try {
-          if (channelName && rtmSubscribedRef.current) {
-            try {
-              await client.presence.removeState(channelName, WALKIE_CHANNEL_TYPE);
-            } catch {
-            }
-            await client.unsubscribe(channelName).catch(() => {});
-          }
-        } catch {
-        }
-        if (listeners) {
-          client.removeEventListener("status", listeners.onStatus);
-          client.removeEventListener("presence", listeners.onPresence);
-          if (listeners.onLock) {
-            client.removeEventListener("lock", listeners.onLock);
-          }
-          client.removeEventListener("message", listeners.onMessage);
-          client.removeEventListener("tokenPrivilegeWillExpire", listeners.onTokenWillExpire);
-        }
-        try {
-          if (rtmLoggedInRef.current) {
-            await client.logout();
-          }
-        } catch {
-        }
-      }
-      rtmClientRef.current = null;
-      rtmListenersRef.current = null;
-      rtmLoggedInRef.current = false;
-      rtmSubscribedRef.current = false;
-      participantsRef.current = new Map();
-      metadataStateRef.current = { enabled: false, pendingRequests: [] };
-      activeSpeakerRef.current = null;
-      setHasWalkieToken(Boolean(participantTokenRef.current));
-      syncSnapshot();
-      if (channelName) {
-        walkieConsole("info", "Walkie signaling cleaned up", {
-          channelName,
-        });
-      }
-    })();
-    rtmCleanupPromiseRef.current = cleanupTask.finally(() => {
-      startTalkingPromiseRef.current = null;
-      if (rtmCleanupPromiseRef.current) {
-        rtmCleanupPromiseRef.current = null;
-      }
-    });
-    await rtmCleanupPromiseRef.current;
-  }, [syncSnapshot]);
-
-  cleanupSignalingHandlerRef.current = cleanupSignaling;
 
   const stopTalking = useCallback(
     async (reason = "released") => {
@@ -2709,99 +1537,7 @@ export default function useWalkieTalkie({
     }
   }, [enableManualSignaling, ensureAudioUnlock, joinRtc, participantId]);
 
-  const refreshSignal = useCallback(
-    async ({ propagate = false, source = "local" } = {}) => {
-      if (refreshSignalPromiseRef.current) {
-        return refreshSignalPromiseRef.current;
-      }
-
-      refreshSignalPromiseRef.current = (async () => {
-        const participant = participantIdRef.current || ensureParticipantId();
-        const requestId = `walkie-refresh:${Date.now()}:${Math.random()
-          .toString(36)
-          .slice(2, 10)}`;
-        lastRefreshRequestIdRef.current = requestId;
-        setError("");
-        clearTimer(audioRetryTimerRef);
-        clearTimer(signalingRetryTimerRef);
-        clearTimer(remoteAudioLingerTimerRef);
-        if (source !== "remote") {
-          updateNotice("Refreshing walkie signal...");
-        }
-
-        if (
-          propagate &&
-          rtmClientRef.current &&
-          signalingChannelRef.current &&
-          participant
-        ) {
-          try {
-            await publishWalkieMessage(
-              {
-                type: "walkie-refresh-request",
-                requestId,
-                participantId: participant,
-                role,
-                name: defaultDisplayName(role, displayName),
-                requestedAt: nowIso(),
-                message: `${defaultDisplayName(role, displayName)} refreshed walkie signal.`,
-              },
-              { client: rtmClientRef.current, bestEffort: true },
-            );
-          } catch (refreshBroadcastError) {
-            walkieConsole("warn", "Walkie refresh broadcast skipped", {
-              stage: "refresh-broadcast",
-              message: messageFor(
-                refreshBroadcastError,
-                "Walkie refresh broadcast could not be sent."
-              ),
-            });
-          }
-        }
-
-        if (matchId && role && participant) {
-          clearStoredWalkieToken("signal", matchId, role, participant);
-        }
-
-        cancelPendingStartRef.current = true;
-        setRecoveringAudio(Boolean(autoConnectAudio));
-        setRecoveringSignaling(true);
-
-        await stopTalking(source === "remote" ? "remote-refresh" : "refreshing");
-        await cleanupTransport();
-        resetRtcSessionForReload();
-        await cleanupSignaling();
-
-        if (mountedRef.current && shouldMaintainSignalingRef.current) {
-          setSignalingReconnectTick((current) => current + 1);
-          return true;
-        }
-
-        setRecoveringAudio(false);
-        setRecoveringSignaling(false);
-        return false;
-      })().finally(() => {
-        refreshSignalPromiseRef.current = null;
-      });
-
-      return refreshSignalPromiseRef.current;
-    },
-    [
-      autoConnectAudio,
-      cleanupSignaling,
-      cleanupTransport,
-      displayName,
-      ensureParticipantId,
-      matchId,
-      publishWalkieMessage,
-      resetRtcSessionForReload,
-      role,
-      stopTalking,
-      updateNotice,
-    ]
-  );
-
-  refreshSignalHandlerRef.current = refreshSignal;
+  stopTalkingHandlerRef.current = stopTalking;
 
   const deactivateAudio = useCallback(async ({ restartSignaling = false } = {}) => {
     clearTimer(audioRetryTimerRef);

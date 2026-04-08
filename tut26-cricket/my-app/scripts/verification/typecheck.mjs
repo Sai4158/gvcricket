@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Developer script for Typecheck maintenance work.
+ * Purpose: Developer script for type generation and TypeScript verification.
  * Main exports: module side effects only.
- * Major callers: Repo maintenance commands.
- * Side effects: none.
+ * Major callers: verification commands and local build checks.
+ * Side effects: writes a temporary typecheck config and Next type outputs.
  * Read next: ../README.md
  */
+
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";

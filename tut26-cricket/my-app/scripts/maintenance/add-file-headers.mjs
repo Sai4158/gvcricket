@@ -1,9 +1,10 @@
 /**
- * Purpose: Adds a standard "File overview" header to source files that do not already have one.
- * Main exports: none.
- * Major callers: developers running maintenance refactors.
+ * File overview:
+ * Purpose: Adds the standard file-overview header to commentable source files that do not already have one.
+ * Main exports: module side effects only.
+ * Major callers: maintenance commands and repo cleanup work.
  * Side effects: rewrites source files in place.
- * Read next: ../docs/ONBOARDING.md
+ * Read next: ../README.md
  */
 
 import fs from "node:fs/promises";
@@ -18,7 +19,7 @@ const ROOT_SOURCE_FILES = [
   "security-headers.mjs",
   "tmp-live-banner-check.mjs",
 ];
-const VALID_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".mts"]);
+const VALID_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".mts", ".cjs"]);
 const DIRECTIVE_RE = /^["']use (client|server)["'];?\s*$/;
 const HEADER_MARKER = "File overview:";
 
@@ -53,6 +54,18 @@ function featureName(parts) {
   return "App";
 }
 
+function inferScriptPurpose(relativePath, fileName) {
+  if (relativePath.startsWith("scripts/verification/")) {
+    return `Developer script for ${startCase(fileName)} verification work.`;
+  }
+
+  if (relativePath.startsWith("scripts/maintenance/")) {
+    return `Developer script for ${startCase(fileName)} maintenance work.`;
+  }
+
+  return `Developer script for ${startCase(fileName)} repo work.`;
+}
+
 function inferPurpose(relativePath, fileName, content) {
   const parts = relativePath.split("/");
 
@@ -61,7 +74,7 @@ function inferPurpose(relativePath, fileName, content) {
   }
 
   if (relativePath.startsWith("scripts/")) {
-    return `Developer script for ${startCase(fileName)} maintenance work.`;
+    return inferScriptPurpose(relativePath, fileName);
   }
 
   if (relativePath.startsWith("src/models/")) {
@@ -160,8 +173,16 @@ function inferCallers(relativePath, fileName) {
     return "Route loaders, API routes, and feature components.";
   }
 
-  if (relativePath.startsWith("scripts/")) {
+  if (relativePath.startsWith("scripts/verification/")) {
+    return "Verification commands and local audit runs.";
+  }
+
+  if (relativePath.startsWith("scripts/maintenance/")) {
     return "Repo maintenance commands.";
+  }
+
+  if (relativePath.startsWith("scripts/")) {
+    return "Developer scripts.";
   }
 
   return "Adjacent modules in the same feature area.";
@@ -260,7 +281,7 @@ function alreadyHasHeader(content) {
 function buildHeader({ purpose, exportsSummary, callers, sideEffects, readNext }) {
   return [
     "/**",
-    ` * File overview:`,
+    " * File overview:",
     ` * Purpose: ${purpose}`,
     ` * Main exports: ${exportsSummary}.`,
     ` * Major callers: ${callers}`,
