@@ -12,12 +12,12 @@ import assert from "node:assert/strict";
 import {
   shouldMaintainWalkieAudioTransport,
   shouldMaintainWalkieSignaling,
-} from "../src/app/components/live/walkie-talkie-gates.js";
-import { mergeWalkieSnapshots } from "../src/app/components/live/walkie-talkie-state.js";
+} from "../../src/app/components/live/walkie-talkie-gates.js";
+import { mergeWalkieSnapshots } from "../../src/app/components/live/walkie-talkie-state.js";
 import {
   classifyWalkieSignalingSetupError,
   isWalkieNetworkError,
-} from "../src/app/components/live/walkie-talkie-support.js";
+} from "../../src/app/components/live/walkie-talkie-support.js";
 import {
   buildWalkieDevicePreferenceKey,
   didSharedWalkieDisable,
@@ -29,7 +29,7 @@ import {
   NON_UMPIRE_WALKIE_SHARED_ENABLE_ANNOUNCEMENT,
   readWalkieDevicePreference,
   writeWalkieDevicePreference,
-} from "../src/app/lib/walkie-device-state.js";
+} from "../../src/app/lib/walkie-device-state.js";
 
 function createLocalStorageMock() {
   const store = new Map();
@@ -47,7 +47,7 @@ function createLocalStorageMock() {
   };
 }
 
-test("walkie audio transport stays off when device walkie is off", () => {
+test("[walkie] walkie audio transport stays off when device walkie is off", () => {
   const result = shouldMaintainWalkieAudioTransport({
     enabled: true,
     snapshot: {
@@ -65,13 +65,13 @@ test("walkie audio transport stays off when device walkie is off", () => {
   assert.equal(result, false);
 });
 
-test("walkie network classifier catches transient browser fetch failures", () => {
+test("[walkie] walkie network classifier catches transient browser fetch failures", () => {
   assert.equal(isWalkieNetworkError(new TypeError("Failed to fetch")), true);
   assert.equal(isWalkieNetworkError(new TypeError("Load failed")), true);
   assert.equal(isWalkieNetworkError(new Error("Request failed")), false);
 });
 
-test("walkie device preference keeps explicit local on and off memory per scope", () => {
+test("[walkie] walkie device preference keeps explicit local on and off memory per scope", () => {
   const previousWindow = global.window;
   global.window = {
     localStorage: createLocalStorageMock(),
@@ -135,7 +135,7 @@ test("walkie device preference keeps explicit local on and off memory per scope"
   }
 });
 
-test("walkie audio transport stays off when match walkie is disabled", () => {
+test("[walkie] walkie audio transport stays off when match walkie is disabled", () => {
   const result = shouldMaintainWalkieAudioTransport({
     enabled: true,
     snapshot: {
@@ -153,7 +153,7 @@ test("walkie audio transport stays off when match walkie is disabled", () => {
   assert.equal(result, false);
 });
 
-test("walkie audio transport stays on only when audio is actually needed", () => {
+test("[walkie] walkie audio transport stays on only when audio is actually needed", () => {
   assert.equal(
     shouldMaintainWalkieAudioTransport({
       enabled: true,
@@ -225,7 +225,7 @@ test("walkie audio transport stays on only when audio is actually needed", () =>
   );
 });
 
-test("walkie audio transport stays ready in background only when local walkie listening is enabled", () => {
+test("[walkie] walkie audio transport stays ready in background only when local walkie listening is enabled", () => {
   assert.equal(
     shouldMaintainWalkieAudioTransport({
       enabled: true,
@@ -263,7 +263,7 @@ test("walkie audio transport stays ready in background only when local walkie li
   );
 });
 
-test("walkie audio transport stays warm for instant push-to-talk when local talk path is armed", () => {
+test("[walkie] walkie audio transport stays warm for instant push-to-talk when local talk path is armed", () => {
   assert.equal(
     shouldMaintainWalkieAudioTransport({
       enabled: true,
@@ -283,7 +283,7 @@ test("walkie audio transport stays warm for instant push-to-talk when local talk
   );
 });
 
-test("walkie signaling stays off unless the session truly needs a live signaling state", () => {
+test("[walkie] walkie signaling stays off unless the session truly needs a live signaling state", () => {
   assert.equal(
     shouldMaintainWalkieSignaling({
       enabled: true,
@@ -340,7 +340,7 @@ test("walkie signaling stays off unless the session truly needs a live signaling
   );
 });
 
-test("walkie snapshot stays live through transient signaling reconnect cleanup", () => {
+test("[walkie] walkie snapshot stays live through transient signaling reconnect cleanup", () => {
   const result = mergeWalkieSnapshots({
     authoritativeSnapshot: {
       enabled: true,
@@ -393,7 +393,7 @@ test("walkie snapshot stays live through transient signaling reconnect cleanup",
   assert.equal(result.spectatorCount, 3);
 });
 
-test("non-umpire walkie UI state keeps the local-off notice persistent while shared walkie stays live", () => {
+test("[walkie] non-umpire walkie UI state keeps the local-off notice persistent while shared walkie stays live", () => {
   assert.deepEqual(
     getNonUmpireWalkieUiState({
       sharedEnabled: true,
@@ -449,7 +449,7 @@ test("non-umpire walkie UI state keeps the local-off notice persistent while sha
   );
 });
 
-test("non-umpire walkie switch uses local enable when shared walkie is live", () => {
+test("[walkie] non-umpire walkie switch uses local enable when shared walkie is live", () => {
   assert.equal(
     getNonUmpireWalkieToggleAction({
       nextChecked: true,
@@ -471,7 +471,7 @@ test("non-umpire walkie switch uses local enable when shared walkie is live", ()
   );
 });
 
-test("non-umpire walkie switch requests umpire approval only while shared walkie is off", () => {
+test("[walkie] non-umpire walkie switch requests umpire approval only while shared walkie is off", () => {
   assert.equal(
     getNonUmpireWalkieToggleAction({
       nextChecked: true,
@@ -503,7 +503,7 @@ test("non-umpire walkie switch requests umpire approval only while shared walkie
   );
 });
 
-test("shared umpire walkie transitions fan out enable and reset local non-umpire state", () => {
+test("[walkie] shared umpire walkie transitions fan out enable and reset local non-umpire state", () => {
   assert.equal(
     didSharedWalkieEnable({
       previousSharedEnabled: false,
@@ -537,7 +537,7 @@ test("shared umpire walkie transitions fan out enable and reset local non-umpire
   );
 });
 
-test("walkie signaling setup classifier ignores stale setup races", () => {
+test("[walkie] walkie signaling setup classifier ignores stale setup races", () => {
   assert.equal(
     classifyWalkieSignalingSetupError(
       new Error("Walkie signaling changed before setup completed.")
@@ -551,7 +551,7 @@ test("walkie signaling setup classifier ignores stale setup races", () => {
   );
 });
 
-test("walkie signaling setup classifier treats transient RTM churn as recoverable", () => {
+test("[walkie] walkie signaling setup classifier treats transient RTM churn as recoverable", () => {
   assert.equal(classifyWalkieSignalingSetupError({}), "recoverable");
 
   assert.equal(
@@ -564,7 +564,7 @@ test("walkie signaling setup classifier treats transient RTM churn as recoverabl
   );
 });
 
-test("walkie signaling setup classifier keeps real configuration failures fatal", () => {
+test("[walkie] walkie signaling setup classifier keeps real configuration failures fatal", () => {
   assert.equal(
     classifyWalkieSignalingSetupError(new Error("Signaling token missing.")),
     "fatal"

@@ -8,16 +8,16 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveDirectorAutoManageSessionId } from "../src/app/components/director/director-console-utils.js";
+import { resolveDirectorAutoManageSessionId } from "../../src/app/components/director/director-console-utils.js";
 import {
   shouldPlayWalkieRemoteAudio,
   shouldReceiveWalkieAudio,
-} from "../src/app/components/live/walkie-talkie-gates.js";
+} from "../../src/app/components/live/walkie-talkie-gates.js";
 import {
   createDirectorAccessToken,
   hasValidDirectorAccess,
   isValidDirectorPin,
-} from "../src/app/lib/director-access.js";
+} from "../../src/app/lib/director-access.js";
 import {
   claimWalkieSpeaker,
   getWalkieSnapshot,
@@ -27,9 +27,9 @@ import {
   requestWalkieEnable,
   respondToWalkieRequest,
   setWalkieEnabled,
-} from "../src/app/lib/walkie-talkie.js";
+} from "../../src/app/lib/walkie-talkie.js";
 
-test("director PIN validation trims spaces and rejects invalid characters", () => {
+test("[director] director PIN validation trims spaces and rejects invalid characters", () => {
   const previousDirectorPin = process.env.DIRECTOR_CONSOLE_PIN;
   const previousDirectorPinHash = process.env.DIRECTOR_CONSOLE_PIN_HASH;
   const previousSecret = process.env.MATCH_ACCESS_SECRET;
@@ -59,7 +59,7 @@ test("director PIN validation trims spaces and rejects invalid characters", () =
   }
 });
 
-test("director auto-manage picks the requested or remembered live session after auth", () => {
+test("[director] director auto-manage picks the requested or remembered live session after auth", () => {
   const sessions = [
     {
       isLive: true,
@@ -107,7 +107,7 @@ test("director auto-manage picks the requested or remembered live session after 
   );
 });
 
-test("shared walkie audio lets every non-speaker listen to the active speaker", () => {
+test("[director] shared walkie audio lets every non-speaker listen to the active speaker", () => {
   const snapshot = {
     enabled: true,
     activeSpeakerId: "spectator:one",
@@ -144,7 +144,7 @@ test("shared walkie audio lets every non-speaker listen to the active speaker", 
   );
 });
 
-test("walkie remote playback stops while this device is actively talking or finishing", () => {
+test("[director] walkie remote playback stops while this device is actively talking or finishing", () => {
   const snapshot = {
     enabled: true,
     activeSpeakerId: "spectator:one",
@@ -182,7 +182,7 @@ test("walkie remote playback stops while this device is actively talking or fini
   );
 });
 
-test("director and spectator can request walkie and umpire must accept or dismiss", () => {
+test("[director] director and spectator can request walkie and umpire must accept or dismiss", () => {
   const matchId = `director-request-${Date.now()}`;
   hydrateWalkieEnabled(matchId, false);
 
@@ -247,7 +247,7 @@ test("director and spectator can request walkie and umpire must accept or dismis
   }
 });
 
-test("walkie lock allows only one active speaker at a time across umpire director spectator", () => {
+test("[director] walkie lock allows only one active speaker at a time across umpire director spectator", () => {
   const matchId = `director-lock-${Date.now()}`;
   hydrateWalkieEnabled(matchId, true);
 
@@ -308,7 +308,7 @@ test("walkie lock allows only one active speaker at a time across umpire directo
   }
 });
 
-test("disabling walkie clears active speaker state safely", () => {
+test("[director] disabling walkie clears active speaker state safely", () => {
   const matchId = `director-disable-${Date.now()}`;
   hydrateWalkieEnabled(matchId, true);
 
@@ -341,7 +341,7 @@ test("disabling walkie clears active speaker state safely", () => {
   }
 });
 
-test("walkie stays enabled when the last listener disconnects", async () => {
+test("[director] walkie stays enabled when the last listener disconnects", async () => {
   const matchId = `director-listener-disconnect-${Date.now()}`;
   hydrateWalkieEnabled(matchId, true);
 

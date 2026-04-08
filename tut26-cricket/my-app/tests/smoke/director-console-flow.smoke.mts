@@ -9,8 +9,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import mongoose from "mongoose";
-import Match from "../src/models/Match.js";
-import Session from "../src/models/Session.js";
+import Match from "../../src/models/Match.js";
+import Session from "../../src/models/Session.js";
 
 const base =
   process.env.DIRECTOR_E2E_BASE_URL ||

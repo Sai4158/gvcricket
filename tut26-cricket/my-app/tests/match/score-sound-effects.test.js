@@ -16,15 +16,15 @@ import {
   normalizeScoreSoundEffectMap,
   SCORE_SOUND_EFFECT_KEYS,
   shouldHydrateScoreSoundEffectMapFromRemote,
-} from "../src/app/lib/score-sound-effects.js";
+} from "../../src/app/lib/score-sound-effects.js";
 import {
   createMatchEndLiveEvent,
   createScoreLiveEvent,
   createSoundEffectLiveEvent,
-} from "../src/app/lib/live-announcements.js";
-import { serializePublicMatch } from "../src/app/lib/public-data.js";
+} from "../../src/app/lib/live-announcements.js";
+import { serializePublicMatch } from "../../src/app/lib/public-data.js";
 
-test("score sound effect mapping covers every supported scoring control", () => {
+test("[match] score sound effect mapping covers every supported scoring control", () => {
   const cases = [
     {
       key: "dot",
@@ -89,7 +89,7 @@ test("score sound effect mapping covers every supported scoring control", () => 
   assert.equal(getScoreSoundEffectPreviewInput("unknown"), null);
 });
 
-test("remote score sound map hydration does not overwrite unsaved local changes", () => {
+test("[match] remote score sound map hydration does not overwrite unsaved local changes", () => {
   const remoteMap = normalizeScoreSoundEffectMap({
     dot: "boom.mp3",
     out: "get_out.mp3",
@@ -118,7 +118,7 @@ test("remote score sound map hydration does not overwrite unsaved local changes"
   );
 });
 
-test("score and sound effect live events preserve their shared action id", () => {
+test("[match] score and sound effect live events preserve their shared action id", () => {
   const actionId = "score:test-action-1";
   const baseMatch = {
     innings1: { score: 12, history: [] },
@@ -162,7 +162,7 @@ test("score and sound effect live events preserve their shared action id", () =>
   assert.equal(soundEvent.sourceActionId, actionId);
 });
 
-test("public match payload exposes normalized score sound effect map", () => {
+test("[match] public match payload exposes normalized score sound effect map", () => {
   const publicMatch = serializePublicMatch({
     _id: "match-1",
     teamA: [],

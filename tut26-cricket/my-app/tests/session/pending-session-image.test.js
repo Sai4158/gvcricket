@@ -16,7 +16,7 @@ import {
   uploadSessionImageFileToDraftSession,
   uploadStoredPendingSessionImageToDraftSession,
   uploadStoredPendingSessionImageToMatch,
-} from "../src/app/lib/pending-session-image.js";
+} from "../../src/app/lib/pending-session-image.js";
 
 function createSessionStorageMock() {
   const store = new Map();
@@ -46,7 +46,7 @@ function setPendingImage(sessionStorage) {
   );
 }
 
-test("stored pending session image clears only after a successful match upload", async () => {
+test("[session] stored pending session image clears only after a successful match upload", async () => {
   const previousWindow = global.window;
   const previousFetch = global.fetch;
   const nativeFetch = previousFetch;
@@ -80,7 +80,7 @@ test("stored pending session image clears only after a successful match upload",
   }
 });
 
-test("stored pending session image clears only after a successful draft upload", async () => {
+test("[session] stored pending session image clears only after a successful draft upload", async () => {
   const previousWindow = global.window;
   const previousFetch = global.fetch;
   const nativeFetch = previousFetch;
@@ -115,7 +115,7 @@ test("stored pending session image clears only after a successful draft upload",
   }
 });
 
-test("stored pending session image stays queued when the deferred match upload fails", async () => {
+test("[session] stored pending session image stays queued when the deferred match upload fails", async () => {
   const previousWindow = global.window;
   const previousFetch = global.fetch;
   const nativeFetch = previousFetch;
@@ -146,7 +146,7 @@ test("stored pending session image stays queued when the deferred match upload f
   }
 });
 
-test("stored pending session image stays queued when the draft upload fails", async () => {
+test("[session] stored pending session image stays queued when the draft upload fails", async () => {
   const previousWindow = global.window;
   const previousFetch = global.fetch;
   const nativeFetch = previousFetch;
@@ -178,7 +178,7 @@ test("stored pending session image stays queued when the draft upload fails", as
   }
 });
 
-test("direct draft upload surfaces the server error message", async () => {
+test("[session] direct draft upload surfaces the server error message", async () => {
   const previousFetch = global.fetch;
 
   global.fetch = async () =>
@@ -202,7 +202,7 @@ test("direct draft upload surfaces the server error message", async () => {
   }
 });
 
-test("session image fallback notices persist until cleared", () => {
+test("[session] session image fallback notices persist until cleared", () => {
   const previousWindow = global.window;
   const sessionStorage = createSessionStorageMock();
 

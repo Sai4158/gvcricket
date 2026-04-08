@@ -12,14 +12,14 @@ import {
   applyMatchAction,
   applySafeMatchPatch,
   buildSessionMirrorUpdate,
-} from "../src/app/lib/match-engine.js";
+} from "../../src/app/lib/match-engine.js";
 import {
   applyStoredMatchImages,
   createStoredMatchImageEntry,
   rebaseStoredMatchImagesForMatch,
-} from "../src/app/lib/match-image-gallery.js";
-import { buildSignedMatchImageUrl } from "../src/app/lib/match-image-secure.js";
-import { serializePublicMatch, serializePublicSession } from "../src/app/lib/public-data.js";
+} from "../../src/app/lib/match-image-gallery.js";
+import { buildSignedMatchImageUrl } from "../../src/app/lib/match-image-secure.js";
+import { serializePublicMatch, serializePublicSession } from "../../src/app/lib/public-data.js";
 import {
   claimWalkieSpeaker,
   getWalkieSnapshot,
@@ -28,8 +28,8 @@ import {
   requestWalkieEnable,
   respondToWalkieRequest,
   releaseWalkieSpeaker,
-} from "../src/app/lib/walkie-talkie.js";
-import { buildBaseMatchFixture } from "./helpers/match-fixtures.js";
+} from "../../src/app/lib/walkie-talkie.js";
+import { buildBaseMatchFixture } from "../helpers/match-fixtures.js";
 
 function buildBaseMatch() {
   return buildBaseMatchFixture({
@@ -59,7 +59,7 @@ function setToss(match) {
   });
 }
 
-test("mixed scoring, undo, innings switch, and winning-shot undo stay consistent", () => {
+test("[match] mixed scoring, undo, innings switch, and winning-shot undo stay consistent", () => {
   let match = setToss(buildBaseMatch());
 
   match = applyMatchAction(match, {
@@ -207,7 +207,7 @@ test("mixed scoring, undo, innings switch, and winning-shot undo stay consistent
   assert.equal(finalMatch.score, 14);
 });
 
-test("image serialization stays safe during scoring and fallback paths stay stable", () => {
+test("[match] image serialization stays safe during scoring and fallback paths stay stable", () => {
   let match = setToss(buildBaseMatch());
   match = applyMatchAction(match, {
     type: "score_ball",
@@ -242,7 +242,7 @@ test("image serialization stays safe during scoring and fallback paths stay stab
   assert.equal(unsafeLegacyPublic.score, 4);
 });
 
-test("step-one session image survives draft save, match promotion, and session mirroring", () => {
+test("[match] step-one session image survives draft save, match promotion, and session mirroring", () => {
   const session = {
     _id: "507f1f77bcf86cd799439211",
     match: null,
@@ -310,7 +310,7 @@ test("step-one session image survives draft save, match promotion, and session m
   );
 });
 
-test("public match data falls back to the linked session image until match mirroring catches up", () => {
+test("[match] public match data falls back to the linked session image until match mirroring catches up", () => {
   const session = {
     _id: "507f1f77bcf86cd799439221",
     match: "507f1f77bcf86cd799439222",
@@ -363,7 +363,7 @@ test("public match data falls back to the linked session image until match mirro
   );
 });
 
-test("inline draft session images stay visible through promotion into the live match", () => {
+test("[match] inline draft session images stay visible through promotion into the live match", () => {
   const inlineImageUrl = "data:image/jpeg;base64,Zm9vYmFy";
   const session = {
     _id: "507f1f77bcf86cd799439231",
@@ -430,7 +430,7 @@ test("inline draft session images stay visible through promotion into the live m
   assert.equal(sessionMirror.matchImages[0].url, inlineImageUrl);
 });
 
-test("walkie changes stay isolated from score state and do not leak across matches", () => {
+test("[match] walkie changes stay isolated from score state and do not leak across matches", () => {
   const matchId = `combo-walkie-${Date.now()}`;
   const otherMatchId = `${matchId}-other`;
   let match = setToss(buildBaseMatch());

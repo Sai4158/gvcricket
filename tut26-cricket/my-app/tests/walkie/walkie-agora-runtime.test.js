@@ -16,9 +16,9 @@ import {
   removeAgoraWalkieRequest,
   serializeAgoraWalkieMetadata,
   upsertAgoraWalkieRequest,
-} from "../src/app/lib/walkie-agora-runtime.js";
+} from "../../src/app/lib/walkie-agora-runtime.js";
 
-test("Agora walkie runtime metadata stays Mongo-free and stable", () => {
+test("[walkie] Agora walkie runtime metadata stays Mongo-free and stable", () => {
   const now = Date.now();
   const requests = filterAgoraWalkieRequests([
     {
@@ -59,7 +59,7 @@ test("Agora walkie runtime metadata stays Mongo-free and stable", () => {
   assert.equal(parsed.pendingRequests[0].signalingUserId, "agora-user-1");
 });
 
-test("Agora walkie runtime snapshot derives live state from signaling data only", () => {
+test("[walkie] Agora walkie runtime snapshot derives live state from signaling data only", () => {
   const now = Date.now();
   const requests = upsertAgoraWalkieRequest([], {
     requestId: "req-1",

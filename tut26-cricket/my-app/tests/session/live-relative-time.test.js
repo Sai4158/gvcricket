@@ -13,16 +13,16 @@ import {
   formatLiveRelativeTimeLabel,
   getLiveRelativeTimeRefreshDelay,
   parseLiveRelativeTimeTimestamp,
-} from "../src/app/components/live/useLiveRelativeTime.js";
+} from "../../src/app/components/live/useLiveRelativeTime.js";
 
-test("live relative time helpers handle invalid timestamps safely", () => {
+test("[session] live relative time helpers handle invalid timestamps safely", () => {
   assert.equal(parseLiveRelativeTimeTimestamp(""), null);
   assert.equal(parseLiveRelativeTimeTimestamp("not-a-date"), null);
   assert.equal(formatLiveRelativeTimeLabel("not-a-date", 0), "Waiting for update");
   assert.equal(getLiveRelativeTimeRefreshDelay("not-a-date", 0), null);
 });
 
-test("live relative time refresh delay slows down after the first minute and hour", () => {
+test("[session] live relative time refresh delay slows down after the first minute and hour", () => {
   const baseNow = Date.parse("2026-03-25T12:00:00.000Z");
 
   assert.equal(
@@ -39,7 +39,7 @@ test("live relative time refresh delay slows down after the first minute and hou
   );
 });
 
-test("live relative time labels stay accurate across seconds minutes and hours", () => {
+test("[session] live relative time labels stay accurate across seconds minutes and hours", () => {
   const baseNow = Date.parse("2026-03-25T12:00:00.000Z");
 
   assert.equal(

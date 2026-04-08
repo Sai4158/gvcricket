@@ -14,7 +14,7 @@ import {
   subscribeSoundEffectsLibrarySync,
   writeCachedSoundEffectsLibrary,
   writeCachedSoundEffectsOrder,
-} from "../src/app/lib/sound-effects-client.js";
+} from "../../src/app/lib/sound-effects-client.js";
 
 function createWindowMock() {
   const eventTarget = new EventTarget();
@@ -44,7 +44,7 @@ function createWindowMock() {
   };
 }
 
-test("sound effect search matches label, filename, and id case-insensitively", () => {
+test("[match] sound effect search matches label, filename, and id case-insensitively", () => {
   const files = [
     {
       id: "crowd-cheer.mp3",
@@ -72,7 +72,7 @@ test("sound effect search matches label, filename, and id case-insensitively", (
   );
 });
 
-test("sound effect cache sync notifies listeners when the shared library changes", () => {
+test("[match] sound effect cache sync notifies listeners when the shared library changes", () => {
   const previousWindow = global.window;
   global.window = createWindowMock();
 

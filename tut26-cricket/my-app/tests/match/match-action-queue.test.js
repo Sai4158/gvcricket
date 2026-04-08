@@ -9,14 +9,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { applyMatchAction } from "../src/app/lib/match-engine.js";
+import { applyMatchAction } from "../../src/app/lib/match-engine.js";
 import {
   filterQueuedActionsAlreadyApplied,
   isMatchNetworkError,
   removeQueuedActionById,
   replayQueuedMatchActions,
   updateQueuedActionRetryFlag,
-} from "../src/app/components/match/useMatch.js";
+} from "../../src/app/components/match/useMatch.js";
 
 function actionId(label) {
   return `${label}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -55,13 +55,13 @@ function buildStartedMatch() {
   });
 }
 
-test("match network classifier catches transient browser fetch failures", () => {
+test("[match] match network classifier catches transient browser fetch failures", () => {
   assert.equal(isMatchNetworkError(new TypeError("Failed to fetch")), true);
   assert.equal(isMatchNetworkError(new TypeError("Load failed")), true);
   assert.equal(isMatchNetworkError(new Error("Failed to update match.")), false);
 });
 
-test("queued scoring actions can be replayed on top of a fresh server snapshot", () => {
+test("[match] queued scoring actions can be replayed on top of a fresh server snapshot", () => {
   const startedMatch = buildStartedMatch();
   const serverMatch = applyMatchAction(startedMatch, {
     type: "score_ball",
@@ -100,7 +100,7 @@ test("queued scoring actions can be replayed on top of a fresh server snapshot",
   assert.equal(replayedMatch.actionHistory.length, 4);
 });
 
-test("queue helpers drop applied actions and persist retry flag changes safely", () => {
+test("[match] queue helpers drop applied actions and persist retry flag changes safely", () => {
   const queuedEntries = [
     {
       action: {
