@@ -38,6 +38,8 @@ npm run build
 Useful maintenance and verification commands:
 
 ```bash
+npm run artifacts:normalize
+npm run artifacts:adopt-root
 npm run docs:headers
 npm run verify:audit
 npm run verify:root
@@ -59,6 +61,13 @@ See `docs/COMMANDS.md` for the full command guide.
 ## Artifacts
 
 Generated logs and reports belong in `artifacts`, not the repo root.
+
+Naming rule:
+
+- logs: `task-name.log`, `task-name.out.log`, `task-name.err.log`
+- walkie reports: `walkie-scenario.txt`
+- stress reports: `walkie-stress-scenario.txt`
+- smoke and audit reports: `probe-name.json`
 
 - `artifacts/logs/dev`
 - `artifacts/logs/e2e`

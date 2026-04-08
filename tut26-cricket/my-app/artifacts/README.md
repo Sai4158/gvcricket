@@ -19,5 +19,10 @@ Nothing in this folder should affect product behavior. These files are local out
 ## Rules
 
 - New generated logs should go here, not the repo root.
+- Use readable names with no leading `.` and no `tmp-` prefix.
+- Logs should use `task-name.log`, `task-name.out.log`, or `task-name.err.log`.
+- Walkie reports should use `walkie-scenario.txt`.
+- Stress reports should use `walkie-stress-scenario.txt`.
+- Smoke and audit reports should use `probe-name.json`.
 - Keep tracked docs or placeholders only when they help explain the layout.
 - Everything else in this folder is safe to regenerate locally.

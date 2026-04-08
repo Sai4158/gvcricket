@@ -13,6 +13,27 @@ Run scripts through `npm run ...` when a package script exists. That keeps comma
 
 ## Scripts
 
+- `maintenance/artifact-name-utils.mjs`
+  - Purpose: shared artifact filename and path normalization helpers
+  - Run with: imported by the artifact maintenance scripts
+  - Reads: file and folder names
+  - Writes: none
+  - Runtime: Node
+
+- `maintenance/normalize-artifacts.mjs`
+  - Purpose: renames existing artifact logs and reports to the readable naming convention
+  - Run with: `npm run artifacts:normalize`
+  - Reads: `artifacts/logs` and `artifacts/reports`
+  - Writes: renames artifact files in place
+  - Runtime: Node
+
+- `maintenance/adopt-root-artifacts.mjs`
+  - Purpose: moves root-level generated log and result files into `artifacts/logs/checks`
+  - Run with: `npm run artifacts:adopt-root`
+  - Reads: repo root file names
+  - Writes: moves generated files into `artifacts/logs/checks`
+  - Runtime: Node
+
 - `maintenance/add-file-headers.mjs`
   - Purpose: adds the standard file-overview header to commentable source files that do not have one yet
   - Run with: `npm run docs:headers`
@@ -40,6 +61,13 @@ Run scripts through `npm run ...` when a package script exists. That keeps comma
   - Reads: repo root file names
   - Writes: none
   - Runtime: Node
+
+- `verification/start-logged-command.ps1`
+  - Purpose: starts a local Windows command and writes readable stdout and stderr logs under `artifacts/logs`
+  - Run with: direct PowerShell execution for manual runs
+  - Reads: the command path, arguments, and artifact log folder
+  - Writes: `*.out.log` and `*.err.log` files in the chosen artifact log group
+  - Runtime: PowerShell
 
 - `verification/stress-audit-scratch.cjs`
   - Purpose: saved scratch script for local stress-audit experiments

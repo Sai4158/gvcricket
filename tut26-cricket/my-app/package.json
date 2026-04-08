@@ -12,6 +12,8 @@
     "lint": "eslint .",
     "test": "tsx --test tests",
     "typecheck": "node scripts/verification/typecheck.mjs",
+    "artifacts:normalize": "node scripts/maintenance/normalize-artifacts.mjs",
+    "artifacts:adopt-root": "node scripts/maintenance/adopt-root-artifacts.mjs",
     "docs:headers": "node scripts/maintenance/add-file-headers.mjs",
     "verify:lint": "npm run lint",
     "verify:test": "npm test",
