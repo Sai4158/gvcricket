@@ -58,10 +58,10 @@ const SessionSchema = new mongoose.Schema(
       enum: ["simple", "full", ""],
       default: "",
     },
-    announcerScoreSoundEffectsEnabled: { type: Boolean, default: true },
+    announcerScoreSoundEffectsEnabled: { type: Boolean, default: false },
     announcerBroadcastScoreSoundEffectsEnabled: {
       type: Boolean,
-      default: true,
+      default: false,
     },
     walkieTalkieEnabled: { type: Boolean, default: false },
     walkieTalkieUpdatedAt: { type: Date, default: null },

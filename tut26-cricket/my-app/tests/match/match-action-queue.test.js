@@ -13,6 +13,7 @@ import test from "node:test";
 import { applyMatchAction } from "../../src/app/lib/match-engine.js";
 import {
   filterQueuedActionsAlreadyApplied,
+  isIncomingUpdateOlder,
   isMatchNetworkError,
   removeQueuedActionById,
   replayQueuedMatchActions,
@@ -60,6 +61,34 @@ test("[match] match network classifier catches transient browser fetch failures"
   assert.equal(isMatchNetworkError(new TypeError("Failed to fetch")), true);
   assert.equal(isMatchNetworkError(new TypeError("Load failed")), true);
   assert.equal(isMatchNetworkError(new Error("Failed to update match.")), false);
+});
+
+test("[match] stale stream updates are ignored while newer updates continue to apply", () => {
+  assert.equal(
+    isIncomingUpdateOlder(
+      "2026-04-09T12:00:00.000Z",
+      "2026-04-09T12:00:00.100Z",
+    ),
+    true,
+  );
+  assert.equal(
+    isIncomingUpdateOlder(
+      "2026-04-09T12:00:00.100Z",
+      "2026-04-09T12:00:00.100Z",
+    ),
+    false,
+  );
+  assert.equal(
+    isIncomingUpdateOlder(
+      "2026-04-09T12:00:00.200Z",
+      "2026-04-09T12:00:00.100Z",
+    ),
+    false,
+  );
+  assert.equal(
+    isIncomingUpdateOlder("not-a-date", "2026-04-09T12:00:00.100Z"),
+    false,
+  );
 });
 
 test("[match] queued scoring actions can be replayed on top of a fresh server snapshot", () => {
