@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Renames existing artifact logs and reports to the repo's readable naming convention.
+ * Purpose: Handles Normalize Artifacts maintenance work for repo consistency and cleanup.
  * Main exports: module side effects only.
- * Major callers: npm run artifacts:normalize.
- * Side effects: renames files under artifacts/logs and artifacts/reports.
- * Read next: ./artifact-name-utils.mjs
+ * Major callers: Repo maintenance commands.
+ * Side effects: reads or writes repo files.
+ * Read next: ../README.md
  */
 
 import fs from "node:fs/promises";
@@ -75,3 +75,5 @@ async function main() {
 }
 
 await main();
+
+

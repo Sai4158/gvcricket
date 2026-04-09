@@ -1,9 +1,9 @@
 /**
  * File overview:
- * Purpose: Owns director PIN auth, logout, and leave-console flow.
+ * Purpose: Encapsulates Director browser state, effects, and runtime coordination.
  * Main exports: useDirectorAuth.
- * Major callers: DirectorConsoleScreen.
- * Side effects: calls director auth APIs and updates client PIN rate-limit state.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
  * Read next: ./README.md
  */
 
@@ -173,3 +173,5 @@ export default function useDirectorAuth({
     submitDirectorPin,
   };
 }
+
+

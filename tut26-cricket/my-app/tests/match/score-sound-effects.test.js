@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Automated test coverage for Score Sound Effects.Test behavior and regressions.
+ * Purpose: Covers Score Sound Effects.Test behavior and regression cases in the automated test suite.
  * Main exports: module side effects only.
  * Major callers: `npm test` and focused test runs.
  * Side effects: runs assertions and test-side setup/teardown only.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -193,3 +194,5 @@ test("[match] public match payload exposes normalized score sound effect map", (
   assert.equal(publicMatch.announcerScoreSoundEffectMap.four, "four.mp3");
   assert.equal(publicMatch.announcerScoreSoundEffectMap.six, "");
 });
+
+

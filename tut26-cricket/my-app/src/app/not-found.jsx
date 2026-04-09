@@ -1,12 +1,12 @@
 /**
  * File overview:
- * Purpose: Source module for Not Found.
+ * Purpose: Renders the custom not-found experience for unknown app routes.
  * Main exports: NotFound.
  * Major callers: Adjacent modules in the same feature area.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
-// src/app/not-found.jsx
+
 "use client";
 
 import Image from "next/image";
@@ -121,3 +121,4 @@ export default function NotFound() {
     </div>
   );
 }
+

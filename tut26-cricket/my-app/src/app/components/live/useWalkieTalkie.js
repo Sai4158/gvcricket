@@ -2,11 +2,11 @@
 
 /**
  * File overview:
- * Purpose: Stable public entry for the walkie-talkie hook.
- * Main exports: useWalkieTalkie and walkie helper re-exports.
- * Major callers: live, match, session-view, and director screens.
- * Side effects: none in this wrapper.
- * Read next: ./walkie/README.md
+ * Purpose: Encapsulates Live browser state, effects, and runtime coordination.
+ * Main exports: module side effects only.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
  */
 
 export {
@@ -21,3 +21,5 @@ export {
   shouldReceiveWalkieAudio,
 } from "./walkie/useWalkieTalkieRuntime";
 export { default } from "./walkie/useWalkieTalkieRuntime";
+
+

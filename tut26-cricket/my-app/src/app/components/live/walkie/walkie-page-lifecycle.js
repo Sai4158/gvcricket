@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: React effects for page visibility, reconnect recovery, and cleanup in the walkie runtime.
+ * Purpose: Renders Live UI for the app's screens and flows.
  * Main exports: useWalkiePageLifecycle.
- * Major callers: useWalkieTalkieRuntime.
- * Side effects: listens for browser lifecycle events and resets walkie state around page transitions.
- * Read next: ./useWalkieTalkieRuntime.js
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
  */
 
 import { useEffect } from "react";
@@ -268,3 +268,5 @@ export function useWalkiePageLifecycle({
     ],
   );
 }
+
+

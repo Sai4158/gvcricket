@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Mongoose model definition for Session.
+ * Purpose: Defines the Mongoose schema and model wiring for Session data.
  * Main exports: default export.
  * Major callers: Server loaders, API routes, and data helpers.
  * Side effects: registers or reuses a Mongoose model.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import mongoose from "mongoose";
 
 const MatchImageEntrySchema = new mongoose.Schema(
@@ -78,3 +79,5 @@ SessionSchema.index({ match: 1 });
 
 export default mongoose.models.Session ||
   mongoose.model("Session", SessionSchema);
+
+

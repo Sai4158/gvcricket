@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Automated test coverage for Walkie Transport Gating.Test behavior and regressions.
+ * Purpose: Covers Walkie Transport Gating.Test behavior and regression cases in the automated test suite.
  * Main exports: module side effects only.
  * Major callers: `npm test` and focused test runs.
  * Side effects: runs assertions and test-side setup/teardown only.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -580,3 +581,5 @@ test("[walkie] walkie signaling setup classifier keeps real configuration failur
     "fatal"
   );
 });
+
+

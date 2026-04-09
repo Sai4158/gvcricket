@@ -1,10 +1,10 @@
-﻿/**
+/**
  * File overview:
- * Purpose: Home-page journey preview renderers for the explainer flow.
- * Main exports: AnimatedStepFlowPreview, AnimatedTeamsJourneyPreview, AnimatedUmpireJourneyPreview, AnimatedHistoryJourneyPreview, AnimatedSpectatorJourneyPreview, AnimatedJourneyWalkiePreview, AnimatedJourneyAudioPreview, AnimatedAccessJourneyPreview, renderJourneyPreview.
- * Major callers: HowItWorksSectionContent and card-shells.
- * Side effects: uses React hooks and browser motion APIs.
- * Read next: README.md
+ * Purpose: Renders the journey-step previews used in the home-page how-it-works section.
+ * Main exports: renderJourneyPreview, AnimatedStepFlowPreview, and related preview components.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
  */
 
 import { motion } from "framer-motion";
@@ -764,4 +764,6 @@ export {
   AnimatedUmpireJourneyPreview,
   renderJourneyPreview,
 };
+
+
 

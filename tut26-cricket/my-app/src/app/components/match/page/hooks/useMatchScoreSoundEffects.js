@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Match sound-effect library, preview, commentary-audio, and sync logic for the umpire screen.
+ * Purpose: Encapsulates Match browser state, effects, and runtime coordination.
  * Main exports: useMatchScoreSoundEffects.
- * Major callers: MatchPageScreen.
- * Side effects: fetches sound-effect settings, syncs browser caches, and relays live sound-effect events.
- * Read next: ../MatchPageScreen.jsx
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
  */
 
 import { useCallback, useEffect, useMemo } from "react";
@@ -1010,3 +1010,5 @@ export default function useMatchScoreSoundEffects({
     triggerSharedSoundEffect,
   };
 }
+
+

@@ -1,10 +1,10 @@
-﻿/**
+/**
  * File overview:
- * Purpose: Home-page feature preview renderers and shared preview primitives.
- * Main exports: getPreviewNodeSet, MiniBall, PreviewSurface, MiniStepFlowPreview, MiniTossSpinner, MiniPulseDot, MiniAudioBars, useLoopedFrame, AnimatedMiniBallRow, AnimatedWalkieFeaturePreview, AnimatedLoudspeakerFeaturePreview, AnimatedAnnouncerFeaturePreview, AnimatedShareFeaturePreview, AnimatedCoverFeaturePreview, AnimatedInsightsFeaturePreview, AnimatedDirectorFeaturePreview, AnimatedLiveBannerFeaturePreview, renderFeaturePreview.
- * Major callers: HowItWorksSectionContent and adjacent journey preview modules.
- * Side effects: uses React hooks and browser motion APIs.
- * Read next: README.md
+ * Purpose: Renders interactive feature-preview cards for the home-page how-it-works section.
+ * Main exports: renderFeaturePreview, getPreviewNodeSet, useLoopedFrame, and related helpers.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
  */
 
 import { useEffect, useState } from "react";
@@ -751,4 +751,6 @@ export {
   renderFeaturePreview,
   useLoopedFrame,
 };
+
+
 

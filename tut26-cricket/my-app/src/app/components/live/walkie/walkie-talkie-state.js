@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Shared walkie snapshot, token, and identity helpers for the walkie hook.
- * Main exports: EMPTY_WALKIE_SNAPSHOT, mergeWalkieSnapshots, token validation helpers.
- * Major callers: useWalkieTalkie and walkie-focused tests.
+ * Purpose: Renders Live UI for the app's screens and flows.
+ * Main exports: nowIso, normalizeAuthoritativeWalkieSnapshot, mergeWalkieSnapshots, buildLocalSpeakerFromSnapshot, withTokenExpiry, isTokenFresh, validateWalkieTokenPayload, defaultDisplayName, EMPTY_WALKIE_SNAPSHOT.
+ * Major callers: Feature routes and sibling components.
  * Side effects: none.
- * Read next: ../README.md
+ * Read next: ./README.md
  */
 
 import { filterAgoraWalkieRequests } from "../../../lib/walkie-agora-runtime";
@@ -192,3 +192,5 @@ export function defaultDisplayName(role, name = "") {
   if (role === "director") return "Director";
   return "Spectator";
 }
+
+

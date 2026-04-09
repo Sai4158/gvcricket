@@ -1,9 +1,9 @@
 /**
  * File overview:
- * Purpose: Developer script for repo-root cleanliness verification.
+ * Purpose: Runs Check Root Cleanliness verification checks or local audit support tasks.
  * Main exports: module side effects only.
- * Major callers: verification commands and local repo checks.
- * Side effects: exits non-zero when generated files leak into the repo root.
+ * Major callers: Verification commands and local audit runs.
+ * Side effects: runs local verification tasks and may write reports or logs.
  * Read next: ../README.md
  */
 
@@ -25,7 +25,6 @@ const ALLOWLIST = new Set([
   "postcss.config.mjs",
   "eslint.config.mjs",
   "security-headers.mjs",
-  "tmp-live-banner-check.mjs",
   "vercel.json",
 ]);
 
@@ -51,3 +50,4 @@ async function main() {
 }
 
 await main();
+

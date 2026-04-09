@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Spectator loudspeaker and score-announcer launcher and modal sections.
+ * Purpose: Renders Session View UI for the app's screens and flows.
  * Main exports: SpectatorAudioLaunchers, SpectatorAudioModals.
- * Major callers: SessionViewScreen.
- * Side effects: uses browser pointer events and announcer callbacks.
- * Read next: README.md
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
  */
 
 import { FaBullhorn, FaMicrophone, FaMicrophoneSlash } from "react-icons/fa";
@@ -254,3 +254,5 @@ export function SpectatorAudioModals({
     </>
   );
 }
+
+

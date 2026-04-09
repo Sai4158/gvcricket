@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Mongoose model definition for WalkieState.
+ * Purpose: Defines the Mongoose schema and model wiring for WalkieState data.
  * Main exports: default export.
  * Major callers: Server loaders, API routes, and data helpers.
  * Side effects: registers or reuses a Mongoose model.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import mongoose from "mongoose";
 
 const WalkieParticipantSchema = new mongoose.Schema(
@@ -77,3 +78,5 @@ WalkieStateSchema.index({ idleExpiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export default mongoose.models.WalkieState ||
   mongoose.model("WalkieState", WalkieStateSchema);
+
+

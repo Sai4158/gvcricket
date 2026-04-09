@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Shared artifact path and filename normalization helpers for local maintenance scripts.
- * Main exports: artifact roots, folder groups, and filename/path normalization helpers.
- * Major callers: normalize-artifacts.mjs and adopt-root-artifacts.mjs.
- * Side effects: none in this helper module.
- * Read next: ./normalize-artifacts.mjs
+ * Purpose: Handles Artifact Name Utils maintenance work for repo consistency and cleanup.
+ * Main exports: ARTIFACTS_ROOT, ARTIFACT_LOG_GROUPS, ARTIFACT_REPORT_GROUPS, normalizeArtifactLeafName, buildNormalizedArtifactPath, nextAvailablePath.
+ * Major callers: Repo maintenance commands.
+ * Side effects: reads or writes repo files.
+ * Read next: ../README.md
  */
 
 import path from "node:path";
@@ -151,3 +151,5 @@ export const nextAvailablePath = async (filePath, exists) => {
     counter += 1;
   }
 };
+
+

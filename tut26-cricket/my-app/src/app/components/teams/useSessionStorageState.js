@@ -2,12 +2,13 @@
 
 /**
  * File overview:
- * Purpose: React hook for Teams behavior and browser state.
+ * Purpose: Encapsulates Teams browser state, effects, and runtime coordination.
  * Main exports: useSessionStorageState.
  * Major callers: Feature routes and sibling components.
  * Side effects: reads or writes browser storage.
- * Read next: ../README.md
+ * Read next: ./README.md
  */
+
 
 import { useEffect, useRef, useState } from "react";
 
@@ -49,3 +50,5 @@ export default function useSessionStorageState(key, defaultValue) {
 
   return [state, setState];
 }
+
+

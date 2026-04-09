@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Shared helper module for Site Metadata logic.
+ * Purpose: Provides shared Site Metadata logic for routes, APIs, and feature code.
  * Main exports: getPublicSiteUrl, getSiteUrl, absoluteUrl, buildShareUrl, versionedSocialImagePath, cleanText, pluralizeRuns, pluralizeWickets, getMatchupLabel, buildPageTitle, siteConfig.
  * Major callers: Route loaders, API routes, and feature components.
  * Side effects: none.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 export const siteConfig = {
   name: "GV Cricket",
   shortName: "GV Cricket",
@@ -142,3 +143,5 @@ export function getMatchupLabel({
 export function buildPageTitle(title) {
   return cleanText(title);
 }
+
+

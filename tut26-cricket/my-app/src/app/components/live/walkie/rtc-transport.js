@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: RTC audio transport and remote playback helpers for the walkie runtime.
+ * Purpose: Renders Live UI for the app's screens and flows.
  * Main exports: createWalkieRtcTransportApi.
- * Major callers: useWalkieTalkieRuntime.
- * Side effects: joins Agora RTC, publishes microphone audio, and plays remote tracks.
- * Read next: ./presence-snapshot.js
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
  */
 
 import { clearStoredWalkieToken } from "./walkie-talkie-storage";
@@ -477,3 +477,5 @@ export function createWalkieRtcTransportApi({
     unpublishRtc,
   };
 }
+
+

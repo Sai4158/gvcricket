@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: React effects for maintaining walkie signaling, transport, and remote playback.
+ * Purpose: Renders Live UI for the app's screens and flows.
  * Main exports: useWalkieTransportEffects.
- * Major callers: useWalkieTalkieRuntime.
- * Side effects: opens or closes signaling and RTC transport based on runtime state.
- * Read next: ./walkie-page-lifecycle.js
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
  */
 
 import { useEffect } from "react";
@@ -507,3 +507,5 @@ export function useWalkieTransportEffects({
     updateNotice,
   ]);
 }
+
+

@@ -2,12 +2,13 @@
 
 /**
  * File overview:
- * Purpose: UI component for Session screens and flows.
+ * Purpose: Renders Session UI for the app's screens and flows.
  * Main exports: InfoModal.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 
 import { motion } from "framer-motion";
 import { FaEye, FaLock, FaTimes } from "react-icons/fa";
@@ -103,3 +104,5 @@ export default function InfoModal({ onExit }) {
     </motion.div>
   );
 }
+
+

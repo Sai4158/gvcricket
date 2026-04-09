@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Automated test coverage for Stress Isolation behavior and regressions.
+ * Purpose: Covers Stress Isolation.Smoke behavior and regression cases in the automated test suite.
  * Main exports: module side effects only.
  * Major callers: `npm test` and focused test runs.
  * Side effects: runs assertions and test-side setup/teardown only.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import fs from "node:fs";
 import path from "node:path";
 import mongoose from "mongoose";
@@ -525,3 +526,5 @@ try {
     console.error(`CLEANUP_ERROR=${error.message}`);
   });
 }
+
+

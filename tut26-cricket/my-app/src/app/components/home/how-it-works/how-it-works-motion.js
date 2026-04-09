@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Shared motion variants for the home how-it-works experience.
- * Main exports: card, grid, and preview motion variants.
- * Major callers: HowItWorksSectionContent.
+ * Purpose: Renders Home UI for the app's screens and flows.
+ * Main exports: gridVariants, cardVariants, previewStaggerVariants, previewItemVariants, previewTitleVariants.
+ * Major callers: Feature routes and sibling components.
  * Side effects: none.
- * Read next: ./HowItWorksSectionContent.jsx
+ * Read next: ./README.md
  */
 
 export const gridVariants = {
@@ -75,4 +75,6 @@ export const previewTitleVariants = {
     },
   },
 };
+
+
 

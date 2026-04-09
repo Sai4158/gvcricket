@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Match-stage countdown and continue-flow logic for innings transitions and result cards.
+ * Purpose: Encapsulates Match browser state, effects, and runtime coordination.
  * Main exports: useMatchStageCardFlow.
- * Major callers: MatchPageScreen.
- * Side effects: delays result-card reveal until commentary or effects settle and navigates to results.
- * Read next: ../MatchPageScreen.jsx
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
  */
 
 /* eslint-disable react-hooks/refs */
@@ -505,3 +505,5 @@ export default function useMatchStageCardFlow({
     hasPendingStageContinueSpeech,
   };
 }
+
+

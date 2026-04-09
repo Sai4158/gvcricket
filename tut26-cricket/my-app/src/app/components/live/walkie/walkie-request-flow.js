@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Request, toggle, unlock, and deactivation actions for the walkie runtime.
+ * Purpose: Renders Live UI for the app's screens and flows.
  * Main exports: createWalkieRequestFlowApi.
- * Major callers: useWalkieTalkieRuntime.
- * Side effects: sends request and toggle mutations to walkie endpoints.
- * Read next: ./walkie-transport-effects.js
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
  */
 
 import { defaultDisplayName, nowIso } from "./walkie-talkie-state";
@@ -451,3 +451,5 @@ export function createWalkieRequestFlowApi({
     unlockAudio,
   };
 }
+
+

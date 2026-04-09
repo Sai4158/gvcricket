@@ -1,12 +1,12 @@
-﻿"use client";
+"use client";
 
 /**
  * File overview:
- * Purpose: UI component for Session View screens and flows.
+ * Purpose: Renders the spectator session-view screen, live data hydration, and result navigation.
  * Main exports: SessionViewClient.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
 
 import {
@@ -1952,4 +1952,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
     </main>
   );
 }
+
+
 

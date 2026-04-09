@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Shared helper module for Match Access logic.
+ * Purpose: Provides shared Match Access logic for routes, APIs, and feature code.
  * Main exports: getConfiguredUmpirePin, getConfiguredManagePin, isValidUmpirePin, isValidManagePin, getMatchAccessCookieName, createMatchAccessToken, hasValidMatchAccess, getMatchAccessCookie, getClearedMatchAccessCookie.
  * Major callers: Route loaders, API routes, and feature components.
  * Side effects: none.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import crypto from "node:crypto";
 
 const COOKIE_PREFIX = "gv_match_access_";
@@ -196,3 +197,5 @@ export function getClearedMatchAccessCookie(matchId) {
     },
   };
 }
+
+

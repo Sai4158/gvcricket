@@ -1,14 +1,14 @@
 "use client";
 
-
 /**
  * File overview:
- * Purpose: UI component for Live screens and flows.
+ * Purpose: Renders Live UI for the app's screens and flows.
  * Main exports: LiveMicModal.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import {
   FaBluetoothB,
   FaMicrophone,
@@ -200,3 +200,5 @@ export default function LiveMicModal({
     </ModalBase>
   );
 }
+
+

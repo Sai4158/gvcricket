@@ -2,11 +2,13 @@
 
 /**
  * File overview:
- * Purpose: Stable public entry for the spectator session-view screen.
- * Main exports: SessionViewClient.
- * Major callers: session spectator route entry.
- * Side effects: none in this wrapper.
- * Read next: ./page/README.md
+ * Purpose: Renders Session View UI for the app's screens and flows.
+ * Main exports: module side effects only.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
  */
 
 export { default } from "./page/SessionViewScreen";
+
+

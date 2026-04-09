@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: API route handler for Api requests.
+ * Purpose: Handles Api API requests for the app.
  * Main exports: module side effects only.
  * Major callers: Next.js request handlers and client fetch calls.
  * Side effects: none.
  * Read next: ../../../../../../docs/ONBOARDING.md
  */
+
 import { NextResponse } from "next/server";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
@@ -235,3 +236,5 @@ export async function POST(req, { params }) {
     }
   }
 }
+
+

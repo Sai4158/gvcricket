@@ -1,9 +1,9 @@
 /**
  * File overview:
- * Purpose: Shared sound-effect and stage helpers for the umpire match screen.
- * Main exports: stage-state helpers, sound-effect helpers, and local storage cache helpers.
- * Major callers: MatchPageClient.
- * Side effects: reads and writes localStorage for audio duration caching.
+ * Purpose: Renders Match UI for the app's screens and flows.
+ * Main exports: createSoundEffectRequestId, createScoreActionId, getMatchEndStageState, estimateSpeechLeadDelayMs, estimateBoundaryLeadDelayMs, estimateSpeechSequenceDelayMs, getConfiguredScoreEffectDelayMs, buildFallbackSoundEffectFromId, getSelectedScoreSoundEffectIds, readCachedSoundEffectDurations, writeCachedSoundEffectDurations, IPL_HORN_EFFECT, SCORE_PRE_EFFECT_RATE, SCORE_PRE_EFFECT_GAP_MS, WIDE_PLUS_ONE_EXTRA_DELAY_MS, ENTRY_SCORE_SOUND_EFFECTS_MODAL, STAGE_CARD_REVEAL_TIMEOUT_MS.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: reads or writes browser storage.
  * Read next: ./README.md
  */
 
@@ -207,3 +207,5 @@ export function writeCachedSoundEffectDurations(nextDurations) {
     // Ignore storage failures and keep the in-memory cache.
   }
 }
+
+

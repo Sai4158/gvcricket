@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: API route handler for Api requests.
+ * Purpose: Handles Api API requests for the app.
  * Main exports: runtime, dynamic, maxDuration, preferredRegion.
  * Major callers: Next.js request handlers and client fetch calls.
  * Side effects: none.
  * Read next: ../../../../../../docs/ONBOARDING.md
  */
+
 import { connectDB } from "../../../../lib/db";
 import {
   ensureLiveUpdates,
@@ -358,3 +359,5 @@ export async function GET(request, { params }) {
 
   return new Response(readable, { headers: sseHeaders() });
 }
+
+

@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Automated test coverage for Match Action Queue.Test behavior and regressions.
+ * Purpose: Covers Match Action Queue.Test behavior and regression cases in the automated test suite.
  * Main exports: module side effects only.
  * Major callers: `npm test` and focused test runs.
  * Side effects: runs assertions and test-side setup/teardown only.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -140,3 +141,5 @@ test("[match] queue helpers drop applied actions and persist retry flag changes 
   const trimmedQueue = removeQueuedActionById(updatedRetryQueue, "action-2");
   assert.deepEqual(trimmedQueue.map((entry) => entry.action.actionId), ["action-1"]);
 });
+
+

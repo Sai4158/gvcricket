@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Shared helper module for Match Image Moderation logic.
+ * Purpose: Provides shared Match Image Moderation logic for routes, APIs, and feature code.
  * Main exports: evaluateSensitiveImagePredictions.
  * Major callers: Route loaders, API routes, and feature components.
  * Side effects: none.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import { createRequire } from "node:module";
 
 const MODERATION_IMAGE_SIZE = 224;
@@ -121,3 +122,5 @@ export async function moderateMatchImageBuffer(buffer) {
     throw new Error("Image moderation unavailable.");
   }
 }
+
+

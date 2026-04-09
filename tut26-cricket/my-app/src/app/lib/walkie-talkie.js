@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Shared helper module for Walkie Talkie logic.
+ * Purpose: Provides shared Walkie Talkie logic for routes, APIs, and feature code.
  * Main exports: subscribeToWalkieMatch, subscribeToWalkieParticipant, registerWalkieParticipant, registerWalkieParticipantFromToken, hydrateWalkieEnabled, setWalkieEnabled, requestWalkieEnable, respondToWalkieRequest, claimWalkieSpeaker, releaseWalkieSpeaker, getWalkieSnapshot, hasRegisteredWalkieParticipant, dispatchWalkieSignal.
  * Major callers: Route loaders, API routes, and feature components.
  * Side effects: none.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import { EventEmitter } from "node:events";
 import { sanitizePlainText } from "./validators";
 
@@ -607,3 +608,5 @@ export function dispatchWalkieSignal(matchId, { fromId, toId, payload }) {
 
   return { ok: true };
 }
+
+

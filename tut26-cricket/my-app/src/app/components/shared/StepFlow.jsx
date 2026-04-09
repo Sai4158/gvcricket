@@ -1,14 +1,14 @@
 "use client";
 
-
 /**
  * File overview:
- * Purpose: UI component for Shared screens and flows.
+ * Purpose: Renders Shared UI for the app's screens and flows.
  * Main exports: StepFlow.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 const STEPS = [
   { number: 1, label: "Session" },
   { number: 2, label: "Teams" },
@@ -64,3 +64,5 @@ export default function StepFlow({ currentStep = 1, className = "" }) {
     </div>
   );
 }
+
+

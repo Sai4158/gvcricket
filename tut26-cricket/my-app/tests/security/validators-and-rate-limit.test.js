@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Validation, schema hardening, and security header regression coverage.
+ * Purpose: Covers Validators And Rate Limit.Test behavior and regression cases in the automated test suite.
  * Main exports: module side effects only.
  * Major callers: `npm test` and focused test runs.
  * Side effects: runs assertions and test-side setup/teardown only.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import {
   Match,
   PIN_BURST_BLOCK_MS,
@@ -137,3 +138,5 @@ test("[security] security headers include the required protection policy", () =>
   assert.match(contentSecurityPolicy, /wss:\/\/\*\.edge\.sd-rtn\.com:\*/);
   assert.match(headers.get("permissions-policy"), /camera=\(\)/);
 });
+
+

@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Renders Director UI for the app's screens and flows.
+ * Main exports: DirectorLoudspeakerPanel.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import { FaMicrophone } from "react-icons/fa";
 import {
   Card,
@@ -5,14 +14,7 @@ import {
   IosSwitch,
 } from "../DirectorConsoleChrome";
 
-/**
- * File overview:
- * Purpose: Renders the director loudspeaker hold-to-talk panel.
- * Main exports: DirectorLoudspeakerPanel.
- * Major callers: DirectorConsoleScreen.
- * Side effects: none in this render-only panel.
- * Read next: ./README.md
- */
+
 
 export default function DirectorLoudspeakerPanel({ loudspeaker, micMonitor }) {
   const {
@@ -136,3 +138,5 @@ export default function DirectorLoudspeakerPanel({ loudspeaker, micMonitor }) {
     </Card>
   );
 }
+
+

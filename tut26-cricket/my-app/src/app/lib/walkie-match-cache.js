@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Shared helper module for Walkie Match Cache logic.
+ * Purpose: Provides shared Walkie Match Cache logic for routes, APIs, and feature code.
  * Main exports: clearCachedWalkieMatch.
  * Major callers: Route loaders, API routes, and feature components.
  * Side effects: none.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import { connectDB } from "./db";
 import Match from "../../models/Match";
 
@@ -53,3 +54,5 @@ export function clearCachedWalkieMatch(matchId) {
 
   getCacheStore().delete(normalizedMatchId);
 }
+
+

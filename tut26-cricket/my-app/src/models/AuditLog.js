@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Mongoose model definition for AuditLog.
+ * Purpose: Defines the Mongoose schema and model wiring for AuditLog data.
  * Main exports: default export.
  * Major callers: Server loaders, API routes, and data helpers.
  * Side effects: registers or reuses a Mongoose model.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import mongoose from "mongoose";
 
 const AuditLogSchema = new mongoose.Schema(
@@ -23,3 +24,5 @@ const AuditLogSchema = new mongoose.Schema(
 
 export default mongoose.models.AuditLog ||
   mongoose.model("AuditLog", AuditLogSchema);
+
+

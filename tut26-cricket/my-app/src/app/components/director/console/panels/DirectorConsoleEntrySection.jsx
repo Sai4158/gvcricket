@@ -1,17 +1,19 @@
+/**
+ * File overview:
+ * Purpose: Renders Director UI for the app's screens and flows.
+ * Main exports: DirectorConsoleEntrySection.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import { FaBroadcastTower } from "react-icons/fa";
 import LiquidSportText from "../../../home/LiquidSportText";
 import LoadingButton from "../../../shared/LoadingButton";
 import SessionCoverHero from "../../../shared/SessionCoverHero";
 import DirectorSessionPicker from "../../DirectorSessionPicker";
 
-/**
- * File overview:
- * Purpose: Renders the director console entry, auth, and session-selection hero states.
- * Main exports: DirectorConsoleEntrySection.
- * Major callers: DirectorConsoleScreen.
- * Side effects: none in this panel.
- * Read next: ./README.md
- */
+
 
 export default function DirectorConsoleEntrySection({
   auth,
@@ -176,3 +178,5 @@ export default function DirectorConsoleEntrySection({
     </SessionCoverHero>
   );
 }
+
+

@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Automated test coverage for Pending Session Image.Test behavior and regressions.
+ * Purpose: Covers Pending Session Image.Test behavior and regression cases in the automated test suite.
  * Main exports: module side effects only.
  * Major callers: `npm test` and focused test runs.
  * Side effects: runs assertions and test-side setup/teardown only.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -225,3 +226,5 @@ test("[session] session image fallback notices persist until cleared", () => {
     global.window = previousWindow;
   }
 });
+
+

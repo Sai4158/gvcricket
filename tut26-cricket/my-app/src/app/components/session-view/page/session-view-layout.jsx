@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Layout-only sections for the spectator top shell and innings grid.
+ * Purpose: Renders Session View UI for the app's screens and flows.
  * Main exports: SessionViewTopShell, SessionViewInningsGrid.
- * Major callers: SessionViewScreen.
+ * Major callers: Feature routes and sibling components.
  * Side effects: none.
- * Read next: README.md
+ * Read next: ./README.md
  */
 
 import { FaArrowLeft, FaCheck, FaShareAlt } from "react-icons/fa";
@@ -105,3 +105,5 @@ export function SessionViewInningsGrid({ inningsCards, teamBName }) {
     </div>
   );
 }
+
+

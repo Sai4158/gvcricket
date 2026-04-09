@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Shared helper module for Session Draft logic.
+ * Purpose: Provides shared Session Draft logic for routes, APIs, and feature code.
  * Main exports: createDraftToken, createDraftTokenHash, hasValidDraftToken.
  * Major callers: Route loaders, API routes, and feature components.
  * Side effects: none.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import crypto from "crypto";
 
 function hashDraftToken(token) {
@@ -37,3 +38,5 @@ export function hasValidDraftToken(session, token) {
     return false;
   }
 }
+
+

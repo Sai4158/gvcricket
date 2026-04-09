@@ -1,12 +1,12 @@
-﻿"use client";
+"use client";
 
 /**
  * File overview:
- * Purpose: UI component for Home screens and flows.
+ * Purpose: Renders the home-page how-it-works explainer section and its motion-driven layouts.
  * Main exports: HowItWorksSection.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
 
 import { motion, useReducedMotion } from "framer-motion";
@@ -214,3 +214,5 @@ export default function HowItWorksSection() {
     </AnimatedSection>
   );
 }
+
+

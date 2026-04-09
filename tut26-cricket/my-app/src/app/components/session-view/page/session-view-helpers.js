@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Shared stream-signature and announcer timing helpers for spectator session view.
- * Main exports: stream-signature helpers, score-effect helpers, and overs-left formatting.
- * Major callers: SessionViewClient.
+ * Purpose: Renders Session View UI for the app's screens and flows.
+ * Main exports: getSessionStreamPayloadSignature, countLegalBallsLocal, formatOversLeftLocal, isSixBoundaryScoreEvent, estimateSpeechLeadDelayMs, estimateBoundaryLeadDelayMs, getDerivedScoreSoundEffectDelayMs, buildFallbackSoundEffectFromId, resolveSpectatorScoreSoundEffect, ANNOUNCER_GESTURE_READ_DELAY_MS, SIX_PRE_EFFECT_DELAY_MS, SCORE_EFFECT_FALLBACK_BUFFER_MS.
+ * Major callers: Feature routes and sibling components.
  * Side effects: none.
- * Read next: ./SessionViewIcons.jsx
+ * Read next: ./README.md
  */
 
 import { buildSpectatorBallAnnouncement } from "../../../lib/live-announcements";
@@ -152,3 +152,5 @@ export function resolveSpectatorScoreSoundEffect(match, liveEvent) {
 
   return buildFallbackSoundEffectFromId(configuredEffectId);
 }
+
+

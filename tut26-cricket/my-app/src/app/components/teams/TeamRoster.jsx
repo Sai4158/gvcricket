@@ -2,12 +2,13 @@
 
 /**
  * File overview:
- * Purpose: UI component for Teams screens and flows.
+ * Purpose: Renders Teams UI for the app's screens and flows.
  * Main exports: TeamRoster, createDefaultRoster.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: ../README.md
+ * Read next: ./README.md
  */
+
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -225,3 +226,5 @@ export default function TeamRoster({ color, roster, setRoster }) {
     </div>
   );
 }
+
+

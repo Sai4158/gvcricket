@@ -1,16 +1,18 @@
 "use client";
 
-/* eslint-disable react-hooks/refs */
-
-
 /**
  * File overview:
- * Purpose: React hook for Live behavior and browser state.
+ * Purpose: Encapsulates Live browser state, effects, and runtime coordination.
  * Main exports: useWalkieTalkie.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
+/* eslint-disable react-hooks/refs */
+
+
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getNonUmpireWalkieUiState } from "../../../lib/walkie-device-state";
 import {
@@ -1039,3 +1041,5 @@ export default function useWalkieTalkie({
     dismissRequest,
   };
 }
+
+

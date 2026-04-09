@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Shared helper module for Server Data logic.
- * Main exports: invalidateSessionsDataCache.
+ * Purpose: Provides shared Server Data logic for routes, APIs, and feature code.
+ * Main exports: module side effects only.
  * Major callers: Route loaders, API routes, and feature components.
  * Side effects: registers or reuses a Mongoose model.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import { cookies } from "next/headers";
 import { Types, isValidObjectId } from "mongoose";
 import Match from "../../models/Match";
@@ -480,3 +481,5 @@ export async function loadDirectorConsoleData() {
     sessions,
   };
 }
+
+

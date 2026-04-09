@@ -1,9 +1,9 @@
 /**
  * File overview:
- * Purpose: Owns the director YouTube deck, loudspeaker mic controls, and music player browser effects.
+ * Purpose: Encapsulates Director browser state, effects, and runtime coordination.
  * Main exports: useDirectorMusicDeck.
- * Major callers: DirectorConsoleScreen.
- * Side effects: reads and writes cached YouTube tracks, boots the YouTube iframe player, monitors browser audio routes, and binds media-session handlers.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
  * Read next: ./README.md
  */
 
@@ -890,3 +890,5 @@ export default function useDirectorMusicDeck({
     youtubePlayerHostRef,
   };
 }
+
+

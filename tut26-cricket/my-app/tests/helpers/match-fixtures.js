@@ -1,9 +1,9 @@
 /**
  * File overview:
- * Purpose: Shared test fixtures for match-shaped objects used across regression suites.
+ * Purpose: Covers Match Fixtures behavior and regression cases in the automated test suite.
  * Main exports: buildBaseMatchFixture.
- * Major callers: test files that need a plain in-memory match object.
- * Side effects: none.
+ * Major callers: `npm test` and focused test runs.
+ * Side effects: runs assertions and test-side setup/teardown only.
  * Read next: ../README.md
  */
 
@@ -31,3 +31,5 @@ export function buildBaseMatchFixture(overrides = {}) {
     ...overrides,
   };
 }
+
+

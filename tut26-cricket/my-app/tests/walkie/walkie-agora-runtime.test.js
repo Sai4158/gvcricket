@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Automated test coverage for Walkie Agora Runtime.Test behavior and regressions.
+ * Purpose: Covers Walkie Agora Runtime.Test behavior and regression cases in the automated test suite.
  * Main exports: module side effects only.
  * Major callers: `npm test` and focused test runs.
  * Side effects: runs assertions and test-side setup/teardown only.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -111,3 +112,5 @@ test("[walkie] Agora walkie runtime snapshot derives live state from signaling d
   assert.equal(snapshot.activeSpeakerId, "umpire-1");
   assert.equal(snapshot.pendingRequests.length, 1);
 });
+
+

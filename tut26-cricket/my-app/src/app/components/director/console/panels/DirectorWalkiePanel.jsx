@@ -1,15 +1,17 @@
+/**
+ * File overview:
+ * Purpose: Renders Director UI for the app's screens and flows.
+ * Main exports: DirectorWalkiePanel.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import { FaBroadcastTower, FaHeadphones } from "react-icons/fa";
 import { WalkieNotice, WalkieTalkButton } from "../../../live/WalkiePanel";
 import { Card, IosSwitch } from "../DirectorConsoleChrome";
 
-/**
- * File overview:
- * Purpose: Renders the director walkie panel and its remote-speaker or push-to-talk states.
- * Main exports: DirectorWalkiePanel.
- * Major callers: DirectorConsoleScreen.
- * Side effects: none in this render-only panel.
- * Read next: ./README.md
- */
+
 
 export default function DirectorWalkiePanel({
   canManageSession,
@@ -179,3 +181,5 @@ export default function DirectorWalkiePanel({
     </Card>
   );
 }
+
+

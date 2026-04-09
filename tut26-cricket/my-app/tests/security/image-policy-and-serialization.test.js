@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Public serialization, image validation, and moderation regression coverage.
+ * Purpose: Covers Image Policy And Serialization.Test behavior and regression cases in the automated test suite.
  * Main exports: module side effects only.
  * Major callers: `npm test` and focused test runs.
  * Side effects: runs assertions and test-side setup/teardown only.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import {
   GV_MATCH_FALLBACK_IMAGE,
   assert,
@@ -102,3 +103,5 @@ test("[security] sensitive image moderation flags explicit predictions and allow
   assert.equal(safe.ok, true);
   assert.deepEqual(safe.blockedLabels, []);
 });
+
+

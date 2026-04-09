@@ -2,11 +2,11 @@
 
 /**
  * File overview:
- * Purpose: Reusable layout and chrome pieces for the director console screen.
- * Main exports: IosSwitch, Card, HOLD_BUTTON_INTERACTION_PROPS, SessionHeader.
- * Major callers: DirectorConsoleClient.
- * Side effects: help popovers use portals and document-level listeners.
- * Read next: ./director-console-utils.js
+ * Purpose: Renders Director UI for the app's screens and flows.
+ * Main exports: IosSwitch, Card, SessionHeader, HOLD_BUTTON_INTERACTION_PROPS.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -331,3 +331,5 @@ export function SessionHeader({
     </SessionCoverHero>
   );
 }
+
+

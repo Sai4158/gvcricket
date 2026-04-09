@@ -1,14 +1,16 @@
+/**
+ * File overview:
+ * Purpose: Renders Director UI for the app's screens and flows.
+ * Main exports: DirectorScoreAnnouncerPanel.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import { FaVolumeUp } from "react-icons/fa";
 import { Card, IosSwitch } from "../DirectorConsoleChrome";
 
-/**
- * File overview:
- * Purpose: Renders score-announcer enablement and manual read-current-score controls.
- * Main exports: DirectorScoreAnnouncerPanel.
- * Major callers: DirectorConsoleScreen.
- * Side effects: none in this render-only panel.
- * Read next: ./README.md
- */
+
 
 export default function DirectorScoreAnnouncerPanel({
   canManageSession,
@@ -74,3 +76,5 @@ export default function DirectorScoreAnnouncerPanel({
     </Card>
   );
 }
+
+

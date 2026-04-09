@@ -2,12 +2,13 @@
 
 /**
  * File overview:
- * Purpose: UI component for Result screens and flows.
+ * Purpose: Renders Result UI for the app's screens and flows.
  * Main exports: ResultPageClient.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 
 import dynamic from "next/dynamic";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
@@ -360,3 +361,5 @@ export default function ResultPageClient({ matchId, initialMatch }) {
     </main>
   );
 }
+
+

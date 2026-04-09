@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Access token, PIN, and image-pin policy regression coverage.
+ * Purpose: Covers Access Tokens And Pins.Test behavior and regression cases in the automated test suite.
  * Main exports: module side effects only.
  * Major callers: `npm test` and focused test runs.
  * Side effects: runs assertions and test-side setup/teardown only.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import {
   IMAGE_PIN_ATTEMPT_LIMIT,
   IMAGE_PIN_KIND,
@@ -203,3 +204,5 @@ test("[security] director access tokens validate and director PIN uses the confi
     else process.env.DIRECTOR_CONSOLE_PIN_HASH = previousDirectorPinHash;
   }
 });
+
+

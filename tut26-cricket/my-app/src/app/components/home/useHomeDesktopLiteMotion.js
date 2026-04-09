@@ -1,14 +1,14 @@
 "use client";
 
-
 /**
  * File overview:
- * Purpose: React hook for Home behavior and browser state.
+ * Purpose: Encapsulates Home browser state, effects, and runtime coordination.
  * Main exports: useHomeDesktopLiteMotion.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import { useEffect, useState } from "react";
 
 const HOME_DESKTOP_LITE_QUERY = "(min-width: 768px)";
@@ -37,3 +37,5 @@ export default function useHomeDesktopLiteMotion() {
 
   return useDesktopLiteMotion;
 }
+
+

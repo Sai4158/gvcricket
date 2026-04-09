@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: API route handler for Api requests.
+ * Purpose: Handles Api API requests for the app.
  * Main exports: module side effects only.
  * Major callers: Next.js request handlers and client fetch calls.
  * Side effects: none.
  * Read next: ../../../../../../../docs/ONBOARDING.md
  */
+
 import { jsonError } from "../../../../../lib/api-response";
 import { connectDB } from "../../../../../lib/db";
 import { parseJsonRequest } from "../../../../../lib/request-security";
@@ -67,3 +68,5 @@ export async function POST(req, { params }) {
     { headers: { "Cache-Control": "no-store" } }
   );
 }
+
+

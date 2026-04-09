@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Renders Director UI for the app's screens and flows.
+ * Main exports: DirectorSoundEffectsPanel.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import {
   FaBullhorn,
   FaChevronDown,
@@ -10,14 +19,7 @@ import {
 import { formatAudioTime } from "../director-console-utils";
 import { Card } from "../DirectorConsoleChrome";
 
-/**
- * File overview:
- * Purpose: Renders the searchable director sound-effect deck with reorder handles and playback state.
- * Main exports: DirectorSoundEffectsPanel.
- * Major callers: DirectorConsoleScreen.
- * Side effects: none in this render-only panel.
- * Read next: ./README.md
- */
+
 
 export default function DirectorSoundEffectsPanel({
   audioLibrary,
@@ -338,3 +340,5 @@ export default function DirectorSoundEffectsPanel({
     </Card>
   );
 }
+
+

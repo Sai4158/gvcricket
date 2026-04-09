@@ -2,11 +2,13 @@
 
 /**
  * File overview:
- * Purpose: Stable public entry for the home how-it-works section.
- * Main exports: HowItWorksSection.
- * Major callers: home page composition.
- * Side effects: none in this wrapper.
- * Read next: ./how-it-works/README.md
+ * Purpose: Renders Home UI for the app's screens and flows.
+ * Main exports: module side effects only.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
  */
 
 export { default } from "./how-it-works/HowItWorksSectionContent";
+
+

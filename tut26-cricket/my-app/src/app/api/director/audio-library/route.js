@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: API route handler for Api requests.
+ * Purpose: Handles Api API requests for the app.
  * Main exports: dynamic.
  * Major callers: Next.js request handlers and client fetch calls.
  * Side effects: reads server request metadata.
  * Read next: ../../../../../docs/ONBOARDING.md
  */
+
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { readdir, stat } from "node:fs/promises";
@@ -165,3 +166,5 @@ export async function POST(req) {
     return jsonError("Could not save the audio library order.", 500);
   }
 }
+
+

@@ -1,10 +1,12 @@
 /**
  * File overview:
- * Purpose: Stable public entry for director console helper utilities.
- * Main exports: caching, playlist, and session-selection helpers.
- * Major callers: director console screen and tests.
- * Side effects: none in this wrapper.
- * Read next: ./console/README.md
+ * Purpose: Renders Director UI for the app's screens and flows.
+ * Main exports: module side effects only.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
  */
 
 export * from "./console/director-console-utils";
+
+

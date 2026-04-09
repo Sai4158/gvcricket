@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Presence, authoritative snapshot, and RTM metadata sync helpers for the walkie runtime.
+ * Purpose: Renders Live UI for the app's screens and flows.
  * Main exports: createWalkiePresenceSnapshotApi.
- * Major callers: useWalkieTalkieRuntime.
- * Side effects: fetches authoritative walkie state and publishes RTM updates.
- * Read next: ./rtm-signaling.js
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
  */
 
 import {
@@ -354,3 +354,5 @@ export function createWalkiePresenceSnapshotApi({
     syncSnapshot,
   };
 }
+
+

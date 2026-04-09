@@ -1,9 +1,9 @@
 /**
  * File overview:
- * Purpose: Owns director walkie preferences, request flow, notices, and derived walkie UI state.
+ * Purpose: Encapsulates Director browser state, effects, and runtime coordination.
  * Main exports: useDirectorWalkieControls.
- * Major callers: DirectorConsoleScreen.
- * Side effects: reads and writes local walkie device preferences and uses the shared walkie hook.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
  * Read next: ./README.md
  */
 
@@ -369,3 +369,5 @@ export default function useDirectorWalkieControls({
     walkieStatus,
   };
 }
+
+

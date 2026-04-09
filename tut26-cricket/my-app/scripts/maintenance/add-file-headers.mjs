@@ -1,11 +1,4 @@
-/**
- * File overview:
- * Purpose: Adds the standard file-overview header to commentable source files that do not already have one.
- * Main exports: module side effects only.
- * Major callers: maintenance commands and repo cleanup work.
- * Side effects: rewrites source files in place.
- * Read next: ../README.md
- */
+
 
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -17,11 +10,57 @@ const ROOT_SOURCE_FILES = [
   "next.config.mjs",
   "postcss.config.mjs",
   "security-headers.mjs",
-  "tmp-live-banner-check.mjs",
 ];
-const VALID_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".mts", ".cjs"]);
+const VALID_EXTENSIONS = new Set([
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".mts",
+  ".cjs",
+  ".ts",
+  ".tsx",
+]);
 const DIRECTIVE_RE = /^["']use (client|server)["'];?\s*$/;
 const HEADER_MARKER = "File overview:";
+const FILE_OVERVIEW_BLOCK_RE = /\/\*\*[\s\S]*?\*\//g;
+const BYTE_ORDER_MARK = "\uFEFF";
+const MISENCODED_BOM = "";
+
+const ROOT_PURPOSES = new Map([
+  ["layout.js", "Defines the root app shell, shared metadata, and global providers."],
+  ["page.js", "Renders the public landing page for the app."],
+  ["not-found.jsx", "Renders the custom not-found experience for unknown app routes."],
+  ["robots.js", "Declares crawler rules, sitemap location, and host metadata for search engines."],
+  ["sitemap.js", "Builds the public sitemap entries for the app, sessions, and matches."],
+  ["twitter-image.js", "Generates the default app-wide Twitter social preview image."],
+  ["opengraph-image.js", "Generates the default app-wide Open Graph social preview image."],
+]);
+const SPECIAL_PURPOSES = new Map([
+  [
+    "scripts/verification/live-banner-check.mjs",
+    "Manually inspects the home live-banner payload during local verification.",
+  ],
+  [
+    "src/app/components/home/how-it-works/HowItWorksSectionContent.jsx",
+    "Renders the home-page how-it-works explainer section and its motion-driven layouts.",
+  ],
+  [
+    "src/app/components/home/how-it-works/card-shells.jsx",
+    "Provides the reusable card shells for the home-page how-it-works previews.",
+  ],
+  [
+    "src/app/components/home/how-it-works/feature-previews.jsx",
+    "Renders interactive feature-preview cards for the home-page how-it-works section.",
+  ],
+  [
+    "src/app/components/home/how-it-works/journey-previews.jsx",
+    "Renders the journey-step previews used in the home-page how-it-works section.",
+  ],
+  [
+    "src/app/components/session-view/page/SessionViewScreen.jsx",
+    "Renders the spectator session-view screen, live data hydration, and result navigation.",
+  ],
+]);
 
 function toPosix(relativePath) {
   return relativePath.split(path.sep).join("/");
@@ -40,6 +79,10 @@ function relativePathLabel(filePath) {
   return toPosix(path.relative(ROOT, filePath));
 }
 
+function stripByteOrderMark(value) {
+  return value.replaceAll(BYTE_ORDER_MARK, "").replaceAll(MISENCODED_BOM, "");
+}
+
 function featureName(parts) {
   const componentsIndex = parts.indexOf("components");
   if (componentsIndex >= 0 && parts[componentsIndex + 1]) {
@@ -54,23 +97,40 @@ function featureName(parts) {
   return "App";
 }
 
+function explicitRelativePath(fromDirectory, targetPath) {
+  const relativePath = toPosix(path.relative(fromDirectory, targetPath)) || ".";
+  if (
+    relativePath === "." ||
+    relativePath.startsWith("./") ||
+    relativePath.startsWith("../")
+  ) {
+    return relativePath;
+  }
+
+  return `./${relativePath}`;
+}
+
 function inferScriptPurpose(relativePath, fileName) {
   if (relativePath.startsWith("scripts/verification/")) {
-    return `Developer script for ${startCase(fileName)} verification work.`;
+    return `Runs ${startCase(fileName)} verification checks or local audit support tasks.`;
   }
 
   if (relativePath.startsWith("scripts/maintenance/")) {
-    return `Developer script for ${startCase(fileName)} maintenance work.`;
+    return `Handles ${startCase(fileName)} maintenance work for repo consistency and cleanup.`;
   }
 
-  return `Developer script for ${startCase(fileName)} repo work.`;
+  return `Runs ${startCase(fileName)} developer tasks for the repo.`;
 }
 
 function inferPurpose(relativePath, fileName, content) {
   const parts = relativePath.split("/");
 
+  if (SPECIAL_PURPOSES.has(relativePath)) {
+    return SPECIAL_PURPOSES.get(relativePath);
+  }
+
   if (relativePath.startsWith("tests/")) {
-    return `Automated test coverage for ${startCase(fileName)} behavior and regressions.`;
+    return `Covers ${startCase(fileName)} behavior and regression cases in the automated test suite.`;
   }
 
   if (relativePath.startsWith("scripts/")) {
@@ -78,50 +138,55 @@ function inferPurpose(relativePath, fileName, content) {
   }
 
   if (relativePath.startsWith("src/models/")) {
-    return `Mongoose model definition for ${startCase(fileName)}.`;
+    return `Defines the Mongoose schema and model wiring for ${startCase(fileName)} data.`;
   }
 
-  if (fileName === "layout.js") {
-    return "Root app shell, metadata, and shared providers.";
+  if (ROOT_PURPOSES.has(fileName) && relativePath.startsWith("src/app/")) {
+    return ROOT_PURPOSES.get(fileName);
   }
 
-  if (/^page\.(js|jsx)$/.test(fileName)) {
-    return `App Router page entry for ${featureName(parts)}.`;
+  if (/^page\.(js|jsx|ts|tsx)$/.test(fileName)) {
+    return `Renders the App Router page entry for ${featureName(parts)}.`;
   }
 
-  if (/^loading\.(js|jsx)$/.test(fileName)) {
-    return `Route loading state for ${featureName(parts)}.`;
+  if (/^loading\.(js|jsx|ts|tsx)$/.test(fileName)) {
+    return `Renders the route loading state for ${featureName(parts)}.`;
   }
 
-  if (/^(opengraph-image|twitter-image)\.(js|jsx)$/.test(fileName)) {
-    return `Social image generator for ${featureName(parts)}.`;
+  if (/^(opengraph-image|twitter-image)\.(js|jsx|ts|tsx)$/.test(fileName)) {
+    return `Generates the social preview image for ${featureName(parts)} sharing routes.`;
   }
 
   if (fileName === "route.js") {
-    return `API route handler for ${featureName(parts)} requests.`;
+    return `Handles ${featureName(parts)} API requests for the app.`;
   }
 
   if (relativePath.includes("/components/")) {
-    if (/^use[A-Z]/.test(fileName)) {
-      return `React hook for ${featureName(parts)} behavior and browser state.`;
+    if (content.includes("ReactLenis")) {
+      return "Wraps app content with Lenis-based smooth scrolling for client-rendered pages.";
     }
 
-    return `UI component for ${featureName(parts)} screens and flows.`;
+    if (/^use[A-Z]/.test(fileName)) {
+      return `Encapsulates ${featureName(parts)} browser state, effects, and runtime coordination.`;
+    }
+
+    return `Renders ${featureName(parts)} UI for the app's screens and flows.`;
   }
 
   if (relativePath.includes("/lib/")) {
-    return `Shared helper module for ${startCase(fileName)} logic.`;
+    return `Provides shared ${startCase(fileName)} logic for routes, APIs, and feature code.`;
   }
 
   if (content.includes("export const metadata")) {
-    return "Route metadata configuration for the app.";
+    return "Declares route metadata and sharing defaults for the app.";
   }
 
-  return `Source module for ${startCase(fileName)}.`;
+  return `Defines ${startCase(fileName)} behavior used by the app.`;
 }
 
 function inferExports(content) {
   const matches = [];
+  const exportNames = new Set();
   const regexes = [
     /export default function\s+([A-Za-z0-9_]+)/g,
     /export function\s+([A-Za-z0-9_]+)/g,
@@ -133,8 +198,35 @@ function inferExports(content) {
     let match = regex.exec(content);
     while (match) {
       matches.push(match[1]);
+      exportNames.add(match[1]);
       match = regex.exec(content);
     }
+  }
+
+  const exportListRegex = /export\s*{\s*([^}]+)\s*}/gs;
+  let exportListMatch = exportListRegex.exec(content);
+  while (exportListMatch) {
+    const names = exportListMatch[1]
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => part.replace(/\s+as\s+/i, " as ").split(" as ").pop())
+      .filter(Boolean);
+
+    for (const name of names) {
+      exportNames.add(name);
+    }
+
+    exportListMatch = exportListRegex.exec(content);
+  }
+
+  if (exportNames.size) {
+    const orderedNames = [...matches, ...[...exportNames].filter((name) => !matches.includes(name))];
+    if (orderedNames.length > 6) {
+      return `${orderedNames.slice(0, 5).join(", ")}, and related helpers`;
+    }
+
+    return orderedNames.join(", ");
   }
 
   if (!matches.length) {
@@ -193,6 +285,18 @@ function inferSideEffects(relativePath, content) {
     return "runs assertions and test-side setup/teardown only";
   }
 
+  if (relativePath.startsWith("scripts/maintenance/")) {
+    return "reads or writes repo files";
+  }
+
+  if (relativePath.startsWith("scripts/verification/")) {
+    return "runs local verification tasks and may write reports or logs";
+  }
+
+  if (relativePath.startsWith("scripts/")) {
+    return "runs local developer tasks";
+  }
+
   if (content.includes("sessionStorage") || content.includes("localStorage")) {
     return "reads or writes browser storage";
   }
@@ -227,13 +331,13 @@ async function inferReadNext(filePath) {
   for (const candidate of candidates) {
     try {
       await fs.access(candidate);
-      return toPosix(path.relative(path.dirname(filePath), candidate)) || ".";
+      return explicitRelativePath(path.dirname(filePath), candidate);
     } catch {
       // Try next candidate.
     }
   }
 
-  return "docs/ONBOARDING.md";
+  return explicitRelativePath(path.dirname(filePath), path.join(ROOT, "docs", "ONBOARDING.md"));
 }
 
 async function gatherFiles() {
@@ -274,47 +378,63 @@ async function walk(currentPath, results) {
 }
 
 function alreadyHasHeader(content) {
-  const firstChunk = content.slice(0, 800);
+  const firstChunk = content.slice(0, 1200);
   return firstChunk.includes(HEADER_MARKER);
 }
 
 function buildHeader({ purpose, exportsSummary, callers, sideEffects, readNext }) {
   return [
-    "/**",
-    " * File overview:",
-    ` * Purpose: ${purpose}`,
-    ` * Main exports: ${exportsSummary}.`,
-    ` * Major callers: ${callers}`,
-    ` * Side effects: ${sideEffects}.`,
-    ` * Read next: ${readNext}`,
-    " */",
+    "",
     "",
   ].join("\n");
 }
 
-function insertHeader(content, header) {
-  const lines = content.split("\n");
+function findInsertIndex(lines) {
   let insertAt = 0;
 
-  if (lines[0]?.startsWith("#!")) {
+  if (stripByteOrderMark(lines[0] || "").startsWith("#!")) {
     insertAt = 1;
   }
 
-  while (DIRECTIVE_RE.test(lines[insertAt] || "")) {
+  while (DIRECTIVE_RE.test(stripByteOrderMark(lines[insertAt] || ""))) {
     insertAt += 1;
     if (lines[insertAt] === "") {
       insertAt += 1;
     }
   }
 
-  const before = lines.slice(0, insertAt).join("\n");
-  const after = lines.slice(insertAt).join("\n");
+  return insertAt;
+}
 
-  if (!before) {
-    return `${header}${after}`;
+function stripFileOverviewBlocks(content) {
+  return content.replace(FILE_OVERVIEW_BLOCK_RE, (block) =>
+    block.includes(HEADER_MARKER) ? "" : block
+  );
+}
+
+function insertOrReplaceHeader(content, header) {
+  const hasTrailingNewline = content.endsWith("\n");
+  const normalizedContent = stripFileOverviewBlocks(stripByteOrderMark(content));
+  const lines = normalizedContent.split("\n");
+  const insertAt = findInsertIndex(lines);
+  const before = lines.slice(0, insertAt).join("\n").replace(/\n+$/u, "");
+  const afterLines = lines.slice(insertAt);
+
+  while (afterLines[0] === "") {
+    afterLines.shift();
   }
 
-  return `${before}\n\n${header}${after}`;
+  const parts = [];
+  if (before) {
+    parts.push(before);
+  }
+  parts.push(header.trimEnd());
+  if (afterLines.length) {
+    parts.push(afterLines.join("\n"));
+  }
+
+  const nextContent = parts.join("\n\n");
+  return hasTrailingNewline ? `${nextContent}\n` : nextContent;
 }
 
 async function main() {
@@ -322,10 +442,6 @@ async function main() {
 
   for (const filePath of files) {
     const original = await fs.readFile(filePath, "utf8");
-    if (alreadyHasHeader(original)) {
-      continue;
-    }
-
     const relativePath = relativePathLabel(filePath);
     const fileName = path.basename(filePath);
     const header = buildHeader({
@@ -336,11 +452,12 @@ async function main() {
       readNext: await inferReadNext(filePath),
     });
 
-    const nextContent = insertHeader(original, header);
-    if (nextContent !== original) {
+    const nextContent = insertOrReplaceHeader(original, header);
+    if (nextContent !== original && nextContent.includes(HEADER_MARKER)) {
       await fs.writeFile(filePath, nextContent, "utf8");
     }
   }
 }
 
 await main();
+

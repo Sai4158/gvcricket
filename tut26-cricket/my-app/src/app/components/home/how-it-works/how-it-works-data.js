@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Static preview card and animation data for the home how-it-works experience.
- * Main exports: feature cards, journey cards, and animated preview frame data.
- * Major callers: HowItWorksSectionContent.
+ * Purpose: Renders Home UI for the app's screens and flows.
+ * Main exports: featureCards, journeyCards, miniCelebrationConfetti, animatedUmpireFrames, animatedHistoryFrames, animatedSpectatorFrames, animatedTeamsFrames, animatedLoudspeakerFrames, animatedWalkieFeatureFrames, animatedAnnouncerFrames, animatedShareFrames, animatedCoverFrames, animatedInsightsFrames, animatedDirectorFrames, animatedLiveBannerFrames, animatedJourneyWalkieFrames, animatedJourneyAudioFrames, animatedAccessFrames.
+ * Major callers: Feature routes and sibling components.
  * Side effects: none.
- * Read next: ./HowItWorksSectionContent.jsx
+ * Read next: ./README.md
  */
 
 export const featureCards = [
@@ -330,4 +330,6 @@ export const animatedAccessFrames = [
   { pin: "• • - -", status: "PIN checking" },
   { pin: "• • • •", status: "Access granted" },
 ];
+
+
 

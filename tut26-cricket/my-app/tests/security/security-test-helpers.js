@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Shared imports and builders for split security and regression test modules.
- * Main exports: shared `test` runner bindings, domain helpers, and `buildBaseMatch`.
- * Major callers: security domain test files under this folder.
- * Side effects: none.
- * Read next: README.md
+ * Purpose: Covers Security Test Helpers behavior and regression cases in the automated test suite.
+ * Main exports: module side effects only.
+ * Major callers: `npm test` and focused test runs.
+ * Side effects: runs assertions and test-side setup/teardown only.
+ * Read next: ./README.md
  */
+
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import test from "node:test";
@@ -159,3 +160,5 @@ export {
   test,
   validateMatchImageBuffer,
 };
+
+

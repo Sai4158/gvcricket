@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Social image generator for Opengraph Image.
+ * Purpose: Generates the default app-wide Open Graph social preview image.
  * Main exports: OpenGraphImage, runtime, alt, size, contentType.
  * Major callers: Adjacent modules in the same feature area.
  * Side effects: none.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import {
   createLogoOnlySocialImage,
   SOCIAL_IMAGE_SIZE,
@@ -19,3 +20,5 @@ export const contentType = "image/png";
 export default function OpenGraphImage() {
   return createLogoOnlySocialImage();
 }
+
+

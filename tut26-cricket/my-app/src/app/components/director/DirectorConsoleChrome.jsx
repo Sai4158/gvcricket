@@ -2,11 +2,13 @@
 
 /**
  * File overview:
- * Purpose: Stable public entry for director console chrome components.
- * Main exports: Card, HOLD_BUTTON_INTERACTION_PROPS, IosSwitch, SessionHeader.
- * Major callers: director console screen and related UI.
- * Side effects: none in this wrapper.
- * Read next: ./console/README.md
+ * Purpose: Renders Director UI for the app's screens and flows.
+ * Main exports: module side effects only.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
  */
 
 export * from "./console/DirectorConsoleChrome";
+
+

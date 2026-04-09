@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Shared projections, cache state, and fallback loaders for server-data routes.
- * Main exports: projection constants, cache helpers, and fallback session/match resolvers.
- * Major callers: server-data.js.
- * Side effects: reads Mongo collections and updates a global in-memory cache.
- * Read next: ./server-data.js
+ * Purpose: Provides shared Server Data Helpers logic for routes, APIs, and feature code.
+ * Main exports: invalidateSessionsDataCache, getPublicId, getIsoTimestamp, buildLockedTossPageData, SERVER_DATA_CACHE_TTL_MS, PUBLIC_SESSION_FIELDS, READ_ONLY_PUBLIC_MATCH_FIELDS, PUBLIC_MATCH_FIELDS, SESSION_MATCH_SUMMARY_FIELDS, FALLBACK_SESSION_FIELDS, NON_DRAFT_SESSION_COLLECTION_FILTER, PUBLIC_SESSION_PROJECTION, SESSION_MATCH_SUMMARY_PROJECTION, globalServerDataCache.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: registers or reuses a Mongoose model.
+ * Read next: ./README.md
  */
 
 import { Types, isValidObjectId } from "mongoose";
@@ -160,3 +160,5 @@ export async function resolveSessionMatches(sessions) {
 
   return resolvedBySessionId;
 }
+
+

@@ -1,14 +1,14 @@
 "use client";
 
-
 /**
  * File overview:
- * Purpose: UI component for Home screens and flows.
+ * Purpose: Renders Home UI for the app's screens and flows.
  * Main exports: HeroSection.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
@@ -541,3 +541,5 @@ export default function HeroSection({ liveMatch = null }) {
     />
   );
 }
+
+

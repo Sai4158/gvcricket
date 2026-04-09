@@ -1,14 +1,14 @@
 "use client";
 
-
 /**
  * File overview:
- * Purpose: UI component for Match screens and flows.
+ * Purpose: Renders Match UI for the app's screens and flows.
  * Main exports: getAcceptedMatchImageTypes.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 const MAX_DIMENSION = 1280;
 const TARGET_MAX_BYTES = 450 * 1024;
 const FAST_PATH_MAX_BYTES = 450 * 1024;
@@ -95,3 +95,5 @@ export async function compressMatchImage(file) {
     type: "image/jpeg",
   });
 }
+
+

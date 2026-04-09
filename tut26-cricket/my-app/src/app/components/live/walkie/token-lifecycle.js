@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Token, participant identity, and countdown helpers for the walkie runtime.
+ * Purpose: Renders Live UI for the app's screens and flows.
  * Main exports: createWalkieTokenLifecycleApi.
- * Major callers: useWalkieTalkieRuntime.
- * Side effects: reads and writes session or storage tokens.
- * Read next: ./rtc-transport.js
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
  */
 
 import { primeUiAudio } from "../../../lib/page-audio";
@@ -253,3 +253,5 @@ export function createWalkieTokenLifecycleApi({
     startCountdown,
   };
 }
+
+

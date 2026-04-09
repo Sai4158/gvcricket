@@ -1,9 +1,9 @@
 /**
  * File overview:
- * Purpose: Developer script for type generation and TypeScript verification.
+ * Purpose: Runs Typecheck verification checks or local audit support tasks.
  * Main exports: module side effects only.
- * Major callers: verification commands and local build checks.
- * Side effects: writes a temporary typecheck config and Next type outputs.
+ * Major callers: Verification commands and local audit runs.
+ * Side effects: runs local verification tasks and may write reports or logs.
  * Read next: ../README.md
  */
 
@@ -86,3 +86,5 @@ try {
     unlinkSync(tempTsconfigPath);
   }
 }
+
+

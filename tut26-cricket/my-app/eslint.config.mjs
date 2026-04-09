@@ -1,13 +1,16 @@
 /**
  * File overview:
- * Purpose: Source module for Eslint.Config.
+ * Purpose: Defines Eslint.Config behavior used by the app.
  * Main exports: default export.
  * Major callers: Adjacent modules in the same feature area.
  * Side effects: none.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
 
 const config = [...nextCoreWebVitals];
 
 export default config;
+
+

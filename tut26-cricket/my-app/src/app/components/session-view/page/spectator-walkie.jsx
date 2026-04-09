@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Spectator walkie launcher and modal sections for the live-view screen.
+ * Purpose: Renders Session View UI for the app's screens and flows.
  * Main exports: SpectatorWalkieSection, SpectatorWalkieModal.
- * Major callers: SessionViewScreen.
- * Side effects: uses browser pointer events and walkie callbacks.
- * Read next: README.md
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
  */
 
 import { FaMicrophone, FaMicrophoneSlash } from "react-icons/fa";
@@ -257,3 +257,5 @@ export function SpectatorWalkieModal({
     </OptionalFeatureBoundary>
   );
 }
+
+

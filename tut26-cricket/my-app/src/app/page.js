@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: App Router page entry for Page.
+ * Purpose: Renders the public landing page for the app.
  * Main exports: dynamic, metadata.
  * Major callers: Next.js App Router.
  * Side effects: none.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import nextDynamic from "next/dynamic";
 import HeroSection from "./components/home/HeroSection";
 import HomeHeader from "./components/home/HomeHeader";
@@ -68,3 +69,5 @@ export default async function HomePage() {
     </>
   );
 }
+
+

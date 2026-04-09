@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Automated test coverage for Umpire Flow Smoke behavior and regressions.
+ * Purpose: Covers Umpire Match Flow.Smoke behavior and regression cases in the automated test suite.
  * Main exports: module side effects only.
  * Major callers: `npm test` and focused test runs.
  * Side effects: runs assertions and test-side setup/teardown only.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import assert from "node:assert/strict";
 
 const BASE_URL = process.env.TEST_BASE_URL || "http://127.0.0.1:3031";
@@ -367,3 +368,5 @@ main().catch((error) => {
   console.error(error);
   process.exit(1);
 });
+
+

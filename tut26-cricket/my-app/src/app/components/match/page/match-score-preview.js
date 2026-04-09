@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Builds the umpire-facing score announcement preview for a scoring action.
+ * Purpose: Renders Match UI for the app's screens and flows.
  * Main exports: buildMatchScorePreview.
- * Major callers: MatchPageScreen.
+ * Major callers: Feature routes and sibling components.
  * Side effects: none.
- * Read next: ./MatchPageScreen.jsx
+ * Read next: ./README.md
  */
 
 import {
@@ -141,3 +141,5 @@ export function buildMatchScorePreview({
     endsFirstInnings,
   };
 }
+
+

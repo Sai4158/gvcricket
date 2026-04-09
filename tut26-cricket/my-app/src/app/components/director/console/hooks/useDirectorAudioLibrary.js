@@ -1,9 +1,9 @@
 /**
  * File overview:
- * Purpose: Owns the director sound-effect deck cache, ordering, drag-reorder state, and metadata cache.
+ * Purpose: Encapsulates Director browser state, effects, and runtime coordination.
  * Main exports: useDirectorAudioLibrary.
- * Major callers: DirectorConsoleScreen.
- * Side effects: reads and writes browser storage and persists sound-effect order to the director API.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: reads or writes browser storage.
  * Read next: ./README.md
  */
 
@@ -581,3 +581,5 @@ export default function useDirectorAudioLibrary({ usePointerLibraryReorder }) {
     usePointerLibraryReorder,
   };
 }
+
+

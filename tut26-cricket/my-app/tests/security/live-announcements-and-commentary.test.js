@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Live commentary, speech sequence, and announcement wording regression coverage.
+ * Purpose: Covers Live Announcements And Commentary.Test behavior and regression cases in the automated test suite.
  * Main exports: module side effects only.
  * Major callers: `npm test` and focused test runs.
  * Side effects: runs assertions and test-side setup/teardown only.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import {
   Match,
   applyMatchAction,
@@ -678,3 +679,5 @@ test("[security] wide and no-ball extras use given wording in announcer text", (
     "No ball, 1 run given."
   );
 });
+
+

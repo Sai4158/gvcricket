@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Renders Director UI for the app's screens and flows.
+ * Main exports: DirectorYouTubeDeckPanel.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import {
   FaCompactDisc,
   FaExternalLinkAlt,
@@ -14,14 +23,7 @@ import LoadingButton from "../../../shared/LoadingButton";
 import { buildYouTubeThumbnailUrl } from "../director-console-utils";
 import { Card } from "../DirectorConsoleChrome";
 
-/**
- * File overview:
- * Purpose: Renders the director YouTube deck, playlist controls, and current playback UI.
- * Main exports: DirectorYouTubeDeckPanel.
- * Major callers: DirectorConsoleScreen.
- * Side effects: none in this render-only panel.
- * Read next: ./README.md
- */
+
 
 export default function DirectorYouTubeDeckPanel({ musicDeck, speakerMessage }) {
   const {
@@ -455,3 +457,5 @@ export default function DirectorYouTubeDeckPanel({ musicDeck, speakerMessage }) 
     </>
   );
 }
+
+

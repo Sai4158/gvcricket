@@ -2,11 +2,11 @@
 
 /**
  * File overview:
- * Purpose: Small presentational controls and hold-button props used by the spectator session view.
- * Main exports: spectator view icons, IosGlassSwitch, and HOLD_BUTTON_INTERACTION_PROPS.
- * Major callers: SessionViewClient.
- * Side effects: none.
- * Read next: ./session-view-helpers.js
+ * Purpose: Renders Session View UI for the app's screens and flows.
+ * Main exports: DualWalkieIcon, LoudspeakerIcon, PaMicSpeakerIcon, IosGlassSwitch, HOLD_BUTTON_INTERACTION_PROPS.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
  */
 
 import { FaBullhorn } from "react-icons/fa";
@@ -135,3 +135,5 @@ export const HOLD_BUTTON_INTERACTION_PROPS = {
     WebkitTapHighlightColor: "transparent",
   },
 };
+
+

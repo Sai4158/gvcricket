@@ -35,7 +35,7 @@ Run scripts through `npm run ...` when a package script exists. That keeps comma
   - Runtime: Node
 
 - `maintenance/add-file-headers.mjs`
-  - Purpose: adds the standard file-overview header to commentable source files that do not have one yet
+  - Purpose: adds or refreshes the standard file-overview header on commentable source files
   - Run with: `npm run docs:headers`
   - Reads: `src`, `tests`, `scripts`, and selected root source files
   - Writes: source files in place
@@ -59,6 +59,13 @@ Run scripts through `npm run ...` when a package script exists. That keeps comma
   - Purpose: fails if generated log, err, out, or result files appear in the repo root
   - Run with: `npm run verify:root`
   - Reads: repo root file names
+  - Writes: none
+  - Runtime: Node
+
+- `verification/live-banner-check.mjs`
+  - Purpose: manually inspects the home live-banner payload during local verification
+  - Run with: direct Node execution only when doing focused live-banner checks
+  - Reads: `src/app/lib/server-data.js` and the current database data
   - Writes: none
   - Runtime: Node
 

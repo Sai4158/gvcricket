@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Pure spectator-view data builders for innings cards and tracker history.
- * Main exports: buildSessionViewInningsCards, buildSessionViewTrackerHistory.
- * Major callers: SessionViewScreen.
+ * Purpose: Renders Session View UI for the app's screens and flows.
+ * Main exports: buildSessionViewTrackerHistory, buildSessionViewInningsCards.
+ * Major callers: Feature routes and sibling components.
  * Side effects: none.
- * Read next: README.md
+ * Read next: ./README.md
  */
 
 import { addBallToHistory } from "../../../lib/match-scoring";
@@ -99,3 +99,5 @@ export function buildSessionViewInningsCards({ match, teamA, teamB, isLiveMatch 
     },
   ];
 }
+
+

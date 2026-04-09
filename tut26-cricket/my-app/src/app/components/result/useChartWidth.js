@@ -1,14 +1,14 @@
 "use client";
 
-
 /**
  * File overview:
- * Purpose: React hook for Result behavior and browser state.
+ * Purpose: Encapsulates Result browser state, effects, and runtime coordination.
  * Main exports: useChartWidth.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import { useEffect, useRef, useState } from "react";
 
 export default function useChartWidth() {
@@ -47,3 +47,5 @@ export default function useChartWidth() {
 
   return [containerRef, width];
 }
+
+

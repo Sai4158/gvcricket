@@ -1,14 +1,14 @@
 "use client";
 
-
 /**
  * File overview:
- * Purpose: UI component for Match screens and flows.
+ * Purpose: Renders Match UI for the app's screens and flows.
  * Main exports: MatchSoundEffectsPanel.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FaChevronDown,
@@ -660,3 +660,5 @@ export default function MatchSoundEffectsPanel({
     </section>
   );
 }
+
+

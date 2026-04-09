@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Moves root-level generated logs and result files into artifacts/logs/checks using the readable naming rule.
+ * Purpose: Handles Adopt Root Artifacts maintenance work for repo consistency and cleanup.
  * Main exports: module side effects only.
- * Major callers: npm run artifacts:adopt-root.
- * Side effects: moves generated root files into artifacts/logs/checks and exits non-zero on locked files.
- * Read next: ../verification/check-root-cleanliness.mjs
+ * Major callers: Repo maintenance commands.
+ * Side effects: reads or writes repo files.
+ * Read next: ../README.md
  */
 
 import fs from "node:fs/promises";
@@ -87,3 +87,5 @@ async function main() {
 }
 
 await main();
+
+

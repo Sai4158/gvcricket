@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Developer script for Stress Audit Scratch verification work.
+ * Purpose: Runs Stress Audit Scratch verification checks or local audit support tasks.
  * Main exports: module side effects only.
  * Major callers: Verification commands and local audit runs.
- * Side effects: performs network requests.
+ * Side effects: runs local verification tasks and may write reports or logs.
  * Read next: ../README.md
  */
+
 const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
@@ -373,3 +374,5 @@ main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
+
+

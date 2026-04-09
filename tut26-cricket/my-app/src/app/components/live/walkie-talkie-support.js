@@ -1,10 +1,12 @@
 /**
  * File overview:
- * Purpose: Compatibility wrapper for walkie runtime support helpers.
- * Main exports: RTC and RTM support helpers, retry logic, and runtime utilities.
- * Major callers: walkie hook and walkie-focused tests.
+ * Purpose: Renders Live UI for the app's screens and flows.
+ * Main exports: module side effects only.
+ * Major callers: Feature routes and sibling components.
  * Side effects: none.
- * Read next: ./walkie/README.md
+ * Read next: ./README.md
  */
 
 export * from "./walkie/walkie-talkie-support";
+
+

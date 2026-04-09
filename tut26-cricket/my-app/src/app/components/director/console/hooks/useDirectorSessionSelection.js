@@ -1,9 +1,9 @@
 /**
  * File overview:
- * Purpose: Owns director session loading, auto-manage selection, and cached session refresh behavior.
+ * Purpose: Encapsulates Director browser state, effects, and runtime coordination.
  * Main exports: useDirectorSessionSelection.
- * Major callers: DirectorConsoleScreen.
- * Side effects: reads and writes cached director session state in browser storage.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
  * Read next: ./README.md
  */
 
@@ -351,3 +351,5 @@ export default function useDirectorSessionSelection({
     showPicker,
   };
 }
+
+

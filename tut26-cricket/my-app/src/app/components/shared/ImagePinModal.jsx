@@ -2,12 +2,13 @@
 
 /**
  * File overview:
- * Purpose: UI component for Shared screens and flows.
+ * Purpose: Renders Shared UI for the app's screens and flows.
  * Main exports: ImagePinModal.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -222,3 +223,5 @@ export default function ImagePinModal({
     </AnimatePresence>
   );
 }
+
+

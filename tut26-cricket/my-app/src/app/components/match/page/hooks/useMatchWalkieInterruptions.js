@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Pause and resume umpire announcement playback around live walkie conversations.
+ * Purpose: Encapsulates Match browser state, effects, and runtime coordination.
  * Main exports: useMatchWalkieInterruptions.
- * Major callers: MatchPageScreen.
- * Side effects: interrupts speech and live effect playback while walkie is active.
- * Read next: ./useMatchStageCardFlow.js
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
  */
 
 import { useCallback, useEffect } from "react";
@@ -162,3 +162,5 @@ export default function useMatchWalkieInterruptions({
     resumeUmpireAnnouncementsAfterWalkie,
   };
 }
+
+

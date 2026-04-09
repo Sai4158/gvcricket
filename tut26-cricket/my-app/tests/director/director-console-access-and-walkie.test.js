@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Automated test coverage for Director Console.Test behavior and regressions.
+ * Purpose: Covers Director Console Access And Walkie.Test behavior and regression cases in the automated test suite.
  * Main exports: module side effects only.
  * Major callers: `npm test` and focused test runs.
  * Side effects: runs assertions and test-side setup/teardown only.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import assert from "node:assert/strict";
 import test from "node:test";
 import { resolveDirectorAutoManageSessionId } from "../../src/app/components/director/director-console-utils.js";
@@ -368,3 +369,5 @@ test("[director] walkie stays enabled when the last listener disconnects", async
     umpire.cleanup();
   }
 });
+
+

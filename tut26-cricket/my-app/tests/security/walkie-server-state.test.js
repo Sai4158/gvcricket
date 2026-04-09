@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Walkie request, snapshot, and token-backed participant regression coverage.
+ * Purpose: Covers Walkie Server State.Test behavior and regression cases in the automated test suite.
  * Main exports: module side effects only.
  * Major callers: `npm test` and focused test runs.
  * Side effects: runs assertions and test-side setup/teardown only.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import {
   assert,
   getWalkieSnapshot,
@@ -142,3 +143,5 @@ test("[security] walkie token-backed participant registration can recover on a f
   assert.equal(requestResult.ok, true);
   assert.equal(requestResult.snapshot.pendingRequests.length, 1);
 });
+
+

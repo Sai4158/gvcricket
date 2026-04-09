@@ -1,10 +1,10 @@
-﻿/**
+/**
  * File overview:
- * Purpose: Home-page explainer card shells, motion helpers, and desktop reveal wrappers.
- * Main exports: DesktopLiteHeadline, DesktopRevealCard, FeatureCardDesktop, JourneyCardDesktop, FeatureCard, JourneyCard.
- * Major callers: HowItWorksSectionContent.
- * Side effects: uses React hooks and browser motion APIs.
- * Read next: README.md
+ * Purpose: Provides the reusable card shells for the home-page how-it-works previews.
+ * Main exports: DesktopLiteHeadline, DesktopRevealCard, FeatureCard, FeatureCardDesktop, JourneyCard, JourneyCardDesktop.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
  */
 
 import { useRef } from "react";
@@ -536,4 +536,6 @@ export {
   JourneyCard,
   JourneyCardDesktop,
 };
+
+
 

@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: RTM signaling session, listener, cleanup, and signal-refresh helpers for the walkie runtime.
+ * Purpose: Renders Live UI for the app's screens and flows.
  * Main exports: createWalkieRtmSignalingApi.
- * Major callers: useWalkieTalkieRuntime.
- * Side effects: logs in to Agora RTM, subscribes to channels, and tears signaling down.
- * Read next: ./runtime-ui.js
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
  */
 
 import {
@@ -662,3 +662,5 @@ export function createWalkieRtmSignalingApi({
     refreshSignal,
   };
 }
+
+

@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Route loading state for Match.
+ * Purpose: Renders the route loading state for Match.
  * Main exports: Loading.
  * Major callers: Adjacent modules in the same feature area.
  * Side effects: none.
  * Read next: ../../../../docs/ONBOARDING.md
  */
+
 function RouteLoadingShell({ title, subtitle }) {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.1),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#12141a_0%,#07080d_100%)] px-4 py-8 text-white">
@@ -37,3 +38,5 @@ export default function Loading() {
     />
   );
 }
+
+

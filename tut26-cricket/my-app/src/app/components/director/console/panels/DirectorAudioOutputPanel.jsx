@@ -1,14 +1,16 @@
+/**
+ * File overview:
+ * Purpose: Renders Director UI for the app's screens and flows.
+ * Main exports: DirectorAudioOutputPanel.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import { FaHeadphones } from "react-icons/fa";
 import { Card } from "../DirectorConsoleChrome";
 
-/**
- * File overview:
- * Purpose: Renders the static audio-output guidance panel for the director console.
- * Main exports: DirectorAudioOutputPanel.
- * Major callers: DirectorConsoleScreen.
- * Side effects: none in this render-only panel.
- * Read next: ./README.md
- */
+
 
 export default function DirectorAudioOutputPanel() {
   return (
@@ -35,3 +37,5 @@ export default function DirectorAudioOutputPanel() {
     </Card>
   );
 }
+
+

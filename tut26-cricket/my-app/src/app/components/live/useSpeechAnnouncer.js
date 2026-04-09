@@ -2,12 +2,13 @@
 
 /**
  * File overview:
- * Purpose: React hook for Live behavior and browser state.
+ * Purpose: Encapsulates Live browser state, effects, and runtime coordination.
  * Main exports: useSpeechAnnouncer.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -1436,3 +1437,5 @@ export default function useSpeechAnnouncer(settings) {
       platformRef.current.isIOS && platformRef.current.isSafari && !voice?.name,
   };
 }
+
+

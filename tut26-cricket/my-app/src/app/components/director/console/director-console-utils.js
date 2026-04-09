@@ -1,9 +1,9 @@
 /**
  * File overview:
- * Purpose: Shared director-console helpers for caching, YouTube parsing, and session selection.
- * Main exports: caching helpers, YouTube resolvers, and pure display/state helpers.
- * Major callers: DirectorConsoleClient and director-focused tests.
- * Side effects: reads browser storage and may load the YouTube iframe API.
+ * Purpose: Renders Director UI for the app's screens and flows.
+ * Main exports: buildYouTubeWatchUrl, buildYouTubeThumbnailUrl, extractYouTubePlaylistId, extractYouTubeVideoId, normalizeDirectorYouTubeTrack, readCachedDirectorYouTubeTracks, readStoredDirectorPreferredSessionId, writeStoredDirectorPreferredSessionId, writeCachedDirectorYouTubeTracks, loadDirectorYouTubeIframeApi, serializeOrder, readCachedDirectorSessions, writeCachedDirectorSessions, readCachedDirectorAudioLibrary, writeCachedDirectorAudioLibrary, createSpeechSettings, buildDirectorScoreLine, mergeDirectorMatchIntoSessions, getDirectorActiveHistory, getDirectorOversDisplay, getDirectorChaseSummary, getDirectorPreferredMatch, getPreferredLiveSessionId, resolveDirectorAutoManageSessionId, formatAudioTime, findLibraryCardIdFromPoint, DIRECTOR_AUDIO_METADATA_CACHE_KEY, DIRECTOR_SESSIONS_CACHE_KEY, DIRECTOR_AUDIO_ORDER_SAVE_DELAY_MS, DIRECTOR_SESSIONS_REFRESH_MIN_GAP_MS, DIRECTOR_YOUTUBE_TRACKS_CACHE_KEY, DIRECTOR_PREFERRED_SESSION_STORAGE_KEY, DIRECTOR_YOUTUBE_PLAYLIST_IMPORT_LIMIT, DIRECTOR_AUTO_ANNOUNCE_EVENT_TYPES.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: reads or writes browser storage.
  * Read next: ./README.md
  */
 
@@ -709,3 +709,5 @@ export function findLibraryCardIdFromPoint(clientX, clientY) {
 
   return card.dataset.libraryEffectId || "";
 }
+
+

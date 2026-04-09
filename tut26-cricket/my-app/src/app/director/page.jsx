@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: App Router page entry for Director.
+ * Purpose: Renders the App Router page entry for Director.
  * Main exports: metadata.
  * Major callers: Next.js App Router.
  * Side effects: none.
  * Read next: ../README.md
  */
+
 import DirectorConsoleClient from "../components/director/DirectorConsoleClient";
 import { absoluteUrl, siteConfig } from "../lib/site-metadata";
 import { loadDirectorConsoleData } from "../lib/server-data";
@@ -61,3 +62,5 @@ export default async function DirectorPage({ searchParams }) {
     </main>
   );
 }
+
+

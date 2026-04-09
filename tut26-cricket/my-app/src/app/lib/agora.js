@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Shared helper module for Agora logic.
+ * Purpose: Provides shared Agora logic for routes, APIs, and feature code.
  * Main exports: getAgoraCredentials, createAgoraRtcToken, createAgoraSignalingToken.
  * Major callers: Route loaders, API routes, and feature components.
  * Side effects: none.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import { RtcRole, RtcTokenBuilder, RtmTokenBuilder } from "agora-token";
 import {
   buildAgoraRtcUserId,
@@ -77,3 +78,5 @@ export function createAgoraSignalingToken({ matchId, participantId, role }) {
     expiresInSeconds: AGORA_SIGNALING_TOKEN_TTL_SECONDS,
   };
 }
+
+

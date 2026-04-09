@@ -2,12 +2,13 @@
 
 /**
  * File overview:
- * Purpose: UI component for Home screens and flows.
+ * Purpose: Renders Home UI for the app's screens and flows.
  * Main exports: PrimaryActionsSection.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
@@ -683,3 +684,5 @@ export default function PrimaryActionsSection() {
     </section>
   );
 }
+
+

@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Session-storage helpers used by the walkie hook for participant and token persistence.
- * Main exports: storageParticipantId and token/session persistence helpers.
- * Major callers: useWalkieTalkie.
- * Side effects: reads and writes sessionStorage when available.
- * Read next: ./walkie-talkie-state.js
+ * Purpose: Renders Live UI for the app's screens and flows.
+ * Main exports: storageParticipantId, readSessionValue, writeSessionValue, removeSessionValue, walkieTokenStorageKey, readStoredWalkieToken, writeStoredWalkieToken, clearStoredWalkieToken.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: reads or writes browser storage.
+ * Read next: ./README.md
  */
 
 const participantIdCache = new Map();
@@ -93,3 +93,5 @@ export function clearStoredWalkieToken(kind, matchId, role, participantId) {
   if (!key) return;
   removeSessionValue(key);
 }
+
+

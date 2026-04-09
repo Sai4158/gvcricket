@@ -1,14 +1,14 @@
 "use client";
 
-
 /**
  * File overview:
- * Purpose: UI component for Shared screens and flows.
+ * Purpose: Renders Shared UI for the app's screens and flows.
  * Main exports: PinPad.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import { FaBackspace } from "react-icons/fa";
 
 const PAD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "clear", "0", "delete"];
@@ -121,3 +121,5 @@ export default function PinPad({
     </div>
   );
 }
+
+

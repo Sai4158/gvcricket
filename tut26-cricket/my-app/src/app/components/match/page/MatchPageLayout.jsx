@@ -2,11 +2,11 @@
 
 /**
  * File overview:
- * Purpose: Render-only layout for the live match page shell, panels, and modal layer.
+ * Purpose: Renders Match UI for the app's screens and flows.
  * Main exports: MatchPageLayout.
- * Major callers: MatchPageScreen.
- * Side effects: none in this layout wrapper.
- * Read next: ./MatchPageScreen.jsx
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
  */
 
 import { FaBroadcastTower, FaEllipsisV } from "react-icons/fa";
@@ -488,3 +488,5 @@ export default function MatchPageLayout({
     </>
   );
 }
+
+

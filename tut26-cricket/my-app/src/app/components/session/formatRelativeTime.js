@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: UI component for Session screens and flows.
+ * Purpose: Renders Session UI for the app's screens and flows.
  * Main exports: formatRelativeTime.
  * Major callers: Feature routes and sibling components.
  * Side effects: none.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 export function formatRelativeTime(dateString) {
   if (!dateString) return "some time ago";
   const date = new Date(dateString);
@@ -27,3 +28,5 @@ export function formatRelativeTime(dateString) {
     day: "numeric",
   })}`;
 }
+
+

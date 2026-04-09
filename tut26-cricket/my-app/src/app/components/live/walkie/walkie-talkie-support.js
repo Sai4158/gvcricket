@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Walkie network, retry, timing, logging, and transport helpers.
- * Main exports: request helpers, error classification, timers, and SDK loaders.
- * Major callers: useWalkieTalkie.
- * Side effects: logs to console, fetches network data, and plays short UI tones.
- * Read next: ./walkie-talkie-gates.js
+ * Purpose: Renders Live UI for the app's screens and flows.
+ * Main exports: readPageVisibility, safariBrowser, parseJson, messageFor, isWalkieNetworkError, isRtmPublishDisconnectedError, walkieMessageFor, parseWalkieCooldownSeconds, isExpectedWalkieTransportError, classifyWalkieSignalingSetupError, isRtcUidConflictError, walkieConsole, shouldRetryWalkieStartError, clearTimer, playWalkieCue.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: performs network requests.
+ * Read next: ./README.md
  */
 
 import { playUiTone } from "../../../lib/page-audio";
@@ -288,3 +288,5 @@ export function playWalkieCue(type) {
     playUiTone({ frequency: 520, durationMs: 180, type: "triangle", volume: 0.07 });
   }, 140);
 }
+
+

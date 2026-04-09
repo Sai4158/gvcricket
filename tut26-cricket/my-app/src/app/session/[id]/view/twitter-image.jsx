@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Social image generator for Session.
+ * Purpose: Generates the social preview image for Session sharing routes.
  * Main exports: runtime, size, contentType.
  * Major callers: Adjacent modules in the same feature area.
  * Side effects: none.
  * Read next: ../../../../../docs/ONBOARDING.md
  */
+
 import OpenGraphImage from "./opengraph-image";
 
 export const runtime = "nodejs";
@@ -16,3 +17,5 @@ export const size = {
 export const contentType = "image/png";
 
 export default OpenGraphImage;
+
+

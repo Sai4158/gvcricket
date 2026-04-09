@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Match engine, toss normalization, and scoring safety regression coverage.
+ * Purpose: Covers Match Engine And Toss Safety.Test behavior and regression cases in the automated test suite.
  * Main exports: module side effects only.
  * Major callers: `npm test` and focused test runs.
  * Side effects: runs assertions and test-side setup/teardown only.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import {
   MatchEngineError,
   applyMatchAction,
@@ -690,3 +691,5 @@ test("[security] started match payload helpers only accept real match ids", () =
   assert.equal(getStartedMatchId(badPayload), "");
   assert.equal(getStartedMatchId({}), "");
 });
+
+

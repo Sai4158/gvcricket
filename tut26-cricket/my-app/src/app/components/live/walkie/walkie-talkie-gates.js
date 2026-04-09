@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Small walkie audio/signaling gate helpers that are reused by the main hook and tests.
- * Main exports: shouldReceiveWalkieAudio and related transport guards.
- * Major callers: useWalkieTalkie and walkie transport tests.
+ * Purpose: Renders Live UI for the app's screens and flows.
+ * Main exports: shouldReceiveWalkieAudio, shouldPlayWalkieRemoteAudio, shouldMaintainWalkieAudioTransport, shouldMaintainWalkieSignaling.
+ * Major callers: Feature routes and sibling components.
  * Side effects: none.
- * Read next: ./walkie-talkie-support.js
+ * Read next: ./README.md
  */
 
 import { EMPTY_WALKIE_SNAPSHOT } from "./walkie-talkie-state";
@@ -93,3 +93,5 @@ export function shouldMaintainWalkieSignaling({
       (manualSignalingActive || signalingActive)
   );
 }
+
+

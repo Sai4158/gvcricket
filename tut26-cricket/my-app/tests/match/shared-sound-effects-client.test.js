@@ -1,11 +1,12 @@
 /**
  * File overview:
- * Purpose: Automated test coverage for Sound Effects Client.Test behavior and regressions.
+ * Purpose: Covers Shared Sound Effects Client.Test behavior and regression cases in the automated test suite.
  * Main exports: module side effects only.
  * Major callers: `npm test` and focused test runs.
  * Side effects: runs assertions and test-side setup/teardown only.
- * Read next: README.md
+ * Read next: ./README.md
  */
+
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -98,3 +99,5 @@ test("[match] sound effect cache sync notifies listeners when the shared library
     global.window = previousWindow;
   }
 });
+
+

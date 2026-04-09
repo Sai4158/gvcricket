@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Stream-hydration helpers for spectator session payload updates.
+ * Purpose: Renders Session View UI for the app's screens and flows.
  * Main exports: applySessionStreamPayload.
- * Major callers: SessionViewScreen.
- * Side effects: updates React state through provided setters.
- * Read next: README.md
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
  */
 
 export function applySessionStreamPayload({
@@ -24,3 +24,5 @@ export function applySessionStreamPayload({
   setStreamError("");
   return true;
 }
+
+

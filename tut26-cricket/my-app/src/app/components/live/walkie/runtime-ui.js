@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Small runtime UI, notice, signaling-toggle, and cooldown helpers for the walkie hook.
+ * Purpose: Renders Live UI for the app's screens and flows.
  * Main exports: createWalkieRuntimeUiApi.
- * Major callers: useWalkieTalkieRuntime.
- * Side effects: plays local UI tones and updates notice or cooldown timers.
- * Read next: ./useWalkieTalkieRuntime.js
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
  */
 
 import { playUiTone } from "../../../lib/page-audio";
@@ -122,3 +122,5 @@ export function createWalkieRuntimeUiApi({
     updateNotice,
   };
 }
+
+

@@ -2,12 +2,13 @@
 
 /**
  * File overview:
- * Purpose: UI component for Director screens and flows.
+ * Purpose: Renders Director UI for the app's screens and flows.
  * Main exports: DirectorConsoleScreen.
  * Major callers: Feature routes and sibling components.
  * Side effects: reads or writes browser storage.
  * Read next: ./README.md
  */
+
 
 import {
   startTransition,
@@ -1563,3 +1564,5 @@ export default function DirectorConsoleScreen({
     </div>
   );
 }
+
+

@@ -1,10 +1,10 @@
 /**
  * File overview:
- * Purpose: Pure presentation helpers for the home how-it-works experience.
- * Main exports: compact copy, accent, and desktop grid helper functions.
- * Major callers: HowItWorksSectionContent.
+ * Purpose: Renders Home UI for the app's screens and flows.
+ * Main exports: getJourneyStepLabel, getCompactCardCopy, getAccentRail, getFeatureCardWideSpan, getJourneyCardWideSpan, getFeatureCardWideOrder, getAccentHueLayers.
+ * Major callers: Feature routes and sibling components.
  * Side effects: none.
- * Read next: ./HowItWorksSectionContent.jsx
+ * Read next: ./README.md
  */
 
 export function getJourneyStepLabel(index) {
@@ -139,4 +139,6 @@ export function getAccentHueLayers(accent) {
       };
   }
 }
+
+
 
