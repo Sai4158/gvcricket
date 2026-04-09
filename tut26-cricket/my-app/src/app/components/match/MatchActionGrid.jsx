@@ -9,7 +9,7 @@
  * Read next: ./README.md
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   FaBookOpen,
@@ -121,7 +121,7 @@ function AnnounceIcon() {
   );
 }
 
-const ACTION_HOLD_DELAY_MS = 60;
+const ACTION_HOLD_DELAY_MS = 40;
 
 function ActionHelpItem({ icon, title, description, colorClass, rank }) {
   return (
@@ -212,14 +212,17 @@ function ActionIconButton({
     }
   };
 
-  const clearHoldTimer = () => {
+  const hasPointerSupport =
+    typeof window !== "undefined" && "PointerEvent" in window;
+
+  const clearHoldTimer = useCallback(() => {
     if (holdTimerRef.current) {
       window.clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
     }
-  };
+  }, []);
 
-  const beginPress = () => {
+  const beginPress = useCallback(() => {
     feedbackTriggeredRef.current = false;
     if (disabled || !onHoldStart) {
       return;
@@ -234,9 +237,9 @@ function ActionIconButton({
       holdStartedRef.current = true;
       void onHoldStart();
     }, ACTION_HOLD_DELAY_MS);
-  };
+  }, [clearHoldTimer, disabled, onHoldStart, onPressFeedback, onPressStart]);
 
-  const endPress = () => {
+  const endPress = useCallback(() => {
     clearHoldTimer();
     setHoldPreviewActive(false);
     if (!holdStartedRef.current) {
@@ -248,7 +251,7 @@ function ActionIconButton({
     window.setTimeout(() => {
       suppressClickRef.current = false;
     }, 180);
-  };
+  }, [clearHoldTimer, onHoldEnd]);
 
   useEffect(() => {
     const handlePointerRelease = (event) => {
@@ -271,7 +274,7 @@ function ActionIconButton({
       window.removeEventListener("pointerup", handlePointerRelease);
       window.removeEventListener("pointercancel", handlePointerRelease);
     };
-  });
+  }, [endPress]);
 
   return (
     <motion.button
@@ -340,6 +343,24 @@ function ActionIconButton({
       onDragStart={(event) => {
         event.preventDefault();
       }}
+      onTouchStart={() => {
+        if (hasPointerSupport) {
+          return;
+        }
+        beginPress();
+      }}
+      onTouchEnd={() => {
+        if (hasPointerSupport) {
+          return;
+        }
+        endPress();
+      }}
+      onTouchCancel={() => {
+        if (hasPointerSupport) {
+          return;
+        }
+        endPress();
+      }}
       className={`press-feedback relative flex flex-col items-center justify-center text-zinc-300 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40 ${
         compact ? "w-24 gap-2 p-2" : "w-24 gap-2 p-2"
       }`}
@@ -347,7 +368,7 @@ function ActionIconButton({
         userSelect: "none",
         WebkitUserSelect: "none",
         WebkitTouchCallout: "none",
-        touchAction: "none",
+        touchAction: "manipulation",
         WebkitTapHighlightColor: "transparent",
       }}
       draggable={false}

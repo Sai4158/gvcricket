@@ -15,7 +15,7 @@ import {
   FaMobileAlt,
   FaVolumeUp,
 } from "react-icons/fa";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ModalBase } from "../match/MatchBaseModals";
 import ModalGradientTitle from "../shared/ModalGradientTitle";
 import useLocalMicMonitor from "./useLocalMicMonitor";
@@ -39,6 +39,8 @@ export default function LiveMicModal({
   } = monitor ?? fallbackMonitor;
   const holdRequestedRef = useRef(false);
   const [holdPressed, setHoldPressed] = useState(false);
+  const hasPointerSupport =
+    typeof window !== "undefined" && "PointerEvent" in window;
   const isLive = isActive && !isPaused;
   const isReady = isActive && isPaused;
   const statusLabel = isStarting
@@ -114,6 +116,10 @@ export default function LiveMicModal({
     await pause({ resumeMedia: true });
   }, [isActive, isPaused, pause]);
 
+  useEffect(() => {
+    void prepare();
+  }, [prepare]);
+
   return (
     <ModalBase title="" onExit={handleClose} hideHeader>
       <div className="space-y-4 text-left">
@@ -151,6 +157,24 @@ export default function LiveMicModal({
             onPointerCancel={() => {
               void endHold();
             }}
+            onTouchStart={() => {
+              if (hasPointerSupport) {
+                return;
+              }
+              void beginHold();
+            }}
+            onTouchEnd={() => {
+              if (hasPointerSupport) {
+                return;
+              }
+              void endHold();
+            }}
+            onTouchCancel={() => {
+              if (hasPointerSupport) {
+                return;
+              }
+              void endHold();
+            }}
             onKeyDown={(event) => {
               if ((event.key === " " || event.key === "Enter") && !event.repeat) {
                 event.preventDefault();
@@ -165,6 +189,10 @@ export default function LiveMicModal({
             }}
             className="mx-auto flex w-full flex-col items-center gap-4 focus:outline-none"
             aria-label={isLive ? "Release to stop commentary" : "Press and hold the loudspeaker icon to talk"}
+            style={{
+              touchAction: "manipulation",
+              WebkitTapHighlightColor: "transparent",
+            }}
           >
             <div className="relative flex justify-center">
               <span
