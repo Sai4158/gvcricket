@@ -464,6 +464,63 @@ export default function MatchActionGrid({
         <div className="grid grid-cols-3 gap-x-4 gap-y-6">
           {showLiveControls ? (
             <ActionIconButton
+              onClick={onMic}
+              onHoldStart={onMicHoldStart}
+              onHoldEnd={onMicHoldEnd}
+              onPressFeedback={onPressFeedback}
+              icon={<CommentaryIcon />}
+              label="Loudspeaker"
+              colorClass="text-amber-300"
+              active={isCommentaryActive}
+              talking={isCommentaryTalking}
+              badge={isCommentaryTalking ? "Live" : isCommentaryActive ? "Ready" : "Hold"}
+              badgeClass={
+                isCommentaryTalking
+                  ? "border-cyan-400/30 bg-cyan-500/15 text-cyan-100"
+                  : isCommentaryActive
+                  ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
+                  : "border-amber-300/20 bg-amber-500/10 text-amber-100"
+              }
+              statusText={
+                isCommentaryTalking
+                  ? "Live on"
+                  : "Tap to hold"
+              }
+              statusClass={
+                isCommentaryTalking
+                  ? "text-cyan-100"
+                  : isCommentaryActive
+                  ? "text-amber-200"
+                  : "text-zinc-400"
+              }
+            />
+          ) : null}
+          <ActionIconButton
+            onClick={onCommentary}
+            onHoldStart={onCommentaryHoldStart}
+            onPressFeedback={onPressFeedback}
+            icon={<AnnounceIcon />}
+            label="Announcer / Effects"
+            colorClass="text-cyan-300"
+            active={isAnnounceActive}
+            badge={isAnnounceActive ? "On" : "Off"}
+            badgeClass={
+              isAnnounceActive
+                ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
+                : "border-rose-400/20 bg-rose-500/10 text-rose-200"
+            }
+          />
+          <ActionIconButton
+            onClick={onUndo}
+            onPressFeedback={onPressFeedback}
+            icon={<LuUndo2 />}
+            label="Undo"
+            colorClass="text-zinc-400"
+            disabled={isUpdating || historyStackLength === 0}
+            compact
+          />
+          {showLiveControls ? (
+            <ActionIconButton
               onClick={onWalkie}
               onPressStart={onWalkiePressStart}
               onHoldStart={onWalkieHoldStart}
@@ -511,65 +568,6 @@ export default function MatchActionGrid({
                   : "text-zinc-400"
               }
               holdStatusText={canHoldWalkie ? "Trying" : ""}
-            />
-          ) : null}
-          <ActionIconButton
-            onClick={onCommentary}
-            onHoldStart={onCommentaryHoldStart}
-            onPressFeedback={onPressFeedback}
-            icon={<AnnounceIcon />}
-            label="Announcer / Effects"
-            colorClass="text-cyan-300"
-            active={isAnnounceActive}
-            badge={isAnnounceActive ? "On" : "Off"}
-            badgeClass={
-              isAnnounceActive
-                ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
-                : "border-rose-400/20 bg-rose-500/10 text-rose-200"
-            }
-          />
-          <ActionIconButton
-            onClick={onUndo}
-            onPressFeedback={onPressFeedback}
-            icon={<LuUndo2 />}
-            label="Undo"
-            colorClass="text-zinc-400"
-            disabled={isUpdating || historyStackLength === 0}
-            compact
-          />
-          {showLiveControls ? (
-            <ActionIconButton
-              onClick={onMic}
-              onHoldStart={onMicHoldStart}
-              onHoldEnd={onMicHoldEnd}
-              onPressFeedback={onPressFeedback}
-              icon={<CommentaryIcon />}
-              label="Loudspeaker"
-              colorClass="text-amber-300"
-              active={isCommentaryActive}
-              talking={isCommentaryTalking}
-              badge={isCommentaryTalking ? "Live" : isCommentaryActive ? "On" : "Off"}
-              badgeClass={
-                isCommentaryTalking
-                  ? "border-cyan-400/30 bg-cyan-500/15 text-cyan-100"
-                  : isCommentaryActive
-                  ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
-                  : "border-rose-400/20 bg-rose-500/10 text-rose-200"
-              }
-              statusText={
-                isCommentaryTalking
-                  ? "Live on"
-                  : isCommentaryActive && canHoldMic
-                  ? "Hold to talk"
-                  : ""
-              }
-              statusClass={
-                isCommentaryTalking
-                  ? "text-cyan-100"
-                  : isCommentaryActive && canHoldMic
-                  ? "text-amber-200"
-                  : "text-zinc-400"
-              }
             />
           ) : null}
           <ActionIconButton
@@ -712,27 +710,27 @@ export default function MatchActionGrid({
                 {showLiveControls ? (
                   <ActionHelpItem
                     rank={3}
-                    icon={<WalkieIcon />}
-                    title="Walkie-Talkie"
+                    icon={<CommentaryIcon />}
+                    title="Loudspeaker"
                     description={[
-                      "Turn it on, then hold to talk live.",
-                      "Only one person can speak at a time, so live and busy states stay clear.",
-                      "Works live with umpire, director, and spectators.",
+                      "Tap it to open the loudspeaker pop-up, then press and hold the icon to talk.",
+                      "Best for quick PA calls and live voice updates on the ground.",
+                      "The loudspeaker stays simple, with no separate on and off switch.",
                     ]}
-                    colorClass="text-emerald-300"
+                    colorClass="text-amber-300"
                   />
                 ) : null}
                 {showLiveControls ? (
                   <ActionHelpItem
                     rank={4}
-                    icon={<CommentaryIcon />}
-                    title="Loudspeaker"
+                    icon={<WalkieIcon />}
+                    title="Walkie-Talkie"
                     description={[
-                      "Turn it on first, then hold to talk on the ground.",
-                      "Best for quick PA calls and live voice updates.",
-                      "The mic bars react while you speak.",
+                      "Open the panel, then hold to talk live when the channel is ready.",
+                      "Only one person can speak at a time, so live and busy states stay clear.",
+                      "Works live with umpire, director, and spectators.",
                     ]}
-                    colorClass="text-amber-300"
+                    colorClass="text-emerald-300"
                   />
                 ) : null}
                 <ActionHelpItem

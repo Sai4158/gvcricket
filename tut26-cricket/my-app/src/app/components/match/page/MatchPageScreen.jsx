@@ -130,6 +130,7 @@ export default function MatchPageClient({
   );
   const soundEffectPlaybackCutoffRef = useRef(0);
   const localSoundEffectRequestIdRef = useRef("");
+  const micHoldRequestedRef = useRef(false);
   const skipNextBoundaryLeadRef = useRef(false);
   const activeBoundarySequenceRef = useRef(false);
   const boundarySequenceVersionRef = useRef(0);
@@ -1556,21 +1557,31 @@ export default function MatchPageClient({
       return;
     }
 
+    micHoldRequestedRef.current = true;
+
     if (micMonitor.isPaused) {
-      await micMonitor.resume({ pauseMedia: true });
+      const resumed = await micMonitor.resume({ pauseMedia: true });
+      if (resumed && !micHoldRequestedRef.current) {
+        await micMonitor.pause({ resumeMedia: true });
+      }
       return;
     }
 
     if (!micMonitor.isActive) {
-      await micMonitor.start({
+      const started = await micMonitor.start({
         pauseMedia: true,
         startPaused: false,
         playStartCue: false,
       });
+      if (started && !micHoldRequestedRef.current) {
+        await micMonitor.pause({ resumeMedia: true });
+      }
     }
   }, [isLiveMatch, micMonitor]);
 
   const handleMicHoldEnd = useCallback(async () => {
+    micHoldRequestedRef.current = false;
+
     if (!micMonitor.isActive || micMonitor.isPaused) {
       return;
     }
@@ -1900,9 +1911,7 @@ export default function MatchPageClient({
       walkie.snapshot?.enabled &&
       !umpireRemoteSpeakerState.isRemoteTalking
   );
-  const canGridHoldMic = Boolean(
-    isLiveMatch && (micMonitor.isActive || micMonitor.isPaused)
-  );
+  const canGridHoldMic = Boolean(isLiveMatch);
 
   return (
     <MatchPageLayout
