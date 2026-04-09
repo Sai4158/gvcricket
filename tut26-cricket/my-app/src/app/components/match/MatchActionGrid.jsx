@@ -409,7 +409,7 @@ function ActionIconButton({
       </span>
       {statusText || (holdPreviewActive && holdStatusText) ? (
         <span
-          className={`w-full text-left text-[10px] font-semibold uppercase tracking-[0.16em] ${
+          className={`w-full overflow-hidden text-ellipsis whitespace-nowrap text-left text-[10px] font-semibold uppercase tracking-[0.08em] ${
             holdPreviewActive && holdStatusText ? "text-cyan-200" : statusClass || "text-zinc-400"
           }`}
           style={{
