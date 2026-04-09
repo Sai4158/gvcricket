@@ -56,7 +56,6 @@ export default function MatchPageLayout({
   handlePreviewCommentarySoundEffect,
   handleProtectedNextInningsOrEnd,
   handleReorderSoundEffects,
-  handleScoreFeedbackHoldStart,
   handleStageCardUndo,
   handleStopLiveSoundEffect,
   handleUmpirePressFeedback,
@@ -316,7 +315,6 @@ export default function MatchPageLayout({
               void loadSoundEffectsLibrary();
               setModal({ type: "commentary" });
             }}
-            onCommentaryHoldStart={handleScoreFeedbackHoldStart}
             onWalkie={() => setModal({ type: "walkie" })}
             onMic={() => setModal({ type: "mic" })}
             onShare={handleCopyShareLink}

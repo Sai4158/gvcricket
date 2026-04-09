@@ -436,7 +436,6 @@ export default function MatchActionGrid({
   onHistory,
   onImage,
   onCommentary,
-  onCommentaryHoldStart,
   onWalkie,
   onMic,
   onShare,
@@ -518,7 +517,6 @@ export default function MatchActionGrid({
           ) : null}
           <ActionIconButton
             onClick={onCommentary}
-            onHoldStart={onCommentaryHoldStart}
             onPressFeedback={onPressFeedback}
             icon={<AnnounceIcon />}
             label="Announcer / Effects"

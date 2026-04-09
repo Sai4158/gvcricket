@@ -11,7 +11,6 @@
 
 import { useMemo, useRef, useState } from "react";
 import {
-  FaCompactDisc,
   FaMicrophone,
   FaPause,
   FaPlay,
@@ -140,15 +139,27 @@ export default function AnnouncementControls({
         {!isSoundPickerOpen ? (
           <div className="mb-4 flex items-start justify-between gap-3 border-b border-white/8 pb-4">
             <div className="flex min-w-0 items-start gap-3">
-              <div
-                className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-lg ${
-                  isLiveSpeaking
-                    ? "border-emerald-300/28 bg-emerald-400/15 text-emerald-200 shadow-[0_0_30px_rgba(16,185,129,0.18)]"
-                    : "border-white/10 bg-white/[0.05] text-zinc-100"
-                }`}
-              >
-                <FaCompactDisc />
-              </div>
+              {onAnnounceNow ? (
+                <button
+                  type="button"
+                  onClick={onAnnounceNow}
+                  disabled={announceDisabled}
+                  aria-label={announceIsActive ? "Stop score audio" : "Read score"}
+                  className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-lg transition active:scale-[0.98] ${
+                    announceDisabled
+                      ? "cursor-not-allowed border-white/10 bg-white/[0.04] text-zinc-500"
+                      : announceIsActive
+                      ? "border-emerald-300/28 bg-emerald-400/15 text-emerald-200 shadow-[0_0_30px_rgba(16,185,129,0.18)]"
+                      : "border-white/10 bg-white/[0.05] text-zinc-100 hover:bg-white/[0.08]"
+                  }`}
+                >
+                  {announceIsActive ? <FaPause /> : <FaVolumeUp />}
+                </button>
+              ) : (
+                <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-lg text-zinc-100">
+                  <FaVolumeUp />
+                </div>
+              )}
               <div className="min-w-0">
                 <ModalGradientTitle
                   as="h3"
