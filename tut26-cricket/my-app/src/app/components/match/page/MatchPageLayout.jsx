@@ -56,6 +56,7 @@ export default function MatchPageLayout({
   handleProtectedNextInningsOrEnd,
   handleReorderSoundEffects,
   handleScoreFeedbackHoldStart,
+  handleStageCardUndo,
   handleStopLiveSoundEffect,
   handleUmpirePressFeedback,
   handleWalkieHoldStart,
@@ -483,6 +484,7 @@ export default function MatchPageLayout({
           onScoreEvent={handleAnnouncedScoreEvent}
           onClose={() => setModal({ type: null })}
           onInfoClose={() => setInfoText(null)}
+          onUndoStageCard={handleStageCardUndo}
         />
       </OptionalFeatureBoundary>
     </>

@@ -1773,6 +1773,27 @@ export default function MatchPageClient({
     walkieAnnouncementPauseActiveRef,
   });
 
+  const handleStageCardUndo = useCallback(async () => {
+    if (!match?.undoCount || !currentInningsHasHistory) {
+      return;
+    }
+
+    setStageContinuePrompt(null);
+    cancelBoundarySequence({ stopEffect: true });
+    clearAnnouncementDuck();
+    clearSpeechEffectPlayerDuck();
+
+    await handleUndo();
+  }, [
+    cancelBoundarySequence,
+    clearAnnouncementDuck,
+    clearSpeechEffectPlayerDuck,
+    currentInningsHasHistory,
+    handleUndo,
+    match?.undoCount,
+    setStageContinuePrompt,
+  ]);
+
   useEffect(() => {
     if (!showInningsEnd) {
       return;
@@ -1905,6 +1926,7 @@ export default function MatchPageClient({
         handleProtectedNextInningsOrEnd,
         handleReorderSoundEffects,
         handleScoreFeedbackHoldStart,
+        handleStageCardUndo,
         handleStopLiveSoundEffect,
         handleUmpirePressFeedback,
         handleWalkieHoldStart,

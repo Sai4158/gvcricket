@@ -11,7 +11,7 @@
 
 
 import { motion } from "framer-motion";
-import { FaTimes } from "react-icons/fa";
+import { FaTimes, FaUndoAlt } from "react-icons/fa";
 import LiquidSportText from "../home/LiquidSportText";
 import LoadingButton from "../shared/LoadingButton";
 import ModalGradientTitle from "../shared/ModalGradientTitle";
@@ -52,6 +52,7 @@ export function ModalBase({
   hideHeader = false,
   closeOnBackdrop = true,
   showCloseButton = Boolean(!hideHeader && onExit),
+  headerLeading = null,
   panelClassName = "",
   bodyClassName = "",
 }) {
@@ -89,11 +90,24 @@ export function ModalBase({
       >
         {!hideHeader ? (
           <div className="sticky top-0 z-10 border-b border-white/6 bg-zinc-900/95 px-5 pb-3 pt-5 backdrop-blur">
-            <ModalGradientTitle
-              as="h2"
-              text={String(title || "").toUpperCase()}
-              className="text-center text-2xl font-bold"
-            />
+            {headerLeading ? (
+              <div className="flex items-center gap-3 pr-2">
+                <div className="shrink-0">
+                  {headerLeading}
+                </div>
+                <ModalGradientTitle
+                  as="h2"
+                  text={String(title || "").toUpperCase()}
+                  className="min-w-0 text-left text-2xl font-bold leading-none"
+                />
+              </div>
+            ) : (
+              <ModalGradientTitle
+                as="h2"
+                text={String(title || "").toUpperCase()}
+                className="text-center text-2xl font-bold"
+              />
+            )}
           </div>
         ) : null}
         <div className={bodyClasses}>
@@ -244,7 +258,12 @@ export function RulesModal({ onClose }) {
   );
 }
 
-export function InningsEndModal({ match, onNext }) {
+export function InningsEndModal({
+  match,
+  onNext,
+  onUndo,
+  undoDisabled = false,
+}) {
   const isFirstInningsBreak = match.innings === "first" && !match.result;
   const firstInningsTeam = match?.innings1?.team || "Innings 1";
   const firstInningsScore = Number(match?.score || 0);
@@ -274,6 +293,24 @@ export function InningsEndModal({ match, onNext }) {
       onExit={undefined}
       closeOnBackdrop={false}
       showCloseButton={false}
+      headerLeading={
+        typeof onUndo === "function" ? (
+          <button
+            type="button"
+            onClick={onUndo}
+            disabled={undoDisabled}
+            aria-label="Undo the last ball"
+            className={`press-feedback inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
+              undoDisabled
+                ? "cursor-not-allowed border-white/8 bg-white/4 text-zinc-500"
+                : "border-white/10 bg-white/8 text-white hover:bg-white/12"
+            }`}
+          >
+            <FaUndoAlt className="text-[0.78rem]" />
+            <span>Undo</span>
+          </button>
+        ) : null
+      }
       panelClassName="max-w-md"
     >
       <div className="relative overflow-hidden rounded-[28px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_26%),linear-gradient(180deg,rgba(18,18,24,0.98),rgba(9,10,14,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">

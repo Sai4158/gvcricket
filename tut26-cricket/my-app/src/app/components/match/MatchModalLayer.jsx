@@ -45,6 +45,7 @@ export default function MatchModalLayer({
   onScoreEvent,
   onClose,
   onInfoClose,
+  onUndoStageCard,
 }) {
   const renderPromptSwitch = (checked, onChange, label) => (
     <button
@@ -77,7 +78,13 @@ export default function MatchModalLayer({
   return (
     <AnimatePresence>
       {showInningsEnd && (
-        <InningsEndModal key="innings-end" match={match} onNext={onNext} />
+        <InningsEndModal
+          key="innings-end"
+          match={match}
+          onNext={onNext}
+          onUndo={onUndoStageCard}
+          undoDisabled={isUpdating}
+        />
       )}
       {stageContinuePromptProps ? (
         <ModalBase
