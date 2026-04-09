@@ -38,6 +38,8 @@ export default function LiveMicModal({
     prepare = async () => true,
   } = monitor ?? fallbackMonitor;
   const holdRequestedRef = useRef(false);
+  const pointerIdRef = useRef(null);
+  const pointerPressActiveRef = useRef(false);
   const [holdPressed, setHoldPressed] = useState(false);
   const hasPointerSupport =
     typeof window !== "undefined" && "PointerEvent" in window;
@@ -106,6 +108,7 @@ export default function LiveMicModal({
   }, [isActive, isPaused, isStarting, pause, prepare, resume, start]);
 
   const endHold = useCallback(async () => {
+    pointerPressActiveRef.current = false;
     holdRequestedRef.current = false;
     setHoldPressed(false);
 
@@ -119,6 +122,43 @@ export default function LiveMicModal({
   useEffect(() => {
     void prepare();
   }, [prepare]);
+
+  const safeSetPointerCapture = (target, pointerId) => {
+    if (
+      pointerId === undefined ||
+      !target ||
+      typeof target.setPointerCapture !== "function"
+    ) {
+      return;
+    }
+
+    try {
+      target.setPointerCapture(pointerId);
+    } catch {
+      // Ignore stale pointer capture races.
+    }
+  };
+
+  const safeReleasePointerCapture = (target, pointerId) => {
+    if (
+      pointerId === undefined ||
+      !target ||
+      typeof target.releasePointerCapture !== "function"
+    ) {
+      return;
+    }
+
+    try {
+      if (
+        typeof target.hasPointerCapture !== "function" ||
+        target.hasPointerCapture(pointerId)
+      ) {
+        target.releasePointerCapture(pointerId);
+      }
+    } catch {
+      // Ignore stale pointer release races.
+    }
+  };
 
   return (
     <ModalBase title="" onExit={handleClose} hideHeader>
@@ -145,22 +185,60 @@ export default function LiveMicModal({
           <button
             type="button"
             disabled={isStarting}
-            onPointerDown={() => {
+            onPointerDown={(event) => {
+              if (!event.isPrimary) return;
+              if (event.pointerType === "mouse" && event.button !== 0) return;
+              event.preventDefault();
+              pointerPressActiveRef.current = true;
+              pointerIdRef.current = event.pointerId;
+              safeSetPointerCapture(event.currentTarget, event.pointerId);
               void beginHold();
             }}
-            onPointerUp={() => {
+            onPointerUp={(event) => {
+              if (
+                pointerIdRef.current !== null &&
+                event.pointerId !== undefined &&
+                event.pointerId !== pointerIdRef.current
+              ) {
+                return;
+              }
+              safeReleasePointerCapture(event.currentTarget, event.pointerId);
+              pointerIdRef.current = null;
               void endHold();
             }}
-            onPointerLeave={() => {
+            onPointerCancel={(event) => {
+              if (
+                pointerIdRef.current !== null &&
+                event.pointerId !== undefined &&
+                event.pointerId !== pointerIdRef.current
+              ) {
+                return;
+              }
+              safeReleasePointerCapture(event.currentTarget, event.pointerId);
+              pointerIdRef.current = null;
+              pointerPressActiveRef.current = false;
               void endHold();
             }}
-            onPointerCancel={() => {
+            onLostPointerCapture={(event) => {
+              if (
+                pointerIdRef.current !== null &&
+                event.pointerId !== undefined &&
+                event.pointerId !== pointerIdRef.current
+              ) {
+                return;
+              }
+              pointerIdRef.current = null;
+              if (!pointerPressActiveRef.current) {
+                return;
+              }
+              pointerPressActiveRef.current = false;
               void endHold();
             }}
-            onTouchStart={() => {
+            onTouchStart={(event) => {
               if (hasPointerSupport) {
                 return;
               }
+              event.preventDefault?.();
               void beginHold();
             }}
             onTouchEnd={() => {
@@ -190,7 +268,7 @@ export default function LiveMicModal({
             className="mx-auto flex w-full flex-col items-center gap-4 focus:outline-none"
             aria-label={isLive ? "Release to stop commentary" : "Press and hold the loudspeaker icon to talk"}
             style={{
-              touchAction: "manipulation",
+              touchAction: "none",
               WebkitTapHighlightColor: "transparent",
             }}
           >

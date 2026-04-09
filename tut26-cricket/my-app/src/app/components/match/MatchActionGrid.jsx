@@ -169,6 +169,7 @@ function ActionIconButton({
   compact = false,
 }) {
   const holdTimerRef = useRef(null);
+  const pressActiveRef = useRef(false);
   const holdStartedRef = useRef(false);
   const suppressClickRef = useRef(false);
   const feedbackTriggeredRef = useRef(false);
@@ -222,12 +223,20 @@ function ActionIconButton({
     }
   }, []);
 
+  const suppressNextClick = useCallback((delayMs = 180) => {
+    suppressClickRef.current = true;
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, delayMs);
+  }, []);
+
   const beginPress = useCallback(() => {
     feedbackTriggeredRef.current = false;
     if (disabled || !onHoldStart) {
       return;
     }
 
+    pressActiveRef.current = true;
     setHoldPreviewActive(true);
     onPressFeedback?.();
     feedbackTriggeredRef.current = true;
@@ -240,21 +249,29 @@ function ActionIconButton({
   }, [clearHoldTimer, disabled, onHoldStart, onPressFeedback, onPressStart]);
 
   const endPress = useCallback(() => {
+    if (!pressActiveRef.current) {
+      return false;
+    }
+
+    pressActiveRef.current = false;
     clearHoldTimer();
     setHoldPreviewActive(false);
     if (!holdStartedRef.current) {
-      return;
+      return false;
     }
+
     holdStartedRef.current = false;
-    suppressClickRef.current = true;
+    suppressNextClick();
     void onHoldEnd?.();
-    window.setTimeout(() => {
-      suppressClickRef.current = false;
-    }, 180);
-  }, [clearHoldTimer, onHoldEnd]);
+    return true;
+  }, [clearHoldTimer, onHoldEnd, suppressNextClick]);
 
   useEffect(() => {
     const handlePointerRelease = (event) => {
+      if (!pressActiveRef.current) {
+        return;
+      }
+
       if (
         pointerIdRef.current !== null &&
         event.pointerId !== undefined &&
@@ -280,9 +297,12 @@ function ActionIconButton({
     <motion.button
       type="button"
       whileTap={{ scale: 0.985 }}
-      onClick={() => {
+      onClick={(event) => {
         if (holdStartedRef.current || suppressClickRef.current) {
           holdStartedRef.current = false;
+          return;
+        }
+        if (onHoldStart && event?.detail !== 0) {
           return;
         }
         if (!feedbackTriggeredRef.current) {
@@ -295,6 +315,9 @@ function ActionIconButton({
       onPointerDown={(event) => {
         if (!event.isPrimary) return;
         if (event.pointerType === "mouse" && event.button !== 0) return;
+        if (onHoldStart) {
+          event.preventDefault();
+        }
         pointerIdRef.current = event.pointerId;
         safeSetPointerCapture(event.currentTarget, event.pointerId);
         beginPress();
@@ -309,7 +332,17 @@ function ActionIconButton({
         }
         safeReleasePointerCapture(event.currentTarget, event.pointerId);
         pointerIdRef.current = null;
+        const didHold = holdStartedRef.current;
         endPress();
+        if (onHoldStart && !didHold && !disabled) {
+          event.preventDefault();
+          suppressNextClick();
+          if (!feedbackTriggeredRef.current) {
+            onPressFeedback?.();
+          }
+          feedbackTriggeredRef.current = false;
+          onClick?.();
+        }
       }}
       onPointerCancel={(event) => {
         if (
@@ -343,17 +376,30 @@ function ActionIconButton({
       onDragStart={(event) => {
         event.preventDefault();
       }}
-      onTouchStart={() => {
+      onTouchStart={(event) => {
         if (hasPointerSupport) {
           return;
+        }
+        if (onHoldStart) {
+          event.preventDefault?.();
         }
         beginPress();
       }}
-      onTouchEnd={() => {
+      onTouchEnd={(event) => {
         if (hasPointerSupport) {
           return;
         }
+        const didHold = holdStartedRef.current;
         endPress();
+        if (onHoldStart && !didHold && !disabled) {
+          event.preventDefault?.();
+          suppressNextClick();
+          if (!feedbackTriggeredRef.current) {
+            onPressFeedback?.();
+          }
+          feedbackTriggeredRef.current = false;
+          onClick?.();
+        }
       }}
       onTouchCancel={() => {
         if (hasPointerSupport) {
@@ -368,7 +414,7 @@ function ActionIconButton({
         userSelect: "none",
         WebkitUserSelect: "none",
         WebkitTouchCallout: "none",
-        touchAction: "manipulation",
+        touchAction: onHoldStart ? "none" : "manipulation",
         WebkitTapHighlightColor: "transparent",
       }}
       draggable={false}
