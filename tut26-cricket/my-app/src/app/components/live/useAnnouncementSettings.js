@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { EMPTY_SCORE_SOUND_EFFECT_MAP } from "../../lib/score-sound-effects";
 
-const SETTINGS_VERSION = 11;
+const SETTINGS_VERSION = 12;
 
 const DEFAULTS = {
   spectator: {
@@ -22,8 +22,8 @@ const DEFAULTS = {
     volume: 0.85,
     mode: "full",
     accessibilityMode: false,
-    playScoreSoundEffects: true,
-    broadcastScoreSoundEffects: true,
+    playScoreSoundEffects: false,
+    broadcastScoreSoundEffects: false,
     scoreSoundEffectMap: {
       ...EMPTY_SCORE_SOUND_EFFECT_MAP,
     },
@@ -189,8 +189,8 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
         ...(role === "umpire" && isLegacyVersion
           ? {
               enabled: true,
-              playScoreSoundEffects: true,
-              broadcastScoreSoundEffects: true,
+              playScoreSoundEffects: false,
+              broadcastScoreSoundEffects: false,
             }
           : {}),
         version: SETTINGS_VERSION,

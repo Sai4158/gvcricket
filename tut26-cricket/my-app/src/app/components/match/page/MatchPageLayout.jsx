@@ -36,6 +36,7 @@ export default function MatchPageLayout({
   controlsDisabled,
   currentInningsHasHistory,
   currentOverNumber,
+  entryScoreAnnouncementsEnabled,
   entryScoreSoundEffectsEnabled,
   error,
   firstInningsOversPlayed,
@@ -78,6 +79,7 @@ export default function MatchPageLayout({
   previewingCommentarySoundEffectId,
   prime,
   replaceMatch,
+  setEntryScoreAnnouncementsEnabled,
   setEntryScoreSoundEffectsEnabled,
   setInfoText,
   setModal,
@@ -365,8 +367,10 @@ export default function MatchPageLayout({
           entryScoreSoundPromptProps={
             modal.type === ENTRY_SCORE_SOUND_EFFECTS_MODAL
               ? {
-                  enabled: entryScoreSoundEffectsEnabled,
-                  onChange: setEntryScoreSoundEffectsEnabled,
+                  announcerEnabled: entryScoreAnnouncementsEnabled,
+                  onAnnouncerChange: setEntryScoreAnnouncementsEnabled,
+                  soundEffectsEnabled: entryScoreSoundEffectsEnabled,
+                  onSoundEffectsChange: setEntryScoreSoundEffectsEnabled,
                   onSave: handleEntryScoreSoundPromptSave,
                 }
               : null

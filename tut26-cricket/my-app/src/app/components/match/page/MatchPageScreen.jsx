@@ -169,8 +169,10 @@ export default function MatchPageClient({
   );
   const { settings: umpireSettings, updateSetting: updateUmpireSetting } =
     useAnnouncementSettings("umpire", matchId);
-  const [entryScoreSoundEffectsEnabled, setEntryScoreSoundEffectsEnabled] =
+  const [entryScoreAnnouncementsEnabled, setEntryScoreAnnouncementsEnabled] =
     useState(true);
+  const [entryScoreSoundEffectsEnabled, setEntryScoreSoundEffectsEnabled] =
+    useState(false);
   const micMonitor = useLocalMicMonitor();
   const {
     speak,
@@ -684,8 +686,15 @@ export default function MatchPageClient({
       return;
     }
 
-    setEntryScoreSoundEffectsEnabled(true);
-  }, [modal.type]);
+    setEntryScoreAnnouncementsEnabled(umpireSettings.enabled !== false);
+    setEntryScoreSoundEffectsEnabled(
+      umpireSettings.playScoreSoundEffects !== false,
+    );
+  }, [
+    modal.type,
+    umpireSettings.enabled,
+    umpireSettings.playScoreSoundEffects,
+  ]);
   const [scoreSoundEffectMapSaveNonce, setScoreSoundEffectMapSaveNonce] =
     useState(0);
   const queueScoreSoundEffectMapSave = useCallback(() => {
@@ -1384,6 +1393,7 @@ export default function MatchPageClient({
     cancelBoundarySequence,
     currentScoreSoundEffectMapRef,
     currentScoreSoundEffectMapSignatureRef,
+    entryScoreAnnouncementsEnabled,
     entryScoreSoundEffectsEnabled,
     entryScoreSoundPromptShownRef,
     failAnnouncementSoundEffectDuck,
@@ -1406,6 +1416,7 @@ export default function MatchPageClient({
     selectedScoreSoundEffectIds,
     setActiveCommentaryAction,
     setActiveCommentaryPreviewId,
+    setEntryScoreAnnouncementsEnabled,
     setEntryScoreSoundEffectsEnabled,
     setModal,
     setSoundEffectError,
@@ -1906,6 +1917,7 @@ export default function MatchPageClient({
         controlsDisabled,
         currentInningsHasHistory,
         currentOverNumber,
+        entryScoreAnnouncementsEnabled,
         entryScoreSoundEffectsEnabled,
         error,
         firstInningsOversPlayed,
@@ -1948,6 +1960,7 @@ export default function MatchPageClient({
         previewingCommentarySoundEffectId,
         prime,
         replaceMatch,
+        setEntryScoreAnnouncementsEnabled,
         setEntryScoreSoundEffectsEnabled,
         setInfoText,
         setModal,

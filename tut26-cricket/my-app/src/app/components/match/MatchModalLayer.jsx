@@ -245,11 +245,33 @@ export default function MatchModalLayer({
                 Umpire Mode
               </p>
               <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-                Score Tap Sounds
+                Score Feedback
               </h2>
               <p className="mt-3 text-sm leading-6 text-zinc-300">
-                Turn this off only when playing music.
+                Choose what should happen after each ball.
               </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/8 bg-white/4 p-4 text-left">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 pr-2">
+                  <p className="text-base font-semibold text-white">
+                    Announcer score
+                  </p>
+                  <p className="mt-2 text-sm leading-5 text-zinc-400">
+                    Turn this on to announce the score after each ball.
+                  </p>
+                </div>
+                <div className="shrink-0 pt-1">
+                  {renderPromptSwitch(
+                    entryScoreSoundPromptProps.announcerEnabled,
+                    entryScoreSoundPromptProps.onAnnouncerChange,
+                    entryScoreSoundPromptProps.announcerEnabled
+                      ? "Turn announcer score off"
+                      : "Turn announcer score on",
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-white/8 bg-white/4 p-4 text-left">
@@ -259,14 +281,14 @@ export default function MatchModalLayer({
                     Score tap sound effects
                   </p>
                   <p className="mt-2 text-sm leading-5 text-zinc-400">
-                    Play a sound effect whenever you tap a score.
+                    Turn this off when playing music to avoid cutting it off.
                   </p>
                 </div>
                 <div className="shrink-0 pt-1">
                   {renderPromptSwitch(
-                    entryScoreSoundPromptProps.enabled,
-                    entryScoreSoundPromptProps.onChange,
-                    entryScoreSoundPromptProps.enabled
+                    entryScoreSoundPromptProps.soundEffectsEnabled,
+                    entryScoreSoundPromptProps.onSoundEffectsChange,
+                    entryScoreSoundPromptProps.soundEffectsEnabled
                       ? "Turn score tap sounds off"
                       : "Turn score tap sounds on",
                   )}

@@ -48,6 +48,7 @@ export default function useMatchScoreSoundEffects({
   cancelBoundarySequence,
   currentScoreSoundEffectMapRef,
   currentScoreSoundEffectMapSignatureRef,
+  entryScoreAnnouncementsEnabled,
   entryScoreSoundEffectsEnabled,
   entryScoreSoundPromptShownRef,
   failAnnouncementSoundEffectDuck,
@@ -71,6 +72,7 @@ export default function useMatchScoreSoundEffects({
   selectedScoreSoundEffectIds,
   setActiveCommentaryAction,
   setActiveCommentaryPreviewId,
+  setEntryScoreAnnouncementsEnabled,
   setEntryScoreSoundEffectsEnabled,
   setModal,
   setSoundEffectError,
@@ -197,6 +199,10 @@ export default function useMatchScoreSoundEffects({
   ]);
 
   const handleEntryScoreSoundPromptSave = useCallback(() => {
+    updateUmpireSetting("enabled", entryScoreAnnouncementsEnabled);
+    if (entryScoreAnnouncementsEnabled && umpireSettings.mode === "silent") {
+      updateUmpireSetting("mode", "simple");
+    }
     updateUmpireScoreSoundSettings(
       "playScoreSoundEffects",
       entryScoreSoundEffectsEnabled,
@@ -210,10 +216,13 @@ export default function useMatchScoreSoundEffects({
         : current,
     );
   }, [
+    entryScoreAnnouncementsEnabled,
     entryScoreSoundEffectsEnabled,
     loadSoundEffectsLibrary,
     setModal,
+    umpireSettings.mode,
     updateUmpireScoreSoundSettings,
+    updateUmpireSetting,
   ]);
 
   useEffect(() => {
@@ -449,17 +458,23 @@ export default function useMatchScoreSoundEffects({
     }
 
     entryScoreSoundPromptShownRef.current = true;
-    setEntryScoreSoundEffectsEnabled(true);
+    setEntryScoreAnnouncementsEnabled(umpireSettings.enabled !== false);
+    setEntryScoreSoundEffectsEnabled(
+      umpireSettings.playScoreSoundEffects !== false,
+    );
     setModal({ type: ENTRY_SCORE_SOUND_EFFECTS_MODAL });
   }, [
     authStatus,
+    entryScoreSoundPromptShownRef,
     isLiveMatch,
     isLoading,
     match?._id,
+    setEntryScoreAnnouncementsEnabled,
     setEntryScoreSoundEffectsEnabled,
     setModal,
     tossPending,
-    entryScoreSoundPromptShownRef,
+    umpireSettings.enabled,
+    umpireSettings.playScoreSoundEffects,
   ]);
 
   const toggleSoundEffectsPanel = useCallback(() => {
