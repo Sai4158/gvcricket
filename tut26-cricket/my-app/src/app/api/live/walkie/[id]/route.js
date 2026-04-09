@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Handles Api API requests for the app.
+ * Main exports: runtime, dynamic, maxDuration, preferredRegion.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: reads server request metadata.
+ * Read next: ../../../../../../docs/ONBOARDING.md
+ */
+
 import { cookies } from "next/headers";
 import {
   getDirectorAccessCookieName,
@@ -423,3 +432,5 @@ export async function GET(request, { params }) {
   );
   return new Response(stream, { headers: sseHeaders() });
 }
+
+

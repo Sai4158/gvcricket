@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Renders the App Router page entry for Teams.
+ * Main exports: dynamic.
+ * Major callers: Next.js App Router.
+ * Side effects: registers or reuses a Mongoose model.
+ * Read next: ../../../../docs/ONBOARDING.md
+ */
+
 import { isValidObjectId } from "mongoose";
 import { notFound, redirect } from "next/navigation";
 import Session from "../../../models/Session";
@@ -31,3 +40,5 @@ export default async function TeamSelectionPage({ params }) {
 
   return <TeamSelectionPageClient sessionId={id} />;
 }
+
+

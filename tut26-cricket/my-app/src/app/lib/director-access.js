@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Director Access logic for routes, APIs, and feature code.
+ * Main exports: isValidDirectorPin, getDirectorAccessCookieName, createDirectorAccessToken, hasValidDirectorAccess, getDirectorAccessCookie, getClearedDirectorAccessCookie.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import crypto from "node:crypto";
 
 const DIRECTOR_COOKIE = "gv_director_access";
@@ -129,3 +138,5 @@ export function getClearedDirectorAccessCookie() {
     },
   };
 }
+
+

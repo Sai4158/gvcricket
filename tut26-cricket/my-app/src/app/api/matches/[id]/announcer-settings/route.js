@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Handles Api API requests for the app.
+ * Main exports: module side effects only.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: reads server request metadata.
+ * Read next: ../../../../../../docs/ONBOARDING.md
+ */
+
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { jsonError } from "../../../../lib/api-response";
@@ -227,3 +236,5 @@ export async function PATCH(req, { params }) {
     return jsonError("Could not save announcer settings.", 500);
   }
 }
+
+

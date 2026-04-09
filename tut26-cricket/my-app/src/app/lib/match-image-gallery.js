@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Match Image Gallery logic for routes, APIs, and feature code.
+ * Main exports: createStoredMatchImageEntry, getStoredMatchImages, applyStoredMatchImages, rebaseStoredMatchImagesForMatch, getPublicMatchImages.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import crypto from "node:crypto";
 import { createRequire } from "node:module";
 import {
@@ -216,3 +225,5 @@ export function getPublicMatchImages(record, { matchId = "" } = {}) {
     uploadedBy: entry.uploadedBy || "",
   }));
 }
+
+

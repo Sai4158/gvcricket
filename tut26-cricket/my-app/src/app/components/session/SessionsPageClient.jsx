@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Session UI for the app's screens and flows.
+ * Main exports: SessionsPageClient.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
+
 import {
   useCallback,
   useDeferredValue,
@@ -1506,3 +1516,5 @@ export default function SessionsPageClient({
     </main>
   );
 }
+
+

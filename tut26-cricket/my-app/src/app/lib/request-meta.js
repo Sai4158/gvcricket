@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Request Meta logic for routes, APIs, and feature code.
+ * Main exports: getClientIp, getRequestMeta.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 export function getClientIp(request) {
   const forwardedFor = request.headers.get("x-forwarded-for");
   if (forwardedFor) {
@@ -17,3 +26,5 @@ export function getRequestMeta(request) {
     userAgent: request.headers.get("user-agent") || "",
   };
 }
+
+

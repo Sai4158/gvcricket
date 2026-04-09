@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Defines the root app shell, shared metadata, and global providers.
+ * Main exports: RootLayout, metadata, viewport.
+ * Major callers: Next.js App Router.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SmoothScroll from "./components/SmoothScroll";
@@ -137,3 +146,5 @@ export default function RootLayout({ children }) {
     </html>
   );
 }
+
+

@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Shared UI for the app's screens and flows.
+ * Main exports: PendingLink.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -74,3 +84,5 @@ export default function PendingLink({
     </Link>
   );
 }
+
+

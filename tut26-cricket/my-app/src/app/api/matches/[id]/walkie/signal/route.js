@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Handles Api API requests for the app.
+ * Main exports: module side effects only.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: reads server request metadata.
+ * Read next: ../../../../../../../docs/ONBOARDING.md
+ */
+
 import { cookies } from "next/headers";
 import { jsonError } from "../../../../../lib/api-response";
 import { connectDB } from "../../../../../lib/db";
@@ -85,3 +94,5 @@ export async function POST(req, { params }) {
 
   return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }
+
+

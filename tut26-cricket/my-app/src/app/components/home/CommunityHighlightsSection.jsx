@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Home UI for the app's screens and flows.
+ * Main exports: CommunityHighlightsSection.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
+
 import { motion, useReducedMotion } from "framer-motion";
 import AnimatedSection from "./AnimatedSection";
 import LiquidSportText from "./LiquidSportText";
@@ -131,3 +141,5 @@ export default function CommunityHighlightsSection() {
     </AnimatedSection>
   );
 }
+
+

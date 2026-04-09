@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Defines Next.Config behavior used by the app.
+ * Main exports: default export.
+ * Major callers: Adjacent modules in the same feature area.
+ * Side effects: reads server request metadata.
+ * Read next: ./README.md
+ */
+
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildSecurityHeaders } from "./security-headers.mjs";
@@ -67,3 +76,5 @@ const nextConfig = {
 };
 
 export default nextConfig;
+
+

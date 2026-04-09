@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Match UI for the app's screens and flows.
+ * Main exports: buildBallSlotLabels, BallTracker, Ball.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import { Rajdhani } from "next/font/google";
 
@@ -145,3 +154,5 @@ export function BallTracker({ history }) {
     </div>
   );
 }
+
+

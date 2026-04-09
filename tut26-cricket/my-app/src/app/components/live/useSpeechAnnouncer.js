@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Encapsulates Live browser state, effects, and runtime coordination.
+ * Main exports: useSpeechAnnouncer.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   isUiAudioUnlocked,
@@ -1427,3 +1437,5 @@ export default function useSpeechAnnouncer(settings) {
       platformRef.current.isIOS && platformRef.current.isSafari && !voice?.name,
   };
 }
+
+

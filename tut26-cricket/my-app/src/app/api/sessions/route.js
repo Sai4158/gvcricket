@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Handles Api API requests for the app.
+ * Main exports: module side effects only.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: none.
+ * Read next: ../../../../docs/ONBOARDING.md
+ */
+
 import Session from "../../../models/Session.js";
 import { jsonError, jsonRateLimit } from "../../lib/api-response";
 import { writeAuditLog } from "../../lib/audit-log";
@@ -101,3 +110,5 @@ export async function GET(req) {
     return jsonError("Failed to retrieve sessions.", 500);
   }
 }
+
+

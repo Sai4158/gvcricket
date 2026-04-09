@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Renders the public landing page for the app.
+ * Main exports: dynamic, metadata.
+ * Major callers: Next.js App Router.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import nextDynamic from "next/dynamic";
 import HeroSection from "./components/home/HeroSection";
 import HomeHeader from "./components/home/HomeHeader";
@@ -49,7 +58,7 @@ export default async function HomePage() {
       <HomeHeader />
       <main id="top" className="home-liquid-surface overflow-x-hidden bg-black text-zinc-200 font-sans">
         <HeroSection liveMatch={liveMatch} />
-        <div className="relative z-10 space-y-14 bg-[linear-gradient(155deg,theme(colors.red.900)_0%,theme(colors.black)_40%)] px-5 py-20 md:space-y-24 md:py-28 xl:px-8 xl:py-24 xl:space-y-20 2xl:px-10 2xl:py-28">
+        <div className="relative z-10 space-y-14 bg-[linear-gradient(155deg,var(--color-red-900)_0%,var(--color-black)_40%)] px-5 py-20 md:space-y-24 md:py-28 xl:space-y-20 xl:px-8 xl:py-24 2xl:px-10 2xl:py-28">
           <PrimaryActionsSection />
           <HowItWorksSection />
           <CommunityHighlightsSection />

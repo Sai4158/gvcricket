@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Rate Limit logic for routes, APIs, and feature code.
+ * Main exports: enforceRateLimit.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 const globalStore = globalThis.__gvRateLimitStore || new Map();
 globalThis.__gvRateLimitStore = globalStore;
 
@@ -54,3 +63,5 @@ export function enforceRateLimit({
     resetAt: bucket.resetAt,
   };
 }
+
+

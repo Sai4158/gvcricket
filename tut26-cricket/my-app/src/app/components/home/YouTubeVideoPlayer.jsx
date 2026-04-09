@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Home UI for the app's screens and flows.
+ * Main exports: YouTubeVideoPlayer.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
+
 import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { FaPlay } from "react-icons/fa";
@@ -125,3 +135,5 @@ export default function YouTubeVideoPlayer({ videoId, title }) {
     </motion.figure>
   );
 }
+
+

@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Live Announcements logic for routes, APIs, and feature code.
+ * Main exports: getSpectatorAnnouncementPriority, buildSpectatorBallAnnouncement, buildSpectatorScoreAnnouncement, buildSpectatorOverCompleteAnnouncement, createScoreLiveEvent, createUndoLiveEvent, createMatchCorrectionLiveEvent, createMatchEndLiveEvent, createSoundEffectLiveEvent, createManualScoreAnnouncementLiveEvent, buildSpectatorAnnouncement, buildLiveScoreAnnouncementSequence, buildCurrentScoreAnnouncement, buildUmpireStageAnnouncement, buildUmpireSecondInningsStartSequence, buildUmpireAnnouncement, buildUmpireTapAnnouncement.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import { countLegalBalls } from "./match-scoring";
 import { getBattingTeamBundle } from "./team-utils";
 
@@ -1089,3 +1098,5 @@ export function buildUmpireTapAnnouncement(event, mode = "simple") {
 
   return `${pluralizeRuns(safeNumber(ball.runs))}.`;
 }
+
+

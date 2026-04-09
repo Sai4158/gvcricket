@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Home UI for the app's screens and flows.
+ * Main exports: BackToTopButton.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import { FaArrowUp } from "react-icons/fa";
 
 export default function BackToTopButton() {
@@ -24,3 +33,5 @@ export default function BackToTopButton() {
     </button>
   );
 }
+
+

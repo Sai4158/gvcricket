@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Encapsulates Live browser state, effects, and runtime coordination.
+ * Main exports: useAnnouncementSettings.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: reads or writes browser storage.
+ * Read next: ./README.md
+ */
+
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { EMPTY_SCORE_SOUND_EFFECT_MAP } from "../../lib/score-sound-effects";
 
@@ -265,3 +274,5 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
     updateSetting,
   };
 }
+
+

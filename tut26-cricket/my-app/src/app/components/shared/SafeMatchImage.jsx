@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Shared UI for the app's screens and flows.
+ * Main exports: SafeMatchImage, resolveSafeMatchImage, GV_MATCH_FALLBACK_IMAGE.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
@@ -59,3 +68,5 @@ export default function SafeMatchImage({
     />
   );
 }
+
+

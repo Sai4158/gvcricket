@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Shared UI for the app's screens and flows.
+ * Main exports: LoadingButton.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
+
 import { motion } from "framer-motion";
 import InlineSpinner from "./InlineSpinner";
 
@@ -46,3 +56,5 @@ export default function LoadingButton({
     </motion.button>
   );
 }
+
+

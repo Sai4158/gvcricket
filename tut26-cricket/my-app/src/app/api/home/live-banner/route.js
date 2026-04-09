@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Handles Api API requests for the app.
+ * Main exports: dynamic, revalidate.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: none.
+ * Read next: ../../../../../docs/ONBOARDING.md
+ */
+
 import { NextResponse } from "next/server";
 import { loadHomeLiveBannerData } from "../../../lib/server-data";
 
@@ -29,3 +38,5 @@ export async function GET() {
     );
   }
 }
+
+

@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders the App Router page entry for Session.
+ * Main exports: NewSessionPage.
+ * Major callers: Next.js App Router.
+ * Side effects: reads or writes browser storage.
+ * Read next: ../../../../docs/ONBOARDING.md
+ */
+
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -388,3 +397,5 @@ export default function NewSessionPage() {
     </main>
   );
 }
+
+

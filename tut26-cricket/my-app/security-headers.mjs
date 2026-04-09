@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Defines Security Headers behavior used by the app.
+ * Main exports: buildContentSecurityPolicy, buildSecurityHeaders, applySecurityHeaders.
+ * Major callers: Adjacent modules in the same feature area.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 export function buildContentSecurityPolicy() {
   const scriptSrc = [
     "'self'",
@@ -130,3 +139,5 @@ export function applySecurityHeaders(headers, options) {
   }
   return headers;
 }
+
+

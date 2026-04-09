@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Encapsulates Live browser state, effects, and runtime coordination.
+ * Main exports: useLiveRelativeTime, parseLiveRelativeTimeTimestamp, getLiveRelativeTimeRefreshDelay, formatLiveRelativeTimeLabel.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import { useEffect, useMemo, useState } from "react";
 
 const FIVE_SECONDS_MS = 5000;
@@ -111,3 +120,5 @@ export default function useLiveRelativeTime(timestamp) {
     return formatLiveRelativeTimeLabel(timestamp, now);
   }, [now, timestamp]);
 }
+
+

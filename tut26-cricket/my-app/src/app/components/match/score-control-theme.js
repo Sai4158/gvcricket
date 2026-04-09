@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Renders Match UI for the app's screens and flows.
+ * Main exports: getScoreControlToneClasses, scoreControlFont.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import { Rajdhani } from "next/font/google";
 
 export const scoreControlFont = Rajdhani({
@@ -24,3 +33,5 @@ export function getScoreControlToneClasses(tone = "neutral") {
 
   return "bg-zinc-800 hover:bg-zinc-700";
 }
+
+

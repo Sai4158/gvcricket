@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Defines the Mongoose schema and model wiring for AnnouncerSettings data.
+ * Main exports: default export.
+ * Major callers: Server loaders, API routes, and data helpers.
+ * Side effects: registers or reuses a Mongoose model.
+ * Read next: ./README.md
+ */
+
 import mongoose from "mongoose";
 
 const AnnouncerSettingsSchema = new mongoose.Schema(
@@ -11,3 +20,5 @@ const AnnouncerSettingsSchema = new mongoose.Schema(
 
 export default mongoose.models.AnnouncerSettings ||
   mongoose.model("AnnouncerSettings", AnnouncerSettingsSchema);
+
+

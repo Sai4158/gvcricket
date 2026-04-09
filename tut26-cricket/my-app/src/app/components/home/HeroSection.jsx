@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Home UI for the app's screens and flows.
+ * Main exports: HeroSection.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
@@ -15,7 +24,7 @@ import LiquidSportText from "./LiquidSportText";
 import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
 
 const HERO_VIDEO_PATH = "/videos/Cricket1.mp4";
-const HERO_HEADLINE_DELAY = 0.5/*  */;
+const HERO_HEADLINE_DELAY = 0.5; /*  */
 
 function HeroDesktopScene({
   liveMatch,
@@ -28,15 +37,15 @@ function HeroDesktopScene({
   return (
     <section
       ref={sectionRef}
-      className="relative h-[100svh] min-h-[100svh] overflow-hidden"
+      className="relative h-svh min-h-svh overflow-hidden"
     >
-      <div className="sticky top-0 flex h-[100svh] min-h-[100svh] flex-col items-center justify-center text-center">
+      <div className="sticky top-0 flex h-svh min-h-svh flex-col items-center justify-center text-center">
         <LiveNowBanner liveMatch={liveMatch} />
         <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_24%),linear-gradient(180deg,rgba(7,8,10,0.92),rgba(0,0,0,0.98))]" />
         <video
           ref={videoRef}
           src={HERO_VIDEO_PATH}
-          className={`absolute inset-0 z-0 h-full w-full object-cover bg-black transition-opacity duration-300 [backface-visibility:hidden] [transform:translateZ(0)] ${
+          className={`absolute inset-0 z-0 h-full w-full transform-[translateZ(0)] object-cover bg-black transition-opacity duration-300 backface-hidden ${
             videoReady ? "opacity-100" : "opacity-0"
           }`}
           autoPlay
@@ -66,7 +75,7 @@ function HeroDesktopScene({
                 priority
                 unoptimized
                 sizes="(max-width: 640px) 86vw, (max-width: 768px) 400px, 580px"
-                className="mb-5 h-auto w-[330px] max-w-[86vw] object-contain sm:w-[400px] md:w-[580px]"
+                className="mb-5 h-auto w-82.5 max-w-[86vw] object-contain sm:w-100 md:w-145"
               />
             </div>
           </div>
@@ -128,46 +137,46 @@ function HeroAnimatedScene({
 
   const logoScrollScale = useSpring(
     useTransform(scrollYProgress, [0, 1], [1, 1.1]),
-    { stiffness: 180, damping: 30, mass: 0.22 }
+    { stiffness: 180, damping: 30, mass: 0.22 },
   );
   const logoScrollY = useSpring(
     useTransform(scrollYProgress, [0, 1], [0, 12]),
-    { stiffness: 180, damping: 30, mass: 0.22 }
+    { stiffness: 180, damping: 30, mass: 0.22 },
   );
   const headingScrollScale = useSpring(
     useTransform(scrollYProgress, [0, 1], [1, 1.04]),
-    { stiffness: 180, damping: 30, mass: 0.22 }
+    { stiffness: 180, damping: 30, mass: 0.22 },
   );
   const headingScrollY = useSpring(
     useTransform(scrollYProgress, [0, 1], [0, 8]),
-    { stiffness: 180, damping: 30, mass: 0.22 }
+    { stiffness: 180, damping: 30, mass: 0.22 },
   );
   const headingGlowOpacity = useSpring(
     useTransform(scrollYProgress, [0, 1], [0.18, 0.34]),
-    { stiffness: 180, damping: 30, mass: 0.22 }
+    { stiffness: 180, damping: 30, mass: 0.22 },
   );
   const headingAuraScale = useSpring(
     useTransform(scrollYProgress, [0, 1], [1, 1.16]),
-    { stiffness: 180, damping: 30, mass: 0.22 }
+    { stiffness: 180, damping: 30, mass: 0.22 },
   );
 
   return (
     <section
       ref={sectionRef}
-      className="relative h-[100svh] min-h-[100svh] overflow-hidden"
+      className="relative h-svh min-h-svh overflow-hidden"
     >
       <motion.div
         initial={{ opacity: 0.92, scale: 1.02 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.46, ease: [0.22, 1, 0.36, 1] }}
-        className="sticky top-0 flex h-[100svh] min-h-[100svh] flex-col items-center justify-center text-center"
+        className="sticky top-0 flex h-svh min-h-svh flex-col items-center justify-center text-center"
       >
         <LiveNowBanner liveMatch={liveMatch} />
         <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_24%),linear-gradient(180deg,rgba(7,8,10,0.92),rgba(0,0,0,0.98))]" />
         <video
           ref={videoRef}
           src={HERO_VIDEO_PATH}
-          className={`absolute inset-0 z-0 h-full w-full object-cover bg-black transition-opacity duration-300 [backface-visibility:hidden] [transform:translateZ(0)] ${
+          className={`absolute inset-0 z-0 h-full w-full transform-[translateZ(0)] object-cover bg-black transition-opacity duration-300 backface-hidden ${
             videoReady ? "opacity-100" : "opacity-0"
           }`}
           autoPlay
@@ -185,7 +194,11 @@ function HeroAnimatedScene({
           <motion.div
             initial={{ y: 26, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.42, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+            transition={{
+              duration: 0.42,
+              delay: 0.08,
+              ease: [0.22, 1, 0.36, 1],
+            }}
             className="relative"
           >
             <motion.div
@@ -225,7 +238,7 @@ function HeroAnimatedScene({
                   priority
                   unoptimized
                   sizes="(max-width: 640px) 86vw, (max-width: 768px) 400px, 580px"
-                  className="mb-5 h-auto w-[330px] max-w-[86vw] object-contain sm:w-[400px] md:w-[580px]"
+                  className="mb-5 h-auto w-82.5 max-w-[86vw] object-contain sm:w-100 md:w-145"
                 />
               </motion.div>
             </motion.div>
@@ -233,13 +246,17 @@ function HeroAnimatedScene({
           <motion.h1
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.46, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
+            transition={{
+              duration: 0.46,
+              delay: 0.14,
+              ease: [0.22, 1, 0.36, 1],
+            }}
             className="relative mt-3 max-w-[min(92vw,58rem)] lg:max-w-[min(92vw,70rem)] 2xl:max-w-[min(94vw,88rem)]"
           >
             <>
               <motion.span
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-x-[10%] top-1/2 z-0 h-[72%] -translate-y-1/2 rounded-[32px] bg-[radial-gradient(circle_at_top_left,rgba(244,114,182,0.22),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.2),transparent_32%),linear-gradient(180deg,rgba(0,0,0,0.18),rgba(0,0,0,0.06))] blur-2xl"
+                className="pointer-events-none absolute inset-x-[10%] top-1/2 z-0 h-[72%] -translate-y-1/2 rounded-4xl bg-[radial-gradient(circle_at_top_left,rgba(244,114,182,0.22),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.2),transparent_32%),linear-gradient(180deg,rgba(0,0,0,0.18),rgba(0,0,0,0.06))] blur-2xl"
                 animate={{
                   opacity: [0.38, 0.5, 0.42],
                   scale: [1, 1.01, 1],
@@ -411,8 +428,7 @@ export default function HeroSection({ liveMatch = null }) {
       const shouldPlay =
         document.visibilityState === "visible" &&
         isScrollSettled &&
-        (!useDesktopLiteMotion ||
-          window.scrollY < window.innerHeight * 0.32) &&
+        (!useDesktopLiteMotion || window.scrollY < window.innerHeight * 0.32) &&
         (!useDesktopLiteMotion || isHeroVisible);
 
       if (shouldPlay) {
@@ -451,7 +467,7 @@ export default function HeroSection({ liveMatch = null }) {
         },
         {
           threshold: [0, 0.18, 0.4, 0.7],
-        }
+        },
       );
       visibilityObserver.observe(heroSection);
     }

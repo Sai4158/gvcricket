@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Home UI for the app's screens and flows.
+ * Main exports: LiveNowBanner.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { FaArrowRight } from "react-icons/fa";
@@ -207,3 +216,5 @@ export default function LiveNowBanner({ liveMatch }) {
     </motion.div>
   );
 }
+
+

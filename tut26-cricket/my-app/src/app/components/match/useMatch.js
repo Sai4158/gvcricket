@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Encapsulates Match browser state, effects, and runtime coordination.
+ * Main exports: useMatch, triggerMatchHapticFeedback, isMatchNetworkError, replayQueuedMatchActions.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: reads or writes browser storage.
+ * Read next: ./README.md
+ */
+
 import {
   useCallback,
   useEffect,
@@ -836,3 +845,5 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     patchAndUpdate,
   };
 }
+
+

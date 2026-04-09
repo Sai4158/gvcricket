@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Provides shared Sound Effects Client logic for routes, APIs, and feature code.
+ * Main exports: filterSoundEffectsByQuery, sortSoundEffectsByOrder, readCachedSoundEffectsOrder, writeCachedSoundEffectsOrder, readCachedSoundEffectsLibrary, writeCachedSoundEffectsLibrary, clearCachedSoundEffectsLibrary, subscribeSoundEffectsLibrarySync, SOUND_EFFECT_LIBRARY_CACHE_KEY, SOUND_EFFECT_ORDER_STORAGE_KEY.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: reads or writes browser storage.
+ * Read next: ./README.md
+ */
+
 import { preloadCachedAudioAssets } from "./page-audio";
 
 export const SOUND_EFFECT_LIBRARY_CACHE_KEY = "gv-director-audio-library-v1";
@@ -310,3 +319,5 @@ export function subscribeSoundEffectsLibrarySync(listener) {
     window.removeEventListener("storage", handleStorage);
   };
 }
+
+

@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Team Utils logic for routes, APIs, and feature code.
+ * Main exports: getTeamBundle, buildTeamUpdate, getTeamByName, getBattingTeamBundle, getPlayerCount, getTotalDismissalsAllowed.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 const TEAM_LABELS = {
   teamA: "Team A",
   teamB: "Team B",
@@ -80,3 +89,5 @@ export function getTotalDismissalsAllowed(match) {
   const playerCount = getBattingTeamBundle(match).players.length;
   return Math.max(1, playerCount);
 }
+
+

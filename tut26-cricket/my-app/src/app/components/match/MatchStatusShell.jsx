@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Match UI for the app's screens and flows.
+ * Main exports: Splash, AccessGate, MatchHeader, Scoreboard.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import { useState } from "react";
 import { Barlow_Condensed } from "next/font/google";
 import { FaPause, FaVolumeUp } from "react-icons/fa";
@@ -257,3 +266,5 @@ export function Scoreboard({ match, history }) {
     </div>
   );
 }
+
+

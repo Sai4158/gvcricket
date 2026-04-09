@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Walkie Auth logic for routes, APIs, and feature code.
+ * Main exports: createWalkieParticipantToken, hasValidWalkieParticipantToken.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import crypto from "node:crypto";
 
 const WALKIE_TOKEN_TTL_SECONDS = 60 * 60 * 2;
@@ -64,3 +73,5 @@ export function hasValidWalkieParticipantToken(
     return false;
   }
 }
+
+

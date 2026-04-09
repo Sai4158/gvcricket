@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Public Data logic for routes, APIs, and feature code.
+ * Main exports: serializePublicMatch, serializePublicSession.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import { getTeamBundle } from "./team-utils";
 import { getPublicMatchImagePath } from "./match-image-secure";
 import { getPublicMatchImages } from "./match-image-gallery";
@@ -142,3 +151,5 @@ export function serializePublicSession(sessionDocument) {
     updatedAt: session.updatedAt || null,
   };
 }
+
+

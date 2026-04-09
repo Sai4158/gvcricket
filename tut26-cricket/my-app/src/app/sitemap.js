@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Builds the public sitemap entries for the app, sessions, and matches.
+ * Main exports: default export.
+ * Major callers: Adjacent modules in the same feature area.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import Match from "../models/Match";
 import Session from "../models/Session";
 import { connectDB } from "./lib/db";
@@ -73,3 +82,5 @@ export default async function sitemap() {
 
   return items;
 }
+
+

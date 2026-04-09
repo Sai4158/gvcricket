@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Session UI for the app's screens and flows.
+ * Main exports: PinModal.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
+
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { FaBroadcastTower, FaShieldAlt } from "react-icons/fa";
@@ -143,3 +153,5 @@ export default function PinModal({
     </motion.div>
   );
 }
+
+

@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Renders the App Router page entry for Result.
+ * Main exports: dynamic.
+ * Major callers: Next.js App Router.
+ * Side effects: none.
+ * Read next: ../../../../docs/ONBOARDING.md
+ */
+
 import { notFound } from "next/navigation";
 import ResultPageClient from "../../components/result/ResultPageClient";
 import {
@@ -63,3 +72,5 @@ export default async function ResultPage({ params }) {
 
   return <ResultPageClient matchId={id} initialMatch={initialMatch} />;
 }
+
+

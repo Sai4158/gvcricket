@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Match Engine logic for routes, APIs, and feature code.
+ * Main exports: isProcessedAction, applyMatchAction, applySafeMatchPatch, buildSessionMirrorUpdate, MatchEngineError.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import {
   addBallToHistory,
   buildWinByWicketsText,
@@ -625,3 +634,5 @@ export function buildSessionMirrorUpdate(matchDocument) {
     isLive: Boolean(match?.isOngoing),
   };
 }
+
+

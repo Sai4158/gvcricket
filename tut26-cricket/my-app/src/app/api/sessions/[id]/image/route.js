@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Handles Api API requests for the app.
+ * Main exports: runtime.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: none.
+ * Read next: ../../../../../../docs/ONBOARDING.md
+ */
+
 import crypto from "node:crypto";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
@@ -187,3 +196,5 @@ export async function POST(req, { params }) {
     return jsonError(failureMessage, status);
   }
 }
+
+

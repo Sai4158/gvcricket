@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Toss UI for the app's screens and flows.
+ * Main exports: TossPageClient.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: reads or writes browser storage.
+ * Read next: ./README.md
+ */
+
+
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FaArrowLeft, FaRedo } from "react-icons/fa";
@@ -403,3 +413,5 @@ export default function TossPageClient({
     )
   );
 }
+
+

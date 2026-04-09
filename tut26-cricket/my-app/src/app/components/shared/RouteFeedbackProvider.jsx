@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Shared UI for the app's screens and flows.
+ * Main exports: RouteFeedbackProvider, useRouteFeedback.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
+
 import {
   createContext,
   startTransition,
@@ -143,3 +153,5 @@ export default function RouteFeedbackProvider({ children }) {
     </RouteFeedbackContext.Provider>
   );
 }
+
+

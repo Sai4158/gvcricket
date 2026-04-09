@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Home UI for the app's screens and flows.
+ * Main exports: HomeScrollFade.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import { motion, useReducedMotion } from "framer-motion";
 import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
 import useHomeDesktopReveal from "./useHomeDesktopReveal";
@@ -61,3 +70,5 @@ export default function HomeScrollFade({
     </motion.div>
   );
 }
+
+

@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Shared UI for the app's screens and flows.
+ * Main exports: ImagePinModal.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
+
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FaArrowRight, FaImage, FaTimes } from "react-icons/fa";
@@ -213,3 +223,5 @@ export default function ImagePinModal({
     </AnimatePresence>
   );
 }
+
+

@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Api Response logic for routes, APIs, and feature code.
+ * Main exports: jsonError, jsonRateLimit.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import { NextResponse } from "next/server";
 
 export function jsonError(message, status, extras = {}) {
@@ -16,3 +25,5 @@ export function jsonRateLimit(message, retryAfterMs) {
     }
   );
 }
+
+

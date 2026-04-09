@@ -1,4 +1,12 @@
-// src/components/SmoothScroll.jsx
+/**
+ * File overview:
+ * Purpose: Wraps app content with Lenis-based smooth scrolling for client-rendered pages.
+ * Main exports: default export.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 "use client";
 import { ReactLenis } from "lenis/react";
 
@@ -11,3 +19,4 @@ function SmoothScroll({ children }) {
 }
 
 export default SmoothScroll;
+

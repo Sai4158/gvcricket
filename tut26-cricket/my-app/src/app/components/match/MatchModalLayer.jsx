@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Match UI for the app's screens and flows.
+ * Main exports: MatchModalLayer.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
+
 import { AnimatePresence } from "framer-motion";
 import AnnouncementControls from "../live/AnnouncementControls";
 import LiveMicModal from "../live/LiveMicModal";
@@ -43,22 +53,22 @@ export default function MatchModalLayer({
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange?.(!checked)}
-      className={`relative inline-flex h-8 w-[54px] items-center rounded-full border transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
+      className={`relative inline-flex h-8 w-13.5 items-center rounded-full border transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
         checked
           ? "border-emerald-300/35 bg-emerald-500 shadow-[0_10px_24px_rgba(16,185,129,0.22)]"
-          : "border-white/10 bg-white/[0.08]"
+          : "border-white/10 bg-white/8"
       }`}
     >
       <span
         className={`inline-flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition-transform ${
-          checked ? "translate-x-[26px]" : "translate-x-[3px]"
+          checked ? "translate-x-6.5" : "translate-x-0.75"
         }`}
       />
     </button>
   );
   const modalFallback = (label) => (
     <ModalBase title="Unavailable" onExit={onClose}>
-      <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-center text-sm text-zinc-400">
+      <div className="rounded-2xl border border-white/8 bg-white/3 px-4 py-3 text-center text-sm text-zinc-400">
         {label}
       </div>
     </ModalBase>
@@ -86,7 +96,7 @@ export default function MatchModalLayer({
               <button
                 type="button"
                 onClick={stageContinuePromptProps.onForceContinue}
-                className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/8"
               >
                 Force Continue
               </button>
@@ -235,7 +245,7 @@ export default function MatchModalLayer({
               </p>
             </div>
 
-            <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4 text-left">
+            <div className="rounded-2xl border border-white/8 bg-white/4 p-4 text-left">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 pr-2">
                   <p className="text-base font-semibold text-white">
@@ -275,3 +285,4 @@ export default function MatchModalLayer({
     </AnimatePresence>
   );
 }
+
