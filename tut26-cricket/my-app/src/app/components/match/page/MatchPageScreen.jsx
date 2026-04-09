@@ -92,6 +92,7 @@ import {
   writeCachedSoundEffectsOrder,
 } from "../../../lib/sound-effects-client";
 import { applyMatchAction } from "../../../lib/match-engine";
+import { countLegalBalls } from "../../../lib/match-scoring";
 import { duckPageMedia, restorePageMedia } from "../../../lib/page-audio";
 import { buildMatchScorePreview } from "./match-score-preview";
 
@@ -1956,5 +1957,4 @@ export default function MatchPageClient({
     />
   );
 }
-
 

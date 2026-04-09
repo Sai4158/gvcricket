@@ -53,7 +53,7 @@ export default function NotFound() {
       />
 
       <motion.div
-        className="relative z-10 mx-auto flex w-full max-w-2xl flex-col items-center justify-center rounded-[2rem] border border-white/10 bg-zinc-900/40 p-8 shadow-2xl shadow-black/40 backdrop-blur-sm md:p-12"
+        className="relative z-10 mx-auto flex w-full max-w-2xl flex-col items-center justify-center rounded-4xl border border-white/10 bg-zinc-900/40 p-8 shadow-2xl shadow-black/40 backdrop-blur-sm md:p-12"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
@@ -65,7 +65,7 @@ export default function NotFound() {
             width={560}
             height={560}
             unoptimized
-            className="mx-auto h-[22rem] w-[22rem] object-contain drop-shadow-[0_0_42px_rgba(220,38,38,0.2)] sm:h-[28rem] sm:w-[28rem]"
+            className="mx-auto h-88 w-88 object-contain drop-shadow-[0_0_42px_rgba(220,38,38,0.2)] sm:h-112 sm:w-md"
             priority
           />
         </motion.div>
@@ -121,4 +121,3 @@ export default function NotFound() {
     </div>
   );
 }
-
