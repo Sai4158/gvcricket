@@ -333,6 +333,8 @@ export async function POST(req, { params }) {
       match.save(),
       Session.findByIdAndUpdate(match.sessionId, {
         $set: sessionMirrorUpdate,
+      }, {
+        timestamps: false,
       }),
     ]);
     invalidateSessionsDataCache();
@@ -487,6 +489,8 @@ export async function DELETE(req, { params }) {
       match.save(),
       Session.findByIdAndUpdate(match.sessionId, {
         $set: buildSessionMirrorUpdate(match),
+      }, {
+        timestamps: false,
       }),
     ]);
     invalidateSessionsDataCache();
@@ -628,6 +632,8 @@ export async function PATCH(req, { params }) {
       match.save(),
       Session.findByIdAndUpdate(match.sessionId, {
         $set: buildSessionMirrorUpdate(match),
+      }, {
+        timestamps: false,
       }),
     ]);
 

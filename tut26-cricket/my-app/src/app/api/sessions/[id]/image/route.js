@@ -113,7 +113,7 @@ export async function POST(req, { params }) {
       matchId: session.match ? String(session.match) : "",
     });
     session.mediaUpdatedAt = new Date();
-    await session.save();
+    await session.save({ timestamps: false });
 
     if (session.match) {
       const linkedMatch = await Match.findById(session.match);

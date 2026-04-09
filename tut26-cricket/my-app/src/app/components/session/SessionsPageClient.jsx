@@ -414,7 +414,6 @@ export default function SessionsPageClient({
               matchImages: Array.isArray(updatedMatch?.matchImages)
                 ? updatedMatch.matchImages
                 : [],
-              updatedAt: updatedMatch?.updatedAt || session.updatedAt,
             }
           : session
       )
