@@ -181,7 +181,14 @@ export default function LiveMicModal({
           </button>
         </div>
 
-        <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(16,16,22,0.98),rgba(7,7,11,0.98))] px-5 py-6 text-center shadow-[0_22px_70px_rgba(0,0,0,0.4)]">
+        <section
+          className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(16,16,22,0.98),rgba(7,7,11,0.98))] px-5 py-6 text-center shadow-[0_22px_70px_rgba(0,0,0,0.4)]"
+          style={{
+            userSelect: "none",
+            WebkitUserSelect: "none",
+            WebkitTouchCallout: "none",
+          }}
+        >
           <button
             type="button"
             disabled={isStarting}
@@ -253,6 +260,15 @@ export default function LiveMicModal({
               }
               void endHold();
             }}
+            onContextMenu={(event) => {
+              event.preventDefault();
+            }}
+            onMouseDown={(event) => {
+              event.preventDefault();
+            }}
+            onDragStart={(event) => {
+              event.preventDefault();
+            }}
             onKeyDown={(event) => {
               if ((event.key === " " || event.key === "Enter") && !event.repeat) {
                 event.preventDefault();
@@ -269,6 +285,9 @@ export default function LiveMicModal({
             aria-label={isLive ? "Release to stop commentary" : "Press and hold the loudspeaker icon to talk"}
             style={{
               touchAction: "none",
+              userSelect: "none",
+              WebkitUserSelect: "none",
+              WebkitTouchCallout: "none",
               WebkitTapHighlightColor: "transparent",
             }}
           >

@@ -121,7 +121,7 @@ function AnnounceIcon() {
   );
 }
 
-const ACTION_HOLD_DELAY_MS = 40;
+const ACTION_HOLD_DELAY_MS = 180;
 
 function ActionHelpItem({ icon, title, description, colorClass, rank }) {
   return (
