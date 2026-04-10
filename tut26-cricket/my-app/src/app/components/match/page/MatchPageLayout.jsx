@@ -64,6 +64,7 @@ export default function MatchPageLayout({
   infoText,
   isLiveMatch,
   isReadScoreActionActive,
+  isStageCardUndoPending,
   isTestSequenceActionActive,
   isUpdating,
   liveUpdatedLabel,
@@ -361,6 +362,7 @@ export default function MatchPageLayout({
           match={match}
           modalType={modal.type}
           isUpdating={isUpdating}
+          isStageCardUndoPending={isStageCardUndoPending}
           micMonitor={micMonitor}
           entryScoreSoundPromptProps={
             modal.type === ENTRY_SCORE_SOUND_EFFECTS_MODAL

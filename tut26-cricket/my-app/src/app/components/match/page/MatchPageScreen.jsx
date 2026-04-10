@@ -174,6 +174,7 @@ export default function MatchPageClient({
     useState(true);
   const [entryScoreSoundEffectsEnabled, setEntryScoreSoundEffectsEnabled] =
     useState(false);
+  const [stageCardUndoPending, setStageCardUndoPending] = useState(false);
   const micMonitor = useLocalMicMonitor();
   const {
     speak,
@@ -1761,6 +1762,7 @@ export default function MatchPageClient({
     Math.ceil(countLegalBalls(match?.innings1?.history ?? []) / 6)
   );
   const {
+    dismissVisibleStageCard,
     handleForceContinuePastSpeech,
     handleProtectedNextInningsOrEnd,
     pendingStageCardCountdownLabel,
@@ -1795,23 +1797,35 @@ export default function MatchPageClient({
   });
 
   const handleStageCardUndo = useCallback(async () => {
+    if (stageCardUndoPending) {
+      return;
+    }
     if (!match?.undoCount || !currentInningsHasHistory) {
       return;
     }
 
+    setStageCardUndoPending(true);
+    dismissVisibleStageCard();
     setStageContinuePrompt(null);
     cancelBoundarySequence({ stopEffect: true });
     clearAnnouncementDuck();
     clearSpeechEffectPlayerDuck();
 
-    await handleUndo();
+    try {
+      await handleUndo();
+    } finally {
+      setStageCardUndoPending(false);
+    }
   }, [
     cancelBoundarySequence,
     clearAnnouncementDuck,
     clearSpeechEffectPlayerDuck,
     currentInningsHasHistory,
+    dismissVisibleStageCard,
     handleUndo,
     match?.undoCount,
+    stageCardUndoPending,
+    setStageCardUndoPending,
     setStageContinuePrompt,
   ]);
 
@@ -1953,6 +1967,7 @@ export default function MatchPageClient({
         infoText,
         isLiveMatch,
         isReadScoreActionActive,
+        isStageCardUndoPending: stageCardUndoPending,
         isTestSequenceActionActive,
         isUpdating,
         liveUpdatedLabel,

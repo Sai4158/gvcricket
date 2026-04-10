@@ -31,6 +31,7 @@ export default function MatchModalLayer({
   match,
   modalType,
   isUpdating,
+  isStageCardUndoPending = false,
   micMonitor,
   entryScoreSoundPromptProps,
   stageContinuePromptProps,
@@ -83,7 +84,7 @@ export default function MatchModalLayer({
           match={match}
           onNext={onNext}
           onUndo={onUndoStageCard}
-          undoDisabled={isUpdating}
+          undoDisabled={isUpdating || isStageCardUndoPending}
         />
       )}
       {stageContinuePromptProps ? (

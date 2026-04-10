@@ -51,6 +51,7 @@ export default function useMatchStageCardFlow({
   const [visibleStageCardKey, setVisibleStageCardKey] = useState(
     initialStageState.key,
   );
+  const [dismissedStageCardKey, setDismissedStageCardKey] = useState("");
   const [stageCardRevealDeadlineMs, setStageCardRevealDeadlineMs] = useState(null);
   const [stageCardCountdownNow, setStageCardCountdownNow] = useState(() =>
     Date.now(),
@@ -60,11 +61,17 @@ export default function useMatchStageCardFlow({
     showInningsEnd,
     key: stageCardKey,
   } = getMatchEndStageState(match, matchId);
+  const isStageCardDismissed = Boolean(
+    showInningsEnd && stageCardKey && dismissedStageCardKey === stageCardKey,
+  );
   const showVisibleInningsEndCard = Boolean(
-    showInningsEnd && visibleStageCardKey === stageCardKey,
+    showInningsEnd && !isStageCardDismissed && visibleStageCardKey === stageCardKey,
   );
   const showPendingMatchOverCountdown = Boolean(
-    match?.result && showInningsEnd && !showVisibleInningsEndCard,
+    match?.result &&
+      showInningsEnd &&
+      !isStageCardDismissed &&
+      !showVisibleInningsEndCard,
   );
 
   const getRemainingActiveSoundEffectMs = useCallback(() => {
@@ -252,10 +259,30 @@ export default function useMatchStageCardFlow({
   );
 
   useEffect(() => {
+    if (!stageCardKey) {
+      if (dismissedStageCardKey) {
+        setDismissedStageCardKey("");
+      }
+      return;
+    }
+
+    if (dismissedStageCardKey && dismissedStageCardKey !== stageCardKey) {
+      setDismissedStageCardKey("");
+    }
+  }, [dismissedStageCardKey, stageCardKey]);
+
+  useEffect(() => {
     stageCardRevealVersionRef.current += 1;
     const revealVersion = stageCardRevealVersionRef.current;
 
     if (!showInningsEnd || !stageCardKey) {
+      stageCardPlaybackBlockUntilRef.current = 0;
+      setStageCardRevealDeadlineMs(null);
+      setVisibleStageCardKey("");
+      return;
+    }
+
+    if (isStageCardDismissed) {
       stageCardPlaybackBlockUntilRef.current = 0;
       setStageCardRevealDeadlineMs(null);
       setVisibleStageCardKey("");
@@ -304,6 +331,7 @@ export default function useMatchStageCardFlow({
     isAnySoundEffectActive,
     pendingUmpireAnnouncementRef,
     showInningsEnd,
+    isStageCardDismissed,
     soundEffectPlayingRef,
     stageCardKey,
     stageCardPlaybackBlockUntilRef,
@@ -314,6 +342,17 @@ export default function useMatchStageCardFlow({
     waitForUmpirePlaybackToSettle,
     walkieAnnouncementPauseActiveRef,
   ]);
+
+  const dismissVisibleStageCard = useCallback(() => {
+    if (!stageCardKey) {
+      return;
+    }
+
+    stageCardPlaybackBlockUntilRef.current = 0;
+    setStageCardRevealDeadlineMs(null);
+    setVisibleStageCardKey("");
+    setDismissedStageCardKey(stageCardKey);
+  }, [stageCardKey, stageCardPlaybackBlockUntilRef]);
 
   useEffect(() => {
     if (!showPendingMatchOverCountdown || !pendingStageCardEffectiveDeadlineMs) {
@@ -501,6 +540,7 @@ export default function useMatchStageCardFlow({
     showPendingMatchOverCountdown,
     showVisibleInningsEndCard,
     stageContinuePrompt,
+    dismissVisibleStageCard,
     waitForUmpirePlaybackToSettle,
     hasPendingStageContinueSpeech,
   };
