@@ -1517,9 +1517,9 @@ export default function DirectorConsoleScreen({
         </div>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.78fr)] 2xl:grid-cols-[minmax(0,1.48fr)_minmax(380px,0.72fr)]">
-        <div className="min-w-0 flex flex-col gap-5">
-          <div className="order-4 xl:order-4">
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] 2xl:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)]">
+        <div className="min-w-0 flex flex-col gap-4">
+          <div className="order-4 md:hidden">
             <DirectorLoudspeakerPanel
               loudspeaker={musicDeck}
               micMonitor={micMonitor}
@@ -1541,7 +1541,7 @@ export default function DirectorConsoleScreen({
             />
           </div>
 
-          <div className="order-3 xl:order-3">
+          <div className="order-3">
             <DirectorYouTubeDeckPanel
               musicDeck={musicDeck}
               speakerMessage={speakerMessage}
@@ -1549,7 +1549,7 @@ export default function DirectorConsoleScreen({
           </div>
         </div>
 
-        <div className="min-w-0 space-y-5">
+        <div className="min-w-0 space-y-4">
           <DirectorScoreAnnouncerPanel
             canManageSession={canManageSession}
             readCurrentScore={readCurrentScore}
@@ -1557,6 +1557,13 @@ export default function DirectorConsoleScreen({
             speech={speech}
             speechSettings={speechSettings}
           />
+
+          <div className="hidden md:block">
+            <DirectorLoudspeakerPanel
+              loudspeaker={musicDeck}
+              micMonitor={micMonitor}
+            />
+          </div>
 
           <DirectorAudioOutputPanel />
         </div>

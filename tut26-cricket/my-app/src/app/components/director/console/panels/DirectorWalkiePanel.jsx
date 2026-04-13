@@ -70,20 +70,18 @@ export default function DirectorWalkiePanel({
         </div>
       }
     >
-      <div className="space-y-4">
-        <div className="min-h-18">
-          {showDirectorWalkieNotice ? (
-            <WalkieNotice
-              embedded
-              notice={surfacedDirectorWalkieNotice}
-              attention={directorWalkieUi.attentionMode}
-              onDismiss={() => {
-                setDirectorWalkieNotice("");
-                walkie.dismissNotice();
-              }}
-            />
-          ) : null}
-        </div>
+      <div className="space-y-3">
+        {showDirectorWalkieNotice ? (
+          <WalkieNotice
+            embedded
+            notice={surfacedDirectorWalkieNotice}
+            attention={directorWalkieUi.attentionMode}
+            onDismiss={() => {
+              setDirectorWalkieNotice("");
+              walkie.dismissNotice();
+            }}
+          />
+        ) : null}
         <div
           className={
             directorWalkieChannelEnabled && directorWalkieOn
@@ -105,7 +103,7 @@ export default function DirectorWalkiePanel({
             <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(4,20,18,0.68),rgba(10,10,14,0.5))] px-4 py-3 text-center text-sm text-zinc-300">
               <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,rgba(0,0,0,0),rgba(52,211,153,0.8)_22%,rgba(34,211,238,0.46)_72%,rgba(0,0,0,0))]" />
               {!canManageSession
-                ? "Enter director mode and choose a live session to use walkie."
+                ? "Select a live match first to use walkie."
                 : directorWalkieLoading
                   ? walkie.recoveringAudio || walkie.recoveringSignaling
                     ? "Reconnecting walkie..."

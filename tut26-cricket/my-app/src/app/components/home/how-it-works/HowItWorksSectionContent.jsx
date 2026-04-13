@@ -184,7 +184,7 @@ export default function HowItWorksSection() {
               />
             )}
             <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-white/72 md:hidden">
-              GV Cricket lets one person score live while everyone else can watch, hear updates, and follow the match in real time.
+              GV Cricket lets one person scoresek live while everyone else can watch, hear updates, and follow the match in real time.
             </p>
             <p className="mx-auto mt-4 hidden max-w-xl text-sm leading-6 text-white/72 md:block md:text-base">
               GV Cricket is a mobile-first live scoring app for local cricket matches. One person updates the game, everyone else can watch it live, and the app can speak updates, play audio, and keep the match organized from start to finish.
