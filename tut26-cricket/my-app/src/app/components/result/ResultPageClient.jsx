@@ -40,6 +40,14 @@ const ScoringBreakdownCharts = dynamic(() => import("./ScoringBreakdownCharts"),
   ssr: false,
 });
 
+const IMAGE_ZOOM_MIN = 1;
+const IMAGE_ZOOM_MAX = 3;
+const IMAGE_ZOOM_STEP = 0.25;
+
+function clampImageZoom(value) {
+  return Math.min(IMAGE_ZOOM_MAX, Math.max(IMAGE_ZOOM_MIN, value));
+}
+
 export default function ResultPageClient({ matchId, initialMatch }) {
   const router = useRouter();
   const { startNavigation } = useRouteFeedback();
@@ -50,6 +58,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   const [showConfetti, setShowConfetti] = useState(true);
   const [activeGalleryImageId, setActiveGalleryImageId] = useState("");
   const [zoomedImage, setZoomedImage] = useState(null);
+  const [zoomedImageScale, setZoomedImageScale] = useState(1);
   const lastStreamUpdateRef = useRef(initialMatch?.updatedAt || "");
 
   const confettiPieces = useMemo(
@@ -120,6 +129,25 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   const innings2Summary = calculateInningsSummary(match.innings2);
   const winningInningsSummary = getWinningInningsSummary(match);
 
+  const updateZoomedImageScale = (updater) => {
+    setZoomedImageScale((current) => {
+      const nextValue =
+        typeof updater === "function" ? updater(current) : Number(updater);
+      return clampImageZoom(nextValue);
+    });
+  };
+
+  const handleZoomedImageWheel = (event) => {
+    if (!(event.ctrlKey || event.metaKey)) {
+      return;
+    }
+
+    event.preventDefault();
+    updateZoomedImageScale((current) =>
+      current + (event.deltaY < 0 ? IMAGE_ZOOM_STEP : -IMAGE_ZOOM_STEP)
+    );
+  };
+
   const handleOpenSessions = () => {
     setIsLeavingToSessions(true);
     startNavigation("Opening sessions...");
@@ -144,6 +172,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
             setActiveGalleryImageId(image?.url ? image.id || "" : "");
           }}
           onImageTap={(image) => {
+            setZoomedImageScale(1);
             setZoomedImage(image || null);
           }}
           onImageHold={(image, _index, event) => {
@@ -367,20 +396,77 @@ export default function ResultPageClient({ matchId, initialMatch }) {
         {zoomedImage?.url ? (
           <ModalBase
             title=""
-            onExit={() => setZoomedImage(null)}
+            onExit={() => {
+              setZoomedImageScale(1);
+              setZoomedImage(null);
+            }}
             panelClassName="max-w-5xl bg-black/95"
             bodyClassName="max-h-[calc(100vh-4rem)] p-0"
           >
-            <div className="overflow-hidden rounded-[24px] bg-black">
-              <SafeMatchImage
-                src={zoomedImage.url}
-                alt={match.name || "Match image"}
-                width={2000}
-                height={1400}
-                className="mx-auto h-auto max-h-[82vh] w-full object-contain"
-                fallbackClassName="mx-auto h-auto max-h-[82vh] w-full object-contain bg-black p-10"
-                sizes="100vw"
-              />
+            <div
+              className="overflow-hidden rounded-[24px] bg-black"
+              onContextMenu={(event) => event.preventDefault()}
+            >
+              <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
+                <span>Image preview</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateZoomedImageScale((current) => current - IMAGE_ZOOM_STEP)
+                    }
+                    disabled={zoomedImageScale <= IMAGE_ZOOM_MIN}
+                    className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    -
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateZoomedImageScale(1)}
+                    disabled={zoomedImageScale === 1}
+                    className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {Math.round(zoomedImageScale * 100)}%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateZoomedImageScale((current) => current + IMAGE_ZOOM_STEP)
+                    }
+                    disabled={zoomedImageScale >= IMAGE_ZOOM_MAX}
+                    className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <div
+                className="max-h-[82vh] overflow-auto overscroll-contain"
+                onWheel={handleZoomedImageWheel}
+                style={{ touchAction: "pan-x pan-y pinch-zoom" }}
+              >
+                <div className="flex min-h-[82vh] min-w-full items-center justify-center p-4 sm:p-6">
+                  <SafeMatchImage
+                    src={zoomedImage.url}
+                    alt={match.name || "Match image"}
+                    width={2000}
+                    height={1400}
+                    className="mx-auto h-auto max-h-[82vh] w-auto max-w-full rounded-[18px] object-contain select-none"
+                    fallbackClassName="mx-auto h-auto max-h-[82vh] w-auto max-w-full rounded-[18px] object-contain bg-black p-10 select-none"
+                    sizes="100vw"
+                    draggable={false}
+                    onDoubleClick={() => {
+                      updateZoomedImageScale((current) => (current > 1 ? 1 : 2));
+                    }}
+                    style={{
+                      width: zoomedImageScale > 1 ? `${zoomedImageScale * 100}%` : undefined,
+                      maxWidth: zoomedImageScale > 1 ? "none" : undefined,
+                      maxHeight: zoomedImageScale > 1 ? "none" : undefined,
+                      cursor: zoomedImageScale > 1 ? "zoom-out" : "zoom-in",
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </ModalBase>
         ) : null}
