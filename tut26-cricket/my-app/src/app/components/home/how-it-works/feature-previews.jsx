@@ -110,7 +110,7 @@ function MiniStepFlowPreview({ staticMode = false }) {
       className="overflow-hidden rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] px-3 py-3"
     >
       <div className="w-full">
-        <StepFlow currentStep={1} />
+        <StepFlow currentStep={1} compact />
       </div>
     </Div>
   );

@@ -10,25 +10,38 @@
  */
 
 const STEPS = [
-  { number: 1, label: "Session" },
-  { number: 2, label: "Teams" },
-  { number: 3, label: "Toss" },
-  { number: 4, label: "Start" },
+  { number: 1, label: "Session", compactLabel: "SES" },
+  { number: 2, label: "Teams", compactLabel: "TEAM" },
+  { number: 3, label: "Toss", compactLabel: "TOSS" },
+  { number: 4, label: "Start", compactLabel: "START" },
 ];
 
-export default function StepFlow({ currentStep = 1, className = "" }) {
+export default function StepFlow({ currentStep = 1, className = "", compact = false }) {
   return (
     <div className={className}>
-      <div className="flex items-center justify-center gap-2 sm:gap-3">
+      <div
+        className={`flex items-center justify-center ${
+          compact ? "gap-1 sm:gap-2" : "gap-2 sm:gap-3"
+        }`}
+      >
         {STEPS.map((step, index) => {
           const isDone = step.number < currentStep;
           const isCurrent = step.number === currentStep;
 
           return (
-            <div key={step.number} className="flex items-center gap-2 sm:gap-3">
-              <div className="flex flex-col items-center gap-1.5 text-center">
+            <div
+              key={step.number}
+              className={`min-w-0 flex items-center ${
+                compact ? "gap-1 sm:gap-2" : "gap-2 sm:gap-3"
+              }`}
+            >
+              <div className={`min-w-0 flex flex-col items-center text-center ${compact ? "gap-1" : "gap-1.5"}`}>
                 <span
-                  className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full border px-2 text-xs font-semibold transition ${
+                  className={`inline-flex items-center justify-center rounded-full border font-semibold transition ${
+                    compact
+                      ? "h-7 min-w-7 px-1.5 text-[11px] sm:h-8 sm:min-w-8 sm:px-2 sm:text-xs"
+                      : "h-8 min-w-8 px-2 text-xs"
+                  } ${
                     isCurrent
                       ? "border-amber-300/30 bg-amber-300/12 text-amber-100"
                       : isDone
@@ -39,7 +52,11 @@ export default function StepFlow({ currentStep = 1, className = "" }) {
                   {step.number}
                 </span>
                 <span
-                  className={`text-[10px] font-medium uppercase tracking-[0.18em] ${
+                  className={`whitespace-nowrap font-medium uppercase ${
+                    compact
+                      ? "text-[9px] tracking-[0.11em] sm:text-[10px] sm:tracking-[0.18em]"
+                      : "text-[10px] tracking-[0.18em]"
+                  } ${
                     isCurrent
                       ? "text-zinc-200"
                       : isDone
@@ -47,12 +64,21 @@ export default function StepFlow({ currentStep = 1, className = "" }) {
                       : "text-zinc-500"
                   }`}
                 >
-                  {step.label}
+                  {compact ? (
+                    <>
+                      <span className="sm:hidden">{step.compactLabel}</span>
+                      <span className="hidden sm:inline">{step.label}</span>
+                    </>
+                  ) : (
+                    step.label
+                  )}
                 </span>
               </div>
               {index < STEPS.length - 1 ? (
                 <span
-                  className={`block h-[2px] w-6 rounded-full sm:w-10 ${
+                  className={`block h-[2px] rounded-full ${
+                    compact ? "w-4 sm:w-10" : "w-6 sm:w-10"
+                  } ${
                     step.number < currentStep ? "bg-emerald-400/70" : "bg-white/10"
                   }`}
                 />

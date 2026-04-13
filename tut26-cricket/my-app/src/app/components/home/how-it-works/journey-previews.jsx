@@ -57,7 +57,7 @@ function AnimatedStepFlowPreview({ staticMode = false }) {
         transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
         className="w-full"
       >
-        <StepFlow currentStep={currentStep} />
+        <StepFlow currentStep={currentStep} compact />
       </motion.div>
     </Div>
   );
@@ -77,22 +77,22 @@ function AnimatedTeamsJourneyPreview({ staticMode = false, accent }) {
         >
           <motion.div
             key={frame.step}
-            initial={{ opacity: 0.72, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0.72 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
             className="w-full"
           >
-            <StepFlow currentStep={frame.step} />
+            <StepFlow currentStep={frame.step} compact />
           </motion.div>
         </Div>
         <Div
           {...withVariants(previewItemVariants)}
-          className="rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-3"
+          className="h-[22.5rem] overflow-hidden rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-3 sm:h-[22rem]"
         >
           <motion.div
             key={`${frame.step}-${frame.heading}`}
-            initial={{ opacity: 0.74, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0.74 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
           >
             <P className="text-[10px] font-semibold uppercase tracking-[0.26em] text-zinc-500">
