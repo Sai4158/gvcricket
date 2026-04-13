@@ -284,7 +284,7 @@ export default function MatchModalLayer({
           fallback={modalFallback("Live mic unavailable right now.")}
         >
           <LiveMicModal
-            title="Live Commentary Mic"
+            title="Bluetooth Mic"
             monitor={micMonitor}
             onClose={onClose}
           />
