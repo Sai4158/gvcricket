@@ -795,64 +795,6 @@ export default function SessionsPageClient({
     }
   }, [closeSessionManager, manageForm.name, manageForm.teamAName, manageForm.teamBName, manageSessionContext, manageSubmitting, mergeSessionUpdateIntoList, reloadSessionsFromServer, sessions]);
 
-  const handleManageSessionDelete = useCallback(async () => {
-    if (!manageSessionContext?.sessionId || manageSubmitting) {
-      return;
-    }
-
-    const confirmed = window.confirm(
-      "Delete this session and its match permanently?"
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    setManageSubmitting(true);
-    setManageError("");
-
-    try {
-      const deletedSession =
-        sessions.find((session) => session._id === manageSessionContext.sessionId) || null;
-      const response = await fetch(
-        `/api/sessions/${manageSessionContext.sessionId}`,
-        {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pin: manageSessionContext.pin }),
-        }
-      );
-      const payload = await response
-        .json()
-        .catch(() => ({ message: "Could not delete session." }));
-
-      if (!response.ok) {
-        throw new Error(payload.message || "Could not delete session.");
-      }
-
-      removeSessionsFromList([manageSessionContext.sessionId]);
-      setPage(1);
-      closeSessionManager({ force: true });
-      setActionSummary({
-        title: "Session Deleted",
-        heading: deletedSession?.name || "Session removed",
-        description: "The session and any linked match were deleted.",
-        items: deletedSession
-          ? [
-              deletedSession.teamAName && deletedSession.teamBName
-                ? `${deletedSession.teamAName} vs ${deletedSession.teamBName}`
-                : "",
-            ].filter(Boolean)
-          : [],
-        tone: "danger",
-      });
-      void reloadSessionsFromServer({ forceFresh: true }).catch(() => {});
-    } catch (error) {
-      setManageError(error.message || "Could not delete session.");
-    } finally {
-      setManageSubmitting(false);
-    }
-  }, [closeSessionManager, manageSessionContext, manageSubmitting, reloadSessionsFromServer, removeSessionsFromList, sessions]);
-
   const handleBulkDeleteSessions = useCallback(
     async (pin) => {
       if (!selectedSessionIds.length) {
@@ -1447,11 +1389,11 @@ export default function SessionsPageClient({
                 </LoadingButton>
                 <button
                   type="button"
-                  onClick={() => void handleManageSessionDelete()}
+                  onClick={() => closeSessionManager()}
                   disabled={manageSubmitting}
-                  className="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-5 py-3 font-semibold text-rose-200 transition hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-2xl border border-white/10 bg-white/[0.05] px-5 py-3 font-semibold text-zinc-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Delete Session
+                  Back
                 </button>
               </div>
             </div>
