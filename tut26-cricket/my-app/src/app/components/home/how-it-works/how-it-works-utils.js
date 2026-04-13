@@ -56,10 +56,18 @@ export function getAccentRail(accent) {
 
 
 export function getFeatureCardWideSpan(previewType) {
+  if (previewType === "livebanner") {
+    return "md:col-span-2 md:justify-self-center md:w-full md:max-w-[46rem] xl:col-span-2 xl:col-start-2 xl:max-w-none 2xl:col-span-3 2xl:col-start-auto";
+  }
+
   return "2xl:col-span-3";
 }
 
-export function getJourneyCardWideSpan() {
+export function getJourneyCardWideSpan(previewType) {
+  if (previewType === "access") {
+    return "md:col-span-2 md:justify-self-center md:w-full md:max-w-[46rem] xl:col-span-1 xl:max-w-none 2xl:col-span-4";
+  }
+
   return "2xl:col-span-4";
 }
 
