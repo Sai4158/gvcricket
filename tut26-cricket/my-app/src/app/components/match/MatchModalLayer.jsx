@@ -62,11 +62,13 @@ export default function MatchModalLayer({
         ? {
             title: "Turn Score Announcer On?",
             description: "Score updates will be announced after each ball.",
+            emphasizedAction: "confirm",
           }
         : {
             title: "Turn Score Announcer Off?",
             description:
               "Score updates will not be announced after each ball when this is off.",
+            emphasizedAction: "cancel",
           };
     }
 
@@ -74,12 +76,14 @@ export default function MatchModalLayer({
       ? {
           title: "Turn Score Music Effects On?",
           description:
-            "A sound effect will play after each ball and can duck/cut music while it plays.",
+            "Turn off when playing music to avoid cutting off. Score tap sound effect will play after each ball.",
+          emphasizedAction: "cancel",
         }
       : {
           title: "Turn Score Music Effects Off?",
           description:
             "No score tap sound effect will play after each ball, and music will keep playing normally.",
+          emphasizedAction: "confirm",
         };
   }, [entryScoreToggleConfirm]);
 
@@ -103,6 +107,41 @@ export default function MatchModalLayer({
 
     setEntryScoreToggleConfirm(null);
   };
+
+  const entryScoreConfirmButtons =
+    entryScoreToggleConfirmCopy?.emphasizedAction === "cancel"
+      ? [
+          {
+            key: "confirm",
+            label: "OK",
+            onClick: handleConfirmEntryScoreToggle,
+            className:
+              "rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]",
+          },
+          {
+            key: "cancel",
+            label: "Back",
+            onClick: () => setEntryScoreToggleConfirm(null),
+            className:
+              "rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black transition hover:bg-emerald-400",
+          },
+        ]
+      : [
+          {
+            key: "cancel",
+            label: "Back",
+            onClick: () => setEntryScoreToggleConfirm(null),
+            className:
+              "rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]",
+          },
+          {
+            key: "confirm",
+            label: "OK",
+            onClick: handleConfirmEntryScoreToggle,
+            className:
+              "rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black transition hover:bg-emerald-400",
+          },
+        ];
 
   const renderPromptSwitch = (checked, onChange, label) => (
     <button
@@ -398,20 +437,16 @@ export default function MatchModalLayer({
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setEntryScoreToggleConfirm(null)}
-                className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmEntryScoreToggle}
-                className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black transition hover:bg-emerald-400"
-              >
-                OK
-              </button>
+              {entryScoreConfirmButtons.map((buttonConfig) => (
+                <button
+                  key={buttonConfig.key}
+                  type="button"
+                  onClick={buttonConfig.onClick}
+                  className={buttonConfig.className}
+                >
+                  {buttonConfig.label}
+                </button>
+              ))}
             </div>
           </div>
         </ModalBase>
