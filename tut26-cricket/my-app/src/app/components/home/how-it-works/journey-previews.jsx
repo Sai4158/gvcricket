@@ -55,7 +55,7 @@ function AnimatedStepFlowPreview({ staticMode = false }) {
         initial={{ opacity: 0.7, y: 5 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-        className="w-[21rem] origin-top-left scale-[0.72]"
+        className="w-full"
       >
         <StepFlow currentStep={currentStep} />
       </motion.div>
@@ -80,7 +80,7 @@ function AnimatedTeamsJourneyPreview({ staticMode = false, accent }) {
             initial={{ opacity: 0.72, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-            className="w-[21rem] origin-top-left scale-[0.72]"
+            className="w-full"
           >
             <StepFlow currentStep={frame.step} />
           </motion.div>

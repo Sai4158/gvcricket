@@ -73,7 +73,7 @@ function PreviewSurface({ accent, heading, children, staticMode = false }) {
   return (
     <Div
       {...withVariants(previewStaggerVariants)}
-      className={`relative overflow-hidden rounded-[26px] border border-white/12 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_28%),linear-gradient(180deg,rgba(12,14,20,0.96),rgba(7,8,12,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ${
+      className={`relative min-w-0 overflow-hidden rounded-[26px] border border-white/12 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_28%),linear-gradient(180deg,rgba(12,14,20,0.96),rgba(7,8,12,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ${
         staticMode
           ? "home-desktop-preview-surface home-updates-desktop-preview"
           : "home-desktop-preview-surface"
@@ -109,7 +109,7 @@ function MiniStepFlowPreview({ staticMode = false }) {
       {...withVariants(previewItemVariants)}
       className="overflow-hidden rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] px-3 py-3"
     >
-      <div className="w-[21rem] origin-top-left scale-[0.72]">
+      <div className="w-full">
         <StepFlow currentStep={1} />
       </div>
     </Div>

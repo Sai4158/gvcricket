@@ -313,7 +313,7 @@ function FeatureCardDesktop({ card, index }) {
   return (
     <DesktopRevealCard
       index={index}
-      className={`group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 home-desktop-lite-card home-updates-desktop-card ${
+      className={`group relative min-w-0 h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 home-desktop-lite-card home-updates-desktop-card ${
         card.previewType === "director" ? "md:col-span-2 xl:col-span-2" : ""
       } ${getFeatureCardWideSpan(card.previewType)} ${getFeatureCardWideOrder(card.previewType)}`}
     >
@@ -343,7 +343,7 @@ function JourneyCardDesktop({ card, index }) {
   return (
     <DesktopRevealCard
       index={index}
-      className={`group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 home-desktop-lite-card home-updates-desktop-card ${getJourneyCardWideSpan()}`}
+      className={`group relative min-w-0 h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 xl:p-5 2xl:p-6 home-desktop-lite-card home-updates-desktop-card ${getJourneyCardWideSpan()}`}
     >
       <div
         className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${getAccentRail(
@@ -401,7 +401,7 @@ function FeatureCard({ card, index, prefersReducedMotion, useFlatLaptopMotion })
             }
       }
       style={cardStyle}
-      className={`liquid-glass-soft group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 ${
+      className={`liquid-glass-soft group relative min-w-0 h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6 ${
         card.previewType === "director" ? "md:col-span-2 xl:col-span-2" : ""
       } xl:p-5 2xl:p-6 ${getFeatureCardWideSpan(card.previewType)} ${getFeatureCardWideOrder(card.previewType)} will-change-transform [transform-style:preserve-3d]`}
     >
@@ -476,7 +476,7 @@ function JourneyCard({ card, index, prefersReducedMotion, useFlatLaptopMotion })
             }
       }
       style={cardStyle}
-      className={`liquid-glass-soft group relative h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] will-change-transform [transform-style:preserve-3d] sm:p-6 xl:p-5 2xl:p-6 ${getJourneyCardWideSpan()}`}
+      className={`liquid-glass-soft group relative min-w-0 h-full overflow-hidden rounded-[30px] border border-white/14 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%),linear-gradient(180deg,rgba(20,20,26,0.84),rgba(8,8,12,0.76))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] will-change-transform [transform-style:preserve-3d] sm:p-6 xl:p-5 2xl:p-6 ${getJourneyCardWideSpan()}`}
     >
       <motion.div
         style={glowStyle}
