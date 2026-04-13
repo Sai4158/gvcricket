@@ -121,11 +121,6 @@ const jsonLd = [
 ];
 
 export default function RootLayout({ children }) {
-  const shouldRenderAnalytics =
-    process.env.NODE_ENV === "production" &&
-    process.env.VERCEL === "1" &&
-    process.env.NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS === "1";
-
   return (
     <html lang="en">
       <head>
@@ -141,7 +136,7 @@ export default function RootLayout({ children }) {
         <RouteFeedbackProvider>
           <SmoothScroll>{children}</SmoothScroll>
         </RouteFeedbackProvider>
-        {shouldRenderAnalytics ? <Analytics /> : null}
+        <Analytics />
       </body>
     </html>
   );
