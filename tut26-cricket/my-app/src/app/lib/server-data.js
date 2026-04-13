@@ -96,6 +96,15 @@ function getStableCreatedTimeMs(value) {
   return new Date(value || 0).getTime();
 }
 
+function getStableSessionSortTimestamp(sessionDate, ...fallbacks) {
+  const parsedSessionDate = new Date(String(sessionDate || ""));
+  if (!Number.isNaN(parsedSessionDate.getTime())) {
+    return parsedSessionDate.toISOString();
+  }
+
+  return getStableCreatedTimestamp(...fallbacks);
+}
+
 async function getCachedServerData(cacheEntry, loader) {
   const now = Date.now();
 
@@ -165,7 +174,8 @@ async function readSessionsIndexPageData() {
           ? publicMatch.matchImages
           : publicSession.matchImages || [],
       matchCreatedAt: publicMatch?.createdAt || null,
-      sortCreatedAt: getStableCreatedTimestamp(
+      sortCreatedAt: getStableSessionSortTimestamp(
+        publicSession.date,
         publicMatch?.createdAt,
         publicSession.createdAt,
       ),
@@ -459,7 +469,8 @@ async function readDirectorSessionsList() {
       return {
         session: publicSession,
         match: publicMatch,
-        sortCreatedAt: getStableCreatedTimestamp(
+        sortCreatedAt: getStableSessionSortTimestamp(
+          publicSession.date,
           resolvedMatch?.createdAt,
           session.createdAt,
         ),

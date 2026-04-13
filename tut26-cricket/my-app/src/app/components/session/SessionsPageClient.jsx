@@ -83,6 +83,17 @@ function getTimestampMs(value) {
   return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
+function getPreferredTimestampMs(...values) {
+  for (const value of values) {
+    const timestamp = getTimestampMs(value);
+    if (timestamp > 0) {
+      return timestamp;
+    }
+  }
+
+  return 0;
+}
+
 function buildSearchText(session) {
   return [
     session.name,
@@ -334,7 +345,8 @@ export default function SessionsPageClient({
   const indexedSessions = useMemo(
     () =>
       sessions.map((session) => {
-        const createdAtMs = getTimestampMs(
+        const createdAtMs = getPreferredTimestampMs(
+          session.date,
           session.sortCreatedAt ||
             session.matchCreatedAt ||
             session.createdAt ||
