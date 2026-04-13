@@ -101,18 +101,29 @@ function buildSearchText(session) {
 
 function sortSessions(items, sortValue) {
   const sessions = [...items];
-  const byUpdatedDesc = (left, right) =>
-    right.__updatedAtMs - left.__updatedAtMs;
+  const byCreatedDesc = (left, right) => {
+    const createdDiff = right.__createdAtMs - left.__createdAtMs;
+    if (createdDiff !== 0) {
+      return createdDiff;
+    }
+
+    const updatedDiff = right.__updatedAtMs - left.__updatedAtMs;
+    if (updatedDiff !== 0) {
+      return updatedDiff;
+    }
+
+    return left.__sortName.localeCompare(right.__sortName);
+  };
 
   switch (sortValue) {
     case "newest":
-      return sessions.sort(byUpdatedDesc);
+      return sessions.sort(byCreatedDesc);
     case "oldest":
-      return sessions.sort((left, right) => -byUpdatedDesc(left, right));
+      return sessions.sort((left, right) => -byCreatedDesc(left, right));
     case "recent-ended":
       return sessions.sort((left, right) => {
         if (left.isLive !== right.isLive) return left.isLive ? 1 : -1;
-        return byUpdatedDesc(left, right);
+        return byCreatedDesc(left, right);
       });
     case "a-z":
       return sessions.sort((left, right) =>
@@ -126,7 +137,7 @@ function sortSessions(items, sortValue) {
     default:
       return sessions.sort((left, right) => {
         if (left.isLive !== right.isLive) return left.isLive ? -1 : 1;
-        return byUpdatedDesc(left, right);
+        return byCreatedDesc(left, right);
       });
   }
 }
@@ -322,11 +333,18 @@ export default function SessionsPageClient({
   const indexedSessions = useMemo(
     () =>
       sessions.map((session) => {
+        const createdAtMs = getTimestampMs(
+          session.sortCreatedAt ||
+            session.matchCreatedAt ||
+            session.createdAt ||
+            session.updatedAt
+        );
         const updatedAtMs = getTimestampMs(session.updatedAt || session.createdAt);
         return {
           ...session,
           __searchText: buildSearchText(session),
           __sortName: normalizeSearchValue(session.name || ""),
+          __createdAtMs: createdAtMs,
           __updatedAtMs: updatedAtMs,
         };
       }),

@@ -38,7 +38,7 @@ function buildStatusMeta(session) {
   const hasValidSessionDate = !Number.isNaN(parsedSessionDate.getTime());
   const completedReferenceDate = hasValidSessionDate
     ? parsedSessionDate.toISOString()
-    : session.createdAt || session.updatedAt;
+    : session.matchCreatedAt || session.createdAt || session.updatedAt;
   const referenceDate = isLive
     ? session.updatedAt || session.createdAt
     : completedReferenceDate;

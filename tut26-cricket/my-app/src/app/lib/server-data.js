@@ -88,6 +88,14 @@ async function readVisibleSessionsWithMatches(sort = { createdAt: -1, _id: -1 })
   return hydrateLinkedSessionMatches(sessions);
 }
 
+function getStableCreatedTimestamp(...values) {
+  return getIsoTimestamp(...values);
+}
+
+function getStableCreatedTimeMs(value) {
+  return new Date(value || 0).getTime();
+}
+
 async function getCachedServerData(cacheEntry, loader) {
   const now = Date.now();
 
@@ -156,6 +164,11 @@ async function readSessionsIndexPageData() {
         publicMatch?.matchImages?.length > 0
           ? publicMatch.matchImages
           : publicSession.matchImages || [],
+      matchCreatedAt: publicMatch?.createdAt || null,
+      sortCreatedAt: getStableCreatedTimestamp(
+        publicMatch?.createdAt,
+        publicSession.createdAt,
+      ),
       updatedAt: session.updatedAt || session.createdAt,
       isLive: resolvedMatch ? Boolean(resolvedMatch.isOngoing) : Boolean(session.isLive),
       score: Number(publicMatch?.score || 0),
@@ -380,21 +393,25 @@ export async function loadHomeLiveBannerData() {
     return null;
   }
 
-  const sessionsByRecentUpdate = [...visibleSessions].sort((left, right) => {
-    const leftUpdatedAt = new Date(left?.updatedAt || left?.createdAt || 0).getTime();
-    const rightUpdatedAt = new Date(right?.updatedAt || right?.createdAt || 0).getTime();
-    return rightUpdatedAt - leftUpdatedAt;
+  const sessionsByRecentCreation = [...visibleSessions].sort((left, right) => {
+    const leftCreatedAt = getStableCreatedTimeMs(
+      left?.sortCreatedAt || left?.matchCreatedAt || left?.createdAt || left?.updatedAt,
+    );
+    const rightCreatedAt = getStableCreatedTimeMs(
+      right?.sortCreatedAt || right?.matchCreatedAt || right?.createdAt || right?.updatedAt,
+    );
+    return rightCreatedAt - leftCreatedAt;
   });
 
-  const latestLiveSession = sessionsByRecentUpdate.find((session) => session?.isLive);
-  const latestScoredSession = sessionsByRecentUpdate.find((session) => {
+  const latestLiveSession = sessionsByRecentCreation.find((session) => session?.isLive);
+  const latestScoredSession = sessionsByRecentCreation.find((session) => {
     const score = Number(session?.score || 0);
     const outs = Number(session?.outs || 0);
     const result = String(session?.result || "").trim();
     return score > 0 || outs > 0 || Boolean(result);
   });
   const selectedSession =
-    latestLiveSession || latestScoredSession || sessionsByRecentUpdate[0] || null;
+    latestLiveSession || latestScoredSession || sessionsByRecentCreation[0] || null;
 
   if (!selectedSession) {
     return null;
@@ -442,6 +459,10 @@ async function readDirectorSessionsList() {
       return {
         session: publicSession,
         match: publicMatch,
+        sortCreatedAt: getStableCreatedTimestamp(
+          resolvedMatch?.createdAt,
+          session.createdAt,
+        ),
         updatedAt: getIsoTimestamp(
           resolvedMatch?.updatedAt,
           session.updatedAt,
@@ -455,9 +476,8 @@ async function readDirectorSessionsList() {
         return left.isLive ? -1 : 1;
       }
 
-      return (
-        new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
-      );
+      return getStableCreatedTimeMs(right.sortCreatedAt) -
+        getStableCreatedTimeMs(left.sortCreatedAt);
     });
 
   return mappedSessions;
