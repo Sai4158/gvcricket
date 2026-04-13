@@ -156,7 +156,7 @@ async function readSessionsIndexPageData() {
         publicMatch?.matchImages?.length > 0
           ? publicMatch.matchImages
           : publicSession.matchImages || [],
-      updatedAt: resolvedMatch?.updatedAt || session.updatedAt,
+      updatedAt: session.updatedAt || session.createdAt,
       isLive: resolvedMatch ? Boolean(resolvedMatch.isOngoing) : Boolean(session.isLive),
       score: Number(publicMatch?.score || 0),
       outs: Number(publicMatch?.outs || 0),

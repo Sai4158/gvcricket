@@ -33,7 +33,14 @@ import { primeUiAudio } from "../../lib/page-audio";
 function buildStatusMeta(session) {
   const isLive = Boolean(session.isLive);
   const hasSavedScore = Boolean(session.match);
-  const referenceDate = session.updatedAt || session.createdAt;
+  const parsedSessionDate = new Date(String(session.date || ""));
+  const hasValidSessionDate = !Number.isNaN(parsedSessionDate.getTime());
+  const completedReferenceDate = hasValidSessionDate
+    ? parsedSessionDate.toISOString()
+    : session.createdAt || session.updatedAt;
+  const referenceDate = isLive
+    ? session.updatedAt || session.createdAt
+    : completedReferenceDate;
 
   if (isLive) {
     return {

@@ -147,35 +147,50 @@ export async function PATCH(req, { params }) {
       return jsonError("Admin access required.", 403);
     }
 
-    const {
-      pin: _pin,
-      ...safePatch
-    } = parsedRequest.value;
+    const { pin: _pin, ...safePatch } = parsedRequest.value;
+    const nextIsLive = safePatch.isLive ?? session.isLive;
+    const preserveEndedTimestamp = Boolean(session.match && !nextIsLive);
 
-    Object.assign(session, safePatch);
-    await session.save();
+    const updatedSession = await Session.findByIdAndUpdate(
+      id,
+      {
+        $set: safePatch,
+      },
+      {
+        new: true,
+        runValidators: true,
+        ...(preserveEndedTimestamp ? { timestamps: false } : {}),
+      }
+    );
+    if (!updatedSession) {
+      return jsonError("Session not found.", 404);
+    }
 
-    if (session.match) {
-      await Match.findByIdAndUpdate(session.match, {
-        $set: {
-          teamA: session.teamA,
-          teamB: session.teamB,
-          teamAName: session.teamAName,
-          teamBName: session.teamBName,
-          overs: session.overs,
-          tossWinner: session.tossWinner,
-          matchImages: session.matchImages,
-          matchImageUrl: session.matchImageUrl,
-          matchImagePublicId: session.matchImagePublicId,
-          matchImageUploadedAt: session.matchImageUploadedAt,
-          matchImageUploadedBy: session.matchImageUploadedBy,
-          announcerEnabled: session.announcerEnabled,
-          announcerMode: session.announcerMode,
-          lastEventType: session.lastEventType,
-          lastEventText: session.lastEventText,
-          adminAccessVersion: session.adminAccessVersion,
+    if (updatedSession.match) {
+      await Match.findByIdAndUpdate(
+        updatedSession.match,
+        {
+          $set: {
+            teamA: updatedSession.teamA,
+            teamB: updatedSession.teamB,
+            teamAName: updatedSession.teamAName,
+            teamBName: updatedSession.teamBName,
+            overs: updatedSession.overs,
+            tossWinner: updatedSession.tossWinner,
+            matchImages: updatedSession.matchImages,
+            matchImageUrl: updatedSession.matchImageUrl,
+            matchImagePublicId: updatedSession.matchImagePublicId,
+            matchImageUploadedAt: updatedSession.matchImageUploadedAt,
+            matchImageUploadedBy: updatedSession.matchImageUploadedBy,
+            announcerEnabled: updatedSession.announcerEnabled,
+            announcerMode: updatedSession.announcerMode,
+            lastEventType: updatedSession.lastEventType,
+            lastEventText: updatedSession.lastEventText,
+            adminAccessVersion: updatedSession.adminAccessVersion,
+          },
         },
-      });
+        preserveEndedTimestamp ? { timestamps: false } : undefined
+      );
     }
 
     invalidateSessionsDataCache();
@@ -183,8 +198,8 @@ export async function PATCH(req, { params }) {
       const { publishMatchUpdate, publishSessionUpdate } = await import(
         "../../../lib/live-updates"
       );
-      if (session.match) {
-        publishMatchUpdate(String(session.match));
+      if (updatedSession.match) {
+        publishMatchUpdate(String(updatedSession.match));
       }
       publishSessionUpdate(id);
     }
@@ -199,7 +214,7 @@ export async function PATCH(req, { params }) {
       metadata: { fields: Object.keys(safePatch) },
     });
 
-    return Response.json(serializePublicSession(session), {
+    return Response.json(serializePublicSession(updatedSession), {
       headers: {
         "Cache-Control": "no-store",
       },

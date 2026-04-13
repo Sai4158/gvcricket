@@ -181,31 +181,43 @@ export async function PATCH(req, { params }) {
       }
     );
 
-    await Match.findByIdAndUpdate(id, {
-      $set: {
-        announcer: {
-          ...(match.announcer && typeof match.announcer === "object"
-            ? match.announcer
-            : {}),
-          scoreSoundEffectMap: normalizedScoreSoundEffectMap,
+    await Match.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          announcer: {
+            ...(match.announcer && typeof match.announcer === "object"
+              ? match.announcer
+              : {}),
+            scoreSoundEffectMap: normalizedScoreSoundEffectMap,
+          },
         },
       },
-    });
+      {
+        timestamps: false,
+      }
+    );
 
     if (match.sessionId) {
       const session = await Session.findById(match.sessionId)
         .select("announcer")
         .lean();
-      await Session.findByIdAndUpdate(match.sessionId, {
-        $set: {
-          announcer: {
-            ...(session?.announcer && typeof session.announcer === "object"
-              ? session.announcer
-              : {}),
-            scoreSoundEffectMap: normalizedScoreSoundEffectMap,
+      await Session.findByIdAndUpdate(
+        match.sessionId,
+        {
+          $set: {
+            announcer: {
+              ...(session?.announcer && typeof session.announcer === "object"
+                ? session.announcer
+                : {}),
+              scoreSoundEffectMap: normalizedScoreSoundEffectMap,
+            },
           },
         },
-      });
+        {
+          timestamps: false,
+        }
+      );
     }
 
     await writeAuditLog({

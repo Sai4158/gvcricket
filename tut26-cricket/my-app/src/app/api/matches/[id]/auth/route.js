@@ -48,9 +48,15 @@ async function loadMatchAccessState(matchId) {
 
   if (hydrateLegacyTossState(match, fallbackSession)) {
     await match.save();
-    await Session.findByIdAndUpdate(match.sessionId, {
-      $set: buildSessionMirrorUpdate(match),
-    });
+    await Session.findByIdAndUpdate(
+      match.sessionId,
+      {
+        $set: buildSessionMirrorUpdate(match),
+      },
+      {
+        timestamps: false,
+      }
+    );
   }
 
   return match;

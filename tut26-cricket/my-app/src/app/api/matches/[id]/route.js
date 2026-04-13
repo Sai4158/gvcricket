@@ -67,9 +67,15 @@ export async function GET(_req, { params }) {
 
     if (hydrateLegacyTossState(match, fallbackSession)) {
       await match.save();
-      await Session.findByIdAndUpdate(match.sessionId, {
-        $set: buildSessionMirrorUpdate(match),
-      });
+      await Session.findByIdAndUpdate(
+        match.sessionId,
+        {
+          $set: buildSessionMirrorUpdate(match),
+        },
+        {
+          timestamps: false,
+        }
+      );
     }
 
     return Response.json(
@@ -153,9 +159,15 @@ export async function PATCH(req, { params }) {
 
     if (hydrateLegacyTossState(match, fallbackSession)) {
       await match.save();
-      await Session.findByIdAndUpdate(match.sessionId, {
-        $set: buildSessionMirrorUpdate(match),
-      });
+      await Session.findByIdAndUpdate(
+        match.sessionId,
+        {
+          $set: buildSessionMirrorUpdate(match),
+        },
+        {
+          timestamps: false,
+        }
+      );
     }
 
     const nextState = applySafeMatchPatch(match, parsedRequest.value);
@@ -184,9 +196,15 @@ export async function PATCH(req, { params }) {
       nextState.announcerBroadcastScoreSoundEffectsEnabled;
     await match.save();
 
-    await Session.findByIdAndUpdate(match.sessionId, {
-      $set: buildSessionMirrorUpdate(match),
-    });
+    await Session.findByIdAndUpdate(
+      match.sessionId,
+      {
+        $set: buildSessionMirrorUpdate(match),
+      },
+      {
+        timestamps: false,
+      }
+    );
     publishMatchUpdate(match._id);
     publishSessionUpdate(match.sessionId);
 
