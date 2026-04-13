@@ -25,6 +25,7 @@ import MatchImageCarousel from "../shared/MatchImageCarousel";
 import LoadingButton from "../shared/LoadingButton";
 import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
 import { calculateInningsSummary } from "../../lib/match-stats";
+import { getWinningInningsSummary } from "../../lib/match-result-display";
 import CongratulationsCard from "./CongratulationsCard";
 import EnhancedScorecard from "./EnhancedScorecard";
 import PlayerLists from "./PlayerLists";
@@ -117,6 +118,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
 
   const innings1Summary = calculateInningsSummary(match.innings1);
   const innings2Summary = calculateInningsSummary(match.innings2);
+  const winningInningsSummary = getWinningInningsSummary(match);
 
   const handleOpenSessions = () => {
     setIsLeavingToSessions(true);
@@ -226,22 +228,47 @@ export default function ResultPageClient({ matchId, initialMatch }) {
               <div className="rounded-[28px] border border-white/10 bg-black/35 p-5 backdrop-blur-md shadow-[0_18px_50px_rgba(0,0,0,0.32)]">
                 <div className="grid grid-cols-2 gap-3 text-center">
                   <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
-                    <p className="text-xs uppercase tracking-[0.28em] text-zinc-400">Final score</p>
+                    <p className="text-xs uppercase tracking-[0.28em] text-zinc-400">Winning score</p>
                     <p className="mt-2 text-3xl font-black text-white">
-                      {match.score}
-                      <span className="text-zinc-400">/{match.outs}</span>
+                      {winningInningsSummary
+                        ? winningInningsSummary.score
+                        : match.score}
+                      <span className="text-zinc-400">
+                        /
+                        {winningInningsSummary
+                          ? winningInningsSummary.wickets
+                          : match.outs}
+                      </span>
                     </p>
                   </div>
                   <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
                     <p className="text-xs uppercase tracking-[0.28em] text-zinc-400">Overs</p>
                     <p className="mt-2 text-3xl font-black text-white">
-                      {innings2Summary.overs || innings1Summary.overs || "0.0"}
+                      {winningInningsSummary?.overs ||
+                        innings2Summary.overs ||
+                        innings1Summary.overs ||
+                        "0.0"}
                     </p>
                   </div>
                 </div>
-                <p className="mt-4 text-center text-sm text-zinc-300">
-                  Toss won by <span className="font-semibold text-white">{match.tossWinner}</span>
-                </p>
+                <div className="mt-4 space-y-1 text-center">
+                  {winningInningsSummary?.teamName ? (
+                    <p className="text-sm text-zinc-300">
+                      Winning team{" "}
+                      <span className="font-semibold text-white">
+                        {winningInningsSummary.teamName}
+                      </span>
+                    </p>
+                  ) : null}
+                  {match.tossWinner ? (
+                    <p className="text-sm text-zinc-400">
+                      Toss won by{" "}
+                      <span className="font-semibold text-white">
+                        {match.tossWinner}
+                      </span>
+                    </p>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>
