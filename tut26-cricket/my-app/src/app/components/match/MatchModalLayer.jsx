@@ -10,6 +10,7 @@
  */
 
 import { AnimatePresence } from "framer-motion";
+import { useMemo, useState } from "react";
 import AnnouncementControls from "../live/AnnouncementControls";
 import LiveMicModal from "../live/LiveMicModal";
 import WalkiePanel from "../live/WalkiePanel";
@@ -47,6 +48,62 @@ export default function MatchModalLayer({
   onInfoClose,
   onUndoStageCard,
 }) {
+  const [entryScoreToggleConfirm, setEntryScoreToggleConfirm] = useState(null);
+
+  const entryScoreToggleConfirmCopy = useMemo(() => {
+    if (!entryScoreToggleConfirm) {
+      return null;
+    }
+
+    const { setting, nextValue } = entryScoreToggleConfirm;
+
+    if (setting === "announcer") {
+      return nextValue
+        ? {
+            title: "Turn Score Announcer On?",
+            description: "Score updates will be announced after each ball.",
+          }
+        : {
+            title: "Turn Score Announcer Off?",
+            description:
+              "Score updates will not be announced after each ball when this is off.",
+          };
+    }
+
+    return nextValue
+      ? {
+          title: "Turn Score Music Effects On?",
+          description:
+            "A sound effect will play after each ball and can duck/cut music while it plays.",
+        }
+      : {
+          title: "Turn Score Music Effects Off?",
+          description:
+            "No score tap sound effect will play after each ball, and music will keep playing normally.",
+        };
+  }, [entryScoreToggleConfirm]);
+
+  const openEntryScoreToggleConfirm = (setting, nextValue) => {
+    setEntryScoreToggleConfirm({ setting, nextValue });
+  };
+
+  const handleConfirmEntryScoreToggle = () => {
+    if (!entryScoreToggleConfirm || !entryScoreSoundPromptProps) {
+      setEntryScoreToggleConfirm(null);
+      return;
+    }
+
+    const { setting, nextValue } = entryScoreToggleConfirm;
+
+    if (setting === "announcer") {
+      entryScoreSoundPromptProps.onAnnouncerChange?.(nextValue);
+    } else {
+      entryScoreSoundPromptProps.onSoundEffectsChange?.(nextValue);
+    }
+
+    setEntryScoreToggleConfirm(null);
+  };
+
   const renderPromptSwitch = (checked, onChange, label) => (
     <button
       type="button"
@@ -271,7 +328,8 @@ export default function MatchModalLayer({
                 <div className="shrink-0 pt-1">
                   {renderPromptSwitch(
                     entryScoreSoundPromptProps.announcerEnabled,
-                    entryScoreSoundPromptProps.onAnnouncerChange,
+                    (nextValue) =>
+                      openEntryScoreToggleConfirm("announcer", nextValue),
                     entryScoreSoundPromptProps.announcerEnabled
                       ? "Turn score announcer off"
                       : "Turn score announcer on",
@@ -296,7 +354,8 @@ export default function MatchModalLayer({
                 <div className="shrink-0 pt-1">
                   {renderPromptSwitch(
                     entryScoreSoundPromptProps.soundEffectsEnabled,
-                    entryScoreSoundPromptProps.onSoundEffectsChange,
+                    (nextValue) =>
+                      openEntryScoreToggleConfirm("soundEffects", nextValue),
                     entryScoreSoundPromptProps.soundEffectsEnabled
                       ? "Turn score tap music effects off"
                       : "Turn score tap music effects on",
@@ -307,11 +366,53 @@ export default function MatchModalLayer({
 
             <button
               type="button"
-              onClick={entryScoreSoundPromptProps.onSave}
+              onClick={() => {
+                setEntryScoreToggleConfirm(null);
+                entryScoreSoundPromptProps.onSave?.();
+              }}
               className="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black transition hover:bg-emerald-400 active:scale-[0.99]"
             >
               Save
             </button>
+          </div>
+        </ModalBase>
+      ) : null}
+      {modalType === "entryScoreSoundEffects" && entryScoreToggleConfirmCopy ? (
+        <ModalBase
+          key="entry-score-sound-toggle-confirm"
+          title=""
+          onExit={() => setEntryScoreToggleConfirm(null)}
+          hideHeader
+          panelClassName="max-w-sm"
+        >
+          <div className="space-y-5">
+            <div className="text-center">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-300/80">
+                Confirm Change
+              </p>
+              <h3 className="mt-2 text-xl font-semibold tracking-tight text-white">
+                {entryScoreToggleConfirmCopy.title}
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-zinc-300">
+                {entryScoreToggleConfirmCopy.description}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setEntryScoreToggleConfirm(null)}
+                className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmEntryScoreToggle}
+                className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black transition hover:bg-emerald-400"
+              >
+                OK
+              </button>
+            </div>
           </div>
         </ModalBase>
       ) : null}
