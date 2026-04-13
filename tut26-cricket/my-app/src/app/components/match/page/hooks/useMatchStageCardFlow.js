@@ -9,7 +9,7 @@
 
 /* eslint-disable react-hooks/refs */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildUmpireSecondInningsStartSequence,
   buildUmpireStageAnnouncement,
@@ -44,6 +44,7 @@ export default function useMatchStageCardFlow({
   umpireAnnouncementTimerRef,
   walkieAnnouncementPauseActiveRef,
 } = {}) {
+  const MIN_STAGE_CARD_CONFIRM_DELAY_MS = 450;
   const [stageContinuePrompt, setStageContinuePrompt] = useState(null);
   const [initialStageState] = useState(() =>
     getMatchEndStageState(match, matchId),
@@ -56,6 +57,7 @@ export default function useMatchStageCardFlow({
   const [stageCardCountdownNow, setStageCardCountdownNow] = useState(() =>
     Date.now(),
   );
+  const stageCardVisibleAtRef = useRef(0);
 
   const {
     showInningsEnd,
@@ -279,6 +281,7 @@ export default function useMatchStageCardFlow({
       stageCardPlaybackBlockUntilRef.current = 0;
       setStageCardRevealDeadlineMs(null);
       setVisibleStageCardKey("");
+      stageCardVisibleAtRef.current = 0;
       return;
     }
 
@@ -286,6 +289,7 @@ export default function useMatchStageCardFlow({
       stageCardPlaybackBlockUntilRef.current = 0;
       setStageCardRevealDeadlineMs(null);
       setVisibleStageCardKey("");
+      stageCardVisibleAtRef.current = 0;
       return;
     }
 
@@ -309,6 +313,7 @@ export default function useMatchStageCardFlow({
     if (!hasPlaybackInFlight) {
       stageCardPlaybackBlockUntilRef.current = 0;
       setStageCardRevealDeadlineMs(null);
+      stageCardVisibleAtRef.current = Date.now();
       setVisibleStageCardKey(stageCardKey);
       return;
     }
@@ -322,6 +327,7 @@ export default function useMatchStageCardFlow({
       }
       stageCardPlaybackBlockUntilRef.current = 0;
       setStageCardRevealDeadlineMs(null);
+      stageCardVisibleAtRef.current = Date.now();
       setVisibleStageCardKey(stageCardKey);
     })();
   }, [
@@ -349,6 +355,7 @@ export default function useMatchStageCardFlow({
     }
 
     stageCardPlaybackBlockUntilRef.current = 0;
+    stageCardVisibleAtRef.current = 0;
     setStageCardRevealDeadlineMs(null);
     setVisibleStageCardKey("");
     setDismissedStageCardKey(stageCardKey);
@@ -512,6 +519,15 @@ export default function useMatchStageCardFlow({
   );
 
   const handleProtectedNextInningsOrEnd = useCallback(async () => {
+    if (
+      showVisibleInningsEndCard &&
+      stageCardVisibleAtRef.current > 0 &&
+      Date.now() - stageCardVisibleAtRef.current <
+        MIN_STAGE_CARD_CONFIRM_DELAY_MS
+    ) {
+      return null;
+    }
+
     if (hasPendingStageContinueSpeech()) {
       setStageContinuePrompt({
         mode: match?.result && !match?.isOngoing ? "result" : "innings",
@@ -525,6 +541,7 @@ export default function useMatchStageCardFlow({
     hasPendingStageContinueSpeech,
     match?.isOngoing,
     match?.result,
+    showVisibleInningsEndCard,
   ]);
 
   const handleForceContinuePastSpeech = useCallback(async () => {
