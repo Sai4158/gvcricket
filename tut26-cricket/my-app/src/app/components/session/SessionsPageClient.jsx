@@ -1346,6 +1346,7 @@ export default function SessionsPageClient({
             pinLabel="Manage PIN"
             placeholder="- - - - - -"
             rateLimitScope="session-manage-pin"
+            allowSubmitDuringRateLimit
             onConfirm={handleManagePinSubmit}
             onClose={() => {
               setManagePinPrompt(null);

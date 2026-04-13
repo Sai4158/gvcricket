@@ -33,6 +33,7 @@ export default function ImagePinModal({
   summaryTitle = "",
   summaryItems = [],
   rateLimitScope = "media-pin",
+  allowSubmitDuringRateLimit = false,
   onConfirm,
   onContinueWithout,
   onClose,
@@ -62,7 +63,7 @@ export default function ImagePinModal({
   const handleSubmit = async () => {
     if (isSubmitting) return;
 
-    if (pinRateLimit.isBlocked) {
+    if (pinRateLimit.isBlocked && !allowSubmitDuringRateLimit) {
       setError(pinRateLimit.message);
       return;
     }
@@ -170,7 +171,10 @@ export default function ImagePinModal({
                   autoComplete="one-time-code"
                   maxLength={digitCount}
                   value={pin}
-                  disabled={isSubmitting || pinRateLimit.isBlocked}
+                  disabled={
+                    isSubmitting ||
+                    (pinRateLimit.isBlocked && !allowSubmitDuringRateLimit)
+                  }
                   onChange={(event) =>
                     setPin(
                       event.target.value.replace(/\D/g, "").slice(0, digitCount)
@@ -198,7 +202,10 @@ export default function ImagePinModal({
                 <LoadingButton
                   type="button"
                   onClick={handleSubmit}
-                  disabled={pin.length !== digitCount || pinRateLimit.isBlocked}
+                  disabled={
+                    pin.length !== digitCount ||
+                    (pinRateLimit.isBlocked && !allowSubmitDuringRateLimit)
+                  }
                   loading={isSubmitting}
                   pendingLabel="Checking..."
                   trailingIcon={<FaArrowRight />}
