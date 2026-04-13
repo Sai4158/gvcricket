@@ -68,6 +68,11 @@ const FILTER_OPTIONS = [
   { value: "completed", label: "Completed" },
 ];
 const SESSION_SELECTION_HOLD_MS = 3000;
+const EMPTY_MANAGE_FORM = {
+  name: "",
+  teamAName: "",
+  teamBName: "",
+};
 
 function normalizeSearchValue(value) {
   return String(value || "").trim().toLowerCase();
@@ -181,9 +186,9 @@ function ActionSummaryModal({ summary, onClose }) {
 
         {summary.items?.length ? (
           <div className="mt-4 space-y-2">
-            {summary.items.map((item) => (
+            {summary.items.map((item, index) => (
               <div
-                key={item}
+                key={`summary-item-${String(item)}-${index}`}
                 className="rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2.5 text-sm text-zinc-100"
               >
                 {item}
@@ -229,13 +234,12 @@ export default function SessionsPageClient({
   const [pinSubmitting, setPinSubmitting] = useState(false);
   const [managePinPrompt, setManagePinPrompt] = useState(null);
   const [manageSessionContext, setManageSessionContext] = useState(null);
-  const [manageForm, setManageForm] = useState({
-    name: "",
-    teamAName: "",
-    teamBName: "",
-  });
+  const [manageForm, setManageForm] = useState(EMPTY_MANAGE_FORM);
+  const [manageInitialForm, setManageInitialForm] = useState(EMPTY_MANAGE_FORM);
+  const [manageWasEdited, setManageWasEdited] = useState(false);
   const [manageSubmitting, setManageSubmitting] = useState(false);
   const [manageError, setManageError] = useState("");
+  const [manageDiscardPromptOpen, setManageDiscardPromptOpen] = useState(false);
   const [imageActionContext, setImageActionContext] = useState(null);
   const [imageDeleteContext, setImageDeleteContext] = useState(null);
   const [imageReplaceContext, setImageReplaceContext] = useState(null);
@@ -378,6 +382,37 @@ export default function SessionsPageClient({
   );
   const selectedSessionForManage =
     selectedSessions.length === 1 ? selectedSessions[0] : null;
+  const normalizedManageForm = useMemo(
+    () => ({
+      name: String(manageForm.name || "").trim(),
+      teamAName: String(manageForm.teamAName || "").trim(),
+      teamBName: String(manageForm.teamBName || "").trim(),
+    }),
+    [manageForm.name, manageForm.teamAName, manageForm.teamBName]
+  );
+  const normalizedManageInitialForm = useMemo(
+    () => ({
+      name: String(manageInitialForm.name || "").trim(),
+      teamAName: String(manageInitialForm.teamAName || "").trim(),
+      teamBName: String(manageInitialForm.teamBName || "").trim(),
+    }),
+    [manageInitialForm.name, manageInitialForm.teamAName, manageInitialForm.teamBName]
+  );
+  const isManageFormDirty = useMemo(
+    () =>
+      normalizedManageForm.name !== normalizedManageInitialForm.name ||
+      normalizedManageForm.teamAName !== normalizedManageInitialForm.teamAName ||
+      normalizedManageForm.teamBName !== normalizedManageInitialForm.teamBName,
+    [
+      normalizedManageForm.name,
+      normalizedManageForm.teamAName,
+      normalizedManageForm.teamBName,
+      normalizedManageInitialForm.name,
+      normalizedManageInitialForm.teamAName,
+      normalizedManageInitialForm.teamBName,
+    ]
+  );
+  const shouldPromptManageDiscard = isManageFormDirty || manageWasEdited;
 
   useEffect(() => {
     setPage((current) => Math.min(current, totalPages));
@@ -608,12 +643,16 @@ export default function SessionsPageClient({
 
   const openSessionManager = useCallback((session, pin) => {
     setManageSessionContext({ sessionId: session._id, pin });
-    setManageForm({
+    const nextForm = {
       name: session.name || "",
       teamAName: session.teamAName || "",
       teamBName: session.teamBName || "",
-    });
+    };
+    setManageForm(nextForm);
+    setManageInitialForm(nextForm);
+    setManageWasEdited(false);
     setManageError("");
+    setManageDiscardPromptOpen(false);
   }, []);
 
   const handleManagePinSubmit = useCallback(
@@ -646,13 +685,37 @@ export default function SessionsPageClient({
     [managePinPrompt, openSessionManager, startSelectionMode]
   );
 
-  const closeSessionManager = useCallback(() => {
-    setManageSessionContext(null);
-    setManageError("");
-    setManageSubmitting(false);
-  }, []);
+  const closeSessionManager = useCallback(
+    (options = {}) => {
+      const forceClose = Boolean(
+        options &&
+          typeof options === "object" &&
+          "force" in options &&
+          options.force === true
+      );
+
+      if (manageSubmitting) {
+        return;
+      }
+
+      if (!forceClose && shouldPromptManageDiscard) {
+        setManageDiscardPromptOpen(true);
+        return;
+      }
+
+      setManageSessionContext(null);
+      setManageForm(EMPTY_MANAGE_FORM);
+      setManageInitialForm(EMPTY_MANAGE_FORM);
+      setManageWasEdited(false);
+      setManageError("");
+      setManageSubmitting(false);
+      setManageDiscardPromptOpen(false);
+    },
+    [manageSubmitting, shouldPromptManageDiscard]
+  );
 
   const handleManageFieldChange = useCallback((field, value) => {
+    setManageWasEdited(true);
     setManageForm((current) => ({
       ...current,
       [field]: value,
@@ -714,7 +777,7 @@ export default function SessionsPageClient({
         ...payload,
       });
 
-      closeSessionManager();
+      closeSessionManager({ force: true });
       setActionSummary({
         title: "Session Updated",
         heading: payload.name || previousSession?.name || "Session updated",
@@ -768,7 +831,7 @@ export default function SessionsPageClient({
 
       removeSessionsFromList([manageSessionContext.sessionId]);
       setPage(1);
-      closeSessionManager();
+      closeSessionManager({ force: true });
       setActionSummary({
         title: "Session Deleted",
         heading: deletedSession?.name || "Session removed",
@@ -1232,6 +1295,7 @@ export default function SessionsPageClient({
       <AnimatePresence>
         {pinPrompt ? (
           <PinModal
+            key="pin-modal"
             onPinSubmit={handlePinSubmit}
             onExit={() => {
               setPinPrompt(null);
@@ -1263,6 +1327,7 @@ export default function SessionsPageClient({
         ) : null}
         {managePinPrompt ? (
           <ImagePinModal
+            key="manage-pin-modal"
             isOpen={Boolean(managePinPrompt)}
             title={
               managePinPrompt.mode === "select"
@@ -1289,6 +1354,7 @@ export default function SessionsPageClient({
         ) : null}
         {bulkDeletePromptOpen ? (
           <ImagePinModal
+            key="bulk-delete-pin-modal"
             isOpen={bulkDeletePromptOpen}
             title="Delete Sessions"
             subtitle={`Enter the 6-digit manage PIN to delete ${selectedSessionIds.length} selected session${selectedSessionIds.length === 1 ? "" : "s"}.`}
@@ -1313,8 +1379,9 @@ export default function SessionsPageClient({
         ) : null}
         {manageSessionContext ? (
           <ModalBase
+            key="manage-session-modal"
             title="Session Manager"
-            onExit={closeSessionManager}
+            onExit={() => closeSessionManager()}
             panelClassName="max-w-md"
           >
             <div className="space-y-4">
@@ -1389,8 +1456,37 @@ export default function SessionsPageClient({
             </div>
           </ModalBase>
         ) : null}
+        {manageDiscardPromptOpen ? (
+          <ModalBase
+            key="manage-discard-modal"
+            title="Discard Changes?"
+            onExit={() => setManageDiscardPromptOpen(false)}
+            panelClassName="max-w-sm"
+          >
+            <p className="text-sm leading-6 text-zinc-300">
+              You have unsaved session changes. Do you want to discard them or keep editing?
+            </p>
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setManageDiscardPromptOpen(false)}
+                className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
+              >
+                Keep Editing
+              </button>
+              <button
+                type="button"
+                onClick={() => closeSessionManager({ force: true })}
+                className="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/15"
+              >
+                Discard Changes
+              </button>
+            </div>
+          </ModalBase>
+        ) : null}
         {imageActionContext ? (
           <ModalBase
+            key="image-action-modal"
             title="Match Images"
             onExit={closeImageActionFlows}
             panelClassName="max-w-sm"
@@ -1446,6 +1542,7 @@ export default function SessionsPageClient({
         ) : null}
         {imageReplaceContext ? (
           <ModalBase
+            key="image-replace-modal"
             onExit={undefined}
             hideHeader
             panelClassName="max-w-md"
@@ -1485,6 +1582,7 @@ export default function SessionsPageClient({
         ) : null}
         {imageDeleteContext ? (
           <ImagePinModal
+            key="image-delete-pin-modal"
             isOpen={Boolean(imageDeleteContext)}
             title="Delete image"
             subtitle="Enter the 6-digit manage PIN to remove this image."
@@ -1502,10 +1600,11 @@ export default function SessionsPageClient({
           />
         ) : null}
         {isInfoModalOpen ? (
-          <InfoModal onExit={() => setIsInfoModalOpen(false)} />
+          <InfoModal key="info-modal" onExit={() => setIsInfoModalOpen(false)} />
         ) : null}
         {actionSummary ? (
           <ActionSummaryModal
+            key="action-summary-modal"
             summary={actionSummary}
             onClose={() => setActionSummary(null)}
           />
