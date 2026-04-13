@@ -9,7 +9,6 @@
  * Read next: ./README.md
  */
 
-
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import {
@@ -131,7 +130,9 @@ function DesktopLiteActionCard({
             </p>
           </div>
           <div className="flex items-center justify-end gap-3 border-t border-white/10 pt-4">
-            <span className="text-sm font-medium text-white/88">{actionLabel}</span>
+            <span className="text-sm font-medium text-white/88">
+              {actionLabel}
+            </span>
             <span className="liquid-pill inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition duration-300 group-hover:translate-x-0.5 group-hover:border-white/30">
               <FaArrowRight />
             </span>
@@ -167,7 +168,8 @@ function DesktopLiteDirectorCard({ revealRef, isVisible, delay }) {
               Director mode
             </span>
             <span className="mt-1 block max-w-120 text-sm leading-6 text-white/76">
-              Control mic, music, sound effects, and walkie from one simple phone console.
+              Control mic, music, sound effects, and walkie from one simple
+              phone console.
             </span>
             <span className="mt-3 flex flex-wrap items-center gap-2">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-red-400/28 bg-red-500/14 text-[15px] text-red-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_24px_rgba(239,68,68,0.12)]">
@@ -289,7 +291,7 @@ export default function PrimaryActionsSection() {
             heroIcon={<FaChartLine className="text-[60px]" />}
             icon={<FaChartLine />}
             title="View sessions"
-            description="View live matches, past scorecards, final results, and saved sessions in one place."
+            description="View live matches, images, past scorecards, final results, and saved sessions in one place."
             actionLabel="Browse all"
           />
         </div>
@@ -432,14 +434,17 @@ export default function PrimaryActionsSection() {
                   variants={cardItemVariants}
                   className="max-w-[16rem] text-sm leading-6 text-white/78"
                 >
-                  Create teams, run the toss, open umpire mode, and start scoring live in one flow.
+                  Create teams, run the toss, open umpire mode, and start
+                  scoring live in one flow.
                 </motion.p>
               </div>
               <motion.div
                 variants={cardItemVariants}
                 className="flex items-center justify-end gap-3 border-t border-white/10 pt-4"
               >
-                <span className="text-sm font-medium text-white/88">Start now</span>
+                <span className="text-sm font-medium text-white/88">
+                  Start now
+                </span>
                 <motion.span
                   animate={
                     shouldReduceMotion
@@ -540,14 +545,17 @@ export default function PrimaryActionsSection() {
                   variants={cardItemVariants}
                   className="max-w-[16rem] text-sm leading-6 text-white/78"
                 >
-                  View live matches, past scorecards, final results, and saved sessions in one place.
+                  View live matches, images, past scorecards, final results, and
+                  saved sessions in one place.
                 </motion.p>
               </div>
               <motion.div
                 variants={cardItemVariants}
                 className="flex items-center justify-end gap-3 border-t border-white/10 pt-4"
               >
-                <span className="text-sm font-medium text-white/88">Browse all</span>
+                <span className="text-sm font-medium text-white/88">
+                  Browse all
+                </span>
                 <motion.span
                   animate={
                     shouldReduceMotion
@@ -576,17 +584,9 @@ export default function PrimaryActionsSection() {
         className="block w-full max-w-3xl xl:max-w-6xl 2xl:max-w-7xl"
       >
         <motion.div
-        ref={useDesktopLiteMotion ? directorReveal.ref : undefined}
-        initial={
-          shouldReduceMotion
-              ? false
-              : { opacity: 0 }
-        }
-        whileInView={
-          shouldReduceMotion
-              ? undefined
-              : { opacity: 1 }
-        }
+          ref={useDesktopLiteMotion ? directorReveal.ref : undefined}
+          initial={shouldReduceMotion ? false : { opacity: 0 }}
+          whileInView={shouldReduceMotion ? undefined : { opacity: 1 }}
           viewport={{ once: true, amount: 0.16, margin: "0px 0px -6% 0px" }}
           transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
           whileHover={shouldReduceMotion ? undefined : { scale: 1.012 }}
@@ -643,7 +643,8 @@ export default function PrimaryActionsSection() {
                 variants={cardItemVariants}
                 className="mt-1 block max-w-120 text-sm leading-6 text-white/76"
               >
-                Control mic, music, sound effects, and walkie from one simple phone console.
+                Control mic, music, sound effects, and walkie from one simple
+                phone console.
               </motion.span>
               <motion.span
                 variants={cardItemVariants}
@@ -684,5 +685,3 @@ export default function PrimaryActionsSection() {
     </section>
   );
 }
-
-
