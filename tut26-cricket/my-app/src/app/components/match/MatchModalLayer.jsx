@@ -9,7 +9,6 @@
  * Read next: ./README.md
  */
 
-
 import { AnimatePresence } from "framer-motion";
 import AnnouncementControls from "../live/AnnouncementControls";
 import LiveMicModal from "../live/LiveMicModal";
@@ -202,7 +201,12 @@ export default function MatchModalLayer({
           key="commentary"
           fallback={modalFallback("Commentary controls unavailable right now.")}
         >
-          <ModalBase title="" onExit={onClose} hideHeader>
+          <ModalBase
+            title=""
+            onExit={onClose}
+            hideHeader
+            panelClassName="lg:max-w-[50rem]"
+          >
             <AnnouncementControls {...commentaryProps} />
           </ModalBase>
         </OptionalFeatureBoundary>
@@ -229,9 +233,7 @@ export default function MatchModalLayer({
           />
         </OptionalFeatureBoundary>
       )}
-      {modalType === "rules" && (
-        <RulesModal key="rules" onClose={onClose} />
-      )}
+      {modalType === "rules" && <RulesModal key="rules" onClose={onClose} />}
       {modalType === "entryScoreSoundEffects" && entryScoreSoundPromptProps ? (
         <ModalBase
           key="entry-score-sound-effects"
@@ -257,10 +259,13 @@ export default function MatchModalLayer({
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 pr-2">
                   <p className="text-base font-semibold text-white">
-                    Announcer score
+                    Score Announcer
                   </p>
                   <p className="mt-2 text-sm leading-5 text-zinc-400">
-                    Turn this on to announce the score after each ball.
+                    Turn on to announce score after each ball.
+                  </p>
+                  <p className="mt-2 text-xs text-zinc-500">
+                    Can be edited later.
                   </p>
                 </div>
                 <div className="shrink-0 pt-1">
@@ -268,8 +273,8 @@ export default function MatchModalLayer({
                     entryScoreSoundPromptProps.announcerEnabled,
                     entryScoreSoundPromptProps.onAnnouncerChange,
                     entryScoreSoundPromptProps.announcerEnabled
-                      ? "Turn announcer score off"
-                      : "Turn announcer score on",
+                      ? "Turn score announcer off"
+                      : "Turn score announcer on",
                   )}
                 </div>
               </div>
@@ -279,10 +284,13 @@ export default function MatchModalLayer({
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 pr-2">
                   <p className="text-base font-semibold text-white">
-                    Score tap sound effects
+                    Score Music Effects
                   </p>
                   <p className="mt-2 text-sm leading-5 text-zinc-400">
-                    Turn this off when playing music to avoid cutting it off.
+                    Turn off when playing music to avoid cutting off.
+                  </p>
+                  <p className="mt-2 text-xs text-zinc-500">
+                    Can be edited later.
                   </p>
                 </div>
                 <div className="shrink-0 pt-1">
@@ -290,8 +298,8 @@ export default function MatchModalLayer({
                     entryScoreSoundPromptProps.soundEffectsEnabled,
                     entryScoreSoundPromptProps.onSoundEffectsChange,
                     entryScoreSoundPromptProps.soundEffectsEnabled
-                      ? "Turn score tap sounds off"
-                      : "Turn score tap sounds on",
+                      ? "Turn score tap music effects off"
+                      : "Turn score tap music effects on",
                   )}
                 </div>
               </div>
@@ -315,4 +323,3 @@ export default function MatchModalLayer({
     </AnimatePresence>
   );
 }
-

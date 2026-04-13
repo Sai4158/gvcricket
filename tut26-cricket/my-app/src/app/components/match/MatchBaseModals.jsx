@@ -276,7 +276,14 @@ export function InningsEndModal({
       : "0.0";
   const inningsOvers = Number(match?.overs || 0);
   const requiredRunRate = formatRequiredRunRateDisplay(target, inningsOvers);
-  const winnerName = parseWinnerName(match?.result);
+  const resultText = String(match?.result || "").trim();
+  const winnerName = parseWinnerName(resultText);
+  const winnerPrefix = winnerName ? `${winnerName} won by ` : "";
+  const resultSummary =
+    winnerPrefix &&
+    resultText.toLowerCase().startsWith(winnerPrefix.toLowerCase())
+      ? `Won by ${resultText.slice(winnerPrefix.length)}`
+      : resultText;
   const confettiPieces = [
     "left-[8%] top-5 bg-emerald-400/80",
     "left-[18%] top-10 bg-cyan-300/80",
@@ -341,7 +348,7 @@ export function InningsEndModal({
                 className="mt-3 text-[2rem] font-black tracking-[-0.05em] sm:text-[2.3rem]"
               />
               <p className="mt-1 text-lg font-semibold text-emerald-300">
-                {match.result}
+                {String(resultSummary || "").toUpperCase()}
               </p>
             </>
           ) : (
@@ -373,8 +380,8 @@ export function InningsEndModal({
               {isFirstInningsBreak
                 ? `${firstInningsOvers} overs · ${firstInningsOuts} down`
                 : winnerName
-                ? `${winnerName} closed the chase in style.`
-                : "The match result is locked in."}
+                ? "CLOSED THE CHASE IN STYLE."
+                : "THE MATCH RESULT IS LOCKED IN."}
             </p>
           </div>
 

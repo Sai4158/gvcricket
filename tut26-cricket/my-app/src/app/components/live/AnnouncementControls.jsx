@@ -135,7 +135,7 @@ export default function AnnouncementControls({
 
   if (showModernCompactPanel) {
     return (
-      <section className="relative mx-auto flex max-h-[78vh] max-w-[32rem] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.1),transparent_24%),linear-gradient(180deg,rgba(16,16,20,0.98),rgba(7,7,11,0.99))] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.48)] backdrop-blur-md sm:max-h-[82vh] sm:p-5">
+      <section className="relative mx-auto flex max-h-[78vh] max-w-[32rem] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.1),transparent_24%),linear-gradient(180deg,rgba(16,16,20,0.98),rgba(7,7,11,0.99))] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.48)] backdrop-blur-md sm:max-h-[82vh] sm:p-5 lg:max-h-[84vh] lg:max-w-[46rem] lg:p-6">
         {!isSoundPickerOpen ? (
           <div className="mb-4 flex items-start justify-between gap-3 border-b border-white/8 pb-4">
             <div className="flex min-w-0 items-start gap-3">
