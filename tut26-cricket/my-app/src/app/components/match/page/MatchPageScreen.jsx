@@ -1470,6 +1470,12 @@ export default function MatchPageClient({
   };
 
   const handleAnnouncedPatchUpdate = async (payload) => {
+    const currentTeamALength = Array.isArray(match?.teamA) ? match.teamA.length : 0;
+    const currentTeamBLength = Array.isArray(match?.teamB) ? match.teamB.length : 0;
+    const teamASizeChanged =
+      Array.isArray(payload?.teamA) && payload.teamA.length !== currentTeamALength;
+    const teamBSizeChanged =
+      Array.isArray(payload?.teamB) && payload.teamB.length !== currentTeamBLength;
     const nextMatch = await patchAndUpdate(payload);
     if (!nextMatch) {
       return null;
@@ -1477,7 +1483,9 @@ export default function MatchPageClient({
 
     if (
       payload?.innings1Score === undefined &&
-      payload?.overs === undefined
+      payload?.overs === undefined &&
+      !teamASizeChanged &&
+      !teamBSizeChanged
     ) {
       return nextMatch;
     }

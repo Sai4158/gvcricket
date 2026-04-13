@@ -558,6 +558,11 @@ test("[security] umpire match patching blocks impossible over changes and unsafe
     teamB: ["Dina", "Esha", "Farah", "Gia"],
   });
   assert.equal(expandedBattingTeam.teamB.length, 4);
+  assert.equal(expandedBattingTeam.lastLiveEvent?.type, "score_correction");
+  assert.equal(
+    expandedBattingTeam.lastLiveEvent?.summaryText,
+    "Falcons now have 3 players. Titans now have 4 players."
+  );
 
   const afterSecondInningsWicket = applyMatchAction(match, {
     actionId: "score:patch-second-wicket",

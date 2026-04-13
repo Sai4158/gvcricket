@@ -392,6 +392,38 @@ test("[security] score correction announcements stay smart for umpire and specta
   );
 });
 
+test("[security] roster size corrections announce equal and split team sizes cleanly", () => {
+  const baseMatch = buildBaseMatch();
+
+  const equalSizedMatch = applySafeMatchPatch(baseMatch, {
+    teamA: ["Alice", "Bea", "Cara", "Dana"],
+    teamB: ["Dina", "Esha", "Farah", "Gia"],
+  });
+  const equalSizedEvent = createMatchCorrectionLiveEvent(baseMatch, equalSizedMatch, {
+    teamA: ["Alice", "Bea", "Cara", "Dana"],
+    teamB: ["Dina", "Esha", "Farah", "Gia"],
+  });
+
+  assert.equal(
+    buildSpectatorAnnouncement(equalSizedEvent, equalSizedMatch, "full"),
+    "Both teams now have 4 players."
+  );
+
+  const unevenSizedMatch = applySafeMatchPatch(baseMatch, {
+    teamA: ["Alice", "Bea", "Cara", "Dana", "Eli"],
+    teamB: ["Dina", "Esha", "Farah", "Gia"],
+  });
+  const unevenSizedEvent = createMatchCorrectionLiveEvent(baseMatch, unevenSizedMatch, {
+    teamA: ["Alice", "Bea", "Cara", "Dana", "Eli"],
+    teamB: ["Dina", "Esha", "Farah", "Gia"],
+  });
+
+  assert.equal(
+    buildSpectatorAnnouncement(unevenSizedEvent, unevenSizedMatch, "full"),
+    "Falcons now have 5 players. Titans now have 4 players."
+  );
+});
+
 
 test("[security] umpire commentary speaks score buttons and undo with clean wording", () => {
   const matchBefore = applyMatchAction(buildBaseMatch(), {
