@@ -272,6 +272,7 @@ export default function SessionsPageClient({
   const deferredSearchQuery = useDeferredValue(normalizeSearchValue(searchInput));
   const secretHoldTimerRef = useRef(null);
   const suppressCardOpenUntilRef = useRef(0);
+  const didInitialFreshReloadRef = useRef(false);
 
   const setSecretHoldSelectionLock = useCallback((locked) => {
     if (typeof document === "undefined") {
@@ -652,11 +653,20 @@ export default function SessionsPageClient({
   }, []);
 
   useEffect(() => {
+    if (didInitialFreshReloadRef.current) {
+      return;
+    }
+
+    didInitialFreshReloadRef.current = true;
+    void reloadSessionsFromServer({ forceFresh: true }).catch(() => {});
+  }, [reloadSessionsFromServer]);
+
+  useEffect(() => {
     if (!String(refreshToken || "").trim()) {
       return;
     }
 
-    void reloadSessionsFromServer();
+    void reloadSessionsFromServer({ forceFresh: true });
   }, [refreshToken, reloadSessionsFromServer]);
 
   const openSessionManager = useCallback((session, pin) => {

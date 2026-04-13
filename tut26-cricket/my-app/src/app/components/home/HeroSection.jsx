@@ -23,7 +23,7 @@ import LiveNowBanner from "./LiveNowBanner";
 import LiquidSportText from "./LiquidSportText";
 import useHomeDesktopLiteMotion from "./useHomeDesktopLiteMotion";
 
-const HERO_VIDEO_PATH = "/videos/Cricket1.mp4";
+const HERO_VIDEO_PATH = "/videos/Cricket2.mp4";
 const HERO_HEADLINE_DELAY = 0.5; /*  */
 
 function HeroDesktopScene({
