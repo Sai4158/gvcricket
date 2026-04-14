@@ -134,9 +134,13 @@ export default function HowItWorksSection() {
             {...featureGridProps}
             className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4 xl:gap-4 2xl:grid-cols-12 2xl:gap-5"
           >
-            {featureCards.map((card, index) => (
+            {featureCards.map((card, index) =>
               useDesktopLiteMotion ? (
-                <FeatureCardDesktop key={card.title} card={card} index={index} />
+                <FeatureCardDesktop
+                  key={card.title}
+                  card={card}
+                  index={index}
+                />
               ) : (
                 <FeatureCard
                   key={card.title}
@@ -145,8 +149,8 @@ export default function HowItWorksSection() {
                   prefersReducedMotion={shouldReduceMotion}
                   useFlatLaptopMotion={useFlatLaptopMotion}
                 />
-              )
-            ))}
+              ),
+            )}
           </FeatureGridTag>
         </FeaturePanelTag>
 
@@ -184,10 +188,14 @@ export default function HowItWorksSection() {
               />
             )}
             <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-white/72 md:hidden">
-              GV Cricket lets one person scoresek live while everyone else can watch, hear updates, and follow the match in real time.
+              GV Cricket lets you run the match live while others can watch,
+              hear updates, and follow every moment in real time.
             </p>
             <p className="mx-auto mt-4 hidden max-w-xl text-sm leading-6 text-white/72 md:block md:text-base">
-              GV Cricket is a mobile-first live scoring app for local cricket matches. One person updates the game, everyone else can watch it live, and the app can speak updates, play audio, and keep the match organized from start to finish.
+              GV Cricket is a mobile-first live scoring platform built for end
+              to end cricket scoring. Run the game, everyone else can watch it
+              live, and the app can speak updates, power audio, and keep the
+              full match experience moving from first ball to final result.
             </p>
           </div>
 
@@ -195,9 +203,13 @@ export default function HowItWorksSection() {
             {...journeyGridProps}
             className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3 xl:gap-4 2xl:grid-cols-12 2xl:gap-5"
           >
-            {journeyCards.map((card, index) => (
+            {journeyCards.map((card, index) =>
               useDesktopLiteMotion ? (
-                <JourneyCardDesktop key={card.title} card={card} index={index} />
+                <JourneyCardDesktop
+                  key={card.title}
+                  card={card}
+                  index={index}
+                />
               ) : (
                 <JourneyCard
                   key={card.title}
@@ -206,13 +218,11 @@ export default function HowItWorksSection() {
                   prefersReducedMotion={shouldReduceMotion}
                   useFlatLaptopMotion={useFlatLaptopMotion}
                 />
-              )
-            ))}
+              ),
+            )}
           </JourneyGridTag>
         </JourneyPanelTag>
       </div>
     </AnimatedSection>
   );
 }
-
-

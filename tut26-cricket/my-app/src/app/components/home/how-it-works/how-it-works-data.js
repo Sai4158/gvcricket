@@ -16,7 +16,7 @@ export const featureCards = [
   },
   {
     title: "Loudspeaker",
-    copy: "Turn one phone into a quick PA mic for score calls and ground updates. It works well for small grounds, local tournaments, and indoor screens.",
+    copy: "Turn one phone into a quick PA mic for score calls and ground updates. It works well for tournaments, match venues, and indoor screens.",
     accent: "amber",
     previewType: "loudspeaker",
   },
@@ -61,7 +61,7 @@ export const featureCards = [
 export const journeyCards = [
   {
     title: "Create Teams And Session",
-    copy: "Create the match, add two teams, and start from one clean setup screen. The setup stays simple even for someone running a local game quickly.",
+    copy: "Create the match, add two teams, and start from one clean setup screen. The setup stays simple even for someone running a full match quickly.",
     accent: "rose",
     previewType: "teams",
   },
@@ -116,24 +116,114 @@ export const journeyCards = [
 ];
 
 export const miniCelebrationConfetti = [
-  { left: "8%", delay: "0.1s", duration: "4.3s", rotate: "12deg", color: "#facc15" },
-  { left: "18%", delay: "0.5s", duration: "4.9s", rotate: "-16deg", color: "#fde68a" },
-  { left: "31%", delay: "0.2s", duration: "4.5s", rotate: "18deg", color: "#ffffff" },
-  { left: "46%", delay: "0.7s", duration: "5.1s", rotate: "-10deg", color: "#f59e0b" },
-  { left: "61%", delay: "0.35s", duration: "4.6s", rotate: "15deg", color: "#facc15" },
-  { left: "75%", delay: "0.8s", duration: "5.3s", rotate: "-14deg", color: "#fde68a" },
-  { left: "88%", delay: "0.45s", duration: "4.8s", rotate: "11deg", color: "#ffffff" },
+  {
+    left: "8%",
+    delay: "0.1s",
+    duration: "4.3s",
+    rotate: "12deg",
+    color: "#facc15",
+  },
+  {
+    left: "18%",
+    delay: "0.5s",
+    duration: "4.9s",
+    rotate: "-16deg",
+    color: "#fde68a",
+  },
+  {
+    left: "31%",
+    delay: "0.2s",
+    duration: "4.5s",
+    rotate: "18deg",
+    color: "#ffffff",
+  },
+  {
+    left: "46%",
+    delay: "0.7s",
+    duration: "5.1s",
+    rotate: "-10deg",
+    color: "#f59e0b",
+  },
+  {
+    left: "61%",
+    delay: "0.35s",
+    duration: "4.6s",
+    rotate: "15deg",
+    color: "#facc15",
+  },
+  {
+    left: "75%",
+    delay: "0.8s",
+    duration: "5.3s",
+    rotate: "-14deg",
+    color: "#fde68a",
+  },
+  {
+    left: "88%",
+    delay: "0.45s",
+    duration: "4.8s",
+    rotate: "11deg",
+    color: "#ffffff",
+  },
 ];
 
 export const animatedUmpireFrames = [
-  { target: "39", score: "20/0", overs: "2.1", oversLeft: "(23)", activeAction: "Dot" },
-  { target: "39", score: "21/0", overs: "2.2", oversLeft: "(22)", activeAction: "1" },
-  { target: "39", score: "23/0", overs: "2.3", oversLeft: "(21)", activeAction: "2" },
-  { target: "39", score: "26/0", overs: "2.4", oversLeft: "(20)", activeAction: "3" },
-  { target: "39", score: "30/0", overs: "2.5", oversLeft: "(19)", activeAction: "4" },
-  { target: "39", score: "31/0", overs: "2.5", oversLeft: "(19)", activeAction: "Wide" },
-  { target: "39", score: "37/0", overs: "2.6", oversLeft: "(18)", activeAction: "6" },
-  { target: "39", score: "37/1", overs: "3.0", oversLeft: "(18)", activeAction: "OUT" },
+  {
+    target: "39",
+    score: "20/0",
+    overs: "2.1",
+    oversLeft: "(23)",
+    activeAction: "Dot",
+  },
+  {
+    target: "39",
+    score: "21/0",
+    overs: "2.2",
+    oversLeft: "(22)",
+    activeAction: "1",
+  },
+  {
+    target: "39",
+    score: "23/0",
+    overs: "2.3",
+    oversLeft: "(21)",
+    activeAction: "2",
+  },
+  {
+    target: "39",
+    score: "26/0",
+    overs: "2.4",
+    oversLeft: "(20)",
+    activeAction: "3",
+  },
+  {
+    target: "39",
+    score: "30/0",
+    overs: "2.5",
+    oversLeft: "(19)",
+    activeAction: "4",
+  },
+  {
+    target: "39",
+    score: "31/0",
+    overs: "2.5",
+    oversLeft: "(19)",
+    activeAction: "Wide",
+  },
+  {
+    target: "39",
+    score: "37/0",
+    overs: "2.6",
+    oversLeft: "(18)",
+    activeAction: "6",
+  },
+  {
+    target: "39",
+    score: "37/1",
+    overs: "3.0",
+    oversLeft: "(18)",
+    activeAction: "OUT",
+  },
 ];
 
 export const animatedHistoryFrames = [
@@ -149,7 +239,11 @@ export const animatedHistoryFrames = [
   },
   {
     scoreLine: "Team A 54/3",
-    balls: [{ label: "1" }, { label: "4", tone: "amber" }, { label: "Wd", tone: "amber" }],
+    balls: [
+      { label: "1" },
+      { label: "4", tone: "amber" },
+      { label: "Wd", tone: "amber" },
+    ],
     note: "Ball 3 added",
   },
   {
@@ -189,13 +283,28 @@ export const animatedHistoryFrames = [
 
 export const animatedSpectatorFrames = [
   { target: "45", need: "44", runs: "1", balls: [{ label: "1" }] },
-  { target: "45", need: "43", runs: "2", balls: [{ label: "1" }, { label: "1" }] },
-  { target: "45", need: "42", runs: "3", balls: [{ label: "1" }, { label: "1" }, { label: "1" }] },
+  {
+    target: "45",
+    need: "43",
+    runs: "2",
+    balls: [{ label: "1" }, { label: "1" }],
+  },
+  {
+    target: "45",
+    need: "42",
+    runs: "3",
+    balls: [{ label: "1" }, { label: "1" }, { label: "1" }],
+  },
   {
     target: "45",
     need: "38",
     runs: "7",
-    balls: [{ label: "1" }, { label: "1" }, { label: "1" }, { label: "4", tone: "amber" }],
+    balls: [
+      { label: "1" },
+      { label: "1" },
+      { label: "1" },
+      { label: "4", tone: "amber" },
+    ],
   },
   {
     target: "45",
@@ -256,40 +365,101 @@ export const animatedTeamsFrames = [
 ];
 
 export const animatedLoudspeakerFrames = [
-  { status: "Armed for hold to talk.", footer: "Ready for next call", live: false },
+  {
+    status: "Armed for hold to talk.",
+    footer: "Ready for next call",
+    live: false,
+  },
   { status: "Score call is live.", footer: "PA mic active", live: true },
-  { status: "Ground update in progress.", footer: "Voice is reaching speakers", live: true },
-  { status: "Mic is back on standby.", footer: "Ready for the next call", live: false },
+  {
+    status: "Ground update in progress.",
+    footer: "Voice is reaching speakers",
+    live: true,
+  },
+  {
+    status: "Mic is back on standby.",
+    footer: "Ready for the next call",
+    live: false,
+  },
 ];
 
 export const animatedWalkieFeatureFrames = [
-  { speaker: "Umpire live", note: "Director listening", badges: ["Umpire", "Director", "Spectators"] },
-  { speaker: "Director live", note: "Umpire ready to reply", badges: ["Director", "Umpire", "Spectators"] },
-  { speaker: "Spectator request", note: "Umpire can answer fast", badges: ["Spectators", "Umpire", "Director"] },
+  {
+    speaker: "Umpire live",
+    note: "Director listening",
+    badges: ["Umpire", "Director", "Spectators"],
+  },
+  {
+    speaker: "Director live",
+    note: "Umpire ready to reply",
+    badges: ["Director", "Umpire", "Spectators"],
+  },
+  {
+    speaker: "Spectator request",
+    note: "Umpire can answer fast",
+    badges: ["Spectators", "Umpire", "Director"],
+  },
 ];
 
 export const animatedAnnouncerFrames = [
-  { score: "Team B 52 for 3 after 8.2 overs.", queue: "Next update is queued." },
+  {
+    score: "Team B 52 for 3 after 8.2 overs.",
+    queue: "Next update is queued.",
+  },
   { score: "Team B 56 for 3 after 8.4 overs.", queue: "Boundary call ready." },
   { score: "Target 45. Team B needs 37.", queue: "Chase update queued." },
 ];
 
 export const animatedShareFrames = [
-  { url: "gvcricket.live/session/friday-finals", activeDevice: "Phone", note: "Share opens fast" },
-  { url: "gvcricket.live/session/friday-finals", activeDevice: "Tablet", note: "Works on larger screens" },
-  { url: "gvcricket.live/session/friday-finals", activeDevice: "Big Screen", note: "Good for score display" },
+  {
+    url: "gvcricket.live/session/friday-finals",
+    activeDevice: "Phone",
+    note: "Share opens fast",
+  },
+  {
+    url: "gvcricket.live/session/friday-finals",
+    activeDevice: "Tablet",
+    note: "Works on larger screens",
+  },
+  {
+    url: "gvcricket.live/session/friday-finals",
+    activeDevice: "Big Screen",
+    note: "Good for score display",
+  },
 ];
 
 export const animatedCoverFrames = [
   { label: "Live", tone: "rose", note: "Shown on the live match page." },
   { label: "Spectator", tone: "cyan", note: "Carries into the viewer page." },
-  { label: "Result", tone: "amber", note: "Still looks right on the final card." },
+  {
+    label: "Result",
+    tone: "amber",
+    note: "Still looks right on the final card.",
+  },
 ];
 
 export const animatedInsightsFrames = [
-  { winner: "Team A won", detail: "Won by 7 wickets", score: "44/4", overs: "4.0", rr: "11.00" },
-  { winner: "Team B won", detail: "Won by 12 runs", score: "61/5", overs: "6.0", rr: "10.16" },
-  { winner: "Team A won", detail: "Won by 2 wickets", score: "39/4", overs: "5.4", rr: "6.88" },
+  {
+    winner: "Team A won",
+    detail: "Won by 7 wickets",
+    score: "44/4",
+    overs: "4.0",
+    rr: "11.00",
+  },
+  {
+    winner: "Team B won",
+    detail: "Won by 12 runs",
+    score: "61/5",
+    overs: "6.0",
+    rr: "10.16",
+  },
+  {
+    winner: "Team A won",
+    detail: "Won by 2 wickets",
+    score: "39/4",
+    overs: "5.4",
+    rr: "6.88",
+  },
 ];
 
 export const animatedDirectorFrames = [
@@ -314,14 +484,41 @@ export const animatedLiveBannerFrames = [
 ];
 
 export const animatedJourneyWalkieFrames = [
-  { title: "Walkie live", note: "Umpire speaking now.", counts: [["Umpire", "live"], ["Director", "ready"], ["Spectators", "2 joined"]] },
-  { title: "Director reply", note: "Director speaking back.", counts: [["Umpire", "ready"], ["Director", "live"], ["Spectators", "2 joined"]] },
-  { title: "Walkie live", note: "Spectators can still listen.", counts: [["Umpire", "ready"], ["Director", "ready"], ["Spectators", "3 joined"]] },
+  {
+    title: "Walkie live",
+    note: "Umpire speaking now.",
+    counts: [
+      ["Umpire", "live"],
+      ["Director", "ready"],
+      ["Spectators", "2 joined"],
+    ],
+  },
+  {
+    title: "Director reply",
+    note: "Director speaking back.",
+    counts: [
+      ["Umpire", "ready"],
+      ["Director", "live"],
+      ["Spectators", "2 joined"],
+    ],
+  },
+  {
+    title: "Walkie live",
+    note: "Spectators can still listen.",
+    counts: [
+      ["Umpire", "ready"],
+      ["Director", "ready"],
+      ["Spectators", "3 joined"],
+    ],
+  },
 ];
 
 export const animatedJourneyAudioFrames = [
   { call: "Team A 52 for 3 after 8.2 overs.", sub: "Score call queued." },
-  { call: "Four runs. Team A moves to 56 for 3.", sub: "Boundary update ready." },
+  {
+    call: "Four runs. Team A moves to 56 for 3.",
+    sub: "Boundary update ready.",
+  },
   { call: "Target 45. Team B needs 37.", sub: "Chase update ready." },
 ];
 
@@ -330,6 +527,3 @@ export const animatedAccessFrames = [
   { pin: "• • - -", status: "PIN checking" },
   { pin: "• • • •", status: "Access granted" },
 ];
-
-
-

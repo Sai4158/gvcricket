@@ -108,7 +108,7 @@ export default function CommunityHighlightsSection() {
           }`}
         >
           GV Cricket started in 2022 within this cricket community and was built
-          to make complex local scoring simple. Today, the app is used by 1,000+
+          to make live scoring feel bigger, cleaner, and simpler. Today, the app is used by 1,000+
           monthly users.
         </p>
       ) : (
@@ -128,7 +128,7 @@ export default function CommunityHighlightsSection() {
           className="text-lg text-white/78 leading-relaxed text-center max-w-3xl mx-auto -mt-8 mb-16"
         >
           GV Cricket started in 2022 within this cricket community and was built
-          to make complex local scoring simple. Today, the app is used by 1,000+
+          to make live scoring feel bigger, cleaner, and simpler. Today, the app is used by 1,000+
           monthly users.
         </motion.p>
       )}
