@@ -320,13 +320,13 @@ export default function MatchPageLayout({
             onMic={() => setModal({ type: "mic" })}
             onShare={handleCopyShareLink}
             onWalkiePressStart={undefined}
-            onWalkieHoldStart={canGridHoldWalkie ? handleWalkieHoldStart : undefined}
-            onWalkieHoldEnd={canGridHoldWalkie ? () => walkie.stopTalking() : undefined}
+            onWalkieHoldStart={undefined}
+            onWalkieHoldEnd={undefined}
             onMicHoldStart={canGridHoldMic ? handleMicHoldStart : undefined}
             onMicHoldEnd={canGridHoldMic ? handleMicHoldEnd : undefined}
             onPressFeedback={handleUmpirePressFeedback}
             showLiveControls={Boolean(isLiveMatch)}
-            canHoldWalkie={canGridHoldWalkie}
+            canHoldWalkie={false}
             canHoldMic={canGridHoldMic}
             isWalkieActive={Boolean(walkie.snapshot?.enabled)}
             isWalkieTalking={Boolean(walkie.isSelfTalking)}

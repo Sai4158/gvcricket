@@ -613,11 +613,7 @@ export default function MatchActionGrid({
                   ? "Connecting"
                   : isWalkieFinishing
                   ? "Connected"
-                  : isWalkieActive && canHoldWalkie
-                  ? "Hold to talk"
-                  : isWalkieActive
-                  ? "Open panel"
-                  : ""
+                  : "Open panel"
               }
               statusClass={
                 isWalkieTalking
@@ -628,11 +624,8 @@ export default function MatchActionGrid({
                   ? "text-sky-100"
                   : isWalkieFinishing
                   ? "text-emerald-100"
-                  : isWalkieActive && canHoldWalkie
-                  ? "text-emerald-200"
                   : "text-zinc-400"
               }
-              holdStatusText={canHoldWalkie ? "Trying" : ""}
             />
           ) : null}
           <ActionIconButton
@@ -791,7 +784,8 @@ export default function MatchActionGrid({
                     icon={<WalkieIcon />}
                     title="Walkie-Talkie"
                     description={[
-                      "Open the panel, then hold to talk live when the channel is ready.",
+                      "Tap the icon to open the walkie panel.",
+                      "Once the panel is open, you can hold to talk when the channel is ready.",
                       "Only one person can speak at a time, so live and busy states stay clear.",
                       "Works live with umpire, director, and spectators.",
                     ]}
