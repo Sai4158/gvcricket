@@ -284,6 +284,7 @@ export default function SessionsPageClient({
   const secretHoldTimerRef = useRef(null);
   const suppressCardOpenUntilRef = useRef(0);
   const didInitialFreshReloadRef = useRef(false);
+  const hasHandledInitialPageScrollRef = useRef(false);
 
   const setSecretHoldSelectionLock = useCallback((locked) => {
     if (typeof document === "undefined") {
@@ -411,6 +412,22 @@ export default function SessionsPageClient({
     () => sessions.filter((session) => selectedSessionIds.includes(session._id)),
     [selectedSessionIds, sessions]
   );
+
+  useEffect(() => {
+    if (!hasHandledInitialPageScrollRef.current) {
+      hasHandledInitialPageScrollRef.current = true;
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }, [currentPage]);
   const selectedSessionForManage =
     selectedSessions.length === 1 ? selectedSessions[0] : null;
   const normalizedManageForm = useMemo(
