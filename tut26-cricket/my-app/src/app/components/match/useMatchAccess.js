@@ -242,6 +242,10 @@ export default function useMatchAccess(matchId, initialAuthStatus = "checking") 
         const body = await response
           .json()
           .catch(() => ({ message: "Incorrect PIN." }));
+        if (body?.redirectTo && typeof window !== "undefined") {
+          window.location.assign(body.redirectTo);
+          return;
+        }
         throw buildPinRequestError(response, body, "Incorrect PIN.");
       }
 

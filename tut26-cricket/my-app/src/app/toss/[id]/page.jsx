@@ -28,6 +28,10 @@ export default async function TossPage({ params }) {
     notFound();
   }
 
+  if (initialMatch && String(initialMatch.result || "").trim() && !initialMatch.isOngoing) {
+    redirect(`/result/${actualMatchId || id}`);
+  }
+
   if (
     hasCreatedMatch &&
     initialMatch &&

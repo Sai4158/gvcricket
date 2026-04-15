@@ -189,6 +189,9 @@ export function buildPinRequestError(
 
   error.retryAfterMs = retryAfterMs;
   error.status = Number(response?.status || 0);
+  error.redirectTo =
+    typeof payload?.redirectTo === "string" ? payload.redirectTo : "";
+  error.matchCompleted = Boolean(payload?.matchCompleted);
 
   return error;
 }

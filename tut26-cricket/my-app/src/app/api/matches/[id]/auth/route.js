@@ -33,7 +33,7 @@ import Session from "../../../../../models/Session";
 async function loadMatchAccessState(matchId) {
   await connectDB();
   const match = await Match.findById(matchId).select(
-    "_id adminAccessVersion teamA teamB teamAName teamBName sessionId tossWinner tossDecision innings1 innings2"
+    "_id adminAccessVersion teamA teamB teamAName teamBName sessionId tossWinner tossDecision innings1 innings2 isOngoing result"
   );
 
   if (!match) {
@@ -62,6 +62,34 @@ async function loadMatchAccessState(matchId) {
   return match;
 }
 
+function isMatchCompleted(match) {
+  return Boolean(String(match?.result || "").trim()) && !Boolean(match?.isOngoing);
+}
+
+function buildCompletedMatchAuthResponse(matchId, status = 409) {
+  const response = NextResponse.json(
+    {
+      authorized: false,
+      matchCompleted: true,
+      redirectTo: `/result/${matchId}`,
+      message: "This match is complete. Opening the result page instead.",
+    },
+    {
+      status,
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    }
+  );
+  const clearedCookie = getClearedMatchAccessCookie(matchId);
+  response.cookies.set(
+    clearedCookie.name,
+    clearedCookie.value,
+    clearedCookie.options
+  );
+  return response;
+}
+
 async function hasAuthorizedCookie(matchId, accessVersion) {
   const cookieStore = await cookies();
   const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
@@ -75,6 +103,10 @@ export async function GET(_req, { params }) {
 
   if (!match) {
     return jsonError("Match not found.", 404);
+  }
+
+  if (isMatchCompleted(match)) {
+    return buildCompletedMatchAuthResponse(id, 200);
   }
 
   const authorized = await hasAuthorizedCookie(id, match.adminAccessVersion || 1);
@@ -148,6 +180,19 @@ export async function POST(req, { params }) {
   const match = await loadMatchAccessState(id);
   if (!match) {
     return jsonError("Match not found.", 404);
+  }
+
+  if (isMatchCompleted(match)) {
+    await writeAuditLog({
+      action: "umpire_auth_completed_match_denied",
+      targetType: "match",
+      targetId: id,
+      status: "failure",
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    });
+
+    return buildCompletedMatchAuthResponse(id);
   }
 
   if (!isValidUmpirePin(parsedRequest.value.pin)) {

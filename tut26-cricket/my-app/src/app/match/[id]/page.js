@@ -9,7 +9,7 @@
 
 import MatchPageClient from "../../components/match/MatchPageClient";
 import { absoluteUrl, siteConfig } from "../../lib/site-metadata";
-import { loadMatchAccessData } from "../../lib/server-data";
+import { loadMatchAccessData, loadPublicMatchData } from "../../lib/server-data";
 import { notFound, redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +46,16 @@ export const metadata = {
 
 export default async function MatchPage({ params }) {
   const { id } = await params;
+  const publicMatch = await loadPublicMatchData(id);
+
+  if (!publicMatch) {
+    notFound();
+  }
+
+  if (String(publicMatch.result || "").trim() && !publicMatch.isOngoing) {
+    redirect(`/result/${id}`);
+  }
+
   const { found, authStatus, match } = await loadMatchAccessData(id);
 
   if (!found) {

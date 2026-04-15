@@ -51,6 +51,10 @@ const MUTABLE_ACTION_KEYS = [
   "actionHistory",
 ];
 
+function isMatchCompleted(match) {
+  return Boolean(String(match?.result || "").trim()) && !Boolean(match?.isOngoing);
+}
+
 async function hasMatchAccess(matchId, accessVersion) {
   const cookieStore = await cookies();
   const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
@@ -91,6 +95,20 @@ export async function POST(req, { params }) {
       });
 
       return jsonError("Umpire access required.", 403);
+    }
+
+    if (isMatchCompleted(match)) {
+      await writeAuditLog({
+        action: "match_action_completed_denied",
+        targetType: "match",
+        targetId: id,
+        status: "failure",
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        metadata: { type: parsedRequest.value.type },
+      });
+
+      return jsonError("This match is complete. Open the result page instead.", 409);
     }
 
     const fallbackSession = match.sessionId

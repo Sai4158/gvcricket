@@ -38,6 +38,10 @@ import Session from "../../../../models/Session";
 const FALLBACK_SESSION_FIELDS =
   "tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy updatedAt";
 
+function isMatchCompleted(match) {
+  return Boolean(String(match?.result || "").trim()) && !Boolean(match?.isOngoing);
+}
+
 async function hasMatchAccess(matchId, accessVersion) {
   const cookieStore = await cookies();
   const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
@@ -149,6 +153,19 @@ export async function PATCH(req, { params }) {
       });
 
       return jsonError("Umpire access required.", 403);
+    }
+
+    if (isMatchCompleted(match)) {
+      await writeAuditLog({
+        action: "match_patch_completed_denied",
+        targetType: "match",
+        targetId: id,
+        status: "failure",
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+      });
+
+      return jsonError("This match is complete. Open the result page instead.", 409);
     }
 
     const fallbackSession = match.sessionId
