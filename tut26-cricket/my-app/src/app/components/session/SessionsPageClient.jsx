@@ -965,7 +965,13 @@ export default function SessionsPageClient({
       if (!response.ok) {
         const payload = await response
           .json()
-          .catch(() => ({ message: "Incorrect PIN." }));
+          .catch(() => ({ message: "Incorrect PIN.", redirectTo: "" }));
+        if (payload?.redirectTo) {
+          startNavigation("Opening result...");
+          router.push(payload.redirectTo);
+          setPinPrompt(null);
+          return;
+        }
         throw buildPinRequestError(response, payload, "Incorrect PIN.");
       }
 
