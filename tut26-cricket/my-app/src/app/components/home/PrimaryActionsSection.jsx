@@ -106,39 +106,41 @@ function DesktopLiteActionCard({
       primeAudioOnClick={primeAudioOnClick}
       className="block"
     >
-      <div
-        ref={revealRef}
-        className={`group home-desktop-lite-card home-desktop-reveal home-desktop-reveal-card rounded-[30px] p-5 text-left transition duration-300 hover:border-white/28 ${
-          isVisible ? "is-visible" : ""
-        }`}
-        style={{ "--home-reveal-delay": delay }}
-      >
-        <div className={`absolute inset-0 opacity-90 ${accentClassName}`} />
-        <div className="pointer-events-none absolute right-5 top-5 z-1 text-white/44 drop-shadow-[0_4px_12px_rgba(255,255,255,0.08)] transition duration-300 group-hover:text-white/56">
-          {heroIcon}
-        </div>
-        <div className="relative z-10 flex h-full min-h-38 flex-col justify-between gap-6">
-          <div className="space-y-4">
-            <div className="liquid-icon inline-flex h-11 w-11 items-center justify-center rounded-2xl text-white transition-transform duration-300 group-hover:-translate-y-0.5">
-              {icon}
+      {({ pending, spinner }) => (
+        <div
+          ref={revealRef}
+          className={`group home-desktop-lite-card home-desktop-reveal home-desktop-reveal-card rounded-[30px] p-5 text-left transition duration-300 hover:border-white/28 ${
+            isVisible ? "is-visible" : ""
+          }`}
+          style={{ "--home-reveal-delay": delay }}
+        >
+          <div className={`absolute inset-0 opacity-90 ${accentClassName}`} />
+          <div className="pointer-events-none absolute right-5 top-5 z-1 text-white/44 drop-shadow-[0_4px_12px_rgba(255,255,255,0.08)] transition duration-300 group-hover:text-white/56">
+            {heroIcon}
+          </div>
+          <div className="relative z-10 flex h-full min-h-38 flex-col justify-between gap-6">
+            <div className="space-y-4">
+              <div className="liquid-icon inline-flex h-11 w-11 items-center justify-center rounded-2xl text-white transition-transform duration-300 group-hover:-translate-y-0.5">
+                {icon}
+              </div>
+              <h3 className="max-w-56 text-[24px] font-semibold leading-[1.04] tracking-tight text-white">
+                {title}
+              </h3>
+              <p className="max-w-[16rem] text-sm leading-6 text-white/78">
+                {description}
+              </p>
             </div>
-            <h3 className="max-w-56 text-[24px] font-semibold leading-[1.04] tracking-tight text-white">
-              {title}
-            </h3>
-            <p className="max-w-[16rem] text-sm leading-6 text-white/78">
-              {description}
-            </p>
-          </div>
-          <div className="flex items-center justify-end gap-3 border-t border-white/10 pt-4">
-            <span className="text-sm font-medium text-white/88">
-              {actionLabel}
-            </span>
-            <span className="liquid-pill inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition duration-300 group-hover:translate-x-0.5 group-hover:border-white/30">
-              <FaArrowRight />
-            </span>
+            <div className="flex items-center justify-end gap-3 border-t border-white/10 pt-4">
+              <span className="text-sm font-medium text-white/88">
+                {actionLabel}
+              </span>
+              <span className="liquid-pill inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition duration-300 group-hover:translate-x-0.5 group-hover:border-white/30">
+                {pending ? spinner : <FaArrowRight />}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </PendingLink>
   );
 }
@@ -151,46 +153,48 @@ function DesktopLiteDirectorCard({ revealRef, isVisible, delay }) {
       pendingClassName="pending-shimmer"
       className="block w-full max-w-3xl xl:max-w-6xl 2xl:max-w-7xl"
     >
-      <div
-        ref={revealRef}
-        className={`group home-desktop-lite-card home-desktop-reveal home-desktop-reveal-sm home-desktop-card-sequence flex w-full items-center gap-4 rounded-[28px] px-6 py-5 text-left transition duration-300 hover:border-white/28 sm:gap-5 ${
-          isVisible ? "is-visible" : ""
-        }`}
-        style={{ "--home-reveal-delay": delay }}
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.06),transparent_28%)]" />
-        <div className="relative z-10 flex min-w-0 flex-1 items-center gap-4 sm:gap-5">
-          <span className="liquid-icon inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-lg text-emerald-50 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-[1.04]">
-            <FaBroadcastTower />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[1.15rem] font-semibold tracking-tight text-white">
-              Director mode
+      {({ pending, spinner }) => (
+        <div
+          ref={revealRef}
+          className={`group home-desktop-lite-card home-desktop-reveal home-desktop-reveal-sm home-desktop-card-sequence flex w-full items-center gap-4 rounded-[28px] px-6 py-5 text-left transition duration-300 hover:border-white/28 sm:gap-5 ${
+            isVisible ? "is-visible" : ""
+          }`}
+          style={{ "--home-reveal-delay": delay }}
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.06),transparent_28%)]" />
+          <div className="relative z-10 flex min-w-0 flex-1 items-center gap-4 sm:gap-5">
+            <span className="liquid-icon inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-lg text-emerald-50 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-[1.04]">
+              <FaBroadcastTower />
             </span>
-            <span className="mt-1 block max-w-120 text-sm leading-6 text-white/76">
-              Control mic, music, sound effects, and walkie from one simple
-              phone console.
+            <span className="min-w-0 flex-1">
+              <span className="block text-[1.15rem] font-semibold tracking-tight text-white">
+                Director mode
+              </span>
+              <span className="mt-1 block max-w-120 text-sm leading-6 text-white/76">
+                Control mic, music, sound effects, and walkie from one simple
+                phone console.
+              </span>
+              <span className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-red-400/28 bg-red-500/14 text-[15px] text-red-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_24px_rgba(239,68,68,0.12)]">
+                  <FaYoutube />
+                </span>
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-300/20 bg-emerald-400/10 text-[14px] text-emerald-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                  <FaMicrophoneAlt />
+                </span>
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-amber-300/20 bg-amber-300/10 text-[14px] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                  <FaVolumeUp />
+                </span>
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-sky-300/20 bg-sky-400/10 text-[14px] text-sky-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                  <FaSlidersH />
+                </span>
+              </span>
             </span>
-            <span className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-red-400/28 bg-red-500/14 text-[15px] text-red-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_24px_rgba(239,68,68,0.12)]">
-                <FaYoutube />
-              </span>
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-300/20 bg-emerald-400/10 text-[14px] text-emerald-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-                <FaMicrophoneAlt />
-              </span>
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-amber-300/20 bg-amber-300/10 text-[14px] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-                <FaVolumeUp />
-              </span>
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-sky-300/20 bg-sky-400/10 text-[14px] text-sky-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-                <FaSlidersH />
-              </span>
-            </span>
+          </div>
+          <span className="relative z-10 liquid-pill inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-emerald-50 transition-transform duration-300 group-hover:translate-x-1">
+            {pending ? spinner : <FaArrowRight />}
           </span>
         </div>
-        <span className="relative z-10 liquid-pill inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-emerald-50 transition-transform duration-300 group-hover:translate-x-1">
-          <FaArrowRight />
-        </span>
-      </div>
+      )}
     </PendingLink>
   );
 }
@@ -361,6 +365,7 @@ export default function PrimaryActionsSection() {
           pendingClassName="pending-shimmer"
           className="block"
         >
+          {({ pending, spinner }) => (
           <motion.div
             ref={useDesktopLiteMotion ? startCardReveal.ref : undefined}
             custom={0}
@@ -458,11 +463,14 @@ export default function PrimaryActionsSection() {
                   }
                   className="liquid-pill inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition duration-300 group-hover:border-white/30"
                 >
-                  <FaArrowRight className="transition-transform duration-300 group-hover:translate-x-0.5" />
+                  {pending ? spinner : (
+                    <FaArrowRight className="transition-transform duration-300 group-hover:translate-x-0.5" />
+                  )}
                 </motion.span>
               </motion.div>
             </motion.div>
           </motion.div>
+          )}
         </PendingLink>
 
         <PendingLink
@@ -472,6 +480,7 @@ export default function PrimaryActionsSection() {
           primeAudioOnClick
           className="block"
         >
+          {({ pending, spinner }) => (
           <motion.div
             ref={useDesktopLiteMotion ? sessionsCardReveal.ref : undefined}
             custom={1}
@@ -569,11 +578,14 @@ export default function PrimaryActionsSection() {
                   }
                   className="liquid-pill inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition duration-300 group-hover:border-white/30"
                 >
-                  <FaArrowRight className="transition-transform duration-300 group-hover:translate-x-0.5" />
+                  {pending ? spinner : (
+                    <FaArrowRight className="transition-transform duration-300 group-hover:translate-x-0.5" />
+                  )}
                 </motion.span>
               </motion.div>
             </motion.div>
           </motion.div>
+          )}
         </PendingLink>
       </motion.div>
 
@@ -583,6 +595,7 @@ export default function PrimaryActionsSection() {
         pendingClassName="pending-shimmer"
         className="block w-full max-w-3xl xl:max-w-6xl 2xl:max-w-7xl"
       >
+        {({ pending, spinner }) => (
         <motion.div
           ref={useDesktopLiteMotion ? directorReveal.ref : undefined}
           initial={shouldReduceMotion ? false : { opacity: 0 }}
@@ -676,11 +689,12 @@ export default function PrimaryActionsSection() {
                 ? undefined
                 : { duration: 7.8, repeat: Infinity, ease: "easeInOut" }
             }
-            className="relative z-10 liquid-pill inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-emerald-50 transition-transform duration-300 group-hover:translate-x-1"
+          className="relative z-10 liquid-pill inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-emerald-50 transition-transform duration-300 group-hover:translate-x-1"
           >
-            <FaArrowRight />
+            {pending ? spinner : <FaArrowRight />}
           </motion.span>
         </motion.div>
+        )}
       </PendingLink>
     </section>
   );
