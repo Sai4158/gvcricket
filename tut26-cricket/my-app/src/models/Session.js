@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Defines the Mongoose schema and model wiring for Session data.
+ * Main exports: default export.
+ * Major callers: Server loaders, API routes, and data helpers.
+ * Side effects: registers or reuses a Mongoose model.
+ * Read next: ./README.md
+ */
+
 import mongoose from "mongoose";
 
 const MatchImageEntrySchema = new mongoose.Schema(
@@ -49,10 +58,10 @@ const SessionSchema = new mongoose.Schema(
       enum: ["simple", "full", ""],
       default: "",
     },
-    announcerScoreSoundEffectsEnabled: { type: Boolean, default: true },
+    announcerScoreSoundEffectsEnabled: { type: Boolean, default: false },
     announcerBroadcastScoreSoundEffectsEnabled: {
       type: Boolean,
-      default: true,
+      default: false,
     },
     walkieTalkieEnabled: { type: Boolean, default: false },
     walkieTalkieUpdatedAt: { type: Date, default: null },
@@ -70,3 +79,5 @@ SessionSchema.index({ match: 1 });
 
 export default mongoose.models.Session ||
   mongoose.model("Session", SessionSchema);
+
+

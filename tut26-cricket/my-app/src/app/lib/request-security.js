@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Request Security logic for routes, APIs, and feature code.
+ * Main exports: getExpectedOrigin, isSameOriginRequest, enforceRequestSize, ensureSameOrigin, ensureJsonContentType, ensureMultipartContentType, formatZodError.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import { ZodError } from "zod";
 
 function getForwardedHost(request) {
@@ -163,3 +172,5 @@ export async function parseMultipartRequest(request, options = {}) {
   const formData = await request.formData();
   return { ok: true, value: formData };
 }
+
+

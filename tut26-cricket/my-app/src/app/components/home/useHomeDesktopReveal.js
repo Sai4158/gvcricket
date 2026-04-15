@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Encapsulates Home browser state, effects, and runtime coordination.
+ * Main exports: useHomeDesktopReveal.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import { useEffect, useRef, useState } from "react";
 
 const observerRegistry = new Map();
@@ -203,3 +212,5 @@ export default function useHomeDesktopReveal(
 
   return { ref, isVisible: !active || isVisible };
 }
+
+

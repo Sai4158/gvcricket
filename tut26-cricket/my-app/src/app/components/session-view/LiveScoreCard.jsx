@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Session View UI for the app's screens and flows.
+ * Main exports: LiveScoreCard.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import { countLegalBalls } from "../../lib/match-scoring";
 import { getBattingTeamBundle } from "../../lib/team-utils";
 
@@ -69,3 +78,5 @@ export default function LiveScoreCard({ match }) {
     </div>
   );
 }
+
+

@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Session View UI for the app's screens and flows.
+ * Main exports: SplashMsg.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import Link from "next/link";
 import LiquidLoader from "../shared/LiquidLoader";
 
@@ -17,3 +26,5 @@ export default function SplashMsg({ children, loading = false }) {
     </main>
   );
 }
+
+

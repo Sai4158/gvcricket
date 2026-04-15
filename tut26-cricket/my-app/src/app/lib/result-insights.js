@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Result Insights logic for routes, APIs, and feature code.
+ * Main exports: getBallDisplayLabel, buildInningsInsights, buildResultInsights.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import {
   calculateTrackedPlayerStats,
   hasTrackedPlayerStats,
@@ -267,3 +276,5 @@ export function buildResultInsights(match) {
     turningPoint,
   };
 }
+
+

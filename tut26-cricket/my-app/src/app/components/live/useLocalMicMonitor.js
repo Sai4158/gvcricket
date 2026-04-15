@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Encapsulates Live browser state, effects, and runtime coordination.
+ * Main exports: useLocalMicMonitor.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   duckPageMedia,
@@ -411,3 +421,5 @@ export default function useLocalMicMonitor() {
     setGainLevel,
   };
 }
+
+

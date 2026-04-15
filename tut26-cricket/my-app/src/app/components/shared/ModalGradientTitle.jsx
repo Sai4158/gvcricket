@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Shared UI for the app's screens and flows.
+ * Main exports: ModalGradientTitle.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import LiquidSportText from "../home/LiquidSportText";
 
 export default function ModalGradientTitle({
@@ -21,3 +30,5 @@ export default function ModalGradientTitle({
     />
   );
 }
+
+

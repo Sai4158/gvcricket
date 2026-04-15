@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Handles Api API requests for the app.
+ * Main exports: module side effects only.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: reads server request metadata.
+ * Read next: ../../../../../../docs/ONBOARDING.md
+ */
+
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { jsonError } from "../../../../lib/api-response";
@@ -172,31 +181,43 @@ export async function PATCH(req, { params }) {
       }
     );
 
-    await Match.findByIdAndUpdate(id, {
-      $set: {
-        announcer: {
-          ...(match.announcer && typeof match.announcer === "object"
-            ? match.announcer
-            : {}),
-          scoreSoundEffectMap: normalizedScoreSoundEffectMap,
+    await Match.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          announcer: {
+            ...(match.announcer && typeof match.announcer === "object"
+              ? match.announcer
+              : {}),
+            scoreSoundEffectMap: normalizedScoreSoundEffectMap,
+          },
         },
       },
-    });
+      {
+        timestamps: false,
+      }
+    );
 
     if (match.sessionId) {
       const session = await Session.findById(match.sessionId)
         .select("announcer")
         .lean();
-      await Session.findByIdAndUpdate(match.sessionId, {
-        $set: {
-          announcer: {
-            ...(session?.announcer && typeof session.announcer === "object"
-              ? session.announcer
-              : {}),
-            scoreSoundEffectMap: normalizedScoreSoundEffectMap,
+      await Session.findByIdAndUpdate(
+        match.sessionId,
+        {
+          $set: {
+            announcer: {
+              ...(session?.announcer && typeof session.announcer === "object"
+                ? session.announcer
+                : {}),
+              scoreSoundEffectMap: normalizedScoreSoundEffectMap,
+            },
           },
         },
-      });
+        {
+          timestamps: false,
+        }
+      );
     }
 
     await writeAuditLog({
@@ -227,3 +248,5 @@ export async function PATCH(req, { params }) {
     return jsonError("Could not save announcer settings.", 500);
   }
 }
+
+

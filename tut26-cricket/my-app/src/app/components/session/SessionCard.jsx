@@ -1,9 +1,18 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Session UI for the app's screens and flows.
+ * Main exports: default export.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import { memo, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  FaArrowUpRightFromSquare,
+  FaArrowRight,
   FaCheck,
   FaEye,
   FaLock,
@@ -20,11 +29,19 @@ import {
 } from "../shared/SafeMatchImage";
 import MatchImageCarousel from "../shared/MatchImageCarousel";
 import { primeUiAudio } from "../../lib/page-audio";
+import { getWinningInningsSummary } from "../../lib/match-result-display";
 
 function buildStatusMeta(session) {
   const isLive = Boolean(session.isLive);
   const hasSavedScore = Boolean(session.match);
-  const referenceDate = session.updatedAt || session.createdAt;
+  const parsedSessionDate = new Date(String(session.date || ""));
+  const hasValidSessionDate = !Number.isNaN(parsedSessionDate.getTime());
+  const completedReferenceDate = hasValidSessionDate
+    ? parsedSessionDate.toISOString()
+    : session.matchCreatedAt || session.createdAt || session.updatedAt;
+  const referenceDate = isLive
+    ? session.updatedAt || session.createdAt
+    : completedReferenceDate;
 
   if (isLive) {
     return {
@@ -107,6 +124,8 @@ function SessionCard({
       : "";
   const dateLabel = formatSessionDateLabel(session);
   const canOpenCard = Boolean(scoreHref);
+  const winningInningsSummary =
+    !isLive && session.result ? getWinningInningsSummary(session) : null;
   const hasScoreCard = Boolean(
     session.match &&
       (isLive ||
@@ -114,15 +133,24 @@ function SessionCard({
         Number(session.outs || 0) > 0 ||
         session.result)
   );
-  const displayScore = Number.isFinite(Number(session.score))
+  const displayScore = winningInningsSummary
+    ? winningInningsSummary.score
+    : Number.isFinite(Number(session.score))
     ? Number(session.score)
     : 0;
-  const displayOuts = Number.isFinite(Number(session.outs))
+  const displayOuts = winningInningsSummary
+    ? winningInningsSummary.wickets
+    : Number.isFinite(Number(session.outs))
     ? Number(session.outs)
     : 0;
-  const scoreMetaLabel = isLive ? "Runs" : "Final";
+  const scoreValue = winningInningsSummary
+    ? `${displayScore.toLocaleString()}/${displayOuts}`
+    : displayScore.toLocaleString();
+  const scoreMetaLabel = isLive ? "Runs" : winningInningsSummary ? "Winner" : "Final";
   const scoreDetailLabel =
-    displayOuts > 0
+    winningInningsSummary?.teamName
+      ? winningInningsSummary.teamName
+      : displayOuts > 0
       ? `${displayOuts} ${displayOuts === 1 ? "WKT" : "WKTS"}`
       : !isLive && session.result
       ? "RESULT"
@@ -280,13 +308,20 @@ function SessionCard({
             {hasScoreCard ? (
               <div className="pointer-events-none absolute right-0 top-[3.1rem] text-right">
                 <p className="text-[2.05rem] font-black leading-none tracking-tight text-amber-300 sm:text-[2.3rem]">
-                  {displayScore.toLocaleString()}
+                  {scoreValue}
                 </p>
                 <p className="mt-1 text-[0.92rem] font-black uppercase leading-none tracking-tight text-amber-300">
                   {scoreMetaLabel}
                 </p>
                 {scoreDetailLabel ? (
-                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-400">
+                  <p
+                    className={`mt-1 text-[10px] font-semibold text-zinc-400 ${
+                      winningInningsSummary?.teamName
+                        ? "normal-case tracking-[0.04em] text-zinc-300"
+                        : "uppercase tracking-[0.2em]"
+                    }`}
+                    title={winningInningsSummary?.teamName || undefined}
+                  >
                     {scoreDetailLabel}
                   </p>
                 ) : null}
@@ -448,8 +483,8 @@ function SessionCard({
             >
               {({ pending, spinner }) => (
                 <>
-                  {pending ? spinner : <FaArrowUpRightFromSquare />}
-                  <span>{pending ? "Opening..." : "See Final Score"}</span>
+                  <span>{pending ? "Opening..." : "View All Details"}</span>
+                  {pending ? spinner : <FaArrowRight />}
                 </>
               )}
             </PendingLink>
@@ -466,3 +501,5 @@ function SessionCard({
 }
 
 export default memo(SessionCard);
+
+

@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Home UI for the app's screens and flows.
+ * Main exports: CommunityHighlightsSection.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import { motion, useReducedMotion } from "framer-motion";
 import AnimatedSection from "./AnimatedSection";
 import LiquidSportText from "./LiquidSportText";
@@ -18,16 +27,20 @@ export default function CommunityHighlightsSection() {
   const prefersReducedMotion = useReducedMotion();
   const useDesktopLiteMotion = useHomeDesktopLiteMotion();
   const shouldReduceMotion = prefersReducedMotion || useDesktopLiteMotion;
-  const { ref: headingRevealRef, isVisible: isHeadingVisible } = useHomeDesktopReveal(useDesktopLiteMotion, {
-    threshold: 0.08,
-    rootMargin: "0px 0px -6% 0px",
-    resetOnExit: true,
-  });
-  const { ref: copyRevealRef, isVisible: isCopyVisible } = useHomeDesktopReveal(useDesktopLiteMotion, {
-    threshold: 0.08,
-    rootMargin: "0px 0px -6% 0px",
-    resetOnExit: true,
-  });
+  const { ref: headingRevealRef, isVisible: isHeadingVisible } =
+    useHomeDesktopReveal(useDesktopLiteMotion, {
+      threshold: 0.08,
+      rootMargin: "0px 0px -6% 0px",
+      resetOnExit: true,
+    });
+  const { ref: copyRevealRef, isVisible: isCopyVisible } = useHomeDesktopReveal(
+    useDesktopLiteMotion,
+    {
+      threshold: 0.08,
+      rootMargin: "0px 0px -6% 0px",
+      resetOnExit: true,
+    },
+  );
 
   return (
     <AnimatedSection
@@ -94,7 +107,9 @@ export default function CommunityHighlightsSection() {
             isCopyVisible ? "is-visible" : ""
           }`}
         >
-          GV Cricket started in 2022 with a few friends who loved the game. Today, it helps power a friendly league of more than 50 members who come together for fun, competitive cricket.
+          GV Cricket started in 2022 within this cricket community and was built
+          to make live scoring feel bigger, cleaner, and simpler. Today, the app is used by 1,000+
+          monthly users.
         </p>
       ) : (
         <motion.p
@@ -112,7 +127,9 @@ export default function CommunityHighlightsSection() {
           transition={{ duration: 0.6, delay: 0.04, ease: [0.22, 1, 0.36, 1] }}
           className="text-lg text-white/78 leading-relaxed text-center max-w-3xl mx-auto -mt-8 mb-16"
         >
-          GV Cricket started in 2022 with a few friends who loved the game. Today, it helps power a friendly league of more than 50 members who come together for fun, competitive cricket.
+          GV Cricket started in 2022 within this cricket community and was built
+          to make live scoring feel bigger, cleaner, and simpler. Today, the app is used by 1,000+
+          monthly users.
         </motion.p>
       )}
       <div

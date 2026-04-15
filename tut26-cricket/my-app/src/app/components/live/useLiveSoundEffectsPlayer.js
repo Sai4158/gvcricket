@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Encapsulates Live browser state, effects, and runtime coordination.
+ * Main exports: useLiveSoundEffectsPlayer.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getCachedAudioAssetUrl,
@@ -369,3 +379,5 @@ export default function useLiveSoundEffectsPlayer({
     stop,
   };
 }
+
+

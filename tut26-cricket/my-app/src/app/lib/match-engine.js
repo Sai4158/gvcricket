@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Match Engine logic for routes, APIs, and feature code.
+ * Main exports: isProcessedAction, applyMatchAction, applySafeMatchPatch, buildSessionMirrorUpdate, MatchEngineError.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import {
   addBallToHistory,
   buildWinByWicketsText,
@@ -466,12 +475,28 @@ export function applyMatchAction(matchDocument, action) {
 export function applySafeMatchPatch(matchDocument, patch) {
   const currentMatch = toPlainMatch(matchDocument);
   const nextMatch = toPlainMatch(matchDocument);
+  const currentTeamALength = Array.isArray(currentMatch.teamA)
+    ? currentMatch.teamA.length
+    : 0;
+  const currentTeamBLength = Array.isArray(currentMatch.teamB)
+    ? currentMatch.teamB.length
+    : 0;
+  const nextTeamALength = Array.isArray(patch.teamA)
+    ? patch.teamA.length
+    : currentTeamALength;
+  const nextTeamBLength = Array.isArray(patch.teamB)
+    ? patch.teamB.length
+    : currentTeamBLength;
   const oversChanged =
     typeof patch.overs === "number" &&
     patch.overs !== Number(currentMatch?.overs || 0);
   const innings1ScoreChanged =
     typeof patch.innings1Score === "number" &&
     patch.innings1Score !== Number(currentMatch?.innings1?.score || 0);
+  const teamASizeChanged =
+    Array.isArray(patch.teamA) && nextTeamALength !== currentTeamALength;
+  const teamBSizeChanged =
+    Array.isArray(patch.teamB) && nextTeamBLength !== currentTeamBLength;
   let correctionEndedMatch = false;
   const rosterPermissions = getRosterEditPermissions(currentMatch);
   const previousNames = {
@@ -532,10 +557,6 @@ export function applySafeMatchPatch(matchDocument, patch) {
   if (patch.teamBName !== undefined) nextMatch.teamBName = nextNames.teamBName;
   if (patch.teamA !== undefined) {
     const nextTeamA = [...patch.teamA];
-    const currentTeamALength = Array.isArray(currentMatch.teamA)
-      ? currentMatch.teamA.length
-      : 0;
-
     if (!rosterPermissions.teamA && nextTeamA.length !== currentTeamALength) {
       throw new MatchEngineError(
         `Only ${currentMatch.innings2?.team || "the second innings batting team"} can add or remove players after the first innings.`,
@@ -547,10 +568,6 @@ export function applySafeMatchPatch(matchDocument, patch) {
   }
   if (patch.teamB !== undefined) {
     const nextTeamB = [...patch.teamB];
-    const currentTeamBLength = Array.isArray(currentMatch.teamB)
-      ? currentMatch.teamB.length
-      : 0;
-
     if (!rosterPermissions.teamB && nextTeamB.length !== currentTeamBLength) {
       throw new MatchEngineError(
         `Only ${currentMatch.innings2?.team || "the second innings batting team"} can add or remove players after the first innings.`,
@@ -585,7 +602,10 @@ export function applySafeMatchPatch(matchDocument, patch) {
     nextMatch.innings2 = syncedMatch.innings2;
   }
 
-  if ((oversChanged || innings1ScoreChanged) && !correctionEndedMatch) {
+  if (
+    (oversChanged || innings1ScoreChanged || teamASizeChanged || teamBSizeChanged) &&
+    !correctionEndedMatch
+  ) {
     markLiveEvent(
       nextMatch,
       createMatchCorrectionLiveEvent(currentMatch, nextMatch, patch)
@@ -625,3 +645,5 @@ export function buildSessionMirrorUpdate(matchDocument) {
     isLive: Boolean(match?.isOngoing),
   };
 }
+
+

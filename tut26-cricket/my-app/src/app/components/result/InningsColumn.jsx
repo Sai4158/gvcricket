@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Result UI for the app's screens and flows.
+ * Main exports: InningsColumn.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 export default function InningsColumn({ innings, summary, players, teamColor }) {
   const wickets = (innings.history || [])
     .flatMap((over) => over.balls || [])
@@ -37,3 +46,5 @@ export default function InningsColumn({ innings, summary, players, teamColor }) 
     </div>
   );
 }
+
+

@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Renders the public landing page for the app.
+ * Main exports: RulesPage, metadata.
+ * Major callers: Next.js App Router.
+ * Side effects: none.
+ * Read next: ../README.md
+ */
+
 import Link from "next/link";
 import { FaArrowLeft } from "react-icons/fa";
 import { absoluteUrl, siteConfig } from "../lib/site-metadata";
@@ -101,3 +110,5 @@ export default function RulesPage() {
     </main>
   );
 }
+
+

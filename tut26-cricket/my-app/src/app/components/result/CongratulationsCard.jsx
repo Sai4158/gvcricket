@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Result UI for the app's screens and flows.
+ * Main exports: CongratulationsCard.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
+
 import { motion } from "framer-motion";
 import { FaTrophy } from "react-icons/fa";
 
@@ -34,3 +44,5 @@ export default function CongratulationsCard({ result }) {
     </motion.div>
   );
 }
+
+

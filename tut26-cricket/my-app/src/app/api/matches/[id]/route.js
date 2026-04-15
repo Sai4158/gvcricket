@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Handles Api API requests for the app.
+ * Main exports: module side effects only.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: reads server request metadata.
+ * Read next: ../../../../../docs/ONBOARDING.md
+ */
+
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { jsonError, jsonRateLimit } from "../../../lib/api-response";
@@ -58,9 +67,15 @@ export async function GET(_req, { params }) {
 
     if (hydrateLegacyTossState(match, fallbackSession)) {
       await match.save();
-      await Session.findByIdAndUpdate(match.sessionId, {
-        $set: buildSessionMirrorUpdate(match),
-      });
+      await Session.findByIdAndUpdate(
+        match.sessionId,
+        {
+          $set: buildSessionMirrorUpdate(match),
+        },
+        {
+          timestamps: false,
+        }
+      );
     }
 
     return Response.json(
@@ -144,9 +159,15 @@ export async function PATCH(req, { params }) {
 
     if (hydrateLegacyTossState(match, fallbackSession)) {
       await match.save();
-      await Session.findByIdAndUpdate(match.sessionId, {
-        $set: buildSessionMirrorUpdate(match),
-      });
+      await Session.findByIdAndUpdate(
+        match.sessionId,
+        {
+          $set: buildSessionMirrorUpdate(match),
+        },
+        {
+          timestamps: false,
+        }
+      );
     }
 
     const nextState = applySafeMatchPatch(match, parsedRequest.value);
@@ -175,9 +196,15 @@ export async function PATCH(req, { params }) {
       nextState.announcerBroadcastScoreSoundEffectsEnabled;
     await match.save();
 
-    await Session.findByIdAndUpdate(match.sessionId, {
-      $set: buildSessionMirrorUpdate(match),
-    });
+    await Session.findByIdAndUpdate(
+      match.sessionId,
+      {
+        $set: buildSessionMirrorUpdate(match),
+      },
+      {
+        timestamps: false,
+      }
+    );
     publishMatchUpdate(match._id);
     publishSessionUpdate(match.sessionId);
 
@@ -270,3 +297,5 @@ export async function DELETE(req, { params }) {
     return jsonError("Could not delete match.", 500);
   }
 }
+
+

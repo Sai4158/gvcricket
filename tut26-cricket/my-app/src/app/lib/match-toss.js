@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Match Toss logic for routes, APIs, and feature code.
+ * Main exports: getMatchTeamNames, getBattingFirstTeamName, getBowlingFirstTeamName, normalizeLegacyTossState, hasCompleteTossState, hydrateLegacyTossState.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import { getTeamBundle } from "./team-utils";
 
 function sanitizeName(value) {
@@ -156,3 +165,5 @@ export function hydrateLegacyTossState(matchDocument, fallbackState = null) {
   matchDocument.innings2 = normalized.innings2;
   return true;
 }
+
+

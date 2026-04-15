@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Handles Api API requests for the app.
+ * Main exports: runtime.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: none.
+ * Read next: ../../../../../../docs/ONBOARDING.md
+ */
+
 import crypto from "node:crypto";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
@@ -104,7 +113,7 @@ export async function POST(req, { params }) {
       matchId: session.match ? String(session.match) : "",
     });
     session.mediaUpdatedAt = new Date();
-    await session.save();
+    await session.save({ timestamps: false });
 
     if (session.match) {
       const linkedMatch = await Match.findById(session.match);
@@ -187,3 +196,5 @@ export async function POST(req, { params }) {
     return jsonError(failureMessage, status);
   }
 }
+
+

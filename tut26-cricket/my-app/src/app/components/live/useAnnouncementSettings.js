@@ -1,9 +1,18 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Encapsulates Live browser state, effects, and runtime coordination.
+ * Main exports: useAnnouncementSettings.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: reads or writes browser storage.
+ * Read next: ./README.md
+ */
+
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { EMPTY_SCORE_SOUND_EFFECT_MAP } from "../../lib/score-sound-effects";
 
-const SETTINGS_VERSION = 11;
+const SETTINGS_VERSION = 12;
 
 const DEFAULTS = {
   spectator: {
@@ -13,8 +22,8 @@ const DEFAULTS = {
     volume: 0.85,
     mode: "full",
     accessibilityMode: false,
-    playScoreSoundEffects: true,
-    broadcastScoreSoundEffects: true,
+    playScoreSoundEffects: false,
+    broadcastScoreSoundEffects: false,
     scoreSoundEffectMap: {
       ...EMPTY_SCORE_SOUND_EFFECT_MAP,
     },
@@ -26,8 +35,8 @@ const DEFAULTS = {
     volume: 0.75,
     mode: "simple",
     accessibilityMode: false,
-    playScoreSoundEffects: true,
-    broadcastScoreSoundEffects: true,
+    playScoreSoundEffects: false,
+    broadcastScoreSoundEffects: false,
     scoreSoundEffectMap: {
       ...EMPTY_SCORE_SOUND_EFFECT_MAP,
       six: "ipl_theme_song.mp3",
@@ -65,21 +74,21 @@ function mergeSettings(role, parsed = {}) {
   };
 }
 
-function getStorageKey(role) {
-  return `gv-announcer-${role}`;
+function getStorageKey(role, scopeKey = "") {
+  return `gv-announcer-${role}${scopeKey ? `-${scopeKey}` : ""}`;
 }
 
 function getEnabledStorageKey(role, scopeKey = "") {
   return `gv-announcer-enabled-${role}${scopeKey ? `-${scopeKey}` : ""}`;
 }
 
-function readRawValue(role) {
+function readRawValue(role, scopeKey = "") {
   if (typeof window === "undefined") {
     return "";
   }
 
   try {
-    return window.localStorage.getItem(getStorageKey(role)) || "";
+    return window.localStorage.getItem(getStorageKey(role, scopeKey)) || "";
   } catch (error) {
     console.error("Failed to read announcer settings:", error);
     return "";
@@ -99,13 +108,16 @@ function readEnabledValue(role, scopeKey) {
   }
 }
 
-function persistSettings(role, settings) {
+function persistSettings(role, scopeKey = "", settings) {
   if (typeof window === "undefined") {
     return;
   }
 
   try {
-    window.localStorage.setItem(getStorageKey(role), JSON.stringify(settings));
+    window.localStorage.setItem(
+      getStorageKey(role, scopeKey),
+      JSON.stringify(settings),
+    );
   } catch (error) {
     console.error("Failed to persist announcer settings:", error);
   }
@@ -127,7 +139,7 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
       const handleStorage = (event) => {
         if (
           !event.key ||
-          event.key === getStorageKey(role) ||
+          event.key === getStorageKey(role, scopeKey) ||
           event.key === getEnabledStorageKey(role, scopeKey)
         ) {
           onStoreChange();
@@ -156,7 +168,7 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
 
   const rawValue = useSyncExternalStore(
     subscribe,
-    () => (hydrated ? readRawValue(role) : ""),
+    () => (hydrated ? readRawValue(role, scopeKey) : ""),
     () => ""
   );
   const enabledValue = useSyncExternalStore(
@@ -180,8 +192,8 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
         ...(role === "umpire" && isLegacyVersion
           ? {
               enabled: true,
-              playScoreSoundEffects: true,
-              broadcastScoreSoundEffects: true,
+              playScoreSoundEffects: false,
+              broadcastScoreSoundEffects: false,
             }
           : {}),
         version: SETTINGS_VERSION,
@@ -216,12 +228,12 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
     try {
       const parsed = JSON.parse(rawValue);
       if (!parsed.version || parsed.version < SETTINGS_VERSION) {
-        persistSettings(role, settings);
+        persistSettings(role, scopeKey, settings);
       }
     } catch {
-      persistSettings(role, settings);
+      persistSettings(role, scopeKey, settings);
     }
-  }, [rawValue, role, settings]);
+  }, [rawValue, role, scopeKey, settings]);
 
   const updateSetting = useCallback(
     (key, value) => {
@@ -247,7 +259,7 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
           ...persistedSettings,
           [key]: value,
         };
-        persistSettings(role, nextSettings);
+        persistSettings(role, scopeKey, nextSettings);
         window.dispatchEvent(
           new CustomEvent("gv-announcer-change", {
             detail: { role, scopeKey },
@@ -265,3 +277,5 @@ export default function useAnnouncementSettings(role, scopeKey = "") {
     updateSetting,
   };
 }
+
+

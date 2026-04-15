@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Encapsulates Match browser state, effects, and runtime coordination.
+ * Main exports: useMatch, triggerMatchHapticFeedback, isMatchNetworkError, replayQueuedMatchActions.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: reads or writes browser storage.
+ * Read next: ./README.md
+ */
+
 import {
   useCallback,
   useEffect,
@@ -245,12 +254,29 @@ export function replayQueuedMatchActions(baseMatch, queuedEntries = []) {
 
 export {
   filterQueuedActionsAlreadyApplied,
+  isIncomingUpdateOlder,
   removeQueuedActionById,
   updateQueuedActionRetryFlag,
 };
 
 function isRetryableActionFailure(status) {
   return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+function parseUpdateTimestamp(value) {
+  const timestamp = Date.parse(String(value || ""));
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function isIncomingUpdateOlder(incomingUpdatedAt, currentUpdatedAt) {
+  const incomingTimestamp = parseUpdateTimestamp(incomingUpdatedAt);
+  const currentTimestamp = parseUpdateTimestamp(currentUpdatedAt);
+
+  if (incomingTimestamp === null || currentTimestamp === null) {
+    return false;
+  }
+
+  return incomingTimestamp < currentTimestamp;
 }
 
 export default function useMatch(matchId, hasAccess, initialMatch = null) {
@@ -375,14 +401,18 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
         return null;
       }
 
-      const nextMatch = applyQueuedFallbackState(body);
-      matchRef.current = nextMatch;
-      lastStreamUpdateRef.current = body.updatedAt || lastStreamUpdateRef.current;
-      setMatch(nextMatch);
-      setLastUpdatedAt(
-        nextMatch?.updatedAt || body.updatedAt || new Date().toISOString(),
-      );
-      setError(null);
+      const incomingUpdatedAt = body?.updatedAt || "";
+      if (!isIncomingUpdateOlder(incomingUpdatedAt, lastStreamUpdateRef.current)) {
+        const nextMatch = applyQueuedFallbackState(body);
+        matchRef.current = nextMatch;
+        lastStreamUpdateRef.current =
+          incomingUpdatedAt || lastStreamUpdateRef.current;
+        setMatch(nextMatch);
+        setLastUpdatedAt(
+          nextMatch?.updatedAt || incomingUpdatedAt || new Date().toISOString(),
+        );
+        setError(null);
+      }
 
       return body;
     } catch {
@@ -461,15 +491,18 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     enabled: Boolean(matchId && hasAccess),
     disconnectWhenHidden: false,
     onMessage: (payload) => {
-      if (payload.updatedAt && payload.updatedAt === lastStreamUpdateRef.current) {
+      const incomingUpdatedAt = payload?.updatedAt || payload?.match?.updatedAt || "";
+
+      if (isIncomingUpdateOlder(incomingUpdatedAt, lastStreamUpdateRef.current)) {
         return;
       }
 
-      lastStreamUpdateRef.current = payload.updatedAt || "";
+      lastStreamUpdateRef.current =
+        incomingUpdatedAt || lastStreamUpdateRef.current;
       const nextMatch = applyQueuedFallbackState(payload.match || null);
       matchRef.current = nextMatch;
       setMatch(nextMatch);
-      setLastUpdatedAt(nextMatch?.updatedAt || payload.updatedAt || "");
+      setLastUpdatedAt(nextMatch?.updatedAt || incomingUpdatedAt || "");
       setError(null);
       setIsLoading(false);
     },
@@ -577,14 +610,24 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
             currentEntry.action.actionId,
           );
           updateQueuedActions(remainingQueue);
-          const nextMatch = applyQueuedFallbackState(body.match);
-          matchRef.current = nextMatch;
-          lastStreamUpdateRef.current =
-            body.match.updatedAt || lastStreamUpdateRef.current;
-          setMatch(nextMatch);
-          setLastUpdatedAt(
-            nextMatch?.updatedAt || body.match.updatedAt || new Date().toISOString(),
-          );
+          const incomingUpdatedAt = body?.match?.updatedAt || "";
+          if (
+            !isIncomingUpdateOlder(
+              incomingUpdatedAt,
+              lastStreamUpdateRef.current,
+            )
+          ) {
+            const nextMatch = applyQueuedFallbackState(body.match);
+            matchRef.current = nextMatch;
+            lastStreamUpdateRef.current =
+              incomingUpdatedAt || lastStreamUpdateRef.current;
+            setMatch(nextMatch);
+            setLastUpdatedAt(
+              nextMatch?.updatedAt ||
+                incomingUpdatedAt ||
+                new Date().toISOString(),
+            );
+          }
         } else {
           updateQueuedActions(
             removeQueuedActionById(
@@ -688,11 +731,15 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
         throw new Error(body.message || "Failed to update match.");
       }
 
-      matchRef.current = body;
-      lastStreamUpdateRef.current = body.updatedAt || lastStreamUpdateRef.current;
-      setMatch(body);
-      setLastUpdatedAt(body.updatedAt || new Date().toISOString());
-      setError(null);
+      const incomingUpdatedAt = body?.updatedAt || "";
+      if (!isIncomingUpdateOlder(incomingUpdatedAt, lastStreamUpdateRef.current)) {
+        matchRef.current = body;
+        lastStreamUpdateRef.current =
+          incomingUpdatedAt || lastStreamUpdateRef.current;
+        setMatch(body);
+        setLastUpdatedAt(incomingUpdatedAt || new Date().toISOString());
+        setError(null);
+      }
       return body;
     } catch (caughtError) {
       if (isMatchNetworkError(caughtError) || caughtError?.network) {
@@ -836,3 +883,5 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     patchAndUpdate,
   };
 }
+
+

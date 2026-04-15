@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Handles Api API requests for the app.
+ * Main exports: module side effects only.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: none.
+ * Read next: ../../../../../../docs/ONBOARDING.md
+ */
+
 import { NextResponse } from "next/server";
 import { connectDB } from "../../../../lib/db";
 import { jsonError, jsonRateLimit } from "../../../../lib/api-response";
@@ -102,3 +111,5 @@ export async function POST(req, { params }) {
     return jsonError("Could not save the match setup.", 500);
   }
 }
+
+

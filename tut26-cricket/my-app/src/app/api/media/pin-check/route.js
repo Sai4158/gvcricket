@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Handles Api API requests for the app.
+ * Main exports: module side effects only.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: none.
+ * Read next: ../../../../../docs/ONBOARDING.md
+ */
+
 import { jsonError, jsonRateLimit } from "../../../lib/api-response";
 import { writeAuditLog } from "../../../lib/audit-log";
 import {
@@ -23,6 +32,30 @@ const mediaPinCheckSchema = z
 
 export async function POST(req) {
   const meta = getRequestMeta(req);
+  const parsedRequest = await parseJsonRequest(req, mediaPinCheckSchema, {
+    maxBytes: 2048,
+  });
+  if (!parsedRequest.ok) {
+    return jsonError(parsedRequest.message, parsedRequest.status);
+  }
+
+  const submittedPin = parsedRequest.value.pin;
+  const isValidPin = parsedRequest.value.allowUmpirePin
+    ? isValidUmpirePin(submittedPin) || isValidManagePin(submittedPin)
+    : isValidManagePin(submittedPin);
+
+  // Allow correct PINs immediately even during cooldown windows.
+  if (isValidPin) {
+    return Response.json(
+      { ok: true },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
+  }
+
   const pinAttemptLimit = enforceSmartPinRateLimit({
     key: `media-pin-check:${meta.ip}`,
     longLimit: IMAGE_PIN_ATTEMPT_LIMIT,
@@ -47,37 +80,16 @@ export async function POST(req) {
     );
   }
 
-  const parsedRequest = await parseJsonRequest(req, mediaPinCheckSchema, {
-    maxBytes: 2048,
+  await writeAuditLog({
+    action: "media_pin_failed",
+    targetType: "media",
+    targetId: "global",
+    status: "failure",
+    ip: meta.ip,
+    userAgent: meta.userAgent,
   });
-  if (!parsedRequest.ok) {
-    return jsonError(parsedRequest.message, parsedRequest.status);
-  }
 
-  const submittedPin = parsedRequest.value.pin;
-  const isValidPin = parsedRequest.value.allowUmpirePin
-    ? isValidUmpirePin(submittedPin) || isValidManagePin(submittedPin)
-    : isValidManagePin(submittedPin);
-
-  if (!isValidPin) {
-    await writeAuditLog({
-      action: "media_pin_failed",
-      targetType: "media",
-      targetId: "global",
-      status: "failure",
-      ip: meta.ip,
-      userAgent: meta.userAgent,
-    });
-
-    return jsonError("Incorrect PIN.", 401);
-  }
-
-  return Response.json(
-    { ok: true },
-    {
-      headers: {
-        "Cache-Control": "no-store",
-      },
-    }
-  );
+  return jsonError("Incorrect PIN.", 401);
 }
+
+

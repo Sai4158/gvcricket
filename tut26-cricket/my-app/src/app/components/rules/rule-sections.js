@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Renders Rules UI for the app's screens and flows.
+ * Main exports: ruleSections, appGuideSections, appGuideIcon.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import {
   FaBalanceScale,
   FaGamepad,
@@ -97,3 +106,5 @@ export const appGuideSections = [
 ];
 
 export const appGuideIcon = FaMobileAlt;
+
+

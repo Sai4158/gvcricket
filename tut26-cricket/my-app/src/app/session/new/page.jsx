@@ -1,10 +1,20 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders the App Router page entry for Session.
+ * Main exports: NewSessionPage.
+ * Major callers: Next.js App Router.
+ * Side effects: reads or writes browser storage.
+ * Read next: ../../../../docs/ONBOARDING.md
+ */
+
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FaArrowLeft, FaArrowRight, FaImage, FaPen } from "react-icons/fa";
 import ImagePinModal from "../../components/shared/ImagePinModal";
+import InlineSpinner from "../../components/shared/InlineSpinner";
 import LoadingButton from "../../components/shared/LoadingButton";
 import PendingLink from "../../components/shared/PendingLink";
 import StepFlow from "../../components/shared/StepFlow";
@@ -251,7 +261,15 @@ export default function NewSessionPage() {
             className="btn-ui-icon"
             aria-label="Go back"
           >
-            <FaArrowLeft size={18} />
+            {({ pending, spinner }) =>
+              pending ? (
+                <span className="inline-flex h-full w-full items-center justify-center">
+                  {spinner || <InlineSpinner size="sm" label="Opening home" />}
+                </span>
+              ) : (
+                <FaArrowLeft size={18} />
+              )
+            }
           </PendingLink>
         </div>
 
@@ -388,3 +406,5 @@ export default function NewSessionPage() {
     </main>
   );
 }
+
+

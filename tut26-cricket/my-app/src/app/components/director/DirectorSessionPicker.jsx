@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Director UI for the app's screens and flows.
+ * Main exports: DirectorSessionPicker.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import { useState } from "react";
 import {
   FaArrowRight,
@@ -166,3 +175,5 @@ export default function DirectorSessionPicker({
     </section>
   );
 }
+
+

@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Handles Api API requests for the app.
+ * Main exports: module side effects only.
+ * Major callers: Next.js request handlers and client fetch calls.
+ * Side effects: none.
+ * Read next: ../../../../docs/ONBOARDING.md
+ */
+
 import { jsonError, jsonRateLimit } from "../../lib/api-response";
 import { writeAuditLog } from "../../lib/audit-log";
 import { connectDB } from "../../lib/db";
@@ -96,3 +105,5 @@ export async function GET() {
     return jsonError("Could not load matches.", 500);
   }
 }
+
+

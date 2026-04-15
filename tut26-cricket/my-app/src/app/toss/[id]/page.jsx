@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Renders the App Router page entry for Toss.
+ * Main exports: dynamic.
+ * Major callers: Next.js App Router.
+ * Side effects: none.
+ * Read next: ../../../../docs/ONBOARDING.md
+ */
+
 import TossPageClient from "../../components/toss/TossPageClient";
 import { loadTossPageData } from "../../lib/server-data";
 import { notFound, redirect } from "next/navigation";
@@ -38,3 +47,5 @@ export default async function TossPage({ params }) {
     />
   );
 }
+
+

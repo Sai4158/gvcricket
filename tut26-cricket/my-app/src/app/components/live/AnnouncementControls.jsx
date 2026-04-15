@@ -1,8 +1,16 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Live UI for the app's screens and flows.
+ * Main exports: AnnouncementControls.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import { useMemo, useRef, useState } from "react";
 import {
-  FaCompactDisc,
   FaMicrophone,
   FaPause,
   FaPlay,
@@ -127,19 +135,31 @@ export default function AnnouncementControls({
 
   if (showModernCompactPanel) {
     return (
-      <section className="relative mx-auto flex max-h-[78vh] max-w-[32rem] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.1),transparent_24%),linear-gradient(180deg,rgba(16,16,20,0.98),rgba(7,7,11,0.99))] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.48)] backdrop-blur-md sm:max-h-[82vh] sm:p-5">
+      <section className="relative mx-auto flex max-h-[78vh] max-w-[32rem] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.1),transparent_24%),linear-gradient(180deg,rgba(16,16,20,0.98),rgba(7,7,11,0.99))] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.48)] backdrop-blur-md sm:max-h-[82vh] sm:p-5 lg:max-h-[84vh] lg:max-w-[46rem] lg:p-6">
         {!isSoundPickerOpen ? (
           <div className="mb-4 flex items-start justify-between gap-3 border-b border-white/8 pb-4">
             <div className="flex min-w-0 items-start gap-3">
-              <div
-                className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-lg ${
-                  isLiveSpeaking
-                    ? "border-emerald-300/28 bg-emerald-400/15 text-emerald-200 shadow-[0_0_30px_rgba(16,185,129,0.18)]"
-                    : "border-white/10 bg-white/[0.05] text-zinc-100"
-                }`}
-              >
-                <FaCompactDisc />
-              </div>
+              {onAnnounceNow ? (
+                <button
+                  type="button"
+                  onClick={onAnnounceNow}
+                  disabled={announceDisabled}
+                  aria-label={announceIsActive ? "Stop score audio" : "Read score"}
+                  className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-lg transition active:scale-[0.98] ${
+                    announceDisabled
+                      ? "cursor-not-allowed border-white/10 bg-white/[0.04] text-zinc-500"
+                      : announceIsActive
+                      ? "border-emerald-300/28 bg-emerald-400/15 text-emerald-200 shadow-[0_0_30px_rgba(16,185,129,0.18)]"
+                      : "border-white/10 bg-white/[0.05] text-zinc-100 hover:bg-white/[0.08]"
+                  }`}
+                >
+                  {announceIsActive ? <FaPause /> : <FaVolumeUp />}
+                </button>
+              ) : (
+                <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-lg text-zinc-100">
+                  <FaVolumeUp />
+                </div>
+              )}
               <div className="min-w-0">
                 <ModalGradientTitle
                   as="h3"
@@ -527,3 +547,5 @@ export default function AnnouncementControls({
     </section>
   );
 }
+
+

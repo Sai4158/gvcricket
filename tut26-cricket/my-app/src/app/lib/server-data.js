@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Server Data logic for routes, APIs, and feature code.
+ * Main exports: module side effects only.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: registers or reuses a Mongoose model.
+ * Read next: ./README.md
+ */
+
 import { cookies } from "next/headers";
 import { Types, isValidObjectId } from "mongoose";
 import Match from "../../models/Match";
@@ -10,149 +19,25 @@ import {
 import { getMatchAccessCookieName, hasValidMatchAccess } from "./match-access";
 import { serializePublicMatch, serializePublicSession } from "./public-data";
 import { hasCompleteTossState, hydrateLegacyTossState, normalizeLegacyTossState } from "./match-toss";
+import {
+  buildLockedTossPageData,
+  FALLBACK_SESSION_FIELDS,
+  getIsoTimestamp,
+  getPublicId,
+  globalServerDataCache,
+  invalidateSessionsDataCache,
+  loadFallbackSession,
+  NON_DRAFT_SESSION_COLLECTION_FILTER,
+  PUBLIC_MATCH_FIELDS,
+  PUBLIC_SESSION_FIELDS,
+  PUBLIC_SESSION_PROJECTION,
+  READ_ONLY_PUBLIC_MATCH_FIELDS,
+  resolveSessionMatches,
+  SERVER_DATA_CACHE_TTL_MS,
+  SESSION_MATCH_SUMMARY_PROJECTION,
+} from "./server-data-helpers";
 
-const SERVER_DATA_CACHE_TTL_MS = 15000;
-const PUBLIC_SESSION_FIELDS =
-  "_id name date overs isLive isDraft match tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcer announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastEventType lastEventText createdAt updatedAt";
-const READ_ONLY_PUBLIC_MATCH_FIELDS =
-  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcer announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText createdAt updatedAt";
-const PUBLIC_MATCH_FIELDS = `${READ_ONLY_PUBLIC_MATCH_FIELDS} actionHistory`;
-const SESSION_MATCH_SUMMARY_FIELDS =
-  "_id teamA teamB teamAName teamBName tossWinner tossDecision score outs innings innings1 innings2 isOngoing result updatedAt sessionId matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy createdAt";
-const FALLBACK_SESSION_FIELDS =
-  "tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy updatedAt";
-const NON_DRAFT_SESSION_COLLECTION_FILTER = {
-  isDraft: { $ne: true },
-};
-
-function buildProjection(fields) {
-  return String(fields || "")
-    .split(/\s+/)
-    .filter(Boolean)
-    .reduce((projection, field) => {
-      projection[field] = 1;
-      return projection;
-    }, {});
-}
-
-const PUBLIC_SESSION_PROJECTION = buildProjection(PUBLIC_SESSION_FIELDS);
-const SESSION_MATCH_SUMMARY_PROJECTION = buildProjection(SESSION_MATCH_SUMMARY_FIELDS);
-
-const globalServerDataCache = globalThis.__gvServerDataCache || {
-  sessionsIndex: {
-    value: null,
-    expiresAt: 0,
-    pending: null,
-  },
-  directorSessions: {
-    value: null,
-    expiresAt: 0,
-    pending: null,
-  },
-};
-
-if (!globalThis.__gvServerDataCache) {
-  globalThis.__gvServerDataCache = globalServerDataCache;
-}
-
-export function invalidateSessionsDataCache() {
-  globalServerDataCache.sessionsIndex.value = null;
-  globalServerDataCache.sessionsIndex.expiresAt = 0;
-  globalServerDataCache.sessionsIndex.pending = null;
-  globalServerDataCache.directorSessions.value = null;
-  globalServerDataCache.directorSessions.expiresAt = 0;
-  globalServerDataCache.directorSessions.pending = null;
-}
-
-function getPublicId(value) {
-  return String(value?._id || value || "");
-}
-
-function getIsoTimestamp(...values) {
-  return new Date(values.find(Boolean) || Date.now()).toISOString();
-}
-
-function buildLockedTossPageData() {
-  return {
-    found: false,
-    authStatus: "locked",
-    match: null,
-    sessionId: "",
-    hasCreatedMatch: false,
-    actualMatchId: "",
-  };
-}
-
-async function loadFallbackSession(sessionId, fields = FALLBACK_SESSION_FIELDS) {
-  const normalizedSessionId = getPublicId(sessionId);
-
-  if (!isValidObjectId(normalizedSessionId)) {
-    return null;
-  }
-
-  return Session.findById(normalizedSessionId).select(fields).lean();
-}
-
-async function resolveSessionMatches(sessions) {
-  const resolvedBySessionId = new Map();
-  const unresolvedSessionIds = sessions
-    .filter((session) => !session.match?._id && !session.match)
-    .map((session) => session._id);
-
-  if (!unresolvedSessionIds.length) {
-    return resolvedBySessionId;
-  }
-
-  const fallbackMatchSessionIds = unresolvedSessionIds
-    .map((sessionId) => String(sessionId || ""))
-    .filter((sessionId) => isValidObjectId(sessionId))
-    .map((sessionId) => new Types.ObjectId(sessionId));
-
-  if (!fallbackMatchSessionIds.length) {
-    return resolvedBySessionId;
-  }
-
-  const fallbackMatches = await Match.aggregate([
-    {
-      $match: {
-        sessionId: { $in: fallbackMatchSessionIds },
-      },
-    },
-    {
-      $project: {
-        teamA: 1,
-        teamB: 1,
-        teamAName: 1,
-        teamBName: 1,
-        score: 1,
-        outs: 1,
-        innings: 1,
-        innings1: 1,
-        innings2: 1,
-        isOngoing: 1,
-        result: 1,
-        updatedAt: 1,
-        sessionId: 1,
-        matchImages: 1,
-        tossWinner: 1,
-        tossDecision: 1,
-        matchImageUrl: 1,
-      },
-    },
-    {
-      $sort: { updatedAt: -1, _id: -1 },
-    },
-  ]);
-
-  fallbackMatches.forEach((match) => {
-    const sessionId = getPublicId(match.sessionId);
-    if (sessionId && !resolvedBySessionId.has(sessionId)) {
-      resolvedBySessionId.set(sessionId, match);
-    }
-  });
-
-  return resolvedBySessionId;
-}
+export { invalidateSessionsDataCache } from "./server-data-helpers";
 
 async function hydrateLinkedSessionMatches(sessions) {
   const linkedMatchIds = sessions
@@ -201,6 +86,23 @@ async function readVisibleSessionsWithMatches(sort = { createdAt: -1, _id: -1 })
     .toArray();
 
   return hydrateLinkedSessionMatches(sessions);
+}
+
+function getStableCreatedTimestamp(...values) {
+  return getIsoTimestamp(...values);
+}
+
+function getStableCreatedTimeMs(value) {
+  return new Date(value || 0).getTime();
+}
+
+function getStableSessionSortTimestamp(sessionDate, ...fallbacks) {
+  const parsedSessionDate = new Date(String(sessionDate || ""));
+  if (!Number.isNaN(parsedSessionDate.getTime())) {
+    return parsedSessionDate.toISOString();
+  }
+
+  return getStableCreatedTimestamp(...fallbacks);
 }
 
 async function getCachedServerData(cacheEntry, loader) {
@@ -271,7 +173,13 @@ async function readSessionsIndexPageData() {
         publicMatch?.matchImages?.length > 0
           ? publicMatch.matchImages
           : publicSession.matchImages || [],
-      updatedAt: resolvedMatch?.updatedAt || session.updatedAt,
+      matchCreatedAt: publicMatch?.createdAt || null,
+      sortCreatedAt: getStableSessionSortTimestamp(
+        publicSession.date,
+        publicMatch?.createdAt,
+        publicSession.createdAt,
+      ),
+      updatedAt: session.updatedAt || session.createdAt,
       isLive: resolvedMatch ? Boolean(resolvedMatch.isOngoing) : Boolean(session.isLive),
       score: Number(publicMatch?.score || 0),
       outs: Number(publicMatch?.outs || 0),
@@ -495,21 +403,25 @@ export async function loadHomeLiveBannerData() {
     return null;
   }
 
-  const sessionsByRecentUpdate = [...visibleSessions].sort((left, right) => {
-    const leftUpdatedAt = new Date(left?.updatedAt || left?.createdAt || 0).getTime();
-    const rightUpdatedAt = new Date(right?.updatedAt || right?.createdAt || 0).getTime();
-    return rightUpdatedAt - leftUpdatedAt;
+  const sessionsByRecentCreation = [...visibleSessions].sort((left, right) => {
+    const leftCreatedAt = getStableCreatedTimeMs(
+      left?.sortCreatedAt || left?.matchCreatedAt || left?.createdAt || left?.updatedAt,
+    );
+    const rightCreatedAt = getStableCreatedTimeMs(
+      right?.sortCreatedAt || right?.matchCreatedAt || right?.createdAt || right?.updatedAt,
+    );
+    return rightCreatedAt - leftCreatedAt;
   });
 
-  const latestLiveSession = sessionsByRecentUpdate.find((session) => session?.isLive);
-  const latestScoredSession = sessionsByRecentUpdate.find((session) => {
+  const latestLiveSession = sessionsByRecentCreation.find((session) => session?.isLive);
+  const latestScoredSession = sessionsByRecentCreation.find((session) => {
     const score = Number(session?.score || 0);
     const outs = Number(session?.outs || 0);
     const result = String(session?.result || "").trim();
     return score > 0 || outs > 0 || Boolean(result);
   });
   const selectedSession =
-    latestLiveSession || latestScoredSession || sessionsByRecentUpdate[0] || null;
+    latestLiveSession || latestScoredSession || sessionsByRecentCreation[0] || null;
 
   if (!selectedSession) {
     return null;
@@ -557,6 +469,11 @@ async function readDirectorSessionsList() {
       return {
         session: publicSession,
         match: publicMatch,
+        sortCreatedAt: getStableSessionSortTimestamp(
+          publicSession.date,
+          resolvedMatch?.createdAt,
+          session.createdAt,
+        ),
         updatedAt: getIsoTimestamp(
           resolvedMatch?.updatedAt,
           session.updatedAt,
@@ -570,9 +487,8 @@ async function readDirectorSessionsList() {
         return left.isLive ? -1 : 1;
       }
 
-      return (
-        new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
-      );
+      return getStableCreatedTimeMs(right.sortCreatedAt) -
+        getStableCreatedTimeMs(left.sortCreatedAt);
     });
 
   return mappedSessions;
@@ -596,3 +512,5 @@ export async function loadDirectorConsoleData() {
     sessions,
   };
 }
+
+

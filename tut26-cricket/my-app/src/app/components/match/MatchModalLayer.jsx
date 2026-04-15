@@ -1,6 +1,16 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Match UI for the app's screens and flows.
+ * Main exports: MatchModalLayer.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import { AnimatePresence } from "framer-motion";
+import { useMemo, useState } from "react";
 import AnnouncementControls from "../live/AnnouncementControls";
 import LiveMicModal from "../live/LiveMicModal";
 import WalkiePanel from "../live/WalkiePanel";
@@ -21,6 +31,7 @@ export default function MatchModalLayer({
   match,
   modalType,
   isUpdating,
+  isStageCardUndoPending = false,
   micMonitor,
   entryScoreSoundPromptProps,
   stageContinuePromptProps,
@@ -35,7 +46,103 @@ export default function MatchModalLayer({
   onScoreEvent,
   onClose,
   onInfoClose,
+  onUndoStageCard,
 }) {
+  const [entryScoreToggleConfirm, setEntryScoreToggleConfirm] = useState(null);
+
+  const entryScoreToggleConfirmCopy = useMemo(() => {
+    if (!entryScoreToggleConfirm) {
+      return null;
+    }
+
+    const { setting, nextValue } = entryScoreToggleConfirm;
+
+    if (setting === "announcer") {
+      return nextValue
+        ? {
+            title: "Turn Score Announcer On?",
+            description: "Score updates will be announced after each ball.",
+            emphasizedAction: "confirm",
+          }
+        : {
+            title: "Turn Score Announcer Off?",
+            description:
+              "Score updates will not be announced after each ball when this is off.",
+            emphasizedAction: "cancel",
+          };
+    }
+
+    return nextValue
+      ? {
+          title: "Turn Score Music Effects On?",
+          description:
+            "Turn off when playing music to avoid cutting off. Score tap sound effect will play after each ball.",
+          emphasizedAction: "cancel",
+        }
+      : {
+          title: "Turn Score Music Effects Off?",
+          description:
+            "No score tap sound effect will play after each ball, and music will keep playing normally.",
+          emphasizedAction: "confirm",
+        };
+  }, [entryScoreToggleConfirm]);
+
+  const openEntryScoreToggleConfirm = (setting, nextValue) => {
+    setEntryScoreToggleConfirm({ setting, nextValue });
+  };
+
+  const handleConfirmEntryScoreToggle = () => {
+    if (!entryScoreToggleConfirm || !entryScoreSoundPromptProps) {
+      setEntryScoreToggleConfirm(null);
+      return;
+    }
+
+    const { setting, nextValue } = entryScoreToggleConfirm;
+
+    if (setting === "announcer") {
+      entryScoreSoundPromptProps.onAnnouncerChange?.(nextValue);
+    } else {
+      entryScoreSoundPromptProps.onSoundEffectsChange?.(nextValue);
+    }
+
+    setEntryScoreToggleConfirm(null);
+  };
+
+  const entryScoreConfirmButtons =
+    entryScoreToggleConfirmCopy?.emphasizedAction === "cancel"
+      ? [
+          {
+            key: "confirm",
+            label: "OK",
+            onClick: handleConfirmEntryScoreToggle,
+            className:
+              "rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]",
+          },
+          {
+            key: "cancel",
+            label: "Back",
+            onClick: () => setEntryScoreToggleConfirm(null),
+            className:
+              "rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black transition hover:bg-emerald-400",
+          },
+        ]
+      : [
+          {
+            key: "cancel",
+            label: "Back",
+            onClick: () => setEntryScoreToggleConfirm(null),
+            className:
+              "rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]",
+          },
+          {
+            key: "confirm",
+            label: "OK",
+            onClick: handleConfirmEntryScoreToggle,
+            className:
+              "rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black transition hover:bg-emerald-400",
+          },
+        ];
+
   const renderPromptSwitch = (checked, onChange, label) => (
     <button
       type="button"
@@ -43,22 +150,22 @@ export default function MatchModalLayer({
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange?.(!checked)}
-      className={`relative inline-flex h-8 w-[54px] items-center rounded-full border transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
+      className={`relative inline-flex h-8 w-13.5 items-center rounded-full border transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-400/35 ${
         checked
           ? "border-emerald-300/35 bg-emerald-500 shadow-[0_10px_24px_rgba(16,185,129,0.22)]"
-          : "border-white/10 bg-white/[0.08]"
+          : "border-white/10 bg-white/8"
       }`}
     >
       <span
         className={`inline-flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-[0_2px_10px_rgba(0,0,0,0.28)] transition-transform ${
-          checked ? "translate-x-[26px]" : "translate-x-[3px]"
+          checked ? "translate-x-6.5" : "translate-x-0.75"
         }`}
       />
     </button>
   );
   const modalFallback = (label) => (
     <ModalBase title="Unavailable" onExit={onClose}>
-      <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-center text-sm text-zinc-400">
+      <div className="rounded-2xl border border-white/8 bg-white/3 px-4 py-3 text-center text-sm text-zinc-400">
         {label}
       </div>
     </ModalBase>
@@ -67,7 +174,13 @@ export default function MatchModalLayer({
   return (
     <AnimatePresence>
       {showInningsEnd && (
-        <InningsEndModal key="innings-end" match={match} onNext={onNext} />
+        <InningsEndModal
+          key="innings-end"
+          match={match}
+          onNext={onNext}
+          onUndo={onUndoStageCard}
+          undoDisabled={isUpdating || isStageCardUndoPending}
+        />
       )}
       {stageContinuePromptProps ? (
         <ModalBase
@@ -86,7 +199,7 @@ export default function MatchModalLayer({
               <button
                 type="button"
                 onClick={stageContinuePromptProps.onForceContinue}
-                className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/8"
               >
                 Force Continue
               </button>
@@ -184,7 +297,12 @@ export default function MatchModalLayer({
           key="commentary"
           fallback={modalFallback("Commentary controls unavailable right now.")}
         >
-          <ModalBase title="" onExit={onClose} hideHeader>
+          <ModalBase
+            title=""
+            onExit={onClose}
+            hideHeader
+            panelClassName="lg:max-w-[50rem]"
+          >
             <AnnouncementControls {...commentaryProps} />
           </ModalBase>
         </OptionalFeatureBoundary>
@@ -205,15 +323,13 @@ export default function MatchModalLayer({
           fallback={modalFallback("Live mic unavailable right now.")}
         >
           <LiveMicModal
-            title="Live Commentary Mic"
+            title="Bluetooth Mic"
             monitor={micMonitor}
             onClose={onClose}
           />
         </OptionalFeatureBoundary>
       )}
-      {modalType === "rules" && (
-        <RulesModal key="rules" onClose={onClose} />
-      )}
+      {modalType === "rules" && <RulesModal key="rules" onClose={onClose} />}
       {modalType === "entryScoreSoundEffects" && entryScoreSoundPromptProps ? (
         <ModalBase
           key="entry-score-sound-effects"
@@ -228,30 +344,60 @@ export default function MatchModalLayer({
                 Umpire Mode
               </p>
               <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-                Score Tap Sounds
+                Score Feedback
               </h2>
               <p className="mt-3 text-sm leading-6 text-zinc-300">
-                Turn this off only when playing music.
+                Choose what should happen after each ball.
               </p>
             </div>
 
-            <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4 text-left">
+            <div className="rounded-2xl border border-white/8 bg-white/4 p-4 text-left">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 pr-2">
                   <p className="text-base font-semibold text-white">
-                    Score tap sound effects
+                    Score Announcer
                   </p>
                   <p className="mt-2 text-sm leading-5 text-zinc-400">
-                    Play a sound effect whenever you tap a score.
+                    Turn on to announce score after each ball.
+                  </p>
+                  <p className="mt-2 text-xs text-zinc-500">
+                    Can be edited later.
                   </p>
                 </div>
                 <div className="shrink-0 pt-1">
                   {renderPromptSwitch(
-                    entryScoreSoundPromptProps.enabled,
-                    entryScoreSoundPromptProps.onChange,
-                    entryScoreSoundPromptProps.enabled
-                      ? "Turn score tap sounds off"
-                      : "Turn score tap sounds on",
+                    entryScoreSoundPromptProps.announcerEnabled,
+                    (nextValue) =>
+                      openEntryScoreToggleConfirm("announcer", nextValue),
+                    entryScoreSoundPromptProps.announcerEnabled
+                      ? "Turn score announcer off"
+                      : "Turn score announcer on",
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/8 bg-white/4 p-4 text-left">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 pr-2">
+                  <p className="text-base font-semibold text-white">
+                    Score Music Effects
+                  </p>
+                  <p className="mt-2 text-sm leading-5 text-zinc-400">
+                    Turn off when playing music to avoid cutting off.
+                  </p>
+                  <p className="mt-2 text-xs text-zinc-500">
+                    Can be edited later.
+                  </p>
+                </div>
+                <div className="shrink-0 pt-1">
+                  {renderPromptSwitch(
+                    entryScoreSoundPromptProps.soundEffectsEnabled,
+                    (nextValue) =>
+                      openEntryScoreToggleConfirm("soundEffects", nextValue),
+                    entryScoreSoundPromptProps.soundEffectsEnabled
+                      ? "Turn score tap music effects off"
+                      : "Turn score tap music effects on",
                   )}
                 </div>
               </div>
@@ -259,11 +405,49 @@ export default function MatchModalLayer({
 
             <button
               type="button"
-              onClick={entryScoreSoundPromptProps.onSave}
+              onClick={() => {
+                setEntryScoreToggleConfirm(null);
+                entryScoreSoundPromptProps.onSave?.();
+              }}
               className="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-black transition hover:bg-emerald-400 active:scale-[0.99]"
             >
               Save
             </button>
+          </div>
+        </ModalBase>
+      ) : null}
+      {modalType === "entryScoreSoundEffects" && entryScoreToggleConfirmCopy ? (
+        <ModalBase
+          key="entry-score-sound-toggle-confirm"
+          title=""
+          onExit={() => setEntryScoreToggleConfirm(null)}
+          hideHeader
+          panelClassName="max-w-sm"
+        >
+          <div className="space-y-5">
+            <div className="text-center">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-300/80">
+                Confirm Change
+              </p>
+              <h3 className="mt-2 text-xl font-semibold tracking-tight text-white">
+                {entryScoreToggleConfirmCopy.title}
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-zinc-300">
+                {entryScoreToggleConfirmCopy.description}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {entryScoreConfirmButtons.map((buttonConfig) => (
+                <button
+                  key={buttonConfig.key}
+                  type="button"
+                  onClick={buttonConfig.onClick}
+                  className={buttonConfig.className}
+                >
+                  {buttonConfig.label}
+                </button>
+              ))}
+            </div>
           </div>
         </ModalBase>
       ) : null}

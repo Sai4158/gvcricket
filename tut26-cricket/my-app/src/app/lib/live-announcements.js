@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Live Announcements logic for routes, APIs, and feature code.
+ * Main exports: getSpectatorAnnouncementPriority, buildSpectatorBallAnnouncement, buildSpectatorScoreAnnouncement, buildSpectatorOverCompleteAnnouncement, createScoreLiveEvent, createUndoLiveEvent, createMatchCorrectionLiveEvent, createMatchEndLiveEvent, createSoundEffectLiveEvent, createManualScoreAnnouncementLiveEvent, buildSpectatorAnnouncement, buildLiveScoreAnnouncementSequence, buildCurrentScoreAnnouncement, buildUmpireStageAnnouncement, buildUmpireSecondInningsStartSequence, buildUmpireAnnouncement, buildUmpireTapAnnouncement.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import { countLegalBalls } from "./match-scoring";
 import { getBattingTeamBundle } from "./team-utils";
 
@@ -58,8 +67,47 @@ function pluralizeRuns(value) {
   return `${value} run${value === 1 ? "" : "s"}`;
 }
 
+function pluralizePlayers(value) {
+  return `${value} player${value === 1 ? "" : "s"}`;
+}
+
 function scoreLine(score, outs) {
   return `${score} for ${outs}`;
+}
+
+function buildRosterSizeCorrectionSummary(matchBefore, matchAfter, patch) {
+  const teamABeforeSize = Array.isArray(matchBefore?.teamA)
+    ? matchBefore.teamA.length
+    : 0;
+  const teamBBeforeSize = Array.isArray(matchBefore?.teamB)
+    ? matchBefore.teamB.length
+    : 0;
+  const teamAAfterSize = Array.isArray(matchAfter?.teamA)
+    ? matchAfter.teamA.length
+    : 0;
+  const teamBAfterSize = Array.isArray(matchAfter?.teamB)
+    ? matchAfter.teamB.length
+    : 0;
+  const teamASizeChanged =
+    Array.isArray(patch?.teamA) && teamAAfterSize !== teamABeforeSize;
+  const teamBSizeChanged =
+    Array.isArray(patch?.teamB) && teamBAfterSize !== teamBBeforeSize;
+
+  if (!teamASizeChanged && !teamBSizeChanged) {
+    return "";
+  }
+
+  if (teamAAfterSize === teamBAfterSize) {
+    return `Both teams now have ${pluralizePlayers(teamAAfterSize)}.`;
+  }
+
+  const teamAName = normalizeSpeechName(matchAfter?.teamAName) || "Team A";
+  const teamBName = normalizeSpeechName(matchAfter?.teamBName) || "Team B";
+
+  return [
+    `${teamAName} now have ${pluralizePlayers(teamAAfterSize)}.`,
+    `${teamBName} now have ${pluralizePlayers(teamBAfterSize)}.`,
+  ].join(" ");
 }
 
 function buildRequiredRateAnnouncementLine(target, overs) {
@@ -645,6 +693,11 @@ export function createMatchCorrectionLiveEvent(matchBefore, matchAfter, patch) {
   const activeInningsKey =
     matchAfter?.innings === "first" ? "innings1" : "innings2";
   const history = matchAfter?.[activeInningsKey]?.history ?? [];
+  const rosterSizeSummary = buildRosterSizeCorrectionSummary(
+    matchBefore,
+    matchAfter,
+    patch,
+  );
   const correctionSummary = [
     typeof patch?.innings1Score === "number"
       ? matchAfter?.innings === "second"
@@ -654,6 +707,7 @@ export function createMatchCorrectionLiveEvent(matchBefore, matchAfter, patch) {
     typeof patch?.overs === "number"
       ? `Match is now ${safeNumber(matchAfter?.overs)} overs.`
       : "",
+    rosterSizeSummary,
   ]
     .filter(Boolean)
     .join(" ");
@@ -675,6 +729,14 @@ export function createMatchCorrectionLiveEvent(matchBefore, matchAfter, patch) {
     previousOvers: safeNumber(matchBefore?.overs),
     nextOvers:
       typeof patch?.overs === "number" ? safeNumber(matchAfter?.overs) : null,
+    previousTeamASize: Array.isArray(matchBefore?.teamA)
+      ? matchBefore.teamA.length
+      : 0,
+    nextTeamASize: Array.isArray(matchAfter?.teamA) ? matchAfter.teamA.length : 0,
+    previousTeamBSize: Array.isArray(matchBefore?.teamB)
+      ? matchBefore.teamB.length
+      : 0,
+    nextTeamBSize: Array.isArray(matchAfter?.teamB) ? matchAfter.teamB.length : 0,
     createdAt: new Date().toISOString(),
   };
 }
@@ -1089,3 +1151,5 @@ export function buildUmpireTapAnnouncement(event, mode = "simple") {
 
   return `${pluralizeRuns(safeNumber(ball.runs))}.`;
 }
+
+

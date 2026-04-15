@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Walkie Store logic for routes, APIs, and feature code.
+ * Main exports: module side effects only.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import WalkieMessage from "../../models/WalkieMessage";
 import WalkieState from "../../models/WalkieState";
 import {
@@ -765,3 +774,5 @@ export async function clearPersistentWalkieMessages(matchId, participantId) {
     toParticipantId: String(participantId),
   });
 }
+
+

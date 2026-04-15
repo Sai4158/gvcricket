@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Defines the Mongoose schema and model wiring for Match data.
+ * Main exports: default export.
+ * Major callers: Server loaders, API routes, and data helpers.
+ * Side effects: registers or reuses a Mongoose model.
+ * Read next: ./README.md
+ */
+
 import mongoose from "mongoose";
 
 const BallSchema = new mongoose.Schema(
@@ -86,10 +95,10 @@ const MatchSchema = new mongoose.Schema(
       enum: ["simple", "full", ""],
       default: "",
     },
-    announcerScoreSoundEffectsEnabled: { type: Boolean, default: true },
+    announcerScoreSoundEffectsEnabled: { type: Boolean, default: false },
     announcerBroadcastScoreSoundEffectsEnabled: {
       type: Boolean,
-      default: true,
+      default: false,
     },
     walkieTalkieEnabled: { type: Boolean, default: false },
     walkieTalkieUpdatedAt: { type: Date, default: null },
@@ -109,3 +118,5 @@ MatchSchema.index({ isOngoing: 1, updatedAt: -1, _id: -1 });
 MatchSchema.index({ updatedAt: -1 });
 
 export default mongoose.models.Match || mongoose.model("Match", MatchSchema);
+
+

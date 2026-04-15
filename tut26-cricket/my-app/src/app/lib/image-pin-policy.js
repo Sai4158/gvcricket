@@ -1,6 +1,15 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Image Pin Policy logic for routes, APIs, and feature code.
+ * Main exports: getRequiredImagePinKind, getImagePinPromptConfig, getImagePinCheckPayload, IMAGE_PIN_ATTEMPT_LIMIT, IMAGE_PIN_ATTEMPT_WINDOW_MS, IMAGE_PIN_ATTEMPT_BLOCK_MS, IMAGE_PIN_KIND.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 export const IMAGE_PIN_ATTEMPT_LIMIT = 4;
 export const IMAGE_PIN_ATTEMPT_WINDOW_MS = 5 * 60 * 1000;
-export const IMAGE_PIN_ATTEMPT_BLOCK_MS = 2 * 60 * 1000;
+export const IMAGE_PIN_ATTEMPT_BLOCK_MS = 60 * 1000;
 
 export const IMAGE_PIN_KIND = {
   UMPIRE_OR_MANAGE: "umpire-or-manage",
@@ -63,3 +72,5 @@ export function getImagePinCheckPayload({
     allowUmpirePin: !usesManagePin,
   };
 }
+
+

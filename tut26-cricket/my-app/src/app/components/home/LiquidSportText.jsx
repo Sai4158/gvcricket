@@ -1,7 +1,59 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+/**
+ * File overview:
+ * Purpose: Renders Home UI for the app's screens and flows.
+ * Main exports: LiquidSportText.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
+
+import { motion } from "framer-motion";
+import { useSyncExternalStore } from "react";
 import useHomeDesktopReveal from "./useHomeDesktopReveal";
+
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+function subscribeReducedMotion(onStoreChange) {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return () => {};
+  }
+
+  const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY);
+  const handleChange = () => {
+    onStoreChange();
+  };
+
+  if (typeof mediaQuery.addEventListener === "function") {
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }
+
+  mediaQuery.addListener(handleChange);
+  return () => mediaQuery.removeListener(handleChange);
+}
+
+function getReducedMotionSnapshot() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
+  }
+
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
+
+function getReducedMotionServerSnapshot() {
+  return false;
+}
+
+function useHydrationSafeReducedMotion() {
+  return useSyncExternalStore(
+    subscribeReducedMotion,
+    getReducedMotionSnapshot,
+    getReducedMotionServerSnapshot
+  );
+}
 
 export default function LiquidSportText({
   as: Component = "h2",
@@ -29,10 +81,13 @@ export default function LiquidSportText({
   simplifyMotion = false,
   lightweightCharacterReveal = false,
 }) {
-  const prefersReducedMotion = useReducedMotion();
-  const shouldSimplifyMotion = prefersReducedMotion || simplifyMotion;
+  const prefersReducedMotion = useHydrationSafeReducedMotion();
+  const shouldRespectReducedMotion = Boolean(prefersReducedMotion);
+  const shouldSimplifyMotion = shouldRespectReducedMotion || simplifyMotion;
   const shouldUseLightweightCharacterReveal =
-    lightweightCharacterReveal && characterTyping && !prefersReducedMotion;
+    lightweightCharacterReveal &&
+    characterTyping &&
+    !shouldRespectReducedMotion;
   const { ref, isVisible } = useHomeDesktopReveal(
     shouldUseLightweightCharacterReveal,
     {
@@ -453,3 +508,5 @@ export default function LiquidSportText({
     </Component>
   );
 }
+
+

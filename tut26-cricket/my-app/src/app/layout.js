@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Defines the root app shell, shared metadata, and global providers.
+ * Main exports: RootLayout, metadata, viewport.
+ * Major callers: Next.js App Router.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SmoothScroll from "./components/SmoothScroll";
@@ -112,11 +121,6 @@ const jsonLd = [
 ];
 
 export default function RootLayout({ children }) {
-  const shouldRenderAnalytics =
-    process.env.NODE_ENV === "production" &&
-    process.env.VERCEL === "1" &&
-    process.env.NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS === "1";
-
   return (
     <html lang="en">
       <head>
@@ -132,8 +136,10 @@ export default function RootLayout({ children }) {
         <RouteFeedbackProvider>
           <SmoothScroll>{children}</SmoothScroll>
         </RouteFeedbackProvider>
-        {shouldRenderAnalytics ? <Analytics /> : null}
+        <Analytics />
       </body>
     </html>
   );
 }
+
+

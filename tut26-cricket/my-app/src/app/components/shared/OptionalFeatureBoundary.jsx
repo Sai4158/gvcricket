@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * File overview:
+ * Purpose: Renders Shared UI for the app's screens and flows.
+ * Main exports: default export.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
 import { Component } from "react";
 
 function DefaultFallback({ label = "Feature unavailable." }) {
@@ -37,3 +46,5 @@ export default class OptionalFeatureBoundary extends Component {
     return this.props.children;
   }
 }
+
+

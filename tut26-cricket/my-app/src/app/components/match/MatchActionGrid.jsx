@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+/**
+ * File overview:
+ * Purpose: Renders Match UI for the app's screens and flows.
+ * Main exports: MatchActionGrid.
+ * Major callers: Feature routes and sibling components.
+ * Side effects: uses React hooks and browser APIs.
+ * Read next: ./README.md
+ */
+
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   FaBookOpen,
@@ -112,7 +121,7 @@ function AnnounceIcon() {
   );
 }
 
-const ACTION_HOLD_DELAY_MS = 60;
+const ACTION_HOLD_DELAY_MS = 180;
 
 function ActionHelpItem({ icon, title, description, colorClass, rank }) {
   return (
@@ -160,6 +169,7 @@ function ActionIconButton({
   compact = false,
 }) {
   const holdTimerRef = useRef(null);
+  const pressActiveRef = useRef(false);
   const holdStartedRef = useRef(false);
   const suppressClickRef = useRef(false);
   const feedbackTriggeredRef = useRef(false);
@@ -203,19 +213,30 @@ function ActionIconButton({
     }
   };
 
-  const clearHoldTimer = () => {
+  const hasPointerSupport =
+    typeof window !== "undefined" && "PointerEvent" in window;
+
+  const clearHoldTimer = useCallback(() => {
     if (holdTimerRef.current) {
       window.clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
     }
-  };
+  }, []);
 
-  const beginPress = () => {
+  const suppressNextClick = useCallback((delayMs = 180) => {
+    suppressClickRef.current = true;
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, delayMs);
+  }, []);
+
+  const beginPress = useCallback(() => {
     feedbackTriggeredRef.current = false;
     if (disabled || !onHoldStart) {
       return;
     }
 
+    pressActiveRef.current = true;
     setHoldPreviewActive(true);
     onPressFeedback?.();
     feedbackTriggeredRef.current = true;
@@ -225,24 +246,32 @@ function ActionIconButton({
       holdStartedRef.current = true;
       void onHoldStart();
     }, ACTION_HOLD_DELAY_MS);
-  };
+  }, [clearHoldTimer, disabled, onHoldStart, onPressFeedback, onPressStart]);
 
-  const endPress = () => {
+  const endPress = useCallback(() => {
+    if (!pressActiveRef.current) {
+      return false;
+    }
+
+    pressActiveRef.current = false;
     clearHoldTimer();
     setHoldPreviewActive(false);
     if (!holdStartedRef.current) {
-      return;
+      return false;
     }
+
     holdStartedRef.current = false;
-    suppressClickRef.current = true;
+    suppressNextClick();
     void onHoldEnd?.();
-    window.setTimeout(() => {
-      suppressClickRef.current = false;
-    }, 180);
-  };
+    return true;
+  }, [clearHoldTimer, onHoldEnd, suppressNextClick]);
 
   useEffect(() => {
     const handlePointerRelease = (event) => {
+      if (!pressActiveRef.current) {
+        return;
+      }
+
       if (
         pointerIdRef.current !== null &&
         event.pointerId !== undefined &&
@@ -262,15 +291,18 @@ function ActionIconButton({
       window.removeEventListener("pointerup", handlePointerRelease);
       window.removeEventListener("pointercancel", handlePointerRelease);
     };
-  });
+  }, [endPress]);
 
   return (
     <motion.button
       type="button"
       whileTap={{ scale: 0.985 }}
-      onClick={() => {
+      onClick={(event) => {
         if (holdStartedRef.current || suppressClickRef.current) {
           holdStartedRef.current = false;
+          return;
+        }
+        if (onHoldStart && event?.detail !== 0) {
           return;
         }
         if (!feedbackTriggeredRef.current) {
@@ -283,6 +315,9 @@ function ActionIconButton({
       onPointerDown={(event) => {
         if (!event.isPrimary) return;
         if (event.pointerType === "mouse" && event.button !== 0) return;
+        if (onHoldStart) {
+          event.preventDefault();
+        }
         pointerIdRef.current = event.pointerId;
         safeSetPointerCapture(event.currentTarget, event.pointerId);
         beginPress();
@@ -297,7 +332,17 @@ function ActionIconButton({
         }
         safeReleasePointerCapture(event.currentTarget, event.pointerId);
         pointerIdRef.current = null;
+        const didHold = holdStartedRef.current;
         endPress();
+        if (onHoldStart && !didHold && !disabled) {
+          event.preventDefault();
+          suppressNextClick();
+          if (!feedbackTriggeredRef.current) {
+            onPressFeedback?.();
+          }
+          feedbackTriggeredRef.current = false;
+          onClick?.();
+        }
       }}
       onPointerCancel={(event) => {
         if (
@@ -331,6 +376,37 @@ function ActionIconButton({
       onDragStart={(event) => {
         event.preventDefault();
       }}
+      onTouchStart={(event) => {
+        if (hasPointerSupport) {
+          return;
+        }
+        if (onHoldStart) {
+          event.preventDefault?.();
+        }
+        beginPress();
+      }}
+      onTouchEnd={(event) => {
+        if (hasPointerSupport) {
+          return;
+        }
+        const didHold = holdStartedRef.current;
+        endPress();
+        if (onHoldStart && !didHold && !disabled) {
+          event.preventDefault?.();
+          suppressNextClick();
+          if (!feedbackTriggeredRef.current) {
+            onPressFeedback?.();
+          }
+          feedbackTriggeredRef.current = false;
+          onClick?.();
+        }
+      }}
+      onTouchCancel={() => {
+        if (hasPointerSupport) {
+          return;
+        }
+        endPress();
+      }}
       className={`press-feedback relative flex flex-col items-center justify-center text-zinc-300 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40 ${
         compact ? "w-24 gap-2 p-2" : "w-24 gap-2 p-2"
       }`}
@@ -338,7 +414,7 @@ function ActionIconButton({
         userSelect: "none",
         WebkitUserSelect: "none",
         WebkitTouchCallout: "none",
-        touchAction: "none",
+        touchAction: onHoldStart ? "none" : "manipulation",
         WebkitTapHighlightColor: "transparent",
       }}
       draggable={false}
@@ -379,7 +455,7 @@ function ActionIconButton({
       </span>
       {statusText || (holdPreviewActive && holdStatusText) ? (
         <span
-          className={`w-full text-left text-[10px] font-semibold uppercase tracking-[0.16em] ${
+          className={`w-full overflow-hidden text-ellipsis whitespace-nowrap text-left text-[10px] font-semibold uppercase tracking-[0.08em] ${
             holdPreviewActive && holdStatusText ? "text-cyan-200" : statusClass || "text-zinc-400"
           }`}
           style={{
@@ -406,7 +482,6 @@ export default function MatchActionGrid({
   onHistory,
   onImage,
   onCommentary,
-  onCommentaryHoldStart,
   onWalkie,
   onMic,
   onShare,
@@ -455,6 +530,62 @@ export default function MatchActionGrid({
         <div className="grid grid-cols-3 gap-x-4 gap-y-6">
           {showLiveControls ? (
             <ActionIconButton
+              onClick={onMic}
+              onHoldStart={onMicHoldStart}
+              onHoldEnd={onMicHoldEnd}
+              onPressFeedback={onPressFeedback}
+              icon={<CommentaryIcon />}
+              label="Loudspeaker"
+              colorClass="text-amber-300"
+              active={isCommentaryActive}
+              talking={isCommentaryTalking}
+              badge={isCommentaryTalking ? "Live" : isCommentaryActive ? "Ready" : "Hold"}
+              badgeClass={
+                isCommentaryTalking
+                  ? "border-cyan-400/30 bg-cyan-500/15 text-cyan-100"
+                  : isCommentaryActive
+                  ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
+                  : "border-amber-300/20 bg-amber-500/10 text-amber-100"
+              }
+              statusText={
+                isCommentaryTalking
+                  ? "Live on"
+                  : "Tap to hold"
+              }
+              statusClass={
+                isCommentaryTalking
+                  ? "text-cyan-100"
+                  : isCommentaryActive
+                  ? "text-amber-200"
+                  : "text-zinc-400"
+              }
+            />
+          ) : null}
+          <ActionIconButton
+            onClick={onCommentary}
+            onPressFeedback={onPressFeedback}
+            icon={<AnnounceIcon />}
+            label="Announcer / Effects"
+            colorClass="text-cyan-300"
+            active={isAnnounceActive}
+            badge={isAnnounceActive ? "On" : "Off"}
+            badgeClass={
+              isAnnounceActive
+                ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
+                : "border-rose-400/20 bg-rose-500/10 text-rose-200"
+            }
+          />
+          <ActionIconButton
+            onClick={onUndo}
+            onPressFeedback={onPressFeedback}
+            icon={<LuUndo2 />}
+            label="Undo"
+            colorClass="text-zinc-400"
+            disabled={isUpdating || historyStackLength === 0}
+            compact
+          />
+          {showLiveControls ? (
+            <ActionIconButton
               onClick={onWalkie}
               onPressStart={onWalkiePressStart}
               onHoldStart={onWalkieHoldStart}
@@ -482,11 +613,7 @@ export default function MatchActionGrid({
                   ? "Connecting"
                   : isWalkieFinishing
                   ? "Connected"
-                  : isWalkieActive && canHoldWalkie
-                  ? "Hold to talk"
-                  : isWalkieActive
-                  ? "Open panel"
-                  : ""
+                  : "Open panel"
               }
               statusClass={
                 isWalkieTalking
@@ -497,68 +624,6 @@ export default function MatchActionGrid({
                   ? "text-sky-100"
                   : isWalkieFinishing
                   ? "text-emerald-100"
-                  : isWalkieActive && canHoldWalkie
-                  ? "text-emerald-200"
-                  : "text-zinc-400"
-              }
-              holdStatusText={canHoldWalkie ? "Trying" : ""}
-            />
-          ) : null}
-          <ActionIconButton
-            onClick={onCommentary}
-            onHoldStart={onCommentaryHoldStart}
-            onPressFeedback={onPressFeedback}
-            icon={<AnnounceIcon />}
-            label="Announcer / Effects"
-            colorClass="text-cyan-300"
-            active={isAnnounceActive}
-            badge={isAnnounceActive ? "On" : "Off"}
-            badgeClass={
-              isAnnounceActive
-                ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
-                : "border-rose-400/20 bg-rose-500/10 text-rose-200"
-            }
-          />
-          <ActionIconButton
-            onClick={onUndo}
-            onPressFeedback={onPressFeedback}
-            icon={<LuUndo2 />}
-            label="Undo"
-            colorClass="text-zinc-400"
-            disabled={isUpdating || historyStackLength === 0}
-            compact
-          />
-          {showLiveControls ? (
-            <ActionIconButton
-              onClick={onMic}
-              onHoldStart={onMicHoldStart}
-              onHoldEnd={onMicHoldEnd}
-              onPressFeedback={onPressFeedback}
-              icon={<CommentaryIcon />}
-              label="Loudspeaker"
-              colorClass="text-amber-300"
-              active={isCommentaryActive}
-              talking={isCommentaryTalking}
-              badge={isCommentaryTalking ? "Live" : isCommentaryActive ? "On" : "Off"}
-              badgeClass={
-                isCommentaryTalking
-                  ? "border-cyan-400/30 bg-cyan-500/15 text-cyan-100"
-                  : isCommentaryActive
-                  ? "border-emerald-400/20 bg-emerald-500/12 text-emerald-200"
-                  : "border-rose-400/20 bg-rose-500/10 text-rose-200"
-              }
-              statusText={
-                isCommentaryTalking
-                  ? "Live on"
-                  : isCommentaryActive && canHoldMic
-                  ? "Hold to talk"
-                  : ""
-              }
-              statusClass={
-                isCommentaryTalking
-                  ? "text-cyan-100"
-                  : isCommentaryActive && canHoldMic
-                  ? "text-amber-200"
                   : "text-zinc-400"
               }
             />
@@ -703,27 +768,28 @@ export default function MatchActionGrid({
                 {showLiveControls ? (
                   <ActionHelpItem
                     rank={3}
-                    icon={<WalkieIcon />}
-                    title="Walkie-Talkie"
+                    icon={<CommentaryIcon />}
+                    title="Loudspeaker"
                     description={[
-                      "Turn it on, then hold to talk live.",
-                      "Only one person can speak at a time, so live and busy states stay clear.",
-                      "Works live with umpire, director, and spectators.",
+                      "Tap it to open the loudspeaker pop-up, then press and hold the icon to talk.",
+                      "Best for quick PA calls and live voice updates on the ground.",
+                      "The loudspeaker stays simple, with no separate on and off switch.",
                     ]}
-                    colorClass="text-emerald-300"
+                    colorClass="text-amber-300"
                   />
                 ) : null}
                 {showLiveControls ? (
                   <ActionHelpItem
                     rank={4}
-                    icon={<CommentaryIcon />}
-                    title="Loudspeaker"
+                    icon={<WalkieIcon />}
+                    title="Walkie-Talkie"
                     description={[
-                      "Turn it on first, then hold to talk on the ground.",
-                      "Best for quick PA calls and live voice updates.",
-                      "The mic bars react while you speak.",
+                      "Tap the icon to open the walkie panel.",
+                      "Once the panel is open, you can hold to talk when the channel is ready.",
+                      "Only one person can speak at a time, so live and busy states stay clear.",
+                      "Works live with umpire, director, and spectators.",
                     ]}
-                    colorClass="text-amber-300"
+                    colorClass="text-emerald-300"
                   />
                 ) : null}
                 <ActionHelpItem
@@ -789,3 +855,5 @@ export default function MatchActionGrid({
     </>
   );
 }
+
+

@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Match Image Secure logic for routes, APIs, and feature code.
+ * Main exports: hashMatchImageSourceUrl, buildSignedMatchImageUrl, hasValidSignedMatchImageUrl, encryptMatchImageSourceUrl, decryptMatchImageSourceUrl, resolveStoredMatchImageSource, getPublicMatchImagePath.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: none.
+ * Read next: ./README.md
+ */
+
 import crypto from "node:crypto";
 import {
   buildPublicMatchImageUrl,
@@ -236,3 +245,5 @@ export function getPublicMatchImagePath(match) {
 
   return buildSignedMatchImageUrl(match._id, version);
 }
+
+

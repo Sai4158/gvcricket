@@ -1,3 +1,12 @@
+/**
+ * File overview:
+ * Purpose: Provides shared Live Updates logic for routes, APIs, and feature code.
+ * Main exports: publishMatchUpdate, publishSessionUpdate, subscribeToMatch, subscribeToSession, getMatchSubscriberCount, getSessionSubscriberCount.
+ * Major callers: Route loaders, API routes, and feature components.
+ * Side effects: registers or reuses a Mongoose model.
+ * Read next: ./README.md
+ */
+
 import { EventEmitter } from "node:events";
 import mongoose from "mongoose";
 import { connectDB } from "./db";
@@ -207,3 +216,5 @@ export function getMatchSubscriberCount(matchId) {
 export function getSessionSubscriberCount(sessionId) {
   return Number(state.sessionSubscribers.get(String(sessionId)) || 0);
 }
+
+
