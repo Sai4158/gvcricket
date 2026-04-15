@@ -34,6 +34,7 @@ export default function ImagePinModal({
   summaryItems = [],
   rateLimitScope = "media-pin",
   allowSubmitDuringRateLimit = false,
+  maskDigits = digitCount === 6,
   onConfirm,
   onContinueWithout,
   onClose,
@@ -166,7 +167,7 @@ export default function ImagePinModal({
                 <input
                   ref={inputRef}
                   id="image-pin-input"
-                  type="text"
+                  type={maskDigits ? "password" : "text"}
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   maxLength={digitCount}
