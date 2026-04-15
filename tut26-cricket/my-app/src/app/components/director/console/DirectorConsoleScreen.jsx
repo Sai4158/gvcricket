@@ -41,6 +41,7 @@ import useDirectorAuth from "./hooks/useDirectorAuth";
 import useDirectorMusicDeck from "./hooks/useDirectorMusicDeck";
 import useDirectorSessionSelection from "./hooks/useDirectorSessionSelection";
 import useDirectorWalkieControls from "./hooks/useDirectorWalkieControls";
+import LoadingButton from "../../shared/LoadingButton";
 import DirectorAudioOutputPanel from "./panels/DirectorAudioOutputPanel";
 import DirectorConsoleEntrySection from "./panels/DirectorConsoleEntrySection";
 import DirectorLoudspeakerPanel from "./panels/DirectorLoudspeakerPanel";
@@ -73,6 +74,7 @@ export default function DirectorConsoleScreen({
 }) {
   const router = useRouter();
   const [authorized, setAuthorized] = useState(Boolean(initialAuthorized));
+  const [isLeavingDirectorMode, setIsLeavingDirectorMode] = useState(false);
   const [pin, setPin] = useState("");
   const [authError, setAuthError] = useState("");
   const [isSubmittingPin, setIsSubmittingPin] = useState(false);
@@ -1458,20 +1460,51 @@ export default function DirectorConsoleScreen({
     youtubePlayerRef,
   });
   const canManageSession = Boolean(authorized && managedSession?.match?._id);
+  const handleLeaveDirectorMode = useCallback(async () => {
+    if (isLeavingDirectorMode) {
+      return;
+    }
+
+    setIsLeavingDirectorMode(true);
+    try {
+      await leaveDirectorMode();
+      if (typeof window !== "undefined") {
+        if (window.history.length > 1) {
+          router.back();
+          window.setTimeout(() => {
+            if (
+              window.location.pathname === "/director" ||
+              window.location.pathname.startsWith("/director?")
+            ) {
+              router.replace("/");
+            }
+          }, 180);
+          return;
+        }
+      }
+      router.replace("/");
+    } finally {
+      window.setTimeout(() => {
+        setIsLeavingDirectorMode(false);
+      }, 220);
+    }
+  }, [isLeavingDirectorMode, leaveDirectorMode, router]);
 
   return (
     <div className="mx-auto w-full max-w-full overflow-x-clip px-4 py-6 lg:max-w-375 lg:px-6 2xl:max-w-440">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <button
+        <LoadingButton
           type="button"
           onClick={() => {
-            void leaveDirectorMode();
+            void handleLeaveDirectorMode();
           }}
-          className="press-feedback inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white"
+          loading={isLeavingDirectorMode}
+          pendingLabel="Leaving..."
+          leadingIcon={<FaArrowLeft />}
+          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white"
         >
-          <FaArrowLeft />
-          Home
-        </button>
+          <span>Home</span>
+        </LoadingButton>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {authorized ? (
             <button

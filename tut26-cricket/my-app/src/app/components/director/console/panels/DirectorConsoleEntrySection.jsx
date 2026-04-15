@@ -7,6 +7,7 @@
  * Read next: ./README.md
  */
 
+import { useState } from "react";
 import { FaBroadcastTower } from "react-icons/fa";
 import LiquidSportText from "../../../home/LiquidSportText";
 import LoadingButton from "../../../shared/LoadingButton";
@@ -19,6 +20,7 @@ export default function DirectorConsoleEntrySection({
   auth,
   sessionSelection,
 }) {
+  const [isOpeningPinStep, setIsOpeningPinStep] = useState(false);
   const {
     authorized,
     directorPinError,
@@ -76,9 +78,18 @@ export default function DirectorConsoleEntrySection({
                 <LoadingButton
                   type="button"
                   onClick={() => {
+                    if (isOpeningPinStep) {
+                      return;
+                    }
+                    setIsOpeningPinStep(true);
                     setAuthError("");
-                    setShowDirectorPinStep(true);
+                    window.requestAnimationFrame(() => {
+                      setShowDirectorPinStep(true);
+                      setIsOpeningPinStep(false);
+                    });
                   }}
+                  loading={isOpeningPinStep}
+                  pendingLabel="Opening..."
                   className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(90deg,#10b981_0%,#22c55e_58%,#34d399_100%)] px-5 py-3.5 font-bold text-black shadow-[0_16px_36px_rgba(16,185,129,0.2)] transition hover:-translate-y-0.5 hover:brightness-105"
                 >
                   Get Started
