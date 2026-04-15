@@ -12,7 +12,7 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  FaArrowUpRightFromSquare,
+  FaArrowRight,
   FaCheck,
   FaEye,
   FaLock,
@@ -483,8 +483,8 @@ function SessionCard({
             >
               {({ pending, spinner }) => (
                 <>
-                  {pending ? spinner : <FaArrowUpRightFromSquare />}
-                  <span>{pending ? "Opening..." : "See Final Score"}</span>
+                  <span>{pending ? "Opening..." : "View All Details"}</span>
+                  {pending ? spinner : <FaArrowRight />}
                 </>
               )}
             </PendingLink>
