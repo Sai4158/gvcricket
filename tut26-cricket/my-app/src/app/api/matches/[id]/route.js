@@ -32,6 +32,7 @@ import {
 } from "../../../lib/request-security";
 import { hydrateLegacyTossState } from "../../../lib/match-toss";
 import { matchPatchSchema } from "../../../lib/validators";
+import { invalidateSessionsDataCache } from "../../../lib/server-data";
 import Match from "../../../../models/Match";
 import Session from "../../../../models/Session";
 
@@ -222,6 +223,7 @@ export async function PATCH(req, { params }) {
         timestamps: false,
       }
     );
+    invalidateSessionsDataCache();
     publishMatchUpdate(match._id);
     publishSessionUpdate(match.sessionId);
 
@@ -289,6 +291,7 @@ export async function DELETE(req, { params }) {
       },
     });
     await Match.findByIdAndDelete(id);
+    invalidateSessionsDataCache();
     publishMatchUpdate(id);
     publishSessionUpdate(match.sessionId);
 

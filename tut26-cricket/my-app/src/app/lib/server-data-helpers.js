@@ -21,6 +21,10 @@ export const SESSION_MATCH_SUMMARY_FIELDS =
   "_id teamA teamB teamAName teamBName tossWinner tossDecision score outs innings innings1 innings2 isOngoing result updatedAt sessionId matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy createdAt";
 export const FALLBACK_SESSION_FIELDS =
   "tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy updatedAt";
+export const HOME_LIVE_BANNER_SESSION_FIELDS =
+  "_id match teamAName teamBName matchImageUrl createdAt updatedAt";
+export const HOME_LIVE_BANNER_MATCH_FIELDS =
+  "_id sessionId teamAName teamBName score outs isOngoing result matchImageUrl lastEventType lastEventText createdAt updatedAt";
 export const NON_DRAFT_SESSION_COLLECTION_FILTER = {
   isDraft: { $ne: true },
 };
@@ -37,22 +41,47 @@ function buildProjection(fields) {
 
 export const PUBLIC_SESSION_PROJECTION = buildProjection(PUBLIC_SESSION_FIELDS);
 export const SESSION_MATCH_SUMMARY_PROJECTION = buildProjection(SESSION_MATCH_SUMMARY_FIELDS);
+export const HOME_LIVE_BANNER_SESSION_PROJECTION = buildProjection(
+  HOME_LIVE_BANNER_SESSION_FIELDS
+);
+export const HOME_LIVE_BANNER_MATCH_PROJECTION = buildProjection(
+  HOME_LIVE_BANNER_MATCH_FIELDS
+);
 
-export const globalServerDataCache = globalThis.__gvServerDataCache || {
-  sessionsIndex: {
+function createServerDataCacheEntry() {
+  return {
     value: null,
     expiresAt: 0,
     pending: null,
-  },
-  directorSessions: {
-    value: null,
-    expiresAt: 0,
-    pending: null,
-  },
-};
+  };
+}
+
+function ensureServerDataCacheShape(cache) {
+  const nextCache = cache || {};
+
+  if (!nextCache.sessionsIndex) {
+    nextCache.sessionsIndex = createServerDataCacheEntry();
+  }
+
+  if (!nextCache.directorSessions) {
+    nextCache.directorSessions = createServerDataCacheEntry();
+  }
+
+  if (!nextCache.homeLiveBanner) {
+    nextCache.homeLiveBanner = createServerDataCacheEntry();
+  }
+
+  return nextCache;
+}
+
+export const globalServerDataCache = ensureServerDataCacheShape(
+  globalThis.__gvServerDataCache
+);
 
 if (!globalThis.__gvServerDataCache) {
   globalThis.__gvServerDataCache = globalServerDataCache;
+} else {
+  ensureServerDataCacheShape(globalThis.__gvServerDataCache);
 }
 
 export function invalidateSessionsDataCache() {
@@ -62,6 +91,9 @@ export function invalidateSessionsDataCache() {
   globalServerDataCache.directorSessions.value = null;
   globalServerDataCache.directorSessions.expiresAt = 0;
   globalServerDataCache.directorSessions.pending = null;
+  globalServerDataCache.homeLiveBanner.value = null;
+  globalServerDataCache.homeLiveBanner.expiresAt = 0;
+  globalServerDataCache.homeLiveBanner.pending = null;
 }
 
 export function getPublicId(value) {

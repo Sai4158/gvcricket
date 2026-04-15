@@ -22,6 +22,8 @@ import { hasCompleteTossState, hydrateLegacyTossState, normalizeLegacyTossState 
 import {
   buildLockedTossPageData,
   FALLBACK_SESSION_FIELDS,
+  HOME_LIVE_BANNER_MATCH_PROJECTION,
+  HOME_LIVE_BANNER_SESSION_PROJECTION,
   getIsoTimestamp,
   getPublicId,
   globalServerDataCache,
@@ -105,7 +107,19 @@ function getStableSessionSortTimestamp(sessionDate, ...fallbacks) {
   return getStableCreatedTimestamp(...fallbacks);
 }
 
+function getHomeLiveBannerMatchQueryOptions(limit = 1) {
+  return {
+    projection: HOME_LIVE_BANNER_MATCH_PROJECTION,
+    sort: { updatedAt: -1, _id: -1 },
+    limit,
+  };
+}
+
 async function getCachedServerData(cacheEntry, loader) {
+  if (!cacheEntry) {
+    return loader();
+  }
+
   const now = Date.now();
 
   if (cacheEntry.value && cacheEntry.expiresAt > now) {
@@ -199,6 +213,141 @@ async function readSessionsIndexPageData() {
   return {
     sessions: mappedSessions,
     totalCount: Number(totalCount || 0),
+  };
+}
+
+async function readHomeLiveBannerData() {
+  await connectDB();
+
+  const [meaningfulLiveMatches, scoredMatches, liveMatches, latestSession] = await Promise.all([
+    Match.collection.find(
+      {
+        isOngoing: true,
+        $or: [
+          { score: { $gt: 0 } },
+          { outs: { $gt: 0 } },
+          { lastEventType: { $exists: true, $nin: ["", null] } },
+          { lastEventText: { $exists: true, $nin: ["", null] } },
+        ],
+      },
+      getHomeLiveBannerMatchQueryOptions(8)
+    ).toArray(),
+    Match.collection.find(
+      {
+        $or: [
+          { score: { $gt: 0 } },
+          { outs: { $gt: 0 } },
+          { result: { $exists: true, $nin: ["", null] } },
+        ],
+      },
+      getHomeLiveBannerMatchQueryOptions(8)
+    ).toArray(),
+    Match.collection.find(
+      {
+        isOngoing: true,
+      },
+      getHomeLiveBannerMatchQueryOptions(8)
+    ).toArray(),
+    Session.collection.findOne(NON_DRAFT_SESSION_COLLECTION_FILTER, {
+      projection: HOME_LIVE_BANNER_SESSION_PROJECTION,
+      sort: { createdAt: -1, _id: -1 },
+    }),
+  ]);
+
+  const candidateMatches = [...meaningfulLiveMatches, ...scoredMatches, ...liveMatches];
+  const uniqueCandidateMatches = [];
+  const seenMatchIds = new Set();
+
+  for (const candidateMatch of candidateMatches) {
+    const candidateMatchId = getPublicId(candidateMatch?._id);
+    if (!candidateMatchId || seenMatchIds.has(candidateMatchId)) {
+      continue;
+    }
+
+    seenMatchIds.add(candidateMatchId);
+    uniqueCandidateMatches.push(candidateMatch);
+  }
+
+  const candidateSessionIds = uniqueCandidateMatches
+    .map((match) => getPublicId(match?.sessionId))
+    .filter((sessionId) => isValidObjectId(sessionId))
+    .map((sessionId) => new Types.ObjectId(sessionId));
+
+  const candidateSessions = candidateSessionIds.length
+    ? await Session.collection
+        .find(
+          {
+            ...NON_DRAFT_SESSION_COLLECTION_FILTER,
+            _id: { $in: candidateSessionIds },
+          },
+          {
+            projection: HOME_LIVE_BANNER_SESSION_PROJECTION,
+          }
+        )
+        .toArray()
+    : [];
+
+  const sessionsById = new Map(
+    candidateSessions.map((session) => [getPublicId(session._id), session])
+  );
+
+  const selectedMatch =
+    uniqueCandidateMatches.find((candidateMatch) => {
+      if (!candidateMatch) {
+        return false;
+      }
+
+      if (!candidateMatch.isOngoing) {
+        return Boolean(getPublicId(candidateMatch._id));
+      }
+
+      return sessionsById.has(getPublicId(candidateMatch.sessionId));
+    }) || null;
+
+  if (selectedMatch) {
+    const fallbackSession =
+      sessionsById.get(getPublicId(selectedMatch.sessionId)) ||
+      (await loadFallbackSession(selectedMatch.sessionId, FALLBACK_SESSION_FIELDS));
+
+    return {
+      sessionId: getPublicId(selectedMatch.sessionId),
+      matchId: getPublicId(selectedMatch._id),
+      teamAName:
+        selectedMatch.teamAName || fallbackSession?.teamAName || "Team A",
+      teamBName:
+        selectedMatch.teamBName || fallbackSession?.teamBName || "Team B",
+      score: Number(selectedMatch.score || 0),
+      outs: Number(selectedMatch.outs || 0),
+      isLive: Boolean(selectedMatch.isOngoing),
+      matchImageUrl:
+        selectedMatch.matchImageUrl || fallbackSession?.matchImageUrl || "",
+      updatedAt: getIsoTimestamp(
+        selectedMatch.updatedAt,
+        selectedMatch.createdAt,
+        fallbackSession?.updatedAt
+      ),
+    };
+  }
+
+  if (!latestSession) {
+    return null;
+  }
+
+  const latestSessionMatchId = getPublicId(latestSession.match);
+  if (!latestSessionMatchId) {
+    return null;
+  }
+
+  return {
+    sessionId: getPublicId(latestSession._id),
+    matchId: latestSessionMatchId,
+    teamAName: latestSession.teamAName || "Team A",
+    teamBName: latestSession.teamBName || "Team B",
+    score: 0,
+    outs: 0,
+    isLive: false,
+    matchImageUrl: latestSession.matchImageUrl || "",
+    updatedAt: getIsoTimestamp(latestSession.updatedAt, latestSession.createdAt),
   };
 }
 
@@ -396,54 +545,10 @@ export async function loadMatchAccessData(matchId) {
 }
 
 export async function loadHomeLiveBannerData() {
-  const { sessions } = await readSessionsIndexPageData();
-  const visibleSessions = Array.isArray(sessions) ? sessions : [];
-
-  if (!visibleSessions.length) {
-    return null;
-  }
-
-  const sessionsByRecentCreation = [...visibleSessions].sort((left, right) => {
-    const leftCreatedAt = getStableCreatedTimeMs(
-      left?.sortCreatedAt || left?.matchCreatedAt || left?.createdAt || left?.updatedAt,
-    );
-    const rightCreatedAt = getStableCreatedTimeMs(
-      right?.sortCreatedAt || right?.matchCreatedAt || right?.createdAt || right?.updatedAt,
-    );
-    return rightCreatedAt - leftCreatedAt;
-  });
-
-  const latestLiveSession = sessionsByRecentCreation.find((session) => session?.isLive);
-  const latestScoredSession = sessionsByRecentCreation.find((session) => {
-    const score = Number(session?.score || 0);
-    const outs = Number(session?.outs || 0);
-    const result = String(session?.result || "").trim();
-    return score > 0 || outs > 0 || Boolean(result);
-  });
-  const selectedSession =
-    latestLiveSession || latestScoredSession || sessionsByRecentCreation[0] || null;
-
-  if (!selectedSession) {
-    return null;
-  }
-
-  const matchId = getPublicId(selectedSession.match);
-  const isLive = Boolean(selectedSession.isLive);
-
-  return {
-    sessionId: getPublicId(selectedSession._id),
-    matchId,
-    teamAName: selectedSession.teamAName || "Team A",
-    teamBName: selectedSession.teamBName || "Team B",
-    score: Number(selectedSession.score || 0),
-    outs: Number(selectedSession.outs || 0),
-    isLive,
-    matchImageUrl: selectedSession.matchImageUrl || "",
-    updatedAt: getIsoTimestamp(
-      selectedSession.updatedAt,
-      selectedSession.createdAt
-    ),
-  };
+  return getCachedServerData(
+    globalServerDataCache.homeLiveBanner,
+    readHomeLiveBannerData
+  );
 }
 
 async function readDirectorSessionsList() {
