@@ -27,6 +27,7 @@ import { getRequestMeta } from "../../../../lib/request-meta";
 import { parseJsonRequest } from "../../../../lib/request-security";
 import { hydrateLegacyTossState } from "../../../../lib/match-toss";
 import { matchActionSchema } from "../../../../lib/validators";
+import { invalidateSessionsDataCache } from "../../../../lib/server-data";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 
@@ -158,6 +159,7 @@ export async function POST(req, { params }) {
     await Session.findByIdAndUpdate(updatedMatch.sessionId, {
       $set: buildSessionMirrorUpdate(updatedMatch),
     });
+    invalidateSessionsDataCache();
     publishMatchUpdate(updatedMatch._id);
     publishSessionUpdate(updatedMatch.sessionId);
 
