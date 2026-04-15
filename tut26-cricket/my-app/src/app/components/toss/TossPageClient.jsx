@@ -16,6 +16,7 @@ import { FaArrowLeft, FaRedo } from "react-icons/fa";
 import { AccessGate, Splash } from "../match/MatchStatusShell";
 import useMatchAccess from "../match/useMatchAccess";
 import useSpeechAnnouncer from "../live/useSpeechAnnouncer";
+import InlineSpinner from "../shared/InlineSpinner";
 import LoadingButton from "../shared/LoadingButton";
 import TossStatePanels from "./TossStatePanels";
 import { getTeamBundle } from "../../lib/team-utils";
@@ -107,6 +108,7 @@ export default function TossPageClient({
   });
   const [matchDetails, setMatchDetails] = useState(initialMatch);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isBackingOut, setIsBackingOut] = useState(false);
   const [error, setError] = useState("");
   const { speak, prime, stop } = useSpeechAnnouncer(TOSS_ANNOUNCER_SETTINGS);
   const spokenCountdownRef = useRef(null);
@@ -301,14 +303,29 @@ export default function TossPageClient({
     setError("");
   };
 
-  const handleBack = () => {
+  const handleBack = async () => {
     if (status === "finished") {
       redoToss();
       return;
     }
 
+    if (isBackingOut) {
+      return;
+    }
+
+    setIsBackingOut(true);
     stop();
-    router.back();
+    try {
+      if (sessionId) {
+        router.push(`/teams/${sessionId}`);
+        return;
+      }
+      router.back();
+    } finally {
+      window.setTimeout(() => {
+        setIsBackingOut(false);
+      }, 220);
+    }
   };
 
   if (error) {
@@ -362,13 +379,24 @@ export default function TossPageClient({
 
           <div className="relative">
             <div className="mb-6 flex items-start justify-between gap-4">
-              <button
-                onClick={handleBack}
+              <LoadingButton
+                onClick={() => {
+                  void handleBack();
+                }}
+                loading={isBackingOut}
+                pendingLabel=""
+                loadingIcon={
+                  <InlineSpinner
+                    size="sm"
+                    label="Going back"
+                    className="text-current"
+                  />
+                }
                 className="press-feedback mt-1 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
                 aria-label="Go back"
               >
                 <FaArrowLeft />
-              </button>
+              </LoadingButton>
 
               <button
                 onClick={redoToss}

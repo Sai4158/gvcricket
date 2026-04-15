@@ -23,6 +23,7 @@ import TeamsInfoModal from "../../components/teams/InfoModal";
 import TeamRoster, {
   createDefaultRoster,
 } from "../../components/teams/TeamRoster";
+import InlineSpinner from "../../components/shared/InlineSpinner";
 import useSessionStorageState from "../../components/teams/useSessionStorageState";
 import LoadingButton from "../../components/shared/LoadingButton";
 import LiquidSportText from "../../components/home/LiquidSportText";
@@ -70,6 +71,7 @@ export default function TeamSelectionPageClient({ sessionId }) {
     6
   );
   const [isLoading, setIsLoading] = useState(false);
+  const [isBackingOut, setIsBackingOut] = useState(false);
   const [error, setError] = useState("");
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [imageUploadState, setImageUploadState] = useState("idle");
@@ -267,9 +269,20 @@ export default function TeamSelectionPageClient({ sessionId }) {
   };
 
   const handleBack = async () => {
+    if (isBackingOut) {
+      return;
+    }
+
+    setIsBackingOut(true);
     stop();
-    await deleteDraftSession();
-    router.push("/session/new");
+    try {
+      await deleteDraftSession();
+      router.push("/session/new");
+    } finally {
+      window.setTimeout(() => {
+        setIsBackingOut(false);
+      }, 220);
+    }
   };
 
   const handleSubmit = async () => {
@@ -338,14 +351,25 @@ export default function TeamSelectionPageClient({ sessionId }) {
       <div className="w-full max-w-4xl mx-auto">
         <header className="mb-8 mt-4">
           <div className="mb-5 flex items-center justify-between gap-4">
-            <button
+            <LoadingButton
               type="button"
-              onClick={handleBack}
+              onClick={() => {
+                void handleBack();
+              }}
+              loading={isBackingOut}
+              pendingLabel=""
+              loadingIcon={
+                <InlineSpinner
+                  size="sm"
+                  label="Going back"
+                  className="text-current"
+                />
+              }
               className="btn-ui-icon"
               aria-label="Go back"
             >
               <FaArrowLeft size={18} />
-            </button>
+            </LoadingButton>
             <button
               onClick={() => setIsInfoModalOpen(true)}
               className="btn-ui-icon"
