@@ -354,9 +354,10 @@ export default function ResultPageClient({ matchId, initialMatch }) {
             onClick={handleOpenSessions}
             loading={isLeavingToSessions}
             pendingLabel="Opening..."
-            className="bg-blue-600 text-white px-8 py-3 rounded-lg shadow-lg hover:bg-blue-500 transition-colors font-semibold"
+            className="inline-flex items-center gap-2 bg-blue-600 text-white px-8 py-3 rounded-lg shadow-lg hover:bg-blue-500 transition-colors font-semibold"
           >
-            View All Match History
+            <FaArrowLeft />
+            Back to All Sessions
           </LoadingButton>
         }
       />
