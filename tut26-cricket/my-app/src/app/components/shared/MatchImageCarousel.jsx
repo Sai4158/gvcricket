@@ -42,6 +42,7 @@ export default function MatchImageCarousel({
   const [activeIndex, setActiveIndex] = useState(0);
   const [isInteracting, setIsInteracting] = useState(false);
   const [transitionDirection, setTransitionDirection] = useState(1);
+  const [loadedImageKey, setLoadedImageKey] = useState("");
   const holdTimerRef = useRef(null);
   const interactionTimerRef = useRef(null);
   const pointerStartRef = useRef(null);
@@ -51,6 +52,8 @@ export default function MatchImageCarousel({
     ? Math.min(activeIndex, normalizedImages.length - 1)
     : 0;
   const activeImage = normalizedImages[resolvedActiveIndex] || null;
+  const activeImageKey = activeImage?.id || activeImage?.url || "";
+  const isImageReady = Boolean(activeImageKey) && loadedImageKey === activeImageKey;
   const nextImage =
     normalizedImages.length > 1
       ? normalizedImages[(resolvedActiveIndex + 1) % normalizedImages.length]
@@ -249,9 +252,17 @@ export default function MatchImageCarousel({
               fallbackClassName={animatedFallbackClassName}
               draggable={false}
               loading={compact ? "lazy" : "eager"}
+              onLoad={() => {
+                setLoadedImageKey(activeImageKey);
+              }}
             />
           </motion.div>
         </AnimatePresence>
+        {!isImageReady ? (
+          <div className="pointer-events-none absolute inset-0 z-[1] bg-[linear-gradient(180deg,rgba(12,12,16,0.5),rgba(8,8,12,0.24))]">
+            <div className="absolute inset-0 pending-shimmer bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))]" />
+          </div>
+        ) : null}
         {nextImage ? (
           <div className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0">
             <SafeMatchImage

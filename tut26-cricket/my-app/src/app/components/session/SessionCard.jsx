@@ -395,7 +395,11 @@ function SessionCard({
                   }}
                 />
               ) : (
-                <div className="aspect-[16/8.8] w-full bg-[linear-gradient(180deg,rgba(22,22,28,0.9),rgba(10,10,14,0.96))]" />
+                <div className="relative aspect-[16/8.8] w-full overflow-hidden bg-[linear-gradient(180deg,rgba(22,22,28,0.9),rgba(10,10,14,0.96))]">
+                  <div className="absolute inset-0 pending-shimmer bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))]" />
+                  <div className="absolute left-4 top-4 h-3 w-24 rounded-full bg-white/10" />
+                  <div className="absolute left-4 bottom-4 h-9 w-28 rounded-2xl bg-white/8" />
+                </div>
               )}
             </div>
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(7,7,10,0.08),rgba(7,7,10,0.18))]" />
