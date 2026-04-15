@@ -35,6 +35,8 @@ import {
   PUBLIC_SESSION_PROJECTION,
   READ_ONLY_PUBLIC_MATCH_FIELDS,
   resolveSessionMatches,
+  SESSIONS_INDEX_MATCH_PROJECTION,
+  SESSIONS_INDEX_SESSION_PROJECTION,
   SERVER_DATA_CACHE_TTL_MS,
   SESSION_MATCH_SUMMARY_PROJECTION,
 } from "./server-data-helpers";
@@ -160,53 +162,116 @@ async function readSessionsIndexPageData() {
   await connectDB();
 
   const [sessions, totalCount] = await Promise.all([
-    readVisibleSessionsWithMatches({ createdAt: -1 }),
+    Session.collection
+      .find(NON_DRAFT_SESSION_COLLECTION_FILTER, {
+        projection: SESSIONS_INDEX_SESSION_PROJECTION,
+      })
+      .sort({ createdAt: -1, _id: -1 })
+      .toArray(),
     Session.collection.countDocuments(NON_DRAFT_SESSION_COLLECTION_FILTER),
   ]);
 
-  const fallbackMatchesBySessionId = await resolveSessionMatches(sessions);
+  const linkedMatchIds = sessions
+    .map((session) => getPublicId(session.match))
+    .filter((matchId) => isValidObjectId(matchId))
+    .map((matchId) => new Types.ObjectId(matchId));
+  const unresolvedSessionIds = sessions
+    .filter((session) => !session.match)
+    .map((session) => getPublicId(session._id))
+    .filter((sessionId) => isValidObjectId(sessionId))
+    .map((sessionId) => new Types.ObjectId(sessionId));
+
+  const matchQuery = [];
+  if (linkedMatchIds.length) {
+    matchQuery.push({ _id: { $in: linkedMatchIds } });
+  }
+  if (unresolvedSessionIds.length) {
+    matchQuery.push({ sessionId: { $in: unresolvedSessionIds } });
+  }
+
+  const relatedMatches = matchQuery.length
+    ? await Match.collection
+        .find(
+          matchQuery.length === 1 ? matchQuery[0] : { $or: matchQuery },
+          {
+            projection: SESSIONS_INDEX_MATCH_PROJECTION,
+            sort: { updatedAt: -1, createdAt: -1, _id: -1 },
+          }
+        )
+        .toArray()
+    : [];
+
+  const linkedMatchesById = new Map();
+  const fallbackMatchesBySessionId = new Map();
+
+  for (const match of relatedMatches) {
+    const matchId = getPublicId(match._id);
+    const sessionId = getPublicId(match.sessionId);
+
+    if (matchId && !linkedMatchesById.has(matchId)) {
+      linkedMatchesById.set(matchId, match);
+    }
+
+    if (sessionId && !fallbackMatchesBySessionId.has(sessionId)) {
+      fallbackMatchesBySessionId.set(sessionId, match);
+    }
+  }
 
   const mappedSessions = sessions.map((session) => {
+    const linkedMatchId = getPublicId(session.match);
     let resolvedMatch =
-      session.match || fallbackMatchesBySessionId.get(String(session._id)) || null;
+      linkedMatchesById.get(linkedMatchId) ||
+      fallbackMatchesBySessionId.get(getPublicId(session._id)) ||
+      null;
     if (resolvedMatch && !hasCompleteTossState(resolvedMatch, session)) {
       resolvedMatch = normalizeLegacyTossState(resolvedMatch, session);
     }
-    const publicMatch = serializePublicMatch(resolvedMatch, session);
-    const publicSession = serializePublicSession({
-      ...session,
-      tossWinner: resolvedMatch?.tossWinner || session.tossWinner || "",
-      tossDecision: resolvedMatch?.tossDecision || session.tossDecision || "",
-      match: resolvedMatch?._id || session.match,
-    });
 
     return {
-      ...publicSession,
-      matchImageUrl: publicMatch?.matchImageUrl || publicSession.matchImageUrl || "",
+      _id: getPublicId(session._id),
+      name: session.name || "",
+      date: session.date || "",
+      overs: null,
+      isLive: resolvedMatch ? Boolean(resolvedMatch.isOngoing) : Boolean(session.isLive),
+      match: getPublicId(resolvedMatch?._id || session.match) || null,
+      tossWinner: resolvedMatch?.tossWinner || session.tossWinner || "",
+      tossDecision: resolvedMatch?.tossDecision || session.tossDecision || "",
+      teamAName: resolvedMatch?.teamAName || session.teamAName || "",
+      teamBName: resolvedMatch?.teamBName || session.teamBName || "",
+      teamA: [],
+      teamB: [],
+      matchImageUrl: resolvedMatch?.matchImageUrl || session.matchImageUrl || "",
       matchImages:
-        publicMatch?.matchImages?.length > 0
-          ? publicMatch.matchImages
-          : publicSession.matchImages || [],
-      matchCreatedAt: publicMatch?.createdAt || null,
+        Array.isArray(resolvedMatch?.matchImages) && resolvedMatch.matchImages.length > 0
+          ? resolvedMatch.matchImages
+          : Array.isArray(session.matchImages)
+            ? session.matchImages
+            : [],
+      matchCreatedAt: resolvedMatch?.createdAt || null,
       sortCreatedAt: getStableSessionSortTimestamp(
-        publicSession.date,
-        publicMatch?.createdAt,
-        publicSession.createdAt,
+        session.date,
+        resolvedMatch?.createdAt,
+        session.createdAt,
       ),
       updatedAt: session.updatedAt || session.createdAt,
-      isLive: resolvedMatch ? Boolean(resolvedMatch.isOngoing) : Boolean(session.isLive),
-      score: Number(publicMatch?.score || 0),
-      outs: Number(publicMatch?.outs || 0),
-      innings: publicMatch?.innings || "",
-      innings1: publicMatch?.innings1 || null,
-      innings2: publicMatch?.innings2 || null,
+      createdAt: session.createdAt || null,
+      score: Number(resolvedMatch?.score || 0),
+      outs: Number(resolvedMatch?.outs || 0),
+      innings: resolvedMatch?.innings || "",
+      innings1: resolvedMatch?.innings1 || null,
+      innings2: resolvedMatch?.innings2 || null,
       result: resolvedMatch?.result || session.result || "",
       tossReady:
-        publicMatch?.tossReady ||
         Boolean(
           (resolvedMatch?.tossWinner || session.tossWinner) &&
             (resolvedMatch?.tossDecision || session.tossDecision)
         ),
+      announcerEnabled: false,
+      announcerMode: "",
+      announcerScoreSoundEffectsEnabled: true,
+      announcerBroadcastScoreSoundEffectsEnabled: true,
+      lastEventType: "",
+      lastEventText: "",
     };
   });
 

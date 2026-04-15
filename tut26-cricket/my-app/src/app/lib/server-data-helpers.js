@@ -25,6 +25,10 @@ export const HOME_LIVE_BANNER_SESSION_FIELDS =
   "_id match teamAName teamBName matchImageUrl createdAt updatedAt";
 export const HOME_LIVE_BANNER_MATCH_FIELDS =
   "_id sessionId teamAName teamBName score outs isOngoing result matchImageUrl lastEventType lastEventText createdAt updatedAt";
+export const SESSIONS_INDEX_SESSION_FIELDS =
+  "_id name date isLive match tossWinner tossDecision teamAName teamBName matchImages matchImageUrl createdAt updatedAt";
+export const SESSIONS_INDEX_MATCH_FIELDS =
+  "_id sessionId teamAName teamBName tossWinner tossDecision score outs innings innings1 innings2 isOngoing result matchImages matchImageUrl createdAt updatedAt";
 export const NON_DRAFT_SESSION_COLLECTION_FILTER = {
   isDraft: { $ne: true },
 };
@@ -46,6 +50,12 @@ export const HOME_LIVE_BANNER_SESSION_PROJECTION = buildProjection(
 );
 export const HOME_LIVE_BANNER_MATCH_PROJECTION = buildProjection(
   HOME_LIVE_BANNER_MATCH_FIELDS
+);
+export const SESSIONS_INDEX_SESSION_PROJECTION = buildProjection(
+  SESSIONS_INDEX_SESSION_FIELDS
+);
+export const SESSIONS_INDEX_MATCH_PROJECTION = buildProjection(
+  SESSIONS_INDEX_MATCH_FIELDS
 );
 
 function createServerDataCacheEntry() {
