@@ -4,6 +4,10 @@
  * Main exports: revalidate, metadata.
  * Major callers: Next.js App Router.
  * Side effects: none.
+ * Reading guide:
+ * - top: imports and page settings
+ * - middle: SEO metadata for the session page
+ * - bottom: the page function that loads data and renders the client screen
  * Read next: ../README.md
  */
 
@@ -11,8 +15,10 @@ import SessionsPageClient from "../components/session/SessionsPageClient";
 import { absoluteUrl, siteConfig } from "../lib/site-metadata";
 import { loadSessionsIndexPageData } from "../lib/server-data";
 
+// Refresh this page data every 15 seconds.
 export const revalidate = 15;
 
+// Page title and social-preview data for /session.
 export const metadata = {
   title: "All Cricket Sessions - Live and Completed Matches",
   description:
@@ -42,8 +48,12 @@ export const metadata = {
   },
 };
 
+// Main session page route.
+// This loads the first batch of session data on the server,
+// then passes it into the client page component.
 export default async function SessionsPage({ searchParams }) {
   const { sessions, totalCount } = await loadSessionsIndexPageData();
+  // Optional refresh token from the URL, used by the client page when needed.
   const resolvedSearchParams = await searchParams;
   const refreshToken = String(resolvedSearchParams?.refresh || "").trim();
   return (

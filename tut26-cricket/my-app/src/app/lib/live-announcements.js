@@ -4,16 +4,22 @@
  * Main exports: getSpectatorAnnouncementPriority, buildSpectatorBallAnnouncement, buildSpectatorScoreAnnouncement, buildSpectatorOverCompleteAnnouncement, createScoreLiveEvent, createUndoLiveEvent, createMatchCorrectionLiveEvent, createMatchEndLiveEvent, createSoundEffectLiveEvent, createManualScoreAnnouncementLiveEvent, buildSpectatorAnnouncement, buildLiveScoreAnnouncementSequence, buildCurrentScoreAnnouncement, buildUmpireStageAnnouncement, buildUmpireSecondInningsStartSequence, buildUmpireAnnouncement, buildUmpireTapAnnouncement.
  * Major callers: Route loaders, API routes, and feature components.
  * Side effects: none.
+ * Reading guide:
+ * - top: small text helpers and score wording helpers
+ * - middle: spectator speech and live event builders
+ * - bottom: umpire lines like "Umpire has given ..."
  * Read next: ./README.md
  */
 
 import { countLegalBalls } from "./match-scoring";
 import { getBattingTeamBundle } from "./team-utils";
 
+// Small text helpers used by both spectator and umpire speech.
 function safeNumber(value) {
   return Number(value || 0);
 }
 
+// Clean one word so it sounds better when spoken.
 function normalizeSpeechToken(token) {
   const safeToken = String(token || "");
   const match = safeToken.match(/^([^A-Za-z0-9]*)([A-Za-z0-9][A-Za-z0-9'-]*)([^A-Za-z0-9]*)$/);
@@ -36,6 +42,7 @@ function normalizeSpeechToken(token) {
   return `${prefix}${normalizedCore}${suffix}`;
 }
 
+// Clean names before they are spoken.
 function normalizeSpeechName(value) {
   const safeValue = String(value || "").trim().replace(/\s+/g, " ");
   if (!safeValue) {
@@ -48,6 +55,7 @@ function normalizeSpeechName(value) {
     .join(" ");
 }
 
+// Clean result text for speech.
 function normalizeSpeechResultText(resultText) {
   const result = String(resultText || "").trim();
   if (!result) {
@@ -63,18 +71,22 @@ function normalizeSpeechResultText(resultText) {
   return `${normalizeSpeechName(winnerName)} won by ${margin}.`;
 }
 
+// Format run count like "1 run" or "2 runs".
 function pluralizeRuns(value) {
   return `${value} run${value === 1 ? "" : "s"}`;
 }
 
+// Format player count like "1 player" or "2 players".
 function pluralizePlayers(value) {
   return `${value} player${value === 1 ? "" : "s"}`;
 }
 
+// Format score like "40 for 2".
 function scoreLine(score, outs) {
   return `${score} for ${outs}`;
 }
 
+// Build speech text for team-size fixes.
 function buildRosterSizeCorrectionSummary(matchBefore, matchAfter, patch) {
   const teamABeforeSize = Array.isArray(matchBefore?.teamA)
     ? matchBefore.teamA.length
@@ -110,6 +122,7 @@ function buildRosterSizeCorrectionSummary(matchBefore, matchAfter, patch) {
   ].join(" ");
 }
 
+// Builds spoken required-rate text for a chase.
 function buildRequiredRateAnnouncementLine(target, overs) {
   const safeTarget = safeNumber(target);
   const safeOvers = safeNumber(overs);
@@ -140,6 +153,7 @@ function buildRequiredRateAnnouncementLine(target, overs) {
   return `Required rate is ${wholePart} point ${trimmedDecimal} runs per over.`;
 }
 
+// Turns a legal-ball count into overs-and-balls wording.
 function formatOversForAnnouncement(legalBalls) {
   const safeBalls = safeNumber(legalBalls);
   if (safeBalls <= 0) {
@@ -162,6 +176,7 @@ function formatOversForAnnouncement(legalBalls) {
   }`;
 }
 
+// Prepares the first-innings summary and chase setup lines.
 function buildUmpireFirstInningsTransitionDetails(match) {
   if (!match) {
     return {
@@ -205,38 +220,46 @@ function buildUmpireFirstInningsTransitionDetails(match) {
   };
 }
 
+// Chooses the current innings key from the match state.
 function getActiveInningsKey(match) {
   return match?.innings === "second" ? "innings2" : "innings1";
 }
 
+// Returns the current innings history for progress calculations.
 function getActiveHistory(match) {
   return match?.[getActiveInningsKey(match)]?.history ?? [];
 }
 
+// Counts completed overs in the active innings.
 function getCompletedOvers(match) {
   return Math.floor(countLegalBalls(getActiveHistory(match)) / 6);
 }
 
+// Counts completed legal balls in the active innings.
 function getCompletedLegalBalls(match) {
   return countLegalBalls(getActiveHistory(match));
 }
 
+// Calculates how many full overs remain in the innings.
 function getOversLeft(match) {
   return Math.max(0, safeNumber(match?.overs) - getCompletedOvers(match));
 }
 
+// Returns the current legal-ball number within the over.
 function getBallNumberInOver(match) {
   const legalBalls = countLegalBalls(getActiveHistory(match));
   const ballsIntoOver = legalBalls % 6;
   return ballsIntoOver === 0 ? 6 : ballsIntoOver;
 }
 
+// Counts wickets that fell in the current over.
 function getWicketsInCurrentOver(match) {
   const history = getActiveHistory(match);
   const over = history.at(-1);
   return over?.balls?.filter((ball) => ball?.isOut).length || 0;
 }
 
+// Calculates how many legal balls remain in the innings.
 function getBallsRemaining(match) {
   return Math.max(
     0,
@@ -244,11 +267,13 @@ function getBallsRemaining(match) {
   );
 }
 
+// Format remaining balls like "12 balls".
 function formatRemainingBalls(match) {
   const ballsRemaining = getBallsRemaining(match);
   return `${ballsRemaining} ball${ballsRemaining === 1 ? "" : "s"}`;
 }
 
+// Formats remaining overs and balls for speech.
 function formatRemainingOvers(match) {
   const ballsRemaining = getBallsRemaining(match);
   const overs = Math.floor(ballsRemaining / 6);
@@ -267,6 +292,7 @@ function formatRemainingOvers(match) {
   }`;
 }
 
+// Formats how much of the innings has been completed so far.
 function formatCompletedProgress(match) {
   const legalBalls = getCompletedLegalBalls(match);
   const overs = Math.floor(legalBalls / 6);
@@ -285,6 +311,7 @@ function formatCompletedProgress(match) {
   } bowled.`;
 }
 
+// Calculates how many balls remain in the current over.
 function getBallsLeftInCurrentOver(match) {
   const ballsRemaining = getBallsRemaining(match);
   if (ballsRemaining <= 0) {
@@ -298,6 +325,7 @@ function getBallsLeftInCurrentOver(match) {
   return Math.min(ballsLeftInCurrentOver, ballsRemaining);
 }
 
+// Formats current-over remaining balls for speech.
 function formatBallsLeftInCurrentOver(match) {
   const ballsLeftInCurrentOver = getBallsLeftInCurrentOver(match);
   return `${ballsLeftInCurrentOver} ball${
@@ -305,6 +333,7 @@ function formatBallsLeftInCurrentOver(match) {
   } left in this over.`;
 }
 
+// Combines current-over and innings-remaining progress into one line.
 function buildCurrentOverRemainingLine(match) {
   const ballsLeftLine = formatBallsLeftInCurrentOver(match).replace(/\.$/, "");
   const oversLeftLine = formatOversLeftAfterCurrentOver(match);
@@ -320,6 +349,7 @@ function buildCurrentOverRemainingLine(match) {
   return `${ballsLeftLine} and ${oversLeftLine.charAt(0).toLowerCase()}${oversLeftLine.slice(1)}`;
 }
 
+// Formats overs remaining after the current over finishes.
 function formatOversLeftAfterCurrentOver(match) {
   const ballsRemaining = getBallsRemaining(match);
   if (ballsRemaining <= 0) {
@@ -342,14 +372,17 @@ function formatOversLeftAfterCurrentOver(match) {
   } left.`;
 }
 
+// Cricket event helpers used to decide what should be spoken and how urgent it is.
 function isLegalBall(ball) {
   return ball?.extraType !== "wide" && ball?.extraType !== "noball";
 }
 
+// Checks whether a legal scoring shot was a boundary.
 function isBoundary(ball) {
   return safeNumber(ball?.runs) >= 4 && !ball?.extraType && !ball?.isOut;
 }
 
+// Flags events important enough to deserve extra spoken context.
 function isImportantEvent(ball) {
   return Boolean(
     ball?.isOut ||
@@ -359,6 +392,7 @@ function isImportantEvent(ball) {
   );
 }
 
+// Higher number means the announcement matters more.
 export function getSpectatorAnnouncementPriority(event) {
   if (!event) return 0;
   if (
@@ -385,10 +419,14 @@ export function getSpectatorAnnouncementPriority(event) {
   return 1;
 }
 
+// Core ball-to-speech conversion.
+// If you are looking for lines like "Umpire has given four runs." start here,
+// then also read buildUmpireAnnouncement near the bottom of this file.
 function buildRunsCall(runs) {
   return `Umpire has given ${pluralizeRuns(runs)}.`;
 }
 
+// Converts one scored ball into the core spoken event line.
 function buildBallEventLine(ball) {
   if (!ball) return "";
 
@@ -432,10 +470,12 @@ function buildBallEventLine(ball) {
   return buildRunsCall(safeNumber(ball.runs));
 }
 
+// Spoken line used when the umpire undoes the previous ball.
 function buildUndoAnnouncementLine() {
   return "Umpire has removed the score for that ball. Umpire will redo this ball.";
 }
 
+// Adds simple progress reminders at selected ball numbers.
 function buildProgressReminder(event, match) {
   if (!event?.ball || event.overCompleted || !isLegalBall(event.ball)) {
     return "";
@@ -448,6 +488,7 @@ function buildProgressReminder(event, match) {
   return "";
 }
 
+// Builds the spoken chase equation for second innings.
 function buildChaseEquationLine(match) {
   if (match?.innings !== "second") {
     return "";
@@ -464,6 +505,7 @@ function buildChaseEquationLine(match) {
   return `${runsNeeded} needed from ${formatRemainingBalls(match)}.`;
 }
 
+// Decides whether the chase equation is worth reading after an event.
 function shouldCallChaseEquation(event, match) {
   if (!event || !buildChaseEquationLine(match)) {
     return false;
@@ -490,6 +532,7 @@ function shouldCallChaseEquation(event, match) {
   return ballNumber === 3 || ballNumber === 5;
 }
 
+// Adds contextual reminders such as chase math or over progress.
 function buildSmartScoreReminder(event, match) {
   const chaseEquation = buildChaseEquationLine(match);
   if (shouldCallChaseEquation(event, match) && chaseEquation) {
@@ -499,10 +542,12 @@ function buildSmartScoreReminder(event, match) {
   return buildProgressReminder(event, match);
 }
 
+// Formats the main spoken score sentence.
 function buildScoreSentence(score, outs) {
   return `Score is ${scoreLine(safeNumber(score), safeNumber(outs))}.`;
 }
 
+// Returns result text exactly as it should be spoken.
 function buildResultLine(resultText) {
   const result = String(resultText || "").trim();
   if (!result) return "";
@@ -512,6 +557,7 @@ function buildResultLine(resultText) {
   return `${normalizeSpeechName(winnerName)} wins by ${margin}.`;
 }
 
+// Extracts just the winner name from result text when possible.
 function getWinnerName(resultText) {
   const result = String(resultText || "").trim();
   if (!result) return "";
@@ -519,11 +565,14 @@ function getWinnerName(resultText) {
   return winnerMatch ? normalizeSpeechName(winnerMatch[1]) : "";
 }
 
+// Builds a celebration line for match-winning announcements.
 function buildWinnerCelebrationLine(resultText) {
   const winnerName = getWinnerName(resultText);
   return winnerName ? `Congratulations ${winnerName}.` : "";
 }
 
+// Spectator speech starts here.
+// Builds the first spoken line for spectator live events.
 export function buildSpectatorBallAnnouncement(event) {
   if (!event) return "";
 
@@ -538,6 +587,8 @@ export function buildSpectatorBallAnnouncement(event) {
   return buildBallEventLine(event.ball);
 }
 
+// This builds the score-follow-up line after the main event line.
+// Example: after "four runs", this can add the score or target reminder.
 export function buildSpectatorScoreAnnouncement(event, match) {
   if (!event) return "";
 
@@ -600,6 +651,7 @@ export function buildSpectatorScoreAnnouncement(event, match) {
     return buildCurrentScoreAnnouncement(match);
   }
 
+  // Over-complete speech is handled by its own function below.
   if (event.overCompleted) {
     return "";
   }
@@ -615,6 +667,7 @@ export function buildSpectatorScoreAnnouncement(event, match) {
   return parts.join(" ");
 }
 
+// Spoken summary used when an over completes.
 export function buildSpectatorOverCompleteAnnouncement(match) {
   if (!match) return "";
 
@@ -648,15 +701,19 @@ export function buildSpectatorOverCompleteAnnouncement(match) {
   return parts.join(" ");
 }
 
+// Live-event factory functions below create the event objects stored on match.lastLiveEvent.
 export function createScoreLiveEvent(matchBefore, matchAfter, ball, options = {}) {
+  // Use the innings that was active after this ball.
   const activeInningsKey =
     matchAfter.innings === "first" ? "innings1" : "innings2";
   const history = matchAfter[activeInningsKey]?.history ?? [];
   const battingTeam = getBattingTeamBundle(matchAfter);
+  // A legal ball ends an over when the count reaches a multiple of 6.
   const overCompleted =
     isLegalBall(ball) &&
     countLegalBalls(history) > 0 &&
     countLegalBalls(history) % 6 === 0;
+  // In second innings, going past the target ends the chase.
   const targetChased =
     matchAfter.innings === "second" &&
     matchAfter.score > (matchBefore?.innings1?.score ?? 0);
@@ -678,6 +735,7 @@ export function createScoreLiveEvent(matchBefore, matchAfter, ball, options = {}
   };
 }
 
+// Event object for undo operations.
 export function createUndoLiveEvent(match) {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -689,7 +747,9 @@ export function createUndoLiveEvent(match) {
   };
 }
 
+// Event object for admin score and roster corrections.
 export function createMatchCorrectionLiveEvent(matchBefore, matchAfter, patch) {
+  // Use the latest innings so the overs text matches the new state.
   const activeInningsKey =
     matchAfter?.innings === "first" ? "innings1" : "innings2";
   const history = matchAfter?.[activeInningsKey]?.history ?? [];
@@ -712,6 +772,7 @@ export function createMatchCorrectionLiveEvent(matchBefore, matchAfter, patch) {
     .filter(Boolean)
     .join(" ");
 
+  // Keep old and new values so the UI can explain the fix.
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     type: "score_correction",
@@ -741,6 +802,7 @@ export function createMatchCorrectionLiveEvent(matchBefore, matchAfter, patch) {
   };
 }
 
+// Event object for match completion.
 export function createMatchEndLiveEvent(match, resultText, options = {}) {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -756,7 +818,9 @@ export function createMatchEndLiveEvent(match, resultText, options = {}) {
   };
 }
 
+// Event object for non-speech sound effects triggered during live play.
 export function createSoundEffectLiveEvent(match, effect, options = {}) {
+  // This event can mean either play or stop.
   const action = options.action === "stop" ? "stop" : "play";
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -789,6 +853,7 @@ export function createSoundEffectLiveEvent(match, effect, options = {}) {
   };
 }
 
+// Event object for "announce current score now" requests.
 export function createManualScoreAnnouncementLiveEvent(match) {
   const history = getActiveHistory(match);
   const legalBalls = countLegalBalls(history);
@@ -806,6 +871,7 @@ export function createManualScoreAnnouncementLiveEvent(match) {
   };
 }
 
+// Picks the spectator-facing primary spoken line for a live event.
 export function buildSpectatorAnnouncement(event, match, mode = "full") {
   if (!event || mode === "silent") {
     return "";
@@ -816,6 +882,7 @@ export function buildSpectatorAnnouncement(event, match, mode = "full") {
   }
 
   if (event.type === "innings_change") {
+    // For innings change, spectators first hear a short end-of-innings summary.
     const transition = buildUmpireFirstInningsTransitionDetails(match);
 
     return [
@@ -848,17 +915,20 @@ export function buildSpectatorAnnouncement(event, match, mode = "full") {
   }
 
   if (event.type === "manual_score_announcement") {
+    // Manual score requests skip the normal event line.
     return "";
   }
 
   return buildSpectatorBallAnnouncement(event);
 }
 
+// Builds the multi-line spectator speech queue for the live announcer hook.
 export function buildLiveScoreAnnouncementSequence(
   event,
   match,
   mode = "full",
 ) {
+  // Return an empty queue when there is nothing to say.
   if (!event || mode === "silent") {
     return {
       items: [],
@@ -898,6 +968,10 @@ export function buildLiveScoreAnnouncementSequence(
     ? buildSpectatorOverCompleteAnnouncement(match)
     : "";
 
+  // Queue order:
+  // 1. main event line
+  // 2. score line
+  // 3. over summary if the over just ended
   return {
     items: [
       {
@@ -925,9 +999,11 @@ export function buildLiveScoreAnnouncementSequence(
   };
 }
 
+// Manual score summary used when someone asks to hear the current score right now.
 export function buildCurrentScoreAnnouncement(match) {
   if (!match) return "";
 
+  // This is a short "where are we right now?" summary.
   const parts = [buildScoreSentence(match.score, match.outs)];
 
   if (match?.innings === "second") {
@@ -939,6 +1015,8 @@ export function buildCurrentScoreAnnouncement(match) {
   return parts.join(" ");
 }
 
+// Umpire speech starts here.
+// Spoken summary for innings transitions and end-of-match stage calls on the umpire side.
 export function buildUmpireStageAnnouncement(match) {
   if (!match) {
     return "";
@@ -976,6 +1054,7 @@ export function buildUmpireStageAnnouncement(match) {
     .join(" ");
 }
 
+// Full multi-line umpire intro for the second innings opening.
 export function buildUmpireSecondInningsStartSequence(match) {
   if (!match || match.innings !== "second") {
     return {
@@ -1032,6 +1111,9 @@ export function buildUmpireSecondInningsStartSequence(match) {
   };
 }
 
+// Main umpire speech text builder.
+// This is the clearest single place to read the exact "Umpire has given ..."
+// phrases for runs, wides, no balls, byes, leg byes, wickets, and dot balls.
 export function buildUmpireAnnouncement(event, mode = "simple") {
   if (!event || mode === "silent") {
     return "";
@@ -1050,6 +1132,7 @@ export function buildUmpireAnnouncement(event, mode = "simple") {
     return "";
   }
 
+  // The checks below pick the exact line for this ball result.
   if (ball.isOut) {
     return safeNumber(ball.runs) > 0
       ? `Umpire has given ${pluralizeRuns(safeNumber(ball.runs))}. Batter is out.`
@@ -1097,6 +1180,7 @@ export function buildUmpireAnnouncement(event, mode = "simple") {
   return `Umpire has given ${pluralizeRuns(safeNumber(ball.runs))}.`;
 }
 
+// Alternate umpire call used for simpler tap-to-preview interactions.
 export function buildUmpireTapAnnouncement(event, mode = "simple") {
   if (!event || mode === "silent") {
     return "";
@@ -1115,6 +1199,7 @@ export function buildUmpireTapAnnouncement(event, mode = "simple") {
     return "";
   }
 
+  // This version is shorter than buildUmpireAnnouncement.
   if (ball.isOut) {
     return safeNumber(ball.runs) > 0
       ? `${pluralizeRuns(safeNumber(ball.runs))} and out.`

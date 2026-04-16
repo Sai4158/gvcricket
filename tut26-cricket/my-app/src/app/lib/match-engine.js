@@ -4,6 +4,10 @@
  * Main exports: isProcessedAction, applyMatchAction, applySafeMatchPatch, buildSessionMirrorUpdate, MatchEngineError.
  * Major callers: Route loaders, API routes, and feature components.
  * Side effects: none.
+ * Reading guide:
+ * - top: copy helpers, saved state, and small match helpers
+ * - middle: toss, scoring, innings end, and undo
+ * - bottom: main exported functions used by the app
  * Read next: ./README.md
  */
 
@@ -22,6 +26,7 @@ import {
 } from "./live-announcements";
 import { getBattingTeamBundle, getTotalDismissalsAllowed } from "./team-utils";
 
+// These are the match fields we save for undo and fixes.
 const MUTABLE_STATE_KEYS = [
   "tossWinner",
   "tossDecision",
@@ -38,9 +43,12 @@ const MUTABLE_STATE_KEYS = [
   "lastEventText",
 ];
 
+// Keep only a limited number of old actions.
 const MAX_ACTION_HISTORY = 96;
+// Keep only a limited number of processed ids.
 const MAX_PROCESSED_ACTION_IDS = 256;
 
+// Custom error for bad match actions.
 export class MatchEngineError extends Error {
   constructor(message, status = 400) {
     super(message);
@@ -57,6 +65,7 @@ function cloneValue(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+// Turn a Mongoose document into a plain object we can safely edit.
 function toPlainMatch(matchDocument) {
   if (!matchDocument) return null;
 
@@ -65,6 +74,7 @@ function toPlainMatch(matchDocument) {
     : cloneValue(matchDocument);
 }
 
+// Save the current match state so undo can go back to it.
 function getSnapshot(match) {
   const snapshot = {};
 
@@ -75,17 +85,20 @@ function getSnapshot(match) {
   return snapshot;
 }
 
+// Put back the saved match state.
 function restoreSnapshot(match, snapshot) {
   for (const key of MUTABLE_STATE_KEYS) {
     match[key] = cloneValue(snapshot?.[key]);
   }
 }
 
+// Save an action id so the same action is not used twice.
 function appendProcessedActionId(match, actionId) {
   const nextActionIds = [...(match.processedActionIds || []), actionId];
   match.processedActionIds = nextActionIds.slice(-MAX_PROCESSED_ACTION_IDS);
 }
 
+// Save the old state before an action, so undo can use it later.
 function appendActionHistory(match, action, snapshot) {
   const nextHistory = [
     ...(match.actionHistory || []),
@@ -100,6 +113,7 @@ function appendActionHistory(match, action, snapshot) {
   match.actionHistory = nextHistory.slice(-MAX_ACTION_HISTORY);
 }
 
+// Store a simpler event type name for the UI.
 function getStoredLastEventType(liveEvent) {
   if (!liveEvent?.type) {
     return "";
@@ -108,34 +122,41 @@ function getStoredLastEventType(liveEvent) {
   return liveEvent.type === "score_update" ? "score" : liveEvent.type;
 }
 
+// Save the latest live event onto the match.
 function markLiveEvent(match, liveEvent) {
   match.lastLiveEvent = liveEvent;
   match.lastEventType = getStoredLastEventType(liveEvent);
   match.lastEventText = liveEvent?.summaryText || "";
 }
 
+// Pick first or second innings.
 function getActiveInningsKey(match) {
   return match?.innings === "second" ? "innings2" : "innings1";
 }
 
+// Get the over history for the current innings.
 function getActiveHistory(match) {
   return match?.[getActiveInningsKey(match)]?.history || [];
 }
 
+// Count wickets already stored in the history.
 function countDismissalsInHistory(history) {
   return (history || [])
     .flatMap((over) => over?.balls || [])
     .filter((ball) => ball?.isOut).length;
 }
 
+// Count only legal balls in the current innings.
 function getLegalBallsInActiveInnings(match) {
   return countLegalBalls(getActiveHistory(match));
 }
 
+// Get the max wickets allowed from the team size.
 function getDismissalLimit(match) {
   return getTotalDismissalsAllowed(match);
 }
 
+// Check if toss setup is done and scoring can start.
 function hasTossState(match) {
   return Boolean(
     match?.tossWinner &&
@@ -145,6 +166,7 @@ function hasTossState(match) {
   );
 }
 
+// Check if the match already has score activity.
 function hasScoreActivity(match) {
   return (
     Number(match?.score || 0) > 0 ||
@@ -155,6 +177,7 @@ function hasScoreActivity(match) {
   );
 }
 
+// Do not allow team size changes that break wicket history.
 function validateRosterDismissalState(match) {
   const teamAName = match?.teamAName || "Team A";
   const teamBName = match?.teamBName || "Team B";
@@ -195,6 +218,7 @@ function validateRosterDismissalState(match) {
   }
 }
 
+// In second innings, only the batting team can change player count.
 function getRosterEditPermissions(match) {
   if (match?.innings !== "second") {
     return { teamA: true, teamB: true };
@@ -210,6 +234,7 @@ function getRosterEditPermissions(match) {
   };
 }
 
+// Check if the chasing team has passed the target.
 function isTargetChased(match) {
   return (
     match?.innings === "second" &&
@@ -217,6 +242,7 @@ function isTargetChased(match) {
   );
 }
 
+// Check if the innings should end.
 function isCurrentInningsComplete(match) {
   const oversDone =
     Number(match?.overs || 0) > 0 &&
@@ -226,6 +252,7 @@ function isCurrentInningsComplete(match) {
   return oversDone || allOut || isTargetChased(match);
 }
 
+// Build the final result text.
 function buildMatchResult(match) {
   const firstInningsScore = Number(match?.innings1?.score || 0);
   const secondInningsScore = Number(match?.score || 0);
@@ -244,6 +271,7 @@ function buildMatchResult(match) {
   return "Match Tied";
 }
 
+// Make a simple system event like toss set or innings change.
 function createSystemLiveEvent(type, summaryText, match) {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
@@ -255,6 +283,7 @@ function createSystemLiveEvent(type, summaryText, match) {
   };
 }
 
+// Set the toss result and decide who bats first.
 function setToss(match, action) {
   const teamAName = match.teamAName || "Team A";
   const teamBName = match.teamBName || "Team B";
@@ -268,6 +297,7 @@ function setToss(match, action) {
     throw new MatchEngineError("Toss cannot change after scoring begins.", 409);
   }
 
+  // Save the old state so undo can come back here.
   const snapshot = getSnapshot(match);
   const nextMatch = toPlainMatch(match);
   const battingFirst =
@@ -303,6 +333,8 @@ function setToss(match, action) {
   return nextMatch;
 }
 
+// Main scoring function.
+// Read this for runs, wides, no balls, wickets, and match end checks.
 function scoreBall(match, action) {
   if (!hasTossState(match)) {
     throw new MatchEngineError("Set the toss before scoring starts.", 409);
@@ -335,6 +367,7 @@ function scoreBall(match, action) {
   const snapshot = getSnapshot(match);
   const nextMatch = toPlainMatch(match);
   const activeInningsKey = getActiveInningsKey(nextMatch);
+  // This ball object is what gets saved in history.
   const ball = {
     runs: Number(action.runs || 0),
     isOut: Boolean(action.isOut),
@@ -352,8 +385,10 @@ function scoreBall(match, action) {
   nextMatch.outs = Number(nextMatch.outs || 0) + (ball.isOut ? 1 : 0);
   nextMatch.balls = [...(nextMatch.balls || []), ball];
 
+  // This also updates over history and legal-ball count.
   addBallToHistory(nextMatch, ball);
 
+  // After scoring the ball, check if the match is over.
   if (isTargetChased(nextMatch)) {
     nextMatch.isOngoing = false;
     nextMatch.result = buildWinByWicketsText(nextMatch, nextMatch.outs);
@@ -388,6 +423,7 @@ function scoreBall(match, action) {
   return nextMatch;
 }
 
+// Move from first innings to second innings, or finish the match.
 function completeInnings(match, action) {
   if (!hasTossState(match)) {
     throw new MatchEngineError("Set the toss before completing an innings.", 409);
@@ -401,6 +437,7 @@ function completeInnings(match, action) {
   const nextMatch = toPlainMatch(match);
 
   if (nextMatch.innings === "first") {
+    // Reset the live score view for the chase.
     nextMatch.innings = "second";
     nextMatch.score = Number(nextMatch.innings2?.score || 0);
     nextMatch.outs = 0;
@@ -428,6 +465,7 @@ function completeInnings(match, action) {
   return nextMatch;
 }
 
+// Undo goes back to the last saved state.
 function undoLastAction(match, action) {
   const history = Array.isArray(match?.actionHistory) ? match.actionHistory : [];
   const previousAction = history.at(-1);
@@ -445,12 +483,14 @@ function undoLastAction(match, action) {
   return nextMatch;
 }
 
+// Check if this action id was already used.
 export function isProcessedAction(match, actionId) {
   return Array.isArray(match?.processedActionIds)
     ? match.processedActionIds.includes(actionId)
     : false;
 }
 
+// Main entry point for toss, score, innings end, and undo.
 export function applyMatchAction(matchDocument, action) {
   const match = normalizeLegacyTossState(toPlainMatch(matchDocument));
 
@@ -472,8 +512,11 @@ export function applyMatchAction(matchDocument, action) {
   }
 }
 
+// Use this for manual fixes outside normal ball-by-ball scoring.
 export function applySafeMatchPatch(matchDocument, patch) {
+  // Old state before the fix.
   const currentMatch = toPlainMatch(matchDocument);
+  // Working copy that gets the new values.
   const nextMatch = toPlainMatch(matchDocument);
   const currentTeamALength = Array.isArray(currentMatch.teamA)
     ? currentMatch.teamA.length
@@ -508,6 +551,7 @@ export function applySafeMatchPatch(matchDocument, patch) {
     teamBName: patch.teamBName ?? currentMatch.teamBName,
   };
 
+  // Do not let overs go below what has already been bowled.
   if (typeof patch.overs === "number") {
     const firstInningsOversPlayed = Math.ceil(
       countLegalBalls(currentMatch.innings1?.history || []) / 6
@@ -530,6 +574,7 @@ export function applySafeMatchPatch(matchDocument, patch) {
     nextMatch.overs = patch.overs;
   }
 
+  // A first-innings score fix can end the chase right away.
   if (typeof patch.innings1Score === "number") {
     nextMatch.innings1 = nextMatch.innings1 || {
       team: "",
@@ -553,6 +598,7 @@ export function applySafeMatchPatch(matchDocument, patch) {
     }
   }
 
+  // These are the fields that can be changed by a manual fix.
   if (patch.teamAName !== undefined) nextMatch.teamAName = nextNames.teamAName;
   if (patch.teamBName !== undefined) nextMatch.teamBName = nextNames.teamBName;
   if (patch.teamA !== undefined) {
@@ -592,6 +638,7 @@ export function applySafeMatchPatch(matchDocument, patch) {
       patch.announcerBroadcastScoreSoundEffectsEnabled;
   }
 
+  // If team names change, update the same names in toss and innings too.
   if (
     previousNames.teamAName !== nextNames.teamAName ||
     previousNames.teamBName !== nextNames.teamBName
@@ -602,6 +649,7 @@ export function applySafeMatchPatch(matchDocument, patch) {
     nextMatch.innings2 = syncedMatch.innings2;
   }
 
+  // Only real score or roster changes should create a correction event.
   if (
     (oversChanged || innings1ScoreChanged || teamASizeChanged || teamBSizeChanged) &&
     !correctionEndedMatch
@@ -612,14 +660,17 @@ export function applySafeMatchPatch(matchDocument, patch) {
     );
   }
 
+  // Last safety check for team size and wickets.
   validateRosterDismissalState(nextMatch);
 
   return nextMatch;
 }
 
+// Build the smaller match data object used on session screens.
 export function buildSessionMirrorUpdate(matchDocument) {
   const match = toPlainMatch(matchDocument);
 
+  // Only include the fields needed by session pages.
   return {
     teamA: Array.isArray(match?.teamA) ? match.teamA : [],
     teamB: Array.isArray(match?.teamB) ? match.teamB : [],

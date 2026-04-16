@@ -6,6 +6,10 @@
  * Main exports: SessionsPageClient.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
+ * Reading guide:
+ * - top: session list constants and small helpers
+ * - middle: page state, filters, paging, and modal state
+ * - bottom: click handlers, requests, and page UI
  * Read next: ./README.md
  */
 
@@ -74,15 +78,18 @@ const EMPTY_MANAGE_FORM = {
   teamBName: "",
 };
 
+// Small helpers for search and sorting.
 function normalizeSearchValue(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+// Turn a date into milliseconds for sorting.
 function getTimestampMs(value) {
   const timestamp = Date.parse(String(value || ""));
   return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
+// Pick the first valid date from a few choices.
 function getPreferredTimestampMs(...values) {
   for (const value of values) {
     const timestamp = getTimestampMs(value);
@@ -94,6 +101,7 @@ function getPreferredTimestampMs(...values) {
   return 0;
 }
 
+// Build one search string from a session.
 function buildSearchText(session) {
   return [
     session.name,
@@ -110,6 +118,7 @@ function buildSearchText(session) {
     .join(" ");
 }
 
+// Sort the sessions based on the selected option.
 function sortSessions(items, sortValue) {
   const sessions = [...items];
   const byCreatedDesc = (left, right) => {
@@ -153,6 +162,7 @@ function sortSessions(items, sortValue) {
   }
 }
 
+// Card shown when there are no sessions to show.
 function EmptyState({ title, text, href, label }) {
   return (
     <div className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.08),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.08),transparent_28%),linear-gradient(180deg,rgba(18,18,24,0.97),rgba(8,8,12,0.99))] px-6 py-12 text-center shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
@@ -171,6 +181,7 @@ function EmptyState({ title, text, href, label }) {
   );
 }
 
+// Small modal that shows what action just finished.
 function ActionSummaryModal({ summary, onClose }) {
   if (!summary) {
     return null;
@@ -231,6 +242,7 @@ function ActionSummaryModal({ summary, onClose }) {
   );
 }
 
+// Build a simple "old -> new" line for session edits.
 function describeSessionFieldChange(label, previousValue, nextValue) {
   if (previousValue === nextValue) {
     return "";
@@ -243,11 +255,18 @@ function describeSessionFieldChange(label, previousValue, nextValue) {
   return `${label}: ${previousValue} -> ${nextValue}`;
 }
 
+// Main sessions page.
+// Read this component in this order:
+// 1. state declarations
+// 2. derived lists and pagination
+// 3. handlers for pin, manage, delete, and navigation
+// 4. final JSX layout
 export default function SessionsPageClient({
   initialSessions,
   initialTotalCount = 0,
   refreshToken = "",
 }) {
+  // Main page state.
   const [sessions, setSessions] = useState(initialSessions ?? []);
   const [totalCount, setTotalCount] = useState(Number(initialTotalCount || 0));
   const [pinPrompt, setPinPrompt] = useState(null);
@@ -286,6 +305,7 @@ export default function SessionsPageClient({
   const didInitialFreshReloadRef = useRef(false);
   const hasHandledInitialPageScrollRef = useRef(false);
 
+  // Turn text selection on or off during hidden hold mode.
   const setSecretHoldSelectionLock = useCallback((locked) => {
     if (typeof document === "undefined") {
       return;
@@ -343,6 +363,7 @@ export default function SessionsPageClient({
     };
   }, [setSecretHoldSelectionLock]);
 
+  // Build the list step by step: index -> search -> filter -> sort -> paginate.
   const indexedSessions = useMemo(
     () =>
       sessions.map((session) => {
@@ -477,11 +498,13 @@ export default function SessionsPageClient({
     }
   }, [selectedSessionIds.length, selectionMode]);
 
+  // Click handlers and request handlers start here.
   const handleOpenUmpirePin = useCallback((nextSession) => {
     setPinError("");
     setPinPrompt({ mode: "umpire", session: nextSession });
   }, []);
 
+  // Director uses the same PIN modal, just with a different mode.
   const handleOpenDirectorPin = useCallback((nextSession) => {
     setPinError("");
     setPinPrompt({ mode: "director", session: nextSession });
@@ -1022,6 +1045,7 @@ export default function SessionsPageClient({
     );
   }
 
+  // Main page UI starts here.
   return (
     <main
       id="top"
