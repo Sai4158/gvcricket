@@ -91,7 +91,6 @@ import {
   writeCachedSoundEffectsLibrary,
   writeCachedSoundEffectsOrder,
 } from "../../../lib/sound-effects-client";
-import { applyMatchAction } from "../../../lib/match-engine";
 import { countLegalBalls } from "../../../lib/match-scoring";
 import { duckPageMedia, restorePageMedia } from "../../../lib/page-audio";
 import { buildMatchScorePreview } from "./match-score-preview";
@@ -1448,20 +1447,10 @@ export default function MatchPageClient({
     }
 
     cancelBoundarySequence({ stopEffect: true });
-    let previewMatch = match;
-    try {
-      previewMatch = applyMatchAction(match, {
-        actionId: `umpire-preview:${Date.now()}`,
-        type: "undo_last",
-      });
-    } catch {
-      previewMatch = match;
-    }
-
-    const undoEvent = createUndoLiveEvent(previewMatch);
+    const undoEvent = createUndoLiveEvent(match);
     const undoSequence = buildLiveScoreAnnouncementSequence(
       undoEvent,
-      previewMatch,
+      match,
       umpireSettings.mode
     );
     speakImmediateUmpireSequence(undoSequence, "umpire-undo");
@@ -1915,7 +1904,7 @@ export default function MatchPageClient({
   }
   if (tossPending) return <Splash>Opening toss...</Splash>;
   const controlsDisabled =
-    isUpdating || showInningsEnd || Boolean(match.result) || tossPending;
+    showInningsEnd || Boolean(match.result) || tossPending;
   const showCompactUmpireWalkie = Boolean(
     !hasPendingWalkieRequests &&
       isLiveMatch &&

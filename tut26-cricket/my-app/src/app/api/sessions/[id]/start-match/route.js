@@ -9,6 +9,7 @@
 
 import { NextResponse } from "next/server";
 import Match from "../../../../../models/Match";
+import MatchUndoEntry from "../../../../../models/MatchUndoEntry";
 import Session from "../../../../../models/Session";
 import { connectDB } from "../../../../lib/db";
 import { publishMatchUpdate, publishSessionUpdate } from "../../../../lib/live-updates";
@@ -126,6 +127,9 @@ export async function POST(req, { params }) {
           score: 0,
           history: [],
         };
+        existingMatch.recentActionIds = [];
+        existingMatch.undoCount = 0;
+        existingMatch.undoSequence = 0;
         existingMatch.processedActionIds = [];
         existingMatch.actionHistory = [];
         existingMatch.lastLiveEvent = null;
@@ -139,6 +143,9 @@ export async function POST(req, { params }) {
           matchId: String(existingMatch._id),
         });
         await existingMatch.save({ session: transactionSession });
+        await MatchUndoEntry.deleteMany({
+          matchId: existingMatch._id,
+        }).session(transactionSession);
         finalMatch = existingMatch;
       } else {
         [finalMatch] = await Match.create(
@@ -157,6 +164,9 @@ export async function POST(req, { params }) {
               score: 0,
               outs: 0,
               result: "",
+              recentActionIds: [],
+              undoCount: 0,
+              undoSequence: 0,
               balls: [],
               matchImages: [],
               innings1: { team: battingFirst, score: 0, history: [] },

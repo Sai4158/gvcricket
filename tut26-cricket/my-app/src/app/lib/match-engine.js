@@ -1,7 +1,7 @@
 /**
  * File overview:
  * Purpose: Provides shared Match Engine logic for routes, APIs, and feature code.
- * Main exports: isProcessedAction, applyMatchAction, applySafeMatchPatch, buildSessionMirrorUpdate, MatchEngineError.
+ * Main exports: isProcessedAction, applyMatchAction, applySafeMatchPatch, buildSessionMirrorUpdate, buildRecentActionIds, createMatchUndoSnapshot, restoreMatchUndoSnapshot, getMatchUndoCount, MatchEngineError.
  * Major callers: Route loaders, API routes, and feature components.
  * Side effects: none.
  * Reading guide:
@@ -92,10 +92,39 @@ function restoreSnapshot(match, snapshot) {
   }
 }
 
+export function createMatchUndoSnapshot(matchDocument) {
+  return getSnapshot(toPlainMatch(matchDocument));
+}
+
+export function restoreMatchUndoSnapshot(matchDocument, snapshot) {
+  const nextMatch = toPlainMatch(matchDocument);
+  restoreSnapshot(nextMatch, snapshot);
+  return nextMatch;
+}
+
+export function buildRecentActionIds(existingActionIds = [], actionId = "") {
+  const safeActionId = String(actionId || "").trim();
+  const currentIds = Array.isArray(existingActionIds) ? existingActionIds : [];
+  if (!safeActionId) {
+    return currentIds.slice(-MAX_PROCESSED_ACTION_IDS);
+  }
+
+  return [...currentIds, safeActionId].slice(-MAX_PROCESSED_ACTION_IDS);
+}
+
+export function getMatchUndoCount(match) {
+  if (Number.isFinite(Number(match?.undoCount))) {
+    return Math.max(0, Number(match.undoCount || 0));
+  }
+
+  return Array.isArray(match?.actionHistory) ? match.actionHistory.length : 0;
+}
+
 // Save an action id so the same action is not used twice.
 function appendProcessedActionId(match, actionId) {
-  const nextActionIds = [...(match.processedActionIds || []), actionId];
-  match.processedActionIds = nextActionIds.slice(-MAX_PROCESSED_ACTION_IDS);
+  const nextActionIds = buildRecentActionIds(match.processedActionIds, actionId);
+  match.processedActionIds = nextActionIds;
+  match.recentActionIds = buildRecentActionIds(match.recentActionIds, actionId);
 }
 
 // Save the old state before an action, so undo can use it later.
@@ -485,8 +514,17 @@ function undoLastAction(match, action) {
 
 // Check if this action id was already used.
 export function isProcessedAction(match, actionId) {
+  const safeActionId = String(actionId || "").trim();
+  if (!safeActionId) {
+    return false;
+  }
+
+  if (Array.isArray(match?.recentActionIds) && match.recentActionIds.includes(safeActionId)) {
+    return true;
+  }
+
   return Array.isArray(match?.processedActionIds)
-    ? match.processedActionIds.includes(actionId)
+    ? match.processedActionIds.includes(safeActionId)
     : false;
 }
 

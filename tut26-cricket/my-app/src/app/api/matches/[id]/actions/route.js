@@ -13,9 +13,12 @@ import { writeAuditLog } from "../../../../lib/audit-log";
 import { connectDB } from "../../../../lib/db";
 import {
   applyMatchAction,
+  buildRecentActionIds,
   buildSessionMirrorUpdate,
+  getMatchUndoCount,
   isProcessedAction,
   MatchEngineError,
+  restoreMatchUndoSnapshot,
 } from "../../../../lib/match-engine";
 import { publishMatchUpdate, publishSessionUpdate } from "../../../../lib/live-updates";
 import {
@@ -26,9 +29,11 @@ import { serializePublicMatch } from "../../../../lib/public-data";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { parseJsonRequest } from "../../../../lib/request-security";
 import { hydrateLegacyTossState } from "../../../../lib/match-toss";
+import { createUndoLiveEvent } from "../../../../lib/live-announcements";
 import { matchActionSchema } from "../../../../lib/validators";
 import { invalidateSessionsDataCache } from "../../../../lib/server-data";
 import Match from "../../../../../models/Match";
+import MatchUndoEntry from "../../../../../models/MatchUndoEntry";
 import Session from "../../../../../models/Session";
 
 const FALLBACK_SESSION_FIELDS =
@@ -48,6 +53,9 @@ const MUTABLE_ACTION_KEYS = [
   "lastLiveEvent",
   "lastEventType",
   "lastEventText",
+  "recentActionIds",
+  "undoCount",
+  "undoSequence",
   "processedActionIds",
   "actionHistory",
 ];
@@ -128,9 +136,7 @@ export async function POST(req, { params }) {
     if (isProcessedAction(match, parsedRequest.value.actionId)) {
       return Response.json(
         {
-          match: serializePublicMatch(match, fallbackSession, {
-            includeActionHistory: true,
-          }),
+          match: serializePublicMatch(match, fallbackSession),
           replayed: true,
         },
         {
@@ -141,10 +147,112 @@ export async function POST(req, { params }) {
       );
     }
 
+    if (parsedRequest.value.type === "score_ball") {
+      return jsonError("Score taps must use the dedicated score route.", 409);
+    }
+
+    let updatePayload = {};
+
+    if (parsedRequest.value.type === "undo_last") {
+      const latestUndoEntry = await MatchUndoEntry.findOne({
+        matchId: match._id,
+      })
+        .sort({ sequence: -1, createdAt: -1 })
+        .lean();
+
+      if (latestUndoEntry?.snapshot) {
+        const restoredMatch = restoreMatchUndoSnapshot(match, latestUndoEntry.snapshot);
+        const undoEvent = createUndoLiveEvent(restoredMatch);
+
+        updatePayload = {
+          tossWinner: restoredMatch.tossWinner,
+          tossDecision: restoredMatch.tossDecision,
+          score: restoredMatch.score,
+          outs: restoredMatch.outs,
+          isOngoing: restoredMatch.isOngoing,
+          innings: restoredMatch.innings,
+          result: restoredMatch.result,
+          innings1: restoredMatch.innings1,
+          innings2: restoredMatch.innings2,
+          balls: restoredMatch.balls,
+          lastLiveEvent: undoEvent,
+          lastEventType: undoEvent.type,
+          lastEventText: undoEvent.summaryText,
+          recentActionIds: buildRecentActionIds(
+            match.recentActionIds || match.processedActionIds || [],
+            parsedRequest.value.actionId,
+          ),
+          processedActionIds: buildRecentActionIds(
+            match.processedActionIds || match.recentActionIds || [],
+            parsedRequest.value.actionId,
+          ),
+          undoCount: Math.max(0, getMatchUndoCount(match) - 1),
+          undoSequence: Math.max(0, Number(match.undoSequence || 0)),
+        };
+
+        const updatedMatch = await Match.findByIdAndUpdate(
+          id,
+          { $set: updatePayload },
+          { new: true, runValidators: true },
+        );
+        if (!updatedMatch) {
+          return jsonError("Match not found.", 404);
+        }
+
+        await MatchUndoEntry.findByIdAndDelete(latestUndoEntry._id);
+
+        await Session.findByIdAndUpdate(updatedMatch.sessionId, {
+          $set: buildSessionMirrorUpdate(updatedMatch),
+        });
+        invalidateSessionsDataCache();
+        publishMatchUpdate(updatedMatch._id);
+        publishSessionUpdate(updatedMatch.sessionId);
+
+        await writeAuditLog({
+          action: parsedRequest.value.type,
+          targetType: "match",
+          targetId: id,
+          status: "success",
+          ip: meta.ip,
+          userAgent: meta.userAgent,
+          metadata: { actionId: parsedRequest.value.actionId },
+        });
+
+        return Response.json(
+          {
+            match: serializePublicMatch(updatedMatch, fallbackSession),
+          },
+          {
+            headers: {
+              "Cache-Control": "no-store",
+            },
+          },
+        );
+      }
+    }
+
     const nextState = applyMatchAction(match, parsedRequest.value);
-    const updatePayload = {};
+    updatePayload = {
+      recentActionIds: buildRecentActionIds(
+        match.recentActionIds || match.processedActionIds || [],
+        parsedRequest.value.actionId,
+      ),
+      processedActionIds: buildRecentActionIds(
+        match.processedActionIds || match.recentActionIds || [],
+        parsedRequest.value.actionId,
+      ),
+      undoCount: Array.isArray(nextState.actionHistory)
+        ? nextState.actionHistory.length
+        : getMatchUndoCount(match),
+      undoSequence: Math.max(
+        Number(match.undoSequence || 0),
+        Number(nextState.undoSequence || 0),
+      ),
+    };
     for (const key of MUTABLE_ACTION_KEYS) {
-      updatePayload[key] = nextState[key];
+      if (key in nextState) {
+        updatePayload[key] = nextState[key];
+      }
     }
 
     const updatedMatch = await Match.findByIdAndUpdate(
@@ -175,9 +283,7 @@ export async function POST(req, { params }) {
 
     return Response.json(
         {
-          match: serializePublicMatch(updatedMatch, fallbackSession, {
-            includeActionHistory: true,
-          }),
+          match: serializePublicMatch(updatedMatch, fallbackSession),
         },
       {
         headers: {

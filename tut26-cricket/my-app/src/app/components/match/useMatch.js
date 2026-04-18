@@ -105,13 +105,46 @@ function normalizeOptimisticMatch(nextMatch) {
     return null;
   }
 
+  const historyUndoCount = Array.isArray(nextMatch.actionHistory)
+    ? nextMatch.actionHistory.length
+    : 0;
+  const numericUndoCount = Number(nextMatch.undoCount || 0);
+
   return {
     ...nextMatch,
     actionHistory: Array.isArray(nextMatch.actionHistory) ? nextMatch.actionHistory : [],
-    undoCount: Array.isArray(nextMatch.actionHistory)
-      ? nextMatch.actionHistory.length
-      : Number(nextMatch.undoCount || 0),
+    recentActionIds: Array.isArray(nextMatch.recentActionIds)
+      ? nextMatch.recentActionIds
+      : [],
+    undoCount: Math.max(
+      0,
+      historyUndoCount,
+      Number.isFinite(numericUndoCount) ? numericUndoCount : 0,
+    ),
     updatedAt: new Date().toISOString(),
+  };
+}
+
+function mergeMatchPatch(baseMatch, matchPatch) {
+  if (!matchPatch) {
+    return baseMatch;
+  }
+
+  return {
+    ...(baseMatch || {}),
+    ...matchPatch,
+    innings1: matchPatch.innings1
+      ? {
+          ...(baseMatch?.innings1 || {}),
+          ...matchPatch.innings1,
+        }
+      : baseMatch?.innings1,
+    innings2: matchPatch.innings2
+      ? {
+          ...(baseMatch?.innings2 || {}),
+          ...matchPatch.innings2,
+        }
+      : baseMatch?.innings2,
   };
 }
 
@@ -137,6 +170,20 @@ function normalizeQueuedActionEntry(entry) {
 }
 
 function getAppliedActionIds(match) {
+  const recentActionIds = Array.isArray(match?.recentActionIds)
+    ? match.recentActionIds
+    : Array.isArray(match?.processedActionIds)
+      ? match.processedActionIds
+      : [];
+
+  if (recentActionIds.length) {
+    return new Set(
+      recentActionIds
+        .map((actionId) => String(actionId || "").trim())
+        .filter(Boolean),
+    );
+  }
+
   const history = Array.isArray(match?.actionHistory) ? match.actionHistory : [];
 
   return new Set(
@@ -543,12 +590,24 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     while (actionQueueRef.current.length > 0) {
       const currentEntry = actionQueueRef.current[0];
       setIsUpdating(true);
+      const isScoreAction = currentEntry.action?.type === "score_ball";
+      const targetUrl = isScoreAction
+        ? `/api/matches/${matchId}/score`
+        : `/api/matches/${matchId}/actions`;
+      const requestBody = isScoreAction
+        ? {
+            actionId: currentEntry.action.actionId,
+            runs: currentEntry.action.runs,
+            isOut: currentEntry.action.isOut,
+            extraType: currentEntry.action.extraType,
+          }
+        : currentEntry.action;
 
       try {
-        const response = await fetchWithNetworkRetry(`/api/matches/${matchId}/actions`, {
+        const response = await fetchWithNetworkRetry(targetUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(currentEntry.action),
+          body: JSON.stringify(requestBody),
         });
 
         const body = await response
@@ -604,20 +663,26 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
           throw new Error(body.message || "Failed to update match.");
         }
 
-        if (body.match) {
+        const responseMatch = body.match
+          ? body.match
+          : body.matchPatch
+            ? mergeMatchPatch(matchRef.current, body.matchPatch)
+            : null;
+
+        if (responseMatch) {
           const remainingQueue = removeQueuedActionById(
             actionQueueRef.current,
             currentEntry.action.actionId,
           );
           updateQueuedActions(remainingQueue);
-          const incomingUpdatedAt = body?.match?.updatedAt || "";
+          const incomingUpdatedAt = responseMatch?.updatedAt || "";
           if (
             !isIncomingUpdateOlder(
               incomingUpdatedAt,
               lastStreamUpdateRef.current,
             )
           ) {
-            const nextMatch = applyQueuedFallbackState(body.match);
+            const nextMatch = applyQueuedFallbackState(responseMatch);
             matchRef.current = nextMatch;
             lastStreamUpdateRef.current =
               incomingUpdatedAt || lastStreamUpdateRef.current;

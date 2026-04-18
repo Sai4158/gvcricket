@@ -34,6 +34,7 @@ import { hydrateLegacyTossState } from "../../../lib/match-toss";
 import { matchPatchSchema } from "../../../lib/validators";
 import { invalidateSessionsDataCache } from "../../../lib/server-data";
 import Match from "../../../../models/Match";
+import MatchUndoEntry from "../../../../models/MatchUndoEntry";
 import Session from "../../../../models/Session";
 
 const FALLBACK_SESSION_FIELDS =
@@ -84,9 +85,7 @@ export async function GET(_req, { params }) {
     }
 
     return Response.json(
-      serializePublicMatch(match, fallbackSession, {
-        includeActionHistory: hasAccess,
-      }),
+      serializePublicMatch(match, fallbackSession),
       {
         headers: {
           "Cache-Control": "no-store",
@@ -237,7 +236,7 @@ export async function PATCH(req, { params }) {
       metadata: { fields: Object.keys(parsedRequest.value) },
     });
 
-    return Response.json(serializePublicMatch(match, fallbackSession, { includeActionHistory: true }), {
+    return Response.json(serializePublicMatch(match, fallbackSession), {
       headers: {
         "Cache-Control": "no-store",
       },
@@ -290,6 +289,7 @@ export async function DELETE(req, { params }) {
         isLive: false,
       },
     });
+    await MatchUndoEntry.deleteMany({ matchId: match._id });
     await Match.findByIdAndDelete(id);
     invalidateSessionsDataCache();
     publishMatchUpdate(id);

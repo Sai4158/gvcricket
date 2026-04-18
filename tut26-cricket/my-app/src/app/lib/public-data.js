@@ -1,7 +1,7 @@
 /**
  * File overview:
  * Purpose: Provides shared Public Data logic for routes, APIs, and feature code.
- * Main exports: serializePublicMatch, serializePublicSession.
+ * Main exports: serializePublicMatch, serializeLiveMatchPatch, serializePublicSession.
  * Major callers: Route loaders, API routes, and feature components.
  * Side effects: none.
  * Read next: ./README.md
@@ -27,6 +27,66 @@ function getPublicMatchImagesWithFallback(match, fallbackState = null) {
   return getPublicMatchImages(fallbackState, {
     matchId,
   });
+}
+
+function getPublicUndoCount(match) {
+  const numericUndoCount = Number(match?.undoCount || 0);
+  const historyUndoCount = Array.isArray(match?.actionHistory)
+    ? match.actionHistory.length
+    : 0;
+
+  return Math.max(
+    0,
+    Number.isFinite(numericUndoCount) ? numericUndoCount : 0,
+    historyUndoCount,
+  );
+}
+
+function getPublicRecentActionIds(match) {
+  if (Array.isArray(match?.recentActionIds) && match.recentActionIds.length) {
+    return match.recentActionIds;
+  }
+
+  if (Array.isArray(match?.processedActionIds) && match.processedActionIds.length) {
+    return match.processedActionIds;
+  }
+
+  if (!Array.isArray(match?.actionHistory)) {
+    return [];
+  }
+
+  return match.actionHistory
+    .map((entry) => String(entry?.actionId || "").trim())
+    .filter(Boolean)
+    .slice(-256);
+}
+
+export function serializeLiveMatchPatch(matchDocument) {
+  if (!matchDocument) {
+    return null;
+  }
+
+  const match =
+    typeof matchDocument.toObject === "function"
+      ? matchDocument.toObject()
+      : matchDocument;
+
+  return {
+    score: match?.score ?? 0,
+    outs: match?.outs ?? 0,
+    innings: match?.innings || "first",
+    innings1: match?.innings1 || { team: "", score: 0, history: [] },
+    innings2: match?.innings2 || { team: "", score: 0, history: [] },
+    balls: Array.isArray(match?.balls) ? match.balls : [],
+    result: match?.result || "",
+    isOngoing: Boolean(match?.isOngoing),
+    undoCount: getPublicUndoCount(match),
+    recentActionIds: getPublicRecentActionIds(match),
+    lastLiveEvent: match?.lastLiveEvent || null,
+    lastEventType: match?.lastEventType || "",
+    lastEventText: match?.lastEventText || "",
+    updatedAt: match?.updatedAt || null,
+  };
 }
 
 export function serializePublicMatch(
@@ -79,6 +139,7 @@ export function serializePublicMatch(
     announcerBroadcastScoreSoundEffectsEnabled:
       match.announcerBroadcastScoreSoundEffectsEnabled !== false,
     announcerScoreSoundEffectMap,
+    recentActionIds: getPublicRecentActionIds(match),
     lastLiveEvent: match.lastLiveEvent || null,
     lastEventType: match.lastEventType || "",
     lastEventText: match.lastEventText || "",
@@ -89,9 +150,7 @@ export function serializePublicMatch(
             : [],
         }
       : {}),
-    undoCount: Array.isArray(match.actionHistory)
-      ? match.actionHistory.length
-      : Number(match.undoCount || 0),
+    undoCount: getPublicUndoCount(match),
     createdAt: match.createdAt || null,
     updatedAt: match.updatedAt || null,
   };

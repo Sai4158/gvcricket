@@ -479,7 +479,7 @@ export async function loadTossPageData(matchId) {
 
   await connectDB();
   const match = await Match.findById(matchId)
-    .select(`adminAccessVersion ${PUBLIC_MATCH_FIELDS}`)
+    .select(`adminAccessVersion ${READ_ONLY_PUBLIC_MATCH_FIELDS}`)
     .lean();
 
   if (match) {
@@ -495,9 +495,7 @@ export async function loadTossPageData(matchId) {
     return {
       found: true,
       authStatus: authorized ? "granted" : "locked",
-      match: serializePublicMatch(match, fallbackSession, {
-        includeActionHistory: true,
-      }),
+      match: serializePublicMatch(match, fallbackSession),
       sessionId: getPublicId(match.sessionId),
       hasCreatedMatch: true,
       actualMatchId: getPublicId(match._id),
@@ -514,7 +512,7 @@ export async function loadTossPageData(matchId) {
 
   if (session.match) {
     const linkedMatch = await Match.findById(session.match)
-      .select(`adminAccessVersion ${PUBLIC_MATCH_FIELDS}`)
+      .select(`adminAccessVersion ${READ_ONLY_PUBLIC_MATCH_FIELDS}`)
       .lean();
 
     if (linkedMatch) {
@@ -529,9 +527,7 @@ export async function loadTossPageData(matchId) {
       return {
         found: true,
         authStatus: authorized ? "granted" : "locked",
-        match: serializePublicMatch(linkedMatch, session, {
-          includeActionHistory: true,
-        }),
+        match: serializePublicMatch(linkedMatch, session),
         sessionId: getPublicId(session._id),
         hasCreatedMatch: true,
         actualMatchId: getPublicId(linkedMatch._id),
@@ -577,7 +573,7 @@ export async function loadMatchAccessData(matchId) {
 
   await connectDB();
   const match = await Match.findById(matchId).select(
-    `adminAccessVersion ${PUBLIC_MATCH_FIELDS}`
+    `adminAccessVersion ${READ_ONLY_PUBLIC_MATCH_FIELDS}`
   );
 
   if (!match) {
@@ -601,11 +597,7 @@ export async function loadMatchAccessData(matchId) {
   return {
     found: true,
     authStatus: authorized ? "granted" : "locked",
-    match: authorized
-      ? serializePublicMatch(match, fallbackSession, {
-          includeActionHistory: true,
-        })
-      : null,
+    match: authorized ? serializePublicMatch(match, fallbackSession) : null,
   };
 }
 
