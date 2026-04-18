@@ -1022,13 +1022,15 @@ export function buildUmpireStageAnnouncement(match) {
     return "";
   }
 
-  if (match.result) {
-    const winnerName = getWinnerName(match.result);
+  const displayResult = String(match?.pendingResult || match?.result || "").trim();
+
+  if (displayResult) {
+    const winnerName = getWinnerName(displayResult);
 
     return [
       "Match over.",
       winnerName ? `Congratulations ${winnerName}.` : "",
-      normalizeSpeechResultText(match.result),
+      normalizeSpeechResultText(displayResult),
       `Final score is ${scoreLine(safeNumber(match.score), safeNumber(match.outs))}.`,
     ]
       .filter(Boolean)

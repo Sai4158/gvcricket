@@ -17,7 +17,15 @@ import {
   hasValidDirectorAccess,
 } from "./director-access";
 import { getMatchAccessCookieName, hasValidMatchAccess } from "./match-access";
-import { serializePublicMatch, serializePublicSession } from "./public-data";
+import {
+  serializePublicMatch,
+  serializePublicSession,
+  serializeUmpireBootstrap,
+} from "./public-data";
+import {
+  finalizePendingResultIfExpired,
+  isFinalizedMatchComplete,
+} from "./pending-match-result";
 import { hasCompleteTossState, hydrateLegacyTossState, normalizeLegacyTossState } from "./match-toss";
 import {
   buildLockedTossPageData,
@@ -149,13 +157,16 @@ async function findMatchForSession(session) {
   if (!session) return null;
 
   if (session.match) {
-    return Match.findById(session.match).select(READ_ONLY_PUBLIC_MATCH_FIELDS).lean();
+    const match = await Match.findById(session.match).select(
+      READ_ONLY_PUBLIC_MATCH_FIELDS
+    );
+    return finalizePendingResultIfExpired(match);
   }
 
-  return Match.findOne({ sessionId: session._id })
+  const match = await Match.findOne({ sessionId: session._id })
     .select(READ_ONLY_PUBLIC_MATCH_FIELDS)
-    .sort({ updatedAt: -1 })
-    .lean();
+    .sort({ updatedAt: -1 });
+  return finalizePendingResultIfExpired(match);
 }
 
 async function readSessionsIndexPageData() {
@@ -462,14 +473,13 @@ export async function loadPublicMatchData(matchId) {
   }
 
   await connectDB();
-  const match = await Match.findById(matchId)
-    .select(READ_ONLY_PUBLIC_MATCH_FIELDS)
-    .lean();
+  const match = await Match.findById(matchId).select(READ_ONLY_PUBLIC_MATCH_FIELDS);
   if (!match) {
     return null;
   }
-  const fallbackSession = await loadFallbackSession(match.sessionId);
-  return serializePublicMatch(match, fallbackSession);
+  const finalizedMatch = await finalizePendingResultIfExpired(match);
+  const fallbackSession = await loadFallbackSession(finalizedMatch.sessionId);
+  return serializePublicMatch(finalizedMatch, fallbackSession);
 }
 
 export async function loadTossPageData(matchId) {
@@ -483,22 +493,23 @@ export async function loadTossPageData(matchId) {
     .lean();
 
   if (match) {
-    const fallbackSession = await loadFallbackSession(match.sessionId);
+    const finalizedMatch = await finalizePendingResultIfExpired(match);
+    const fallbackSession = await loadFallbackSession(finalizedMatch.sessionId);
     const cookieStore = await cookies();
     const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
     const authorized = hasValidMatchAccess(
       matchId,
       token,
-      Number(match.adminAccessVersion || 1)
+      Number(finalizedMatch.adminAccessVersion || 1)
     );
 
     return {
       found: true,
       authStatus: authorized ? "granted" : "locked",
-      match: serializePublicMatch(match, fallbackSession),
-      sessionId: getPublicId(match.sessionId),
+      match: serializePublicMatch(finalizedMatch, fallbackSession),
+      sessionId: getPublicId(finalizedMatch.sessionId),
       hasCreatedMatch: true,
-      actualMatchId: getPublicId(match._id),
+      actualMatchId: getPublicId(finalizedMatch._id),
     };
   }
 
@@ -516,21 +527,22 @@ export async function loadTossPageData(matchId) {
       .lean();
 
     if (linkedMatch) {
+      const finalizedLinkedMatch = await finalizePendingResultIfExpired(linkedMatch);
       const cookieStore = await cookies();
-      const token = cookieStore.get(getMatchAccessCookieName(String(linkedMatch._id)))?.value;
+      const token = cookieStore.get(getMatchAccessCookieName(String(finalizedLinkedMatch._id)))?.value;
       const authorized = hasValidMatchAccess(
-        String(linkedMatch._id),
+        String(finalizedLinkedMatch._id),
         token,
-        Number(linkedMatch.adminAccessVersion || 1)
+        Number(finalizedLinkedMatch.adminAccessVersion || 1)
       );
 
       return {
         found: true,
         authStatus: authorized ? "granted" : "locked",
-        match: serializePublicMatch(linkedMatch, session),
+        match: serializePublicMatch(finalizedLinkedMatch, session),
         sessionId: getPublicId(session._id),
         hasCreatedMatch: true,
-        actualMatchId: getPublicId(linkedMatch._id),
+        actualMatchId: getPublicId(finalizedLinkedMatch._id),
       };
     }
   }
@@ -579,25 +591,26 @@ export async function loadMatchAccessData(matchId) {
   if (!match) {
     return { found: false, authStatus: "locked", match: null };
   }
+  const finalizedMatch = await finalizePendingResultIfExpired(match);
 
   const cookieStore = await cookies();
   const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
   const authorized = hasValidMatchAccess(
     matchId,
     token,
-    Number(match.adminAccessVersion || 1)
+    Number(finalizedMatch.adminAccessVersion || 1)
   );
 
-  const fallbackSession = await loadFallbackSession(match.sessionId);
+  const fallbackSession = await loadFallbackSession(finalizedMatch.sessionId);
 
-  if (authorized && hydrateLegacyTossState(match, fallbackSession)) {
-    await match.save();
+  if (authorized && hydrateLegacyTossState(finalizedMatch, fallbackSession)) {
+    await finalizedMatch.save();
   }
 
   return {
     found: true,
     authStatus: authorized ? "granted" : "locked",
-    match: authorized ? serializePublicMatch(match, fallbackSession) : null,
+    match: authorized ? serializeUmpireBootstrap(finalizedMatch, fallbackSession) : null,
   };
 }
 
@@ -641,7 +654,9 @@ async function readDirectorSessionsList() {
           session.updatedAt,
           session.createdAt
         ),
-        isLive: Boolean(resolvedMatch?.isOngoing && !resolvedMatch?.result),
+        isLive: Boolean(
+          resolvedMatch?.isOngoing && !isFinalizedMatchComplete(resolvedMatch)
+        ),
       };
     })
     .sort((left, right) => {

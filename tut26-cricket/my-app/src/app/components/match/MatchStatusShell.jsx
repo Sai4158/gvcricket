@@ -13,7 +13,6 @@ import { useState } from "react";
 import { Barlow_Condensed } from "next/font/google";
 import { FaPause, FaVolumeUp } from "react-icons/fa";
 import LoadingButton from "../shared/LoadingButton";
-import { countLegalBalls } from "../../lib/match-scoring";
 import { getBattingTeamBundle } from "../../lib/team-utils";
 import {
   clearClientPinRateLimit,
@@ -215,8 +214,10 @@ export function MatchHeader({
   );
 }
 
-export function Scoreboard({ match, history }) {
-  const legalBalls = countLegalBalls(history);
+export function Scoreboard({ match, legalBallCount = null }) {
+  const legalBalls = Number.isFinite(Number(legalBallCount))
+    ? Math.max(0, Number(legalBallCount || 0))
+    : 0;
   const oversDisplay = `${Math.floor(legalBalls / 6)}.${legalBalls % 6}`;
   const battingTeam = getBattingTeamBundle(match);
   const ballsLeft = Math.max(Number(match?.overs || 0) * 6 - legalBalls, 0);

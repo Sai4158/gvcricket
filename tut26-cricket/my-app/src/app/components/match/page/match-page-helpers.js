@@ -69,14 +69,15 @@ export function getMatchEndStageState(match, fallbackMatchId = "") {
   const firstInningsComplete = Boolean(
     match?.innings === "first" && (firstInningsOversDone || firstInningsAllOut),
   );
-  const matchFinished = Boolean(match?.result) || Boolean(
+  const displayResult = String(match?.pendingResult || match?.result || "").trim();
+  const matchFinished = Boolean(displayResult) || Boolean(
     match?.innings === "second" && !match?.isOngoing,
   );
 
   let key = "";
   if (matchFinished) {
     key = `result:${match?._id || fallbackMatchId}:${
-      String(match?.result || "").trim() ||
+      displayResult ||
       `${Number(match?.score || 0)}:${Number(match?.outs || 0)}`
     }`;
   } else if (firstInningsComplete) {

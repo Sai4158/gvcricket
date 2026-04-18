@@ -116,6 +116,9 @@ export async function POST(req, { params }) {
         existingMatch.isOngoing = true;
         existingMatch.innings = "first";
         existingMatch.result = "";
+        existingMatch.pendingResult = "";
+        existingMatch.pendingResultAt = null;
+        existingMatch.resultAutoFinalizeAt = null;
         existingMatch.balls = [];
         existingMatch.innings1 = {
           team: battingFirst,
@@ -164,6 +167,9 @@ export async function POST(req, { params }) {
               score: 0,
               outs: 0,
               result: "",
+              pendingResult: "",
+              pendingResultAt: null,
+              resultAutoFinalizeAt: null,
               recentActionIds: [],
               undoCount: 0,
               undoSequence: 0,

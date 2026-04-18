@@ -65,6 +65,9 @@ const MatchSchema = new mongoose.Schema(
     isOngoing: { type: Boolean, default: true },
     innings: { type: String, enum: ["first", "second"], default: "first" },
     result: { type: String, default: "" },
+    pendingResult: { type: String, default: "", trim: true },
+    pendingResultAt: { type: Date, default: null },
+    resultAutoFinalizeAt: { type: Date, default: null },
     innings1: {
       team: { type: String, default: "" },
       score: { type: Number, default: 0 },

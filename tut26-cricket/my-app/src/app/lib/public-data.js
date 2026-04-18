@@ -13,6 +13,7 @@ import { getPublicMatchImages } from "./match-image-gallery";
 import { isSafeMatchImageUrl } from "./match-image";
 import { hasCompleteTossState, normalizeLegacyTossState } from "./match-toss";
 import { normalizeScoreSoundEffectMap } from "./score-sound-effects";
+import { countLegalBalls } from "./match-scoring";
 
 function getPublicMatchImagesWithFallback(match, fallbackState = null) {
   const matchId = String(match?._id || "");
@@ -61,7 +62,85 @@ function getPublicRecentActionIds(match) {
     .slice(-256);
 }
 
+function getHistoryVersion(match) {
+  return match?.updatedAt || null;
+}
+
+function getMediaVersion(match) {
+  return match?.mediaUpdatedAt || match?.updatedAt || null;
+}
+
+function getActiveInningsKey(match) {
+  return match?.innings === "second" ? "innings2" : "innings1";
+}
+
+function getCompactOverState(match) {
+  const activeInningsKey = getActiveInningsKey(match);
+  const activeHistory = Array.isArray(match?.[activeInningsKey]?.history)
+    ? match[activeInningsKey].history
+    : [];
+  const activeOver = activeHistory.at(-1) || null;
+
+  return {
+    activeHistory,
+    activeOver,
+    activeOverBalls: Array.isArray(activeOver?.balls) ? activeOver.balls : [],
+    activeOverNumber: Number(activeOver?.overNumber || 1),
+    legalBallCount: countLegalBalls(activeHistory),
+    firstInningsLegalBallCount: countLegalBalls(match?.innings1?.history || []),
+    secondInningsLegalBallCount: countLegalBalls(match?.innings2?.history || []),
+  };
+}
+
+function buildUmpireInnings(match, inningsKey, includeHistory) {
+  const source = match?.[inningsKey] || {};
+  return {
+    team: source.team || "",
+    score: Number(source.score || 0),
+    history: includeHistory && Array.isArray(source.history) ? source.history : [],
+  };
+}
+
 export function serializeLiveMatchPatch(matchDocument) {
+  if (!matchDocument) {
+    return null;
+  }
+
+  const match =
+    typeof matchDocument.toObject === "function"
+      ? matchDocument.toObject()
+      : matchDocument;
+  const compactOverState = getCompactOverState(match);
+
+  return {
+    score: match?.score ?? 0,
+    outs: match?.outs ?? 0,
+    innings: match?.innings || "first",
+    innings1: buildUmpireInnings(match, "innings1", false),
+    innings2: buildUmpireInnings(match, "innings2", false),
+    balls: Array.isArray(match?.balls) ? match.balls : [],
+    result: match?.result || "",
+    pendingResult: match?.pendingResult || "",
+    pendingResultAt: match?.pendingResultAt || null,
+    resultAutoFinalizeAt: match?.resultAutoFinalizeAt || null,
+    isOngoing: Boolean(match?.isOngoing),
+    undoCount: getPublicUndoCount(match),
+    recentActionIds: getPublicRecentActionIds(match),
+    legalBallCount: compactOverState.legalBallCount,
+    activeOverNumber: compactOverState.activeOverNumber,
+    activeOverBalls: compactOverState.activeOverBalls,
+    firstInningsLegalBallCount: compactOverState.firstInningsLegalBallCount,
+    secondInningsLegalBallCount: compactOverState.secondInningsLegalBallCount,
+    historyVersion: getHistoryVersion(match),
+    mediaVersion: getMediaVersion(match),
+    lastLiveEvent: match?.lastLiveEvent || null,
+    lastEventType: match?.lastEventType || "",
+    lastEventText: match?.lastEventText || "",
+    updatedAt: match?.updatedAt || null,
+  };
+}
+
+export function serializeUmpireHistory(matchDocument) {
   if (!matchDocument) {
     return null;
   }
@@ -72,20 +151,103 @@ export function serializeLiveMatchPatch(matchDocument) {
       : matchDocument;
 
   return {
-    score: match?.score ?? 0,
-    outs: match?.outs ?? 0,
-    innings: match?.innings || "first",
-    innings1: match?.innings1 || { team: "", score: 0, history: [] },
-    innings2: match?.innings2 || { team: "", score: 0, history: [] },
-    balls: Array.isArray(match?.balls) ? match.balls : [],
-    result: match?.result || "",
-    isOngoing: Boolean(match?.isOngoing),
-    undoCount: getPublicUndoCount(match),
-    recentActionIds: getPublicRecentActionIds(match),
+    innings1: buildUmpireInnings(match, "innings1", true),
+    innings2: buildUmpireInnings(match, "innings2", true),
+    historyVersion: getHistoryVersion(match),
+    updatedAt: match?.updatedAt || null,
+  };
+}
+
+export function serializeMatchMediaPatch(matchDocument, fallbackState = null) {
+  if (!matchDocument) {
+    return null;
+  }
+
+  const rawMatch =
+    typeof matchDocument.toObject === "function"
+      ? matchDocument.toObject()
+      : matchDocument;
+  const match = normalizeLegacyTossState(rawMatch, fallbackState);
+  const publicImages = getPublicMatchImagesWithFallback(match, fallbackState);
+
+  return {
+    matchImageUrl: publicImages[0]?.url || getPublicMatchImagePath(match),
+    matchImages: publicImages,
+    mediaVersion: getMediaVersion(match),
     lastLiveEvent: match?.lastLiveEvent || null,
     lastEventType: match?.lastEventType || "",
     lastEventText: match?.lastEventText || "",
     updatedAt: match?.updatedAt || null,
+  };
+}
+
+export function serializeUmpireBootstrap(matchDocument, fallbackState = null) {
+  if (!matchDocument) {
+    return null;
+  }
+
+  const rawMatch =
+    typeof matchDocument.toObject === "function"
+      ? matchDocument.toObject()
+      : matchDocument;
+  const match = normalizeLegacyTossState(rawMatch, fallbackState);
+  const compactOverState = getCompactOverState(match);
+  const activeInningsKey = getActiveInningsKey(match);
+  const publicImages = getPublicMatchImagesWithFallback(match, fallbackState);
+  const announcerScoreSoundEffectMap = normalizeScoreSoundEffectMap(
+    match?.announcer?.scoreSoundEffectMap ||
+      fallbackState?.announcer?.scoreSoundEffectMap ||
+      {},
+  );
+
+  return {
+    _id: String(match._id),
+    teamA: Array.isArray(match.teamA) ? match.teamA : [],
+    teamB: Array.isArray(match.teamB) ? match.teamB : [],
+    teamAName: match.teamAName || "",
+    teamBName: match.teamBName || "",
+    overs: match.overs ?? 0,
+    sessionId: match.sessionId
+      ? String(match.sessionId?._id || match.sessionId)
+      : "",
+    tossWinner: match.tossWinner || "",
+    tossDecision: match.tossDecision || "",
+    tossReady: hasCompleteTossState(match, fallbackState),
+    score: match.score ?? 0,
+    outs: match.outs ?? 0,
+    isOngoing: Boolean(match.isOngoing),
+    innings: match.innings || "first",
+    result: match.result || "",
+    pendingResult: match.pendingResult || "",
+    pendingResultAt: match.pendingResultAt || null,
+    resultAutoFinalizeAt: match.resultAutoFinalizeAt || null,
+    innings1: buildUmpireInnings(match, "innings1", activeInningsKey === "innings1"),
+    innings2: buildUmpireInnings(match, "innings2", activeInningsKey === "innings2"),
+    balls: Array.isArray(match.balls) ? match.balls : [],
+    legalBallCount: compactOverState.legalBallCount,
+    activeOverNumber: compactOverState.activeOverNumber,
+    activeOverBalls: compactOverState.activeOverBalls,
+    firstInningsLegalBallCount: compactOverState.firstInningsLegalBallCount,
+    secondInningsLegalBallCount: compactOverState.secondInningsLegalBallCount,
+    historyVersion: getHistoryVersion(match),
+    mediaVersion: getMediaVersion(match),
+    matchImageUrl: publicImages[0]?.url || getPublicMatchImagePath(match),
+    matchImages: [],
+    announcerEnabled: Boolean(match.announcerEnabled),
+    announcerMode: match.announcerMode || "",
+    announcerScoreSoundEffectsEnabled:
+      match.announcerScoreSoundEffectsEnabled !== false,
+    announcerBroadcastScoreSoundEffectsEnabled:
+      match.announcerBroadcastScoreSoundEffectsEnabled !== false,
+    announcerScoreSoundEffectMap,
+    walkieTalkieEnabled: Boolean(match.walkieTalkieEnabled),
+    recentActionIds: getPublicRecentActionIds(match),
+    lastLiveEvent: match.lastLiveEvent || null,
+    lastEventType: match.lastEventType || "",
+    lastEventText: match.lastEventText || "",
+    undoCount: getPublicUndoCount(match),
+    createdAt: match.createdAt || null,
+    updatedAt: match.updatedAt || null,
   };
 }
 
@@ -126,6 +288,9 @@ export function serializePublicMatch(
     isOngoing: Boolean(match.isOngoing),
     innings: match.innings || "first",
     result: match.result || "",
+    pendingResult: match.pendingResult || "",
+    pendingResultAt: match.pendingResultAt || null,
+    resultAutoFinalizeAt: match.resultAutoFinalizeAt || null,
     innings1: match.innings1 || { team: "", score: 0, history: [] },
     innings2: match.innings2 || { team: "", score: 0, history: [] },
     tossReady: hasCompleteTossState(match, fallbackState),

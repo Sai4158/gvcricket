@@ -130,6 +130,51 @@ test("[match] queued scoring actions can be replayed on top of a fresh server sn
   assert.equal(replayedMatch.actionHistory.length, 4);
 });
 
+test("[match] queued undo can replay after confirmed balls without losing the previous state", () => {
+  const startedMatch = buildStartedMatch();
+  const serverMatch = applyMatchAction(startedMatch, {
+    type: "score_ball",
+    runs: 1,
+    isOut: false,
+    extraType: null,
+    actionId: actionId("server-score"),
+  });
+
+  const replayedMatch = replayQueuedMatchActions(serverMatch, [
+    {
+      action: {
+        type: "score_ball",
+        runs: 2,
+        isOut: false,
+        extraType: null,
+        actionId: actionId("queued-two"),
+      },
+      allowOneRetry: true,
+    },
+    {
+      action: {
+        type: "undo_last",
+        actionId: actionId("queued-undo"),
+      },
+      allowOneRetry: true,
+    },
+    {
+      action: {
+        type: "score_ball",
+        runs: 4,
+        isOut: false,
+        extraType: null,
+        actionId: actionId("queued-four"),
+      },
+      allowOneRetry: true,
+    },
+  ]);
+
+  assert.equal(replayedMatch.score, 5);
+  assert.equal(replayedMatch.innings1.score, 5);
+  assert.equal(replayedMatch.outs, 0);
+});
+
 test("[match] queue helpers drop applied actions and persist retry flag changes safely", () => {
   const queuedEntries = [
     {

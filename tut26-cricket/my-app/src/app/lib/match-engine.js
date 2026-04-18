@@ -35,6 +35,9 @@ const MUTABLE_STATE_KEYS = [
   "isOngoing",
   "innings",
   "result",
+  "pendingResult",
+  "pendingResultAt",
+  "resultAutoFinalizeAt",
   "innings1",
   "innings2",
   "balls",
@@ -42,6 +45,8 @@ const MUTABLE_STATE_KEYS = [
   "lastEventType",
   "lastEventText",
 ];
+
+export const SOFT_MATCH_RESULT_TIMEOUT_MS = 10 * 60 * 1000;
 
 // Keep only a limited number of old actions.
 const MAX_ACTION_HISTORY = 96;
@@ -300,6 +305,37 @@ function buildMatchResult(match) {
   return "Match Tied";
 }
 
+function clearPendingResultFields(match) {
+  match.pendingResult = "";
+  match.pendingResultAt = null;
+  match.resultAutoFinalizeAt = null;
+}
+
+function setPendingMatchResult(match, resultText) {
+  clearPendingResultFields(match);
+  match.isOngoing = false;
+  match.result = "";
+  match.pendingResult = String(resultText || "").trim();
+  match.pendingResultAt = new Date().toISOString();
+  match.resultAutoFinalizeAt = new Date(
+    Date.now() + SOFT_MATCH_RESULT_TIMEOUT_MS,
+  ).toISOString();
+}
+
+export function finalizePendingMatchResult(matchDocument) {
+  const nextMatch = toPlainMatch(matchDocument);
+  const pendingResult = String(nextMatch?.pendingResult || "").trim();
+
+  if (!pendingResult) {
+    return nextMatch;
+  }
+
+  nextMatch.isOngoing = false;
+  nextMatch.result = pendingResult;
+  clearPendingResultFields(nextMatch);
+  return nextMatch;
+}
+
 // Make a simple system event like toss set or innings change.
 function createSystemLiveEvent(type, summaryText, match) {
   return {
@@ -395,6 +431,7 @@ function scoreBall(match, action) {
 
   const snapshot = getSnapshot(match);
   const nextMatch = toPlainMatch(match);
+  clearPendingResultFields(nextMatch);
   const activeInningsKey = getActiveInningsKey(nextMatch);
   // This ball object is what gets saved in history.
   const ball = {
@@ -419,21 +456,21 @@ function scoreBall(match, action) {
 
   // After scoring the ball, check if the match is over.
   if (isTargetChased(nextMatch)) {
-    nextMatch.isOngoing = false;
-    nextMatch.result = buildWinByWicketsText(nextMatch, nextMatch.outs);
+    const pendingResult = buildWinByWicketsText(nextMatch, nextMatch.outs);
+    setPendingMatchResult(nextMatch, pendingResult);
     markLiveEvent(
       nextMatch,
-      createMatchEndLiveEvent(nextMatch, nextMatch.result, {
+      createMatchEndLiveEvent(nextMatch, pendingResult, {
         ball,
         actionId: action.actionId,
       }),
     );
   } else if (nextMatch.innings === "second" && isCurrentInningsComplete(nextMatch)) {
-    nextMatch.isOngoing = false;
-    nextMatch.result = buildMatchResult(nextMatch);
+    const pendingResult = buildMatchResult(nextMatch);
+    setPendingMatchResult(nextMatch, pendingResult);
     markLiveEvent(
       nextMatch,
-      createMatchEndLiveEvent(nextMatch, nextMatch.result, {
+      createMatchEndLiveEvent(nextMatch, pendingResult, {
         ball,
         actionId: action.actionId,
       }),
@@ -472,6 +509,7 @@ function completeInnings(match, action) {
     nextMatch.outs = 0;
     nextMatch.balls = [];
     nextMatch.result = "";
+    clearPendingResultFields(nextMatch);
     nextMatch.isOngoing = true;
 
     markLiveEvent(
@@ -484,8 +522,16 @@ function completeInnings(match, action) {
     return nextMatch;
   }
 
+  if (String(nextMatch.pendingResult || "").trim()) {
+    const finalizedMatch = finalizePendingMatchResult(nextMatch);
+    appendActionHistory(finalizedMatch, action, snapshot);
+    appendProcessedActionId(finalizedMatch, action.actionId);
+    return finalizedMatch;
+  }
+
   nextMatch.isOngoing = false;
   nextMatch.result = buildMatchResult(nextMatch);
+  clearPendingResultFields(nextMatch);
 
   markLiveEvent(nextMatch, createMatchEndLiveEvent(nextMatch, nextMatch.result));
   appendActionHistory(nextMatch, action, snapshot);
@@ -629,9 +675,12 @@ export function applySafeMatchPatch(matchDocument, patch) {
       !nextMatch.result &&
       isTargetChased(nextMatch)
     ) {
-      nextMatch.isOngoing = false;
-      nextMatch.result = buildWinByWicketsText(nextMatch, Number(nextMatch.outs || 0));
-      markLiveEvent(nextMatch, createMatchEndLiveEvent(nextMatch, nextMatch.result));
+      const pendingResult = buildWinByWicketsText(
+        nextMatch,
+        Number(nextMatch.outs || 0),
+      );
+      setPendingMatchResult(nextMatch, pendingResult);
+      markLiveEvent(nextMatch, createMatchEndLiveEvent(nextMatch, pendingResult));
       correctionEndedMatch = true;
     }
   }

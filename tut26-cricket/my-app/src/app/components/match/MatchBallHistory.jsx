@@ -79,15 +79,27 @@ export const Ball = memo(function Ball({ ball, ballNumber }) {
   );
 });
 
-export function BallTracker({ history }) {
+export function BallTracker({
+  history = null,
+  activeOverBalls = [],
+  activeOverNumber = 1,
+}) {
   const trackerRef = useRef(null);
-  const currentOver = useMemo(
-    () => history.at(-1) ?? { overNumber: 1, balls: [] },
-    [history]
+  const fallbackOver = useMemo(
+    () =>
+      Array.isArray(history) && history.length
+        ? history.at(-1)
+        : { overNumber: activeOverNumber, balls: activeOverBalls },
+    [activeOverBalls, activeOverNumber, history]
   );
   const currentBalls = useMemo(
-    () => (Array.isArray(currentOver.balls) ? currentOver.balls : []),
-    [currentOver]
+    () =>
+      Array.isArray(activeOverBalls) && activeOverBalls.length
+        ? activeOverBalls
+        : Array.isArray(fallbackOver?.balls)
+          ? fallbackOver.balls
+          : [],
+    [activeOverBalls, fallbackOver]
   );
   const currentBallSlotLabels = useMemo(
     () => buildBallSlotLabels(currentBalls),
@@ -127,14 +139,14 @@ export function BallTracker({ history }) {
     return () => {
       window.cancelAnimationFrame(frameId);
     };
-  }, [currentBallSignature, currentOver.overNumber]);
+  }, [activeOverNumber, currentBallSignature, fallbackOver?.overNumber]);
 
   return (
     <div className="mb-6 rounded-2xl bg-zinc-900/50 p-4 ring-1 ring-white/10">
       <h3
         className={`${matchControlsFont.className} mb-4 text-center font-bold text-white`}
       >
-        Over {currentOver.overNumber}
+        Over {Number(activeOverNumber || fallbackOver?.overNumber || 1)}
       </h3>
       <div
         ref={trackerRef}
@@ -142,7 +154,12 @@ export function BallTracker({ history }) {
       >
         <div className="ml-auto flex min-h-18 min-w-max items-start gap-4">
           {currentBalls.map((ball, index) => (
-            <div key={getBallKey(index + 1, currentOver.overNumber)}>
+            <div
+              key={getBallKey(
+                index + 1,
+                Number(activeOverNumber || fallbackOver?.overNumber || 1),
+              )}
+            >
               <Ball
                 ball={ball}
                 ballNumber={currentBallSlotLabels[index] || "•"}

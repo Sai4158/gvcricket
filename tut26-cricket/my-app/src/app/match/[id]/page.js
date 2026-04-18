@@ -52,7 +52,11 @@ export default async function MatchPage({ params }) {
     notFound();
   }
 
-  if (String(publicMatch.result || "").trim() && !publicMatch.isOngoing) {
+  if (
+    String(publicMatch.result || "").trim() &&
+    !String(publicMatch.pendingResult || "").trim() &&
+    !publicMatch.isOngoing
+  ) {
     redirect(`/result/${id}`);
   }
 

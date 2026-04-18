@@ -18,6 +18,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { applyMatchAction, MatchEngineError } from "../../lib/match-engine";
+import { countLegalBalls } from "../../lib/match-scoring";
 import useEventSource from "../live/useEventSource";
 import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
 
@@ -27,6 +28,18 @@ function wait(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+function cloneMatchState(match) {
+  if (!match) {
+    return null;
+  }
+
+  if (typeof structuredClone === "function") {
+    return structuredClone(match);
+  }
+
+  return JSON.parse(JSON.stringify(match));
 }
 
 function triggerHapticFeedback() {
@@ -105,6 +118,11 @@ function normalizeOptimisticMatch(nextMatch) {
     return null;
   }
 
+  const activeInningsKey = nextMatch?.innings === "second" ? "innings2" : "innings1";
+  const activeHistory = Array.isArray(nextMatch?.[activeInningsKey]?.history)
+    ? nextMatch[activeInningsKey].history
+    : [];
+  const activeOver = activeHistory.at(-1) || null;
   const historyUndoCount = Array.isArray(nextMatch.actionHistory)
     ? nextMatch.actionHistory.length
     : 0;
@@ -116,6 +134,12 @@ function normalizeOptimisticMatch(nextMatch) {
     recentActionIds: Array.isArray(nextMatch.recentActionIds)
       ? nextMatch.recentActionIds
       : [],
+    legalBallCount: countLegalBalls(activeHistory),
+    activeOverNumber: Number(activeOver?.overNumber || 1),
+    activeOverBalls: Array.isArray(activeOver?.balls) ? activeOver.balls : [],
+    firstInningsLegalBallCount: countLegalBalls(nextMatch?.innings1?.history || []),
+    secondInningsLegalBallCount: countLegalBalls(nextMatch?.innings2?.history || []),
+    historyVersion: nextMatch?.updatedAt || new Date().toISOString(),
     undoCount: Math.max(
       0,
       historyUndoCount,
@@ -146,6 +170,31 @@ function mergeMatchPatch(baseMatch, matchPatch) {
         }
       : baseMatch?.innings2,
   };
+}
+
+function patchChangesScoringStructure(payload) {
+  if (!payload || typeof payload !== "object") {
+    return false;
+  }
+
+  return [
+    "teamA",
+    "teamB",
+    "teamAName",
+    "teamBName",
+    "overs",
+    "innings1Score",
+    "score",
+    "outs",
+    "innings",
+    "innings1",
+    "innings2",
+    "balls",
+    "result",
+    "pendingResult",
+    "pendingResultAt",
+    "resultAutoFinalizeAt",
+  ].some((key) => Object.prototype.hasOwnProperty.call(payload, key));
 }
 
 function getActionQueueStorageKey(matchId) {
@@ -294,8 +343,24 @@ function writeStoredActionQueue(matchId, entries) {
 }
 
 export function replayQueuedMatchActions(baseMatch, queuedEntries = []) {
+  const undoShadowStack = [];
+
   return (queuedEntries || []).reduce((nextMatch, entry) => {
-    return applyMatchAction(nextMatch, entry.action);
+    if (!nextMatch) {
+      return nextMatch;
+    }
+
+    if (entry?.action?.type === "undo_last") {
+      const previousSnapshot = undoShadowStack.pop();
+      if (!previousSnapshot) {
+        throw new MatchEngineError("There is nothing left to undo.", 409);
+      }
+
+      return normalizeOptimisticMatch(previousSnapshot);
+    }
+
+    undoShadowStack.push(cloneMatchState(nextMatch));
+    return normalizeOptimisticMatch(applyMatchAction(nextMatch, entry.action));
   }, baseMatch);
 }
 
@@ -343,6 +408,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
   const processingQueueRef = useRef(false);
   const retryTimerRef = useRef(null);
   const processQueuedActionsRef = useRef(async () => {});
+  const optimisticUndoStackRef = useRef([]);
 
   const clearRetryTimer = useCallback(() => {
     if (retryTimerRef.current) {
@@ -380,6 +446,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       );
     } catch {
       updateQueuedActions([]);
+      optimisticUndoStackRef.current = [];
       setError(
         new Error(
           "Saved local scoring was cleared because the live match changed.",
@@ -437,9 +504,12 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     }
 
     try {
-      const response = await fetchWithNetworkRetry(`/api/matches/${matchId}`, {
+      const response = await fetchWithNetworkRetry(
+        `/api/matches/${matchId}?view=umpire`,
+        {
         cache: "no-store",
-      });
+        },
+      );
       const body = await response
         .json()
         .catch(() => null);
@@ -481,6 +551,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       setError(null);
       setLastUpdatedAt(initialMatch?.updatedAt || "");
       setIsUpdating(false);
+      optimisticUndoStackRef.current = [];
     }
 
     if (!matchId || !hasAccess) {
@@ -491,6 +562,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       setError(null);
       setLastUpdatedAt(initialMatch?.updatedAt || "");
       setIsLoading(false);
+      optimisticUndoStackRef.current = [];
       return;
     }
 
@@ -518,6 +590,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     matchRef.current = replayedMatch;
     setMatch(replayedMatch);
     setLastUpdatedAt(replayedMatch?.updatedAt || initialMatch.updatedAt || "");
+    optimisticUndoStackRef.current = [];
 
     if (hasAccess) {
       scheduleQueuedActionRetry(250);
@@ -566,9 +639,10 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     [match?.undoCount]
   );
   const tossPending = Boolean(match && !match.tossReady);
-  const activeInningsKey = match?.innings === "second" ? "innings2" : "innings1";
   const currentInningsHasHistory = Boolean(
-    match?.[activeInningsKey]?.history?.some((over) => Array.isArray(over?.balls) && over.balls.length > 0)
+    Number(match?.legalBallCount || 0) > 0 ||
+      (Array.isArray(match?.activeOverBalls) && match.activeOverBalls.length > 0) ||
+      match?.balls?.length
   );
 
   const refreshMatchFromServer = useCallback(async () => {
@@ -740,13 +814,36 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     }
 
     try {
-      const optimisticMatch = applyMatchAction(baseMatch, action);
-      const nextOptimisticMatch = normalizeOptimisticMatch(optimisticMatch);
-      matchRef.current = nextOptimisticMatch;
-      setMatch(nextOptimisticMatch);
-      setLastUpdatedAt(nextOptimisticMatch.updatedAt || new Date().toISOString());
-      setError(null);
+      let optimisticMatch = null;
+      let previousSnapshot = null;
+
+      if (action.type === "undo_last") {
+        previousSnapshot = optimisticUndoStackRef.current.pop();
+        if (!previousSnapshot && Number(baseMatch?.undoCount || 0) <= 0) {
+          throw new MatchEngineError("There is nothing left to undo.", 409);
+        }
+        optimisticMatch = previousSnapshot || baseMatch;
+      } else {
+        optimisticUndoStackRef.current.push(cloneMatchState(baseMatch));
+        optimisticMatch = applyMatchAction(baseMatch, action);
+      }
+
+      if (action.type === "undo_last" && !previousSnapshot) {
+        setError(null);
+      } else {
+        const nextOptimisticMatch = normalizeOptimisticMatch(optimisticMatch);
+        matchRef.current = nextOptimisticMatch;
+        setMatch(nextOptimisticMatch);
+        setLastUpdatedAt(nextOptimisticMatch.updatedAt || new Date().toISOString());
+        setError(null);
+      }
     } catch (caughtError) {
+      if (action.type !== "undo_last") {
+        optimisticUndoStackRef.current = optimisticUndoStackRef.current.slice(
+          0,
+          Math.max(0, optimisticUndoStackRef.current.length - 1),
+        );
+      }
       if (caughtError instanceof MatchEngineError) {
         setError(caughtError);
         return null;
@@ -804,6 +901,9 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
         setMatch(body);
         setLastUpdatedAt(incomingUpdatedAt || new Date().toISOString());
         setError(null);
+        if (patchChangesScoringStructure(payload)) {
+          optimisticUndoStackRef.current = [];
+        }
       }
       return body;
     } catch (caughtError) {
@@ -865,7 +965,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
   }, [clearRetryTimer]);
 
   const handleScoreEvent = useCallback((runs, isOut = false, extraType = null, options = {}) => {
-    if (!match || match.result || !hasAccess) return;
+    if (!match || match.result || match.pendingResult || !hasAccess) return;
     if (tossPending) {
       setError(null);
       startNavigation("Opening toss...");
@@ -909,7 +1009,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       return null;
     }
 
-    if (match.result && !match.isOngoing) {
+    if (match.result && !match.pendingResult && !match.isOngoing) {
       startNavigation("Opening result...");
       router.push(`/result/${matchId}`);
       return match;
@@ -920,7 +1020,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       type: "complete_innings",
     });
 
-    if (updatedMatch?.result && !updatedMatch?.isOngoing) {
+    if (updatedMatch?.result && !updatedMatch?.pendingResult && !updatedMatch?.isOngoing) {
       startNavigation("Opening result...");
       router.push(`/result/${matchId}`);
     }
@@ -936,11 +1036,12 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     historyStack,
     currentInningsHasHistory,
     replaceMatch: (nextMatch) => {
-      matchRef.current = nextMatch;
+      const mergedMatch = mergeMatchPatch(matchRef.current, nextMatch);
+      matchRef.current = mergedMatch;
       lastStreamUpdateRef.current =
-        nextMatch?.updatedAt || lastStreamUpdateRef.current;
-      setMatch(nextMatch);
-      setLastUpdatedAt(nextMatch?.updatedAt || new Date().toISOString());
+        mergedMatch?.updatedAt || lastStreamUpdateRef.current;
+      setMatch(mergedMatch);
+      setLastUpdatedAt(mergedMatch?.updatedAt || new Date().toISOString());
     },
     handleScoreEvent,
     handleUndo,

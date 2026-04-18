@@ -82,6 +82,7 @@ export function Controls({
   onWide,
   setInfoText,
   disabled,
+  disabledKeys = {},
 }) {
   const baseBtn =
     "py-6 rounded-2xl transition-transform active:scale-95 shadow-lg w-full disabled:opacity-50 disabled:cursor-not-allowed";
@@ -89,23 +90,23 @@ export function Controls({
   return (
     <div className="grid grid-cols-4 gap-3">
       <ScoreButton
-        onClick={() => onScore(0)}
-        disabled={disabled}
+        onClick={() => onScore(0, false, null, { controlKey: "dot" })}
+        disabled={disabled || Boolean(disabledKeys.dot)}
         className={`${baseBtn} ${getScoreControlToneClasses("dot")}`}
       >
         Dot
       </ScoreButton>
       {[
-        { key: "one", runs: 1 },
-        { key: "two", runs: 2 },
-        { key: "three", runs: 3 },
-        { key: "four", runs: 4 },
-        { key: "six", runs: 6 },
+        { key: "1", runs: 1 },
+        { key: "2", runs: 2 },
+        { key: "3", runs: 3 },
+        { key: "4", runs: 4 },
+        { key: "6", runs: 6 },
       ].map(({ key, runs }) => (
         <ScoreButton
           key={key}
-          onClick={() => onScore(runs)}
-          disabled={disabled}
+          onClick={() => onScore(runs, false, null, { controlKey: key })}
+          disabled={disabled || Boolean(disabledKeys[key])}
           className={`${baseBtn} ${getScoreControlToneClasses("neutral")}`}
         >
           {runs}
@@ -115,7 +116,7 @@ export function Controls({
         info="A dismissal. Specify runs completed in the next step."
         setInfoText={setInfoText}
         onClick={onOut}
-        disabled={disabled}
+        disabled={disabled || Boolean(disabledKeys.out)}
         className={`${baseBtn} ${getScoreControlToneClasses("out")}`}
       >
         OUT
@@ -124,7 +125,7 @@ export function Controls({
         info="A wide adds runs but does not count as a legal ball."
         setInfoText={setInfoText}
         onClick={onWide}
-        disabled={disabled}
+        disabled={disabled || Boolean(disabledKeys.wide)}
         className={`${baseBtn} ${getScoreControlToneClasses("wide")}`}
       >
         WIDE
@@ -133,7 +134,7 @@ export function Controls({
         info="A no ball adds runs but does not count as a legal ball."
         setInfoText={setInfoText}
         onClick={onNoBall}
-        disabled={disabled}
+        disabled={disabled || Boolean(disabledKeys.noball)}
         className={`${baseBtn} ${getScoreControlToneClasses("noball")}`}
       >
         NO BALL

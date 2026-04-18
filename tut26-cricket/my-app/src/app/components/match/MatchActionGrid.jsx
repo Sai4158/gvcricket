@@ -581,7 +581,7 @@ export default function MatchActionGrid({
             icon={<LuUndo2 />}
             label="Undo"
             colorClass="text-zinc-400"
-            disabled={isUpdating || historyStackLength === 0}
+            disabled={historyStackLength === 0}
             compact
           />
           {showLiveControls ? (

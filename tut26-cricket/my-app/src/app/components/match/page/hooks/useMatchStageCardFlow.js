@@ -63,6 +63,7 @@ export default function useMatchStageCardFlow({
     showInningsEnd,
     key: stageCardKey,
   } = getMatchEndStageState(match, matchId);
+  const displayResult = String(match?.pendingResult || match?.result || "").trim();
   const isStageCardDismissed = Boolean(
     showInningsEnd && stageCardKey && dismissedStageCardKey === stageCardKey,
   );
@@ -70,7 +71,7 @@ export default function useMatchStageCardFlow({
     showInningsEnd && !isStageCardDismissed && visibleStageCardKey === stageCardKey,
   );
   const showPendingMatchOverCountdown = Boolean(
-    match?.result &&
+    displayResult &&
       showInningsEnd &&
       !isStageCardDismissed &&
       !showVisibleInningsEndCard,
@@ -383,7 +384,7 @@ export default function useMatchStageCardFlow({
   }, [hasPendingStageContinueSpeech, stageContinuePrompt]);
 
   useEffect(() => {
-    if (!showVisibleInningsEndCard || !match?.result) {
+    if (!showVisibleInningsEndCard || !displayResult) {
       if (!showVisibleInningsEndCard) {
         endStageAnnouncementKeyRef.current = "";
       }
@@ -395,8 +396,8 @@ export default function useMatchStageCardFlow({
       return;
     }
 
-    const nextKey = match.result
-      ? `result:${match._id || matchId}:${match.result}`
+    const nextKey = displayResult
+      ? `result:${match._id || matchId}:${displayResult}`
       : `innings:${match._id || matchId}:${match?.innings1?.score ?? match.score}:${match?.innings1?.outs ?? match.outs}`;
 
     if (endStageAnnouncementKeyRef.current === nextKey) {
@@ -417,6 +418,7 @@ export default function useMatchStageCardFlow({
     queueOrSpeakUmpireSequence(stageSequence, "umpire-match-over-modal");
   }, [
     endStageAnnouncementKeyRef,
+    displayResult,
     match,
     matchId,
     queueOrSpeakUmpireSequence,
@@ -431,7 +433,7 @@ export default function useMatchStageCardFlow({
         cancelBoundarySequence({ stopEffect: true });
       }
 
-      if (match?.result && !match?.isOngoing) {
+      if (match?.result && !match?.pendingResult && !match?.isOngoing) {
         const matchOverText = buildUmpireStageAnnouncement(match);
         const matchOverSequence = {
           items: matchOverText
@@ -530,7 +532,10 @@ export default function useMatchStageCardFlow({
 
     if (hasPendingStageContinueSpeech()) {
       setStageContinuePrompt({
-        mode: match?.result && !match?.isOngoing ? "result" : "innings",
+        mode:
+          (match?.pendingResult || (match?.result && !match?.isOngoing))
+            ? "result"
+            : "innings",
       });
       return null;
     }
@@ -540,9 +545,35 @@ export default function useMatchStageCardFlow({
     handleAnnouncedNextInningsOrEnd,
     hasPendingStageContinueSpeech,
     match?.isOngoing,
+    match?.pendingResult,
     match?.result,
     showVisibleInningsEndCard,
   ]);
+
+  useEffect(() => {
+    if (!matchId || !match?.pendingResult || !match?.resultAutoFinalizeAt) {
+      return undefined;
+    }
+
+    const autoFinalizeAtMs = Date.parse(String(match.resultAutoFinalizeAt || ""));
+    if (!Number.isFinite(autoFinalizeAtMs)) {
+      return undefined;
+    }
+
+    const delayMs = autoFinalizeAtMs - Date.now();
+    if (delayMs <= 0) {
+      router.push(`/result/${matchId}`);
+      return undefined;
+    }
+
+    const timerId = window.setTimeout(() => {
+      router.push(`/result/${matchId}`);
+    }, delayMs);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [match?.pendingResult, match?.resultAutoFinalizeAt, matchId, router]);
 
   const handleForceContinuePastSpeech = useCallback(async () => {
     return handleAnnouncedNextInningsOrEnd({ force: true });

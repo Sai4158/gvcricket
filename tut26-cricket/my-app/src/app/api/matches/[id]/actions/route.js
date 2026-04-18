@@ -25,7 +25,11 @@ import {
   getMatchAccessCookieName,
   hasValidMatchAccess,
 } from "../../../../lib/match-access";
-import { serializePublicMatch } from "../../../../lib/public-data";
+import { serializeLiveMatchPatch, serializePublicMatch } from "../../../../lib/public-data";
+import {
+  finalizePendingResultIfExpired,
+  isFinalizedMatchComplete,
+} from "../../../../lib/pending-match-result";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { parseJsonRequest } from "../../../../lib/request-security";
 import { hydrateLegacyTossState } from "../../../../lib/match-toss";
@@ -47,6 +51,9 @@ const MUTABLE_ACTION_KEYS = [
   "isOngoing",
   "innings",
   "result",
+  "pendingResult",
+  "pendingResultAt",
+  "resultAutoFinalizeAt",
   "innings1",
   "innings2",
   "balls",
@@ -61,7 +68,7 @@ const MUTABLE_ACTION_KEYS = [
 ];
 
 function isMatchCompleted(match) {
-  return Boolean(String(match?.result || "").trim()) && !Boolean(match?.isOngoing);
+  return isFinalizedMatchComplete(match);
 }
 
 async function hasMatchAccess(matchId, accessVersion) {
@@ -87,10 +94,11 @@ export async function POST(req, { params }) {
     if (!match) {
       return jsonError("Match not found.", 404);
     }
+    const finalizedMatch = await finalizePendingResultIfExpired(match);
 
     const hasAccess = await hasMatchAccess(
       id,
-      Number(match.adminAccessVersion || 1)
+      Number(finalizedMatch.adminAccessVersion || 1)
     );
     if (!hasAccess) {
       await writeAuditLog({
@@ -106,7 +114,7 @@ export async function POST(req, { params }) {
       return jsonError("Umpire access required.", 403);
     }
 
-    if (isMatchCompleted(match)) {
+    if (isMatchCompleted(finalizedMatch)) {
       await writeAuditLog({
         action: "match_action_completed_denied",
         targetType: "match",
@@ -120,23 +128,23 @@ export async function POST(req, { params }) {
       return jsonError("This match is complete. Open the result page instead.", 409);
     }
 
-    const fallbackSession = match.sessionId
-      ? await Session.findById(match.sessionId).select(
+    const fallbackSession = finalizedMatch.sessionId
+      ? await Session.findById(finalizedMatch.sessionId).select(
           FALLBACK_SESSION_FIELDS
         )
       : null;
 
-    if (hydrateLegacyTossState(match, fallbackSession)) {
-      await match.save();
-      await Session.findByIdAndUpdate(match.sessionId, {
-        $set: buildSessionMirrorUpdate(match),
+    if (hydrateLegacyTossState(finalizedMatch, fallbackSession)) {
+      await finalizedMatch.save();
+      await Session.findByIdAndUpdate(finalizedMatch.sessionId, {
+        $set: buildSessionMirrorUpdate(finalizedMatch),
       });
     }
 
-    if (isProcessedAction(match, parsedRequest.value.actionId)) {
+    if (isProcessedAction(finalizedMatch, parsedRequest.value.actionId)) {
       return Response.json(
         {
-          match: serializePublicMatch(match, fallbackSession),
+          match: serializePublicMatch(finalizedMatch, fallbackSession),
           replayed: true,
         },
         {
@@ -155,13 +163,13 @@ export async function POST(req, { params }) {
 
     if (parsedRequest.value.type === "undo_last") {
       const latestUndoEntry = await MatchUndoEntry.findOne({
-        matchId: match._id,
+        matchId: finalizedMatch._id,
       })
         .sort({ sequence: -1, createdAt: -1 })
         .lean();
 
       if (latestUndoEntry?.snapshot) {
-        const restoredMatch = restoreMatchUndoSnapshot(match, latestUndoEntry.snapshot);
+        const restoredMatch = restoreMatchUndoSnapshot(finalizedMatch, latestUndoEntry.snapshot);
         const undoEvent = createUndoLiveEvent(restoredMatch);
 
         updatePayload = {
@@ -172,6 +180,9 @@ export async function POST(req, { params }) {
           isOngoing: restoredMatch.isOngoing,
           innings: restoredMatch.innings,
           result: restoredMatch.result,
+          pendingResult: restoredMatch.pendingResult,
+          pendingResultAt: restoredMatch.pendingResultAt,
+          resultAutoFinalizeAt: restoredMatch.resultAutoFinalizeAt,
           innings1: restoredMatch.innings1,
           innings2: restoredMatch.innings2,
           balls: restoredMatch.balls,
@@ -179,15 +190,15 @@ export async function POST(req, { params }) {
           lastEventType: undoEvent.type,
           lastEventText: undoEvent.summaryText,
           recentActionIds: buildRecentActionIds(
-            match.recentActionIds || match.processedActionIds || [],
+            finalizedMatch.recentActionIds || finalizedMatch.processedActionIds || [],
             parsedRequest.value.actionId,
           ),
           processedActionIds: buildRecentActionIds(
-            match.processedActionIds || match.recentActionIds || [],
+            finalizedMatch.processedActionIds || finalizedMatch.recentActionIds || [],
             parsedRequest.value.actionId,
           ),
-          undoCount: Math.max(0, getMatchUndoCount(match) - 1),
-          undoSequence: Math.max(0, Number(match.undoSequence || 0)),
+          undoCount: Math.max(0, getMatchUndoCount(finalizedMatch) - 1),
+          undoSequence: Math.max(0, Number(finalizedMatch.undoSequence || 0)),
         };
 
         const updatedMatch = await Match.findByIdAndUpdate(
@@ -220,7 +231,7 @@ export async function POST(req, { params }) {
 
         return Response.json(
           {
-            match: serializePublicMatch(updatedMatch, fallbackSession),
+            matchPatch: serializeLiveMatchPatch(updatedMatch),
           },
           {
             headers: {
@@ -231,21 +242,21 @@ export async function POST(req, { params }) {
       }
     }
 
-    const nextState = applyMatchAction(match, parsedRequest.value);
+    const nextState = applyMatchAction(finalizedMatch, parsedRequest.value);
     updatePayload = {
       recentActionIds: buildRecentActionIds(
-        match.recentActionIds || match.processedActionIds || [],
+        finalizedMatch.recentActionIds || finalizedMatch.processedActionIds || [],
         parsedRequest.value.actionId,
       ),
       processedActionIds: buildRecentActionIds(
-        match.processedActionIds || match.recentActionIds || [],
+        finalizedMatch.processedActionIds || finalizedMatch.recentActionIds || [],
         parsedRequest.value.actionId,
       ),
       undoCount: Array.isArray(nextState.actionHistory)
         ? nextState.actionHistory.length
-        : getMatchUndoCount(match),
+        : getMatchUndoCount(finalizedMatch),
       undoSequence: Math.max(
-        Number(match.undoSequence || 0),
+        Number(finalizedMatch.undoSequence || 0),
         Number(nextState.undoSequence || 0),
       ),
     };

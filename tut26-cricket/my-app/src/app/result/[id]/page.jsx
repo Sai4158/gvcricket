@@ -7,7 +7,7 @@
  * Read next: ../../../../docs/ONBOARDING.md
  */
 
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import ResultPageClient from "../../components/result/ResultPageClient";
 import {
   absoluteUrl,
@@ -68,6 +68,13 @@ export default async function ResultPage({ params }) {
   const initialMatch = await loadPublicMatchDataCached(id);
   if (!initialMatch) {
     notFound();
+  }
+  if (initialMatch.pendingResult && !initialMatch.result) {
+    redirect(
+      initialMatch.sessionId
+        ? `/session/${initialMatch.sessionId}/view`
+        : `/match/${id}`,
+    );
   }
 
   return <ResultPageClient matchId={id} initialMatch={initialMatch} />;

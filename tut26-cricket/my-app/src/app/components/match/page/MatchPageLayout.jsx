@@ -83,6 +83,7 @@ export default function MatchPageLayout({
   setEntryScoreSoundEffectsEnabled,
   setInfoText,
   setModal,
+  scoreControlDisabledKeys,
   setSoundEffectsOpen,
   setStageContinuePrompt,
   showCompactUmpireWalkie,
@@ -109,6 +110,7 @@ export default function MatchPageLayout({
   walkie,
 } = {}) {
   const hasPendingWalkieRequests = Boolean(walkie.pendingRequests?.length);
+  const displayResult = String(match?.pendingResult || match?.result || "").trim();
 
   return (
     <>
@@ -140,10 +142,10 @@ export default function MatchPageLayout({
                   {liveUpdatedLabel}
                 </span>
               </div>
-              {match.result ? (
+              {displayResult ? (
                 <div className="bg-green-900/50 text-green-300 p-4 rounded-xl text-center mb-4 ring-1 ring-green-500">
                   <h3 className="font-bold text-xl">Match Over</h3>
-                  <p>{match.result}</p>
+                  <p>{displayResult}</p>
                   {showPendingMatchOverCountdown &&
                   pendingStageCardCountdownLabel ? (
                     <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-green-200/80">
@@ -157,7 +159,10 @@ export default function MatchPageLayout({
                 onAnnounceScore={handleHeroReadScoreAction}
                 announceIsActive={isReadScoreActionActive}
               />
-              <Scoreboard match={match} history={oversHistory} />
+              <Scoreboard
+                match={match}
+                legalBallCount={match?.legalBallCount}
+              />
             </div>
           </MatchHeroBackdrop>
           <div ref={contentStartRef} />
@@ -248,7 +253,10 @@ export default function MatchPageLayout({
               />
             ) : null}
           </OptionalFeatureBoundary>
-          <BallTracker history={oversHistory} />
+          <BallTracker
+            activeOverBalls={match?.activeOverBalls}
+            activeOverNumber={match?.activeOverNumber || currentOverNumber}
+          />
           <Controls
             onScore={handleAnnouncedScoreEvent}
             onOut={() => openModalWithFeedback("out")}
@@ -256,6 +264,7 @@ export default function MatchPageLayout({
             onWide={() => openModalWithFeedback("wide")}
             setInfoText={setInfoText}
             disabled={controlsDisabled}
+            disabledKeys={scoreControlDisabledKeys}
           />
           {isLiveMatch ? (
             <MatchSoundEffectsPanel

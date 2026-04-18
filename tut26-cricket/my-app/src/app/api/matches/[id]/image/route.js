@@ -32,7 +32,7 @@ import {
 } from "../../../../lib/match-image-gallery";
 import { getRequiredImagePinKind, IMAGE_PIN_KIND } from "../../../../lib/image-pin-policy";
 import { moderateMatchImageBuffer } from "../../../../lib/match-image-moderation";
-import { serializePublicMatch } from "../../../../lib/public-data";
+import { serializeMatchMediaPatch } from "../../../../lib/public-data";
 import { enforceSmartPinRateLimit } from "../../../../lib/pin-attempt-server";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
@@ -355,7 +355,7 @@ export async function POST(req, { params }) {
       },
     });
 
-    return Response.json(serializePublicMatch(match), {
+    return Response.json(serializeMatchMediaPatch(match), {
       headers: {
         "Cache-Control": "no-store",
       },
@@ -465,7 +465,7 @@ export async function DELETE(req, { params }) {
 
     const targetImageId = String(parsedRequest.value.imageId || "").trim();
     if (!currentImages.length) {
-      return Response.json(serializePublicMatch(match), {
+      return Response.json(serializeMatchMediaPatch(match), {
         headers: {
           "Cache-Control": "no-store",
         },
@@ -506,7 +506,7 @@ export async function DELETE(req, { params }) {
       userAgent: meta.userAgent,
     });
 
-    return Response.json(serializePublicMatch(match), {
+    return Response.json(serializeMatchMediaPatch(match), {
       headers: {
         "Cache-Control": "no-store",
       },
@@ -651,7 +651,7 @@ export async function PATCH(req, { params }) {
       metadata: { imageIds: nextIds },
     });
 
-    return Response.json(serializePublicMatch(match), {
+    return Response.json(serializeMatchMediaPatch(match), {
       headers: {
         "Cache-Control": "no-store",
       },

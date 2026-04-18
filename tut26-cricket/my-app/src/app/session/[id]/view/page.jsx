@@ -90,7 +90,12 @@ export default async function ViewSessionPage({ params }) {
     notFound();
   }
 
-  if (initialData?.match?._id && !initialData.match.isOngoing) {
+  if (
+    initialData?.match?._id &&
+    !initialData.match.isOngoing &&
+    initialData.match.result &&
+    !initialData.match.pendingResult
+  ) {
     redirect(`/result/${initialData.match._id}`);
   }
 

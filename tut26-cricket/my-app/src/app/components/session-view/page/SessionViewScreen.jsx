@@ -181,7 +181,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const currentLiveEventId = match?.lastLiveEvent?.id || "";
   const currentAnnouncementEventId =
     match?.lastLiveEvent?.type === "sound_effect" ? "" : currentLiveEventId;
-  const isLiveMatch = Boolean(match?.isOngoing && !match?.result);
+  const isLiveMatch = Boolean(
+    match?.isOngoing && !match?.result && !match?.pendingResult
+  );
   const walkiePreferenceScope = match?._id || sessionId || "";
   const spectatorWalkieSignalActive = Boolean(
     isLiveMatch && (spectatorWalkieEnabled || quickWalkieTalking),
@@ -1240,7 +1242,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   });
 
   useEffect(() => {
-    if (!match?._id || !match?.result) {
+    if (!match?._id || !match?.result || match?.pendingResult) {
       pendingResultNavigationRef.current = "";
       return undefined;
     }
@@ -1275,12 +1277,38 @@ export default function SessionViewClient({ sessionId, initialData }) {
   }, [
     hasSpectatorPlaybackInFlight,
     match?._id,
+    match?.pendingResult,
     match?.result,
     router,
     settings.enabled,
     settings.mode,
     waitForSpectatorPlaybackToSettle,
   ]);
+
+  useEffect(() => {
+    if (!match?._id || !match?.pendingResult || !match?.resultAutoFinalizeAt) {
+      return undefined;
+    }
+
+    const autoFinalizeAtMs = Date.parse(String(match.resultAutoFinalizeAt || ""));
+    if (!Number.isFinite(autoFinalizeAtMs)) {
+      return undefined;
+    }
+
+    const delayMs = autoFinalizeAtMs - Date.now();
+    if (delayMs <= 0) {
+      router.push(`/result/${match._id}`);
+      return undefined;
+    }
+
+    const timerId = window.setTimeout(() => {
+      router.push(`/result/${match._id}`);
+    }, delayMs);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [match?._id, match?.pendingResult, match?.resultAutoFinalizeAt, router]);
 
   useEffect(() => {
     if (activePanel !== "mic") {

@@ -196,6 +196,15 @@ test("[security] full match flow stays accurate across innings change and target
   assert.equal(match.score, 13);
   assert.equal(match.innings2.score, 13);
   assert.equal(match.isOngoing, false);
+  assert.equal(match.result, "");
+  assert.equal(match.pendingResult, "Titans won by 3 wickets.");
+
+  match = applyMatchAction(match, {
+    actionId: "advance:finalize-full-flow",
+    type: "complete_innings",
+  });
+
+  assert.equal(match.pendingResult, "");
   assert.equal(match.result, "Titans won by 3 wickets.");
 
   assert.throws(
@@ -272,7 +281,7 @@ test("[security] the last remaining batter can continue until the final wicket f
       }),
     (error) => error instanceof MatchEngineError && error.status === 409
   );
-});
+  });
 
 
 test("[security] second innings ends immediately when the final wicket falls short of the target", () => {
@@ -327,7 +336,8 @@ test("[security] second innings ends immediately when the final wicket falls sho
   });
 
   assert.equal(match.isOngoing, false);
-  assert.equal(match.result, "Falcons won by 2 runs.");
+  assert.equal(match.result, "");
+  assert.equal(match.pendingResult, "Falcons won by 2 runs.");
   assert.equal(match.lastLiveEvent?.type, "match_end");
 });
 
@@ -372,8 +382,62 @@ test("[security] second innings ends immediately when the final legal ball compl
   }
 
   assert.equal(match.isOngoing, false);
-  assert.equal(match.result, "Falcons won by 1 run.");
+  assert.equal(match.result, "");
+  assert.equal(match.pendingResult, "Falcons won by 1 run.");
   assert.equal(match.lastLiveEvent?.type, "match_end");
+});
+
+
+test("[security] pending match results stay undoable until final results are confirmed", () => {
+  let match = applyMatchAction(
+    {
+      ...buildBaseMatch(),
+      overs: 1,
+    },
+    {
+      actionId: "toss:pending-undo",
+      type: "set_toss",
+      tossWinner: "Falcons",
+      tossDecision: "bat",
+    }
+  );
+
+  for (let index = 0; index < 6; index += 1) {
+    match = applyMatchAction(match, {
+      actionId: `score:pending-first-${index}`,
+      type: "score_ball",
+      runs: 1,
+      isOut: false,
+      extraType: null,
+    });
+  }
+
+  match = applyMatchAction(match, {
+    actionId: "advance:pending-second",
+    type: "complete_innings",
+  });
+
+  match = applyMatchAction(match, {
+    actionId: "score:pending-second-1",
+    type: "score_ball",
+    runs: 7,
+    isOut: false,
+    extraType: "noball",
+  });
+
+  assert.equal(match.result, "");
+  assert.equal(match.pendingResult, "Titans won by 3 wickets.");
+
+  const undone = applyMatchAction(match, {
+    actionId: "undo:pending-match-end",
+    type: "undo_last",
+  });
+
+  assert.equal(undone.isOngoing, true);
+  assert.equal(undone.result, "");
+  assert.equal(undone.pendingResult, "");
+  assert.equal(undone.score, 0);
+  assert.equal(undone.innings2.score, 0);
 });
 
 
@@ -592,7 +656,8 @@ test("[security] umpire match patching blocks impossible over changes and unsafe
   assert.equal(correctedWinningTarget.innings1.score, 5);
   assert.equal(correctedWinningTarget.score, 6);
   assert.equal(correctedWinningTarget.isOngoing, false);
-  assert.equal(correctedWinningTarget.result, "Titans won by 3 wickets.");
+  assert.equal(correctedWinningTarget.result, "");
+  assert.equal(correctedWinningTarget.pendingResult, "Titans won by 3 wickets.");
   assert.equal(correctedWinningTarget.lastLiveEvent?.type, "match_end");
 
   assert.throws(

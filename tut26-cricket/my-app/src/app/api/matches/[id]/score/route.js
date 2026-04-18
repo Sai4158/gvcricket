@@ -25,6 +25,10 @@ import {
   hasValidMatchAccess,
 } from "../../../../lib/match-access";
 import { serializeLiveMatchPatch } from "../../../../lib/public-data";
+import {
+  finalizePendingResultIfExpired,
+  isFinalizedMatchComplete,
+} from "../../../../lib/pending-match-result";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { parseJsonRequest } from "../../../../lib/request-security";
 import { invalidateSessionsDataCache } from "../../../../lib/server-data";
@@ -39,6 +43,9 @@ const SCORE_MUTABLE_KEYS = [
   "isOngoing",
   "innings",
   "result",
+  "pendingResult",
+  "pendingResultAt",
+  "resultAutoFinalizeAt",
   "innings1",
   "innings2",
   "balls",
@@ -78,7 +85,7 @@ async function hasMatchAccess(matchId, accessVersion) {
 }
 
 function isMatchCompleted(match) {
-  return Boolean(String(match?.result || "").trim()) && !Boolean(match?.isOngoing);
+  return isFinalizedMatchComplete(match);
 }
 
 export async function POST(req, { params }) {
@@ -98,10 +105,11 @@ export async function POST(req, { params }) {
     if (!match) {
       return jsonError("Match not found.", 404);
     }
+    const finalizedMatch = await finalizePendingResultIfExpired(match);
 
     const hasAccess = await hasMatchAccess(
       id,
-      Number(match.adminAccessVersion || 1),
+      Number(finalizedMatch.adminAccessVersion || 1),
     );
     if (!hasAccess) {
       void writeAuditLog({
@@ -116,17 +124,17 @@ export async function POST(req, { params }) {
       return jsonError("Umpire access required.", 403);
     }
 
-    if (isMatchCompleted(match)) {
+    if (isMatchCompleted(finalizedMatch)) {
       return jsonError("This match is complete. Open the result page instead.", 409);
     }
 
-    if (isProcessedAction(match, parsedRequest.value.actionId)) {
+    if (isProcessedAction(finalizedMatch, parsedRequest.value.actionId)) {
       return Response.json(
         {
           ok: true,
           actionId: parsedRequest.value.actionId,
           replayed: true,
-          matchPatch: serializeLiveMatchPatch(match),
+          matchPatch: serializeLiveMatchPatch(finalizedMatch),
         },
         {
           headers: {
@@ -136,24 +144,24 @@ export async function POST(req, { params }) {
       );
     }
 
-    const nextState = applyMatchAction(match, {
+    const nextState = applyMatchAction(finalizedMatch, {
       ...parsedRequest.value,
       type: "score_ball",
     });
     const updatePayload = buildScoreUpdatePayload(
       nextState,
-      match,
+      finalizedMatch,
       parsedRequest.value.actionId,
     );
 
     let createdUndoEntry = null;
     try {
       createdUndoEntry = await MatchUndoEntry.create({
-        matchId: match._id,
+        matchId: finalizedMatch._id,
         sequence: updatePayload.undoSequence,
         actionId: parsedRequest.value.actionId,
         type: "score_ball",
-        snapshot: createMatchUndoSnapshot(match),
+        snapshot: createMatchUndoSnapshot(finalizedMatch),
       });
     } catch (error) {
       console.error("Could not create score undo snapshot:", error);
