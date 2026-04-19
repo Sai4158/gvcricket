@@ -96,16 +96,41 @@ export async function GET(req) {
       requestUrl.searchParams.get("fresh") === "1" ||
       requestCacheControl.includes("no-store") ||
       requestCacheControl.includes("no-cache");
-    const { sessions, totalCount } = await loadSessionsIndexPageData({
+    const limit = Number(requestUrl.searchParams.get("limit") || 10);
+    const cursor = String(requestUrl.searchParams.get("cursor") || "").trim();
+    const search = String(requestUrl.searchParams.get("search") || "").trim();
+    const filter = String(requestUrl.searchParams.get("filter") || "").trim();
+    const sort = String(requestUrl.searchParams.get("sort") || "").trim();
+    const {
+      sessions,
+      totalCount,
+      unfilteredTotalCount,
+      nextCursor,
+      hasMore,
+    } = await loadSessionsIndexPageData({
       forceFresh,
+      limit,
+      cursor,
+      search,
+      filter,
+      sort,
     });
 
-    return Response.json(sessions, {
+    return Response.json(
+      {
+        sessions,
+        nextCursor,
+        hasMore,
+        totalCount,
+        unfilteredTotalCount,
+      },
+      {
       headers: {
         "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=45",
         "X-Total-Count": String(Number(totalCount || 0)),
       },
-    });
+      }
+    );
   } catch {
     return jsonError("Failed to retrieve sessions.", 500);
   }

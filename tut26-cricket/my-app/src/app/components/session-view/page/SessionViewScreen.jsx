@@ -12,6 +12,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -81,6 +82,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const [copied, setCopied] = useState(false);
   const [isLeavingToSessions, setIsLeavingToSessions] = useState(false);
   const [data, setData] = useState(initialData || null);
+  const [historyDetail, setHistoryDetail] = useState(null);
+  const [mediaDetail, setMediaDetail] = useState(null);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [isMediaLoading, setIsMediaLoading] = useState(false);
+  const [liveToolsReady, setLiveToolsReady] = useState(false);
   const [activePanel, setActivePanel] = useState(null);
   const [localWalkieNotice, setLocalWalkieNotice] = useState("");
   const [streamError, setStreamError] = useState("");
@@ -129,10 +135,29 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const pendingDerivedScoreSoundRef = useRef(null);
   const handledDerivedScoreSoundActionIdsRef = useRef(new Map());
   const pendingResultNavigationRef = useRef("");
+  const requestedHistoryVersionRef = useRef("");
+  const requestedMediaVersionRef = useRef("");
   const router = useRouter();
   const { startNavigation } = useRouteFeedback();
   const sessionData = data?.session;
-  const match = data?.match;
+  const match = useMemo(() => {
+    const baseMatch = data?.match;
+    if (!baseMatch) {
+      return null;
+    }
+
+    return {
+      ...baseMatch,
+      innings1: historyDetail?.innings1 || baseMatch.innings1,
+      innings2: historyDetail?.innings2 || baseMatch.innings2,
+      matchImageUrl: mediaDetail?.matchImageUrl || baseMatch.matchImageUrl || "",
+      matchImages: Array.isArray(mediaDetail?.matchImages)
+        ? mediaDetail.matchImages
+        : Array.isArray(baseMatch.matchImages)
+          ? baseMatch.matchImages
+          : [],
+    };
+  }, [data?.match, historyDetail, mediaDetail]);
   const { settings, updateSetting } = useAnnouncementSettings(
     "spectator",
     match?._id || sessionId || "",
@@ -156,6 +181,108 @@ export default function SessionViewClient({ sessionId, initialData }) {
       startNavigation,
     });
   }, [router, startNavigation]);
+
+  const loadSessionHistory = useCallback(async () => {
+    if (!sessionId || isHistoryLoading) {
+      return;
+    }
+
+    setIsHistoryLoading(true);
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/view-history`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Could not load innings history.");
+      }
+
+      const payload = await response.json().catch(() => null);
+      if (!payload) {
+        throw new Error("Could not load innings history.");
+      }
+
+      setHistoryDetail(payload);
+    } catch {
+      // Keep the compact shell visible even if deferred history fails.
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  }, [isHistoryLoading, sessionId]);
+
+  const loadSessionMedia = useCallback(async () => {
+    if (!sessionId || isMediaLoading) {
+      return;
+    }
+
+    setIsMediaLoading(true);
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/view-media`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Could not load match media.");
+      }
+
+      const payload = await response.json().catch(() => null);
+      if (!payload) {
+        throw new Error("Could not load match media.");
+      }
+
+      setMediaDetail(payload);
+    } catch {
+      // Ignore deferred media failures; the shell already has a cover image URL.
+    } finally {
+      setIsMediaLoading(false);
+    }
+  }, [isMediaLoading, sessionId]);
+
+  useEffect(() => {
+    setHistoryDetail(null);
+    setMediaDetail(null);
+    setLiveToolsReady(false);
+    requestedHistoryVersionRef.current = "";
+    requestedMediaVersionRef.current = "";
+
+    const frameId = window.requestAnimationFrame(() => {
+      setLiveToolsReady(true);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!match?._id) {
+      return;
+    }
+    const nextHistoryVersion = String(match.historyVersion || "");
+    if (!nextHistoryVersion || requestedHistoryVersionRef.current === nextHistoryVersion) {
+      return;
+    }
+
+    requestedHistoryVersionRef.current = nextHistoryVersion;
+    void loadSessionHistory();
+  }, [loadSessionHistory, match?._id, match?.historyVersion]);
+
+  useEffect(() => {
+    if (!match?._id) {
+      return;
+    }
+    const nextMediaVersion = String(match.mediaVersion || "");
+    if (!nextMediaVersion || requestedMediaVersionRef.current === nextMediaVersion) {
+      return;
+    }
+
+    requestedMediaVersionRef.current = nextMediaVersion;
+    void loadSessionMedia();
+  }, [loadSessionMedia, match?._id, match?.mediaVersion]);
 
   useEventSource({
     url: sessionId ? `/api/live/sessions/${sessionId}` : null,
@@ -186,11 +313,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
   );
   const walkiePreferenceScope = match?._id || sessionId || "";
   const spectatorWalkieSignalActive = Boolean(
-    isLiveMatch && (spectatorWalkieEnabled || quickWalkieTalking),
+    liveToolsReady && isLiveMatch && (spectatorWalkieEnabled || quickWalkieTalking),
   );
   const walkie = useWalkieTalkie({
     matchId: match?._id || "",
-    enabled: Boolean(match?._id && isLiveMatch),
+    enabled: Boolean(match?._id && isLiveMatch && liveToolsReady),
     role: "spectator",
     displayName: sessionData?.name
       ? `${sessionData.name} Spectator`
@@ -1819,7 +1946,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const announcerCardDescription = announceSwitchOn
     ? "Reads each update."
     : "Turn on for scores.";
-  const trackerHistory = buildSessionViewTrackerHistory(match);
+  const trackerHistory = buildSessionViewTrackerHistory(match, historyDetail);
   const launcherCardClass =
     "relative w-full overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.05),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.06),transparent_28%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] text-left shadow-[0_18px_50px_rgba(0,0,0,0.32)] backdrop-blur-sm transition-transform hover:-translate-y-0.5";
   const handleSpectatorAnnouncerToggle = (nextEnabled) => {
@@ -1873,6 +2000,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
     teamA,
     teamB,
     isLiveMatch,
+    historyDetail,
+    historyLoading: isHistoryLoading && !historyDetail,
   });
 
   return (
@@ -1885,6 +2014,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
         sessionName={sessionData.name}
         match={match}
         trackerHistory={trackerHistory}
+        activeOverBalls={match?.activeOverBalls || []}
+        activeOverNumber={match?.activeOverNumber || 1}
       />
 
       <OptionalFeatureBoundary

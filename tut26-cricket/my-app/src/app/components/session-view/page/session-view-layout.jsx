@@ -23,6 +23,8 @@ export function SessionViewTopShell({
   sessionName,
   match,
   trackerHistory,
+  activeOverBalls,
+  activeOverNumber,
 }) {
   return (
     <>
@@ -76,7 +78,11 @@ export function SessionViewTopShell({
           </div>
           <div className="mt-3 flex justify-center">
             <div className="w-full max-w-xl">
-              <BallTracker history={trackerHistory} />
+              <BallTracker
+                history={trackerHistory}
+                activeOverBalls={activeOverBalls}
+                activeOverNumber={activeOverNumber}
+              />
             </div>
           </div>
         </div>
@@ -95,6 +101,7 @@ export function SessionViewInningsGrid({ inningsCards, teamBName }) {
           inningsData={inningsCard.inningsData}
           statusLabel={inningsCard.statusLabel}
           targetSummary={inningsCard.targetSummary}
+          loadingHistory={inningsCard.loadingHistory}
           teamSide={
             inningsCard.title === teamBName || inningsCard.inningsData?.team === teamBName
               ? "red"

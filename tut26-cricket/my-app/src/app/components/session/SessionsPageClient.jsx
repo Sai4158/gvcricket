@@ -59,19 +59,13 @@ const SORT_OPTIONS = [
   { value: "z-a", label: "Z to A" },
 ];
 
-const PAGE_SIZE_OPTIONS = [
-  { value: "12", label: "12" },
-  { value: "24", label: "24" },
-  { value: "36", label: "36" },
-  { value: "48", label: "48" },
-];
-
 const FILTER_OPTIONS = [
   { value: "all", label: "All" },
   { value: "live", label: "Live" },
   { value: "completed", label: "Completed" },
 ];
 const SESSION_SELECTION_HOLD_MS = 3000;
+const SESSIONS_PAGE_SIZE = 10;
 const EMPTY_MANAGE_FORM = {
   name: "",
   teamAName: "",
@@ -81,85 +75,6 @@ const EMPTY_MANAGE_FORM = {
 // Small helpers for search and sorting.
 function normalizeSearchValue(value) {
   return String(value || "").trim().toLowerCase();
-}
-
-// Turn a date into milliseconds for sorting.
-function getTimestampMs(value) {
-  const timestamp = Date.parse(String(value || ""));
-  return Number.isNaN(timestamp) ? 0 : timestamp;
-}
-
-// Pick the first valid date from a few choices.
-function getPreferredTimestampMs(...values) {
-  for (const value of values) {
-    const timestamp = getTimestampMs(value);
-    if (timestamp > 0) {
-      return timestamp;
-    }
-  }
-
-  return 0;
-}
-
-// Build one search string from a session.
-function buildSearchText(session) {
-  return [
-    session.name,
-    session.teamAName,
-    session.teamBName,
-    session.date,
-    session.isLive ? "live live now" : "completed ended final score",
-    session.result,
-    session.updatedAt,
-    session.createdAt,
-  ]
-    .map(normalizeSearchValue)
-    .filter(Boolean)
-    .join(" ");
-}
-
-// Sort the sessions based on the selected option.
-function sortSessions(items, sortValue) {
-  const sessions = [...items];
-  const byCreatedDesc = (left, right) => {
-    const createdDiff = right.__createdAtMs - left.__createdAtMs;
-    if (createdDiff !== 0) {
-      return createdDiff;
-    }
-
-    const updatedDiff = right.__updatedAtMs - left.__updatedAtMs;
-    if (updatedDiff !== 0) {
-      return updatedDiff;
-    }
-
-    return left.__sortName.localeCompare(right.__sortName);
-  };
-
-  switch (sortValue) {
-    case "newest":
-      return sessions.sort(byCreatedDesc);
-    case "oldest":
-      return sessions.sort((left, right) => -byCreatedDesc(left, right));
-    case "recent-ended":
-      return sessions.sort((left, right) => {
-        if (left.isLive !== right.isLive) return left.isLive ? 1 : -1;
-        return byCreatedDesc(left, right);
-      });
-    case "a-z":
-      return sessions.sort((left, right) =>
-        left.__sortName.localeCompare(right.__sortName)
-      );
-    case "z-a":
-      return sessions.sort((left, right) =>
-        right.__sortName.localeCompare(left.__sortName)
-      );
-    case "live-newest":
-    default:
-      return sessions.sort((left, right) => {
-        if (left.isLive !== right.isLive) return left.isLive ? -1 : 1;
-        return byCreatedDesc(left, right);
-      });
-  }
 }
 
 // Card shown when there are no sessions to show.
@@ -262,13 +177,34 @@ function describeSessionFieldChange(label, previousValue, nextValue) {
 // 3. handlers for pin, manage, delete, and navigation
 // 4. final JSX layout
 export default function SessionsPageClient({
-  initialSessions,
-  initialTotalCount = 0,
+  initialPayload,
   refreshToken = "",
 }) {
+  const initialSessions = useMemo(
+    () => (Array.isArray(initialPayload?.sessions) ? initialPayload.sessions : []),
+    [initialPayload?.sessions]
+  );
+  const initialTotalCount = useMemo(
+    () => Number(initialPayload?.totalCount || 0),
+    [initialPayload?.totalCount]
+  );
+  const initialUnfilteredTotalCount = useMemo(
+    () => Number(initialPayload?.unfilteredTotalCount || initialTotalCount || 0),
+    [initialPayload?.unfilteredTotalCount, initialTotalCount]
+  );
+
   // Main page state.
   const [sessions, setSessions] = useState(initialSessions ?? []);
   const [totalCount, setTotalCount] = useState(Number(initialTotalCount || 0));
+  const [unfilteredTotalCount, setUnfilteredTotalCount] = useState(
+    Number(initialUnfilteredTotalCount || 0)
+  );
+  const [nextCursor, setNextCursor] = useState(
+    String(initialPayload?.nextCursor || "")
+  );
+  const [hasMore, setHasMore] = useState(Boolean(initialPayload?.hasMore));
+  const [isRefreshingList, setIsRefreshingList] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [pinPrompt, setPinPrompt] = useState(null);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [pinError, setPinError] = useState("");
@@ -294,16 +230,15 @@ export default function SessionsPageClient({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("live-newest");
   const [filterBy, setFilterBy] = useState("all");
-  const [pageSizeValue, setPageSizeValue] = useState("24");
-  const [page, setPage] = useState(1);
   const [isGoingHome, setIsGoingHome] = useState(false);
   const router = useRouter();
   const { startNavigation } = useRouteFeedback();
   const deferredSearchQuery = useDeferredValue(normalizeSearchValue(searchInput));
   const secretHoldTimerRef = useRef(null);
   const suppressCardOpenUntilRef = useRef(0);
-  const didInitialFreshReloadRef = useRef(false);
-  const hasHandledInitialPageScrollRef = useRef(false);
+  const hasMountedFiltersRef = useRef(false);
+  const loadMoreSentinelRef = useRef(null);
+  const activeRequestIdRef = useRef(0);
 
   // Turn text selection on or off during hidden hold mode.
   const setSecretHoldSelectionLock = useCallback((locked) => {
@@ -330,28 +265,29 @@ export default function SessionsPageClient({
 
   useEffect(() => {
     setSessions(initialSessions ?? []);
-  }, [initialSessions]);
-
-  useEffect(() => {
     setTotalCount(Number(initialTotalCount || 0));
-  }, [initialTotalCount]);
+    setUnfilteredTotalCount(Number(initialUnfilteredTotalCount || 0));
+    setNextCursor(String(initialPayload?.nextCursor || ""));
+    setHasMore(Boolean(initialPayload?.hasMore));
+  }, [
+    initialPayload?.hasMore,
+    initialPayload?.nextCursor,
+    initialSessions,
+    initialTotalCount,
+    initialUnfilteredTotalCount,
+  ]);
 
   useEffect(() => {
     setSelectedSessionIds((current) =>
       current.filter((sessionId) =>
-        (initialSessions ?? []).some((session) => session._id === sessionId)
+        sessions.some((session) => session._id === sessionId)
       )
     );
-  }, [initialSessions]);
+  }, [sessions]);
 
   useEffect(() => {
     setSearchQuery(deferredSearchQuery);
-    setPage(1);
   }, [deferredSearchQuery]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [filterBy, pageSizeValue, sortBy]);
 
   useEffect(() => {
     return () => {
@@ -363,67 +299,18 @@ export default function SessionsPageClient({
     };
   }, [setSecretHoldSelectionLock]);
 
-  // Build the list step by step: index -> search -> filter -> sort -> paginate.
-  const indexedSessions = useMemo(
-    () =>
-      sessions.map((session) => {
-        const createdAtMs = getPreferredTimestampMs(
-          session.date,
-          session.sortCreatedAt ||
-            session.matchCreatedAt ||
-            session.createdAt ||
-            session.updatedAt
-        );
-        const updatedAtMs = getTimestampMs(session.updatedAt || session.createdAt);
-        return {
-          ...session,
-          __searchText: buildSearchText(session),
-          __sortName: normalizeSearchValue(session.name || ""),
-          __createdAtMs: createdAtMs,
-          __updatedAtMs: updatedAtMs,
-        };
-      }),
-    [sessions]
-  );
-
-  const searchTerms = useMemo(
-    () => searchQuery.split(/\s+/).filter(Boolean),
-    [searchQuery]
-  );
-
-  const filteredSessions = useMemo(() => {
-    const searched = searchTerms.length
-      ? indexedSessions.filter((session) =>
-          searchTerms.every((term) => session.__searchText.includes(term))
-        )
-      : indexedSessions;
-
-    const filtered = searched.filter((session) => {
-      if (filterBy === "live") return session.isLive;
-      if (filterBy === "completed") return !session.isLive;
-      return true;
-    });
-
-    return sortSessions(filtered, sortBy);
-  }, [filterBy, indexedSessions, searchTerms, sortBy]);
-
-  const pageSize = Number(pageSizeValue);
-  const totalPages = Math.max(1, Math.ceil(filteredSessions.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const pageStart = filteredSessions.length ? (currentPage - 1) * pageSize : 0;
-  const paginatedSessions = filteredSessions.slice(pageStart, pageStart + pageSize);
-  const showingFrom = filteredSessions.length ? pageStart + 1 : 0;
-  const showingTo = filteredSessions.length
-    ? Math.min(filteredSessions.length, pageStart + pageSize)
-    : 0;
   const totalSessionCount =
     Number.isFinite(totalCount) && totalCount > 0 ? totalCount : sessions.length;
-  const filteredSessionCount = filteredSessions.length;
+  const overallSessionCount =
+    Number.isFinite(unfilteredTotalCount) && unfilteredTotalCount > 0
+      ? unfilteredTotalCount
+      : totalSessionCount;
+  const loadedSessionCount = sessions.length;
   const totalSessionsLabel = `${totalSessionCount} ${
     totalSessionCount === 1 ? "session" : "sessions"
   }`;
-  const filteredSessionsLabel = `${filteredSessionCount} ${
-    filteredSessionCount === 1 ? "session" : "sessions"
+  const loadedSessionsLabel = `${loadedSessionCount} ${
+    loadedSessionCount === 1 ? "session" : "sessions"
   }`;
   const isFilteredView = filterBy !== "all" || Boolean(searchQuery);
   const imageReplaceSession = imageReplaceContext
@@ -434,21 +321,6 @@ export default function SessionsPageClient({
     [selectedSessionIds, sessions]
   );
 
-  useEffect(() => {
-    if (!hasHandledInitialPageScrollRef.current) {
-      hasHandledInitialPageScrollRef.current = true;
-      return;
-    }
-
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  }, [currentPage]);
   const selectedSessionForManage =
     selectedSessions.length === 1 ? selectedSessions[0] : null;
   const normalizedManageForm = useMemo(
@@ -484,10 +356,6 @@ export default function SessionsPageClient({
   const shouldPromptManageDiscard = isManageFormDirty || manageWasEdited;
 
   useEffect(() => {
-    setPage((current) => Math.min(current, totalPages));
-  }, [totalPages]);
-
-  useEffect(() => {
     if (!selectionMode) {
       return;
     }
@@ -516,6 +384,7 @@ export default function SessionsPageClient({
         session._id === sessionId
           ? {
               ...session,
+              coverImageUrl: updatedMatch?.matchImageUrl || "",
               matchImageUrl: updatedMatch?.matchImageUrl || "",
               matchImages: Array.isArray(updatedMatch?.matchImages)
                 ? updatedMatch.matchImages
@@ -558,6 +427,9 @@ export default function SessionsPageClient({
     setTotalCount((current) =>
       Math.max(0, Number(current || 0) - removedIdSet.size)
     );
+    setUnfilteredTotalCount((current) =>
+      Math.max(0, Number(current || 0) - removedIdSet.size)
+    );
   }, []);
 
   const handleOpenImageActions = useCallback((session, image) => {
@@ -571,7 +443,31 @@ export default function SessionsPageClient({
       matchId: session.match,
       image,
     });
-  }, []);
+
+    if (Array.isArray(session.matchImages) && session.matchImages.length > 1) {
+      return;
+    }
+
+    void fetch(`/api/sessions/${session._id}/view-media`, {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          return null;
+        }
+        return response.json().catch(() => null);
+      })
+      .then((payload) => {
+        if (!payload) {
+          return;
+        }
+        mergeMatchImageUpdateIntoSession(session._id, payload);
+      })
+      .catch(() => {});
+  }, [mergeMatchImageUpdateIntoSession]);
 
   const closeImageActionFlows = useCallback(() => {
     setImageActionContext(null);
@@ -672,54 +568,129 @@ export default function SessionsPageClient({
     router.replace("/");
   }, [router, startNavigation]);
 
-  const reloadSessionsFromServer = useCallback(async ({ forceFresh = false } = {}) => {
-    const requestUrl = forceFresh
-      ? `/api/sessions?fresh=1&t=${Date.now()}`
-      : "/api/sessions";
-    const response = await fetch(requestUrl, {
-      cache: "no-store",
-      headers: {
-        "Cache-Control": "no-store",
-      },
-    });
+  const reloadSessionsFromServer = useCallback(
+    async ({ forceFresh = false, append = false } = {}) => {
+      const query = new URLSearchParams({
+        limit: String(SESSIONS_PAGE_SIZE),
+        search: searchQuery,
+        filter: filterBy,
+        sort: sortBy,
+      });
+      if (append && nextCursor) {
+        query.set("cursor", nextCursor);
+      }
+      if (forceFresh) {
+        query.set("fresh", "1");
+        query.set("t", String(Date.now()));
+      }
 
-    if (!response.ok) {
-      throw new Error("Could not refresh sessions.");
-    }
+      const requestId = activeRequestIdRef.current + 1;
+      activeRequestIdRef.current = requestId;
 
-    const payload = await response
-      .json()
-      .catch(() => []);
+      if (append) {
+        setIsLoadingMore(true);
+      } else {
+        setIsRefreshingList(true);
+      }
 
-    if (!Array.isArray(payload)) {
-      throw new Error("Could not refresh sessions.");
-    }
+      try {
+        const response = await fetch(`/api/sessions?${query.toString()}`, {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        });
 
-    const nextTotalCount = Number(
-      response.headers.get("X-Total-Count") || payload.length || 0
-    );
+        if (!response.ok) {
+          throw new Error("Could not refresh sessions.");
+        }
 
-    setSessions(payload);
-    setTotalCount(Number.isFinite(nextTotalCount) ? nextTotalCount : payload.length);
-    return payload;
-  }, []);
+        const payload = await response
+          .json()
+          .catch(() => null);
 
-  useEffect(() => {
-    if (didInitialFreshReloadRef.current) {
-      return;
-    }
+        if (!payload || !Array.isArray(payload.sessions)) {
+          throw new Error("Could not refresh sessions.");
+        }
 
-    didInitialFreshReloadRef.current = true;
-    void reloadSessionsFromServer({ forceFresh: true }).catch(() => {});
-  }, [reloadSessionsFromServer]);
+        if (requestId !== activeRequestIdRef.current) {
+          return payload.sessions;
+        }
+
+        setSessions((current) =>
+          append
+            ? [
+                ...current,
+                ...payload.sessions.filter(
+                  (session) =>
+                    !current.some((existing) => existing._id === session._id)
+                ),
+              ]
+            : payload.sessions
+        );
+        setTotalCount(Number(payload.totalCount || 0));
+        setUnfilteredTotalCount(Number(payload.unfilteredTotalCount || 0));
+        setHasMore(Boolean(payload.hasMore));
+        setNextCursor(String(payload.nextCursor || ""));
+        return payload.sessions;
+      } finally {
+        if (requestId === activeRequestIdRef.current) {
+          setIsRefreshingList(false);
+          setIsLoadingMore(false);
+        }
+      }
+    },
+    [filterBy, nextCursor, searchQuery, sortBy]
+  );
 
   useEffect(() => {
     if (!String(refreshToken || "").trim()) {
       return;
     }
 
-    void reloadSessionsFromServer({ forceFresh: true });
+    void reloadSessionsFromServer({ forceFresh: true }).catch(() => {});
   }, [refreshToken, reloadSessionsFromServer]);
+
+  useEffect(() => {
+    if (!hasMountedFiltersRef.current) {
+      hasMountedFiltersRef.current = true;
+      return;
+    }
+
+    void reloadSessionsFromServer().catch(() => {});
+  }, [filterBy, reloadSessionsFromServer, searchQuery, sortBy]);
+
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current;
+    if (
+      !sentinel ||
+      !hasMore ||
+      isLoadingMore ||
+      isRefreshingList ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) {
+          return;
+        }
+
+        void reloadSessionsFromServer({ append: true }).catch(() => {});
+      },
+      {
+        rootMargin: "480px 0px",
+        threshold: 0.01,
+      }
+    );
+
+    observer.observe(sentinel);
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasMore, isLoadingMore, isRefreshingList, reloadSessionsFromServer]);
 
   const openSessionManager = useCallback((session, pin) => {
     setManageSessionContext({ sessionId: session._id, pin });
@@ -910,7 +881,6 @@ export default function SessionsPageClient({
       const removedIds = deletedIds.length ? deletedIds : selectedSessionIds;
 
       removeSessionsFromList(removedIds);
-      setPage(1);
       clearSelectionMode();
       setBulkDeletePromptOpen(false);
       setActionSummary({
@@ -1029,7 +999,7 @@ export default function SessionsPageClient({
     }
   };
 
-  if (!sessions.length) {
+  if (!sessions.length && !isFilteredView && !isRefreshingList) {
     return (
       <main id="top" className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_22%),radial-gradient(circle_at_82%_14%,rgba(14,165,233,0.1),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.08),transparent_20%),linear-gradient(180deg,#16181d_0%,#090a0f_100%)] px-5 py-8 text-zinc-100">
         <div className="mx-auto flex min-h-[80vh] max-w-4xl items-center justify-center">
@@ -1102,8 +1072,8 @@ export default function SessionsPageClient({
               </div>
               <p className="mt-3 text-sm text-zinc-400">
                 {isFilteredView
-                  ? `${filteredSessionsLabel} visible of ${totalSessionsLabel}`
-                  : `${totalSessionsLabel} total`}
+                  ? `${loadedSessionsLabel} loaded of ${totalSessionsLabel}`
+                  : `${loadedSessionsLabel} loaded of ${overallSessionCount.toLocaleString()} total`}
               </p>
             </div>
           </div>
@@ -1126,10 +1096,7 @@ export default function SessionsPageClient({
               <div className="shrink-0">
                 <DarkSelect
                   value={sortBy}
-                  onChange={(value) => {
-                    setSortBy(value);
-                    setPage(1);
-                  }}
+                  onChange={setSortBy}
                   options={SORT_OPTIONS}
                   ariaLabel="Sort sessions"
                   leadingIcon={FaSlidersH}
@@ -1144,10 +1111,7 @@ export default function SessionsPageClient({
                 <button
                   key={pill.value}
                   type="button"
-                  onClick={() => {
-                    setFilterBy(pill.value);
-                    setPage(1);
-                  }}
+                  onClick={() => setFilterBy(pill.value)}
                   className={`press-feedback rounded-full px-4 py-2 text-sm font-semibold transition ${
                     filterBy === pill.value
                       ? "border border-cyan-200/24 bg-[linear-gradient(135deg,rgba(245,252,255,0.96),rgba(211,238,248,0.9)_60%,rgba(245,158,11,0.26))] text-black shadow-[0_10px_20px_rgba(255,255,255,0.14)]"
@@ -1163,7 +1127,7 @@ export default function SessionsPageClient({
         </section>
 
         <div className="mt-8">
-          {!filteredSessions.length ? (
+          {!sessions.length && !isRefreshingList ? (
             <EmptyState
               title={searchQuery ? "No matching sessions" : "No sessions in this view"}
               text={
@@ -1179,7 +1143,7 @@ export default function SessionsPageClient({
           ) : (
             <>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] gap-5 2xl:gap-6">
-                {paginatedSessions.map((session) => (
+                {sessions.map((session) => (
                   <div
                     key={session._id}
                     className="h-full select-none [touch-action:pan-y]"
@@ -1210,51 +1174,50 @@ export default function SessionsPageClient({
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <p className="text-sm font-medium text-zinc-200">
-                      Showing {showingFrom}-{showingTo} of{" "}
-                      {isFilteredView ? filteredSessionsLabel : totalSessionsLabel}
+                      Loaded {loadedSessionCount.toLocaleString()} of{" "}
+                      {totalSessionCount.toLocaleString()} matching{" "}
+                      {totalSessionCount === 1 ? "session" : "sessions"}
                     </p>
                     {isFilteredView ? (
                       <p className="mt-1 text-sm text-zinc-500">
-                        {totalSessionsLabel} in database
+                        {overallSessionCount.toLocaleString()} total in database
                       </p>
                     ) : null}
                     <p className="mt-1 text-sm text-zinc-500">
-                      Page {currentPage} of {totalPages}
+                      {hasMore
+                        ? "More sessions load automatically as you scroll."
+                        : "All matching sessions are loaded."}
                     </p>
                   </div>
 
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <div className="min-w-[140px]">
-                      <DarkSelect
-                        value={pageSizeValue}
-                        onChange={(value) => {
-                          setPageSizeValue(value);
-                          setPage(1);
-                        }}
-                        options={PAGE_SIZE_OPTIONS}
-                        ariaLabel="Sessions per page"
-                      />
-                    </div>
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setPage((current) => Math.max(1, current - 1))}
-                        disabled={currentPage <= 1}
-                        className="press-feedback rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Previous
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-                        disabled={currentPage >= totalPages}
-                        className="press-feedback rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Next
-                      </button>
+                      {isRefreshingList ? (
+                        <span className="text-sm text-zinc-400">
+                          Refreshing sessions...
+                        </span>
+                      ) : null}
+                      {isLoadingMore ? (
+                        <span className="text-sm text-zinc-400">
+                          Loading more...
+                        </span>
+                      ) : null}
+                      {hasMore ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void reloadSessionsFromServer({ append: true }).catch(() => {});
+                          }}
+                          disabled={isLoadingMore || isRefreshingList}
+                          className="press-feedback rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Load More
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
+                <div ref={loadMoreSentinelRef} className="h-1 w-full" aria-hidden="true" />
               </section>
             </>
           )}

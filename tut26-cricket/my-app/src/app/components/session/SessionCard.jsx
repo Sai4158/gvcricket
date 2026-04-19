@@ -109,7 +109,8 @@ function SessionCard({
   const isLive = session.isLive;
   const statusMeta = buildStatusMeta(session);
   const matchImages = Array.isArray(session.matchImages) ? session.matchImages : [];
-  const cardImage = matchImages[0]?.url || session.matchImageUrl || "";
+  const cardImage =
+    session.coverImageUrl || matchImages[0]?.url || session.matchImageUrl || "";
   const hasUploadedCardImage =
     resolveSafeMatchImage(cardImage) !== GV_MATCH_FALLBACK_IMAGE;
   const scoreHref =

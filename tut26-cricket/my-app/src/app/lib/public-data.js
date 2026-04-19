@@ -13,7 +13,7 @@ import { getPublicMatchImages } from "./match-image-gallery";
 import { isSafeMatchImageUrl } from "./match-image";
 import { hasCompleteTossState, normalizeLegacyTossState } from "./match-toss";
 import { normalizeScoreSoundEffectMap } from "./score-sound-effects";
-import { countLegalBalls } from "./match-scoring";
+import { addBallToHistory, countLegalBalls } from "./match-scoring";
 
 function getPublicMatchImagesWithFallback(match, fallbackState = null) {
   const matchId = String(match?._id || "");
@@ -92,6 +92,31 @@ function getCompactOverState(match) {
   };
 }
 
+function getCompactOverStateFromBalls(match) {
+  const innings = match?.innings === "second" ? "second" : "first";
+  const reconstructedMatch = {
+    innings,
+    innings1: { history: [] },
+    innings2: { history: [] },
+  };
+
+  for (const ball of Array.isArray(match?.balls) ? match.balls : []) {
+    addBallToHistory(reconstructedMatch, ball);
+  }
+
+  const activeInningsKey = getActiveInningsKey({ innings });
+  const activeHistory = Array.isArray(reconstructedMatch?.[activeInningsKey]?.history)
+    ? reconstructedMatch[activeInningsKey].history
+    : [];
+  const activeOver = activeHistory.at(-1) || null;
+
+  return {
+    activeOverBalls: Array.isArray(activeOver?.balls) ? activeOver.balls : [],
+    activeOverNumber: Number(activeOver?.overNumber || 1),
+    legalBallCount: countLegalBalls(activeHistory),
+  };
+}
+
 function buildUmpireInnings(match, inningsKey, includeHistory) {
   const source = match?.[inningsKey] || {};
   return {
@@ -99,6 +124,19 @@ function buildUmpireInnings(match, inningsKey, includeHistory) {
     score: Number(source.score || 0),
     history: includeHistory && Array.isArray(source.history) ? source.history : [],
   };
+}
+
+function buildCompactInnings(match, inningsKey) {
+  const source = match?.[inningsKey] || {};
+  return {
+    team: source.team || "",
+    score: Number(source.score || 0),
+  };
+}
+
+function getPublicMatchImageUrl(match, fallbackState = null) {
+  const publicImages = getPublicMatchImagesWithFallback(match, fallbackState);
+  return publicImages[0]?.url || getPublicMatchImagePath(match);
 }
 
 export function serializeLiveMatchPatch(matchDocument) {
@@ -317,6 +355,150 @@ export function serializePublicMatch(
       : {}),
     undoCount: getPublicUndoCount(match),
     createdAt: match.createdAt || null,
+    updatedAt: match.updatedAt || null,
+  };
+}
+
+export function serializeSessionCard(sessionDocument) {
+  if (!sessionDocument) {
+    return null;
+  }
+
+  const session =
+    typeof sessionDocument.toObject === "function"
+      ? sessionDocument.toObject()
+      : sessionDocument;
+
+  return {
+    _id: String(session._id),
+    name: session.name || "",
+    date: session.date || "",
+    isLive: Boolean(session.isLive),
+    match: session.match ? String(session.match?._id || session.match) : null,
+    teamAName: session.teamAName || "",
+    teamBName: session.teamBName || "",
+    score: Number(session.score || 0),
+    outs: Number(session.outs || 0),
+    innings: session.innings || "",
+    result: session.result || "",
+    tossReady: Boolean(session.tossReady),
+    coverImageUrl: session.coverImageUrl || session.matchImageUrl || "",
+    matchImageUrl: session.matchImageUrl || "",
+    createdAt: session.createdAt || null,
+    updatedAt: session.updatedAt || null,
+  };
+}
+
+export function serializeSessionViewSession(sessionDocument) {
+  if (!sessionDocument) {
+    return null;
+  }
+
+  const session =
+    typeof sessionDocument.toObject === "function"
+      ? sessionDocument.toObject()
+      : sessionDocument;
+
+  return {
+    _id: String(session._id),
+    name: session.name || "",
+    teamAName: session.teamAName || "",
+    teamBName: session.teamBName || "",
+    match: session.match ? String(session.match?._id || session.match) : null,
+    updatedAt: session.updatedAt || null,
+  };
+}
+
+export function serializeSessionViewBootstrap(
+  matchDocument,
+  fallbackState = null,
+) {
+  if (!matchDocument) {
+    return null;
+  }
+
+  const rawMatch =
+    typeof matchDocument.toObject === "function"
+      ? matchDocument.toObject()
+      : matchDocument;
+  const match = normalizeLegacyTossState(rawMatch, fallbackState);
+  const compactOverState = getCompactOverStateFromBalls(match);
+
+  return {
+    _id: String(match._id),
+    teamA: Array.isArray(match.teamA) ? match.teamA : [],
+    teamB: Array.isArray(match.teamB) ? match.teamB : [],
+    teamAName: match.teamAName || "",
+    teamBName: match.teamBName || "",
+    overs: Number(match.overs || 0),
+    sessionId: match.sessionId
+      ? String(match.sessionId?._id || match.sessionId)
+      : "",
+    score: Number(match.score || 0),
+    outs: Number(match.outs || 0),
+    isOngoing: Boolean(match.isOngoing),
+    innings: match.innings || "first",
+    result: match.result || "",
+    pendingResult: match.pendingResult || "",
+    pendingResultAt: match.pendingResultAt || null,
+    resultAutoFinalizeAt: match.resultAutoFinalizeAt || null,
+    innings1: buildCompactInnings(match, "innings1"),
+    innings2: buildCompactInnings(match, "innings2"),
+    matchImageUrl: getPublicMatchImageUrl(match, fallbackState),
+    legalBallCount: compactOverState.legalBallCount,
+    activeOverNumber: compactOverState.activeOverNumber,
+    activeOverBalls: compactOverState.activeOverBalls,
+    historyVersion: getHistoryVersion(match),
+    mediaVersion: getMediaVersion(match),
+    lastLiveEvent: match.lastLiveEvent || null,
+    lastEventType: match.lastEventType || "",
+    lastEventText: match.lastEventText || "",
+    announcerEnabled: Boolean(match.announcerEnabled),
+    announcerMode: match.announcerMode || "",
+    announcerScoreSoundEffectsEnabled:
+      match.announcerScoreSoundEffectsEnabled !== false,
+    announcerBroadcastScoreSoundEffectsEnabled:
+      match.announcerBroadcastScoreSoundEffectsEnabled !== false,
+    walkieTalkieEnabled: Boolean(match.walkieTalkieEnabled),
+    updatedAt: match.updatedAt || null,
+  };
+}
+
+export function serializeSessionViewHistory(matchDocument, fallbackState = null) {
+  if (!matchDocument) {
+    return null;
+  }
+
+  const rawMatch =
+    typeof matchDocument.toObject === "function"
+      ? matchDocument.toObject()
+      : matchDocument;
+  const match = normalizeLegacyTossState(rawMatch, fallbackState);
+
+  return {
+    innings1: buildUmpireInnings(match, "innings1", true),
+    innings2: buildUmpireInnings(match, "innings2", true),
+    historyVersion: getHistoryVersion(match),
+    updatedAt: match.updatedAt || null,
+  };
+}
+
+export function serializeSessionViewMedia(matchDocument, fallbackState = null) {
+  if (!matchDocument) {
+    return null;
+  }
+
+  const rawMatch =
+    typeof matchDocument.toObject === "function"
+      ? matchDocument.toObject()
+      : matchDocument;
+  const match = normalizeLegacyTossState(rawMatch, fallbackState);
+  const publicImages = getPublicMatchImagesWithFallback(match, fallbackState);
+
+  return {
+    matchImageUrl: publicImages[0]?.url || getPublicMatchImagePath(match),
+    matchImages: publicImages,
+    mediaVersion: getMediaVersion(match),
     updatedAt: match.updatedAt || null,
   };
 }

@@ -10,7 +10,16 @@
 import { addBallToHistory } from "../../../lib/match-scoring";
 import { formatOversLeftLocal } from "./session-view-helpers";
 
-export function buildSessionViewTrackerHistory(match) {
+export function buildSessionViewTrackerHistory(match, historyDetail = null) {
+  const inningsKey = match?.innings === "second" ? "innings2" : "innings1";
+  const detailedHistory = Array.isArray(historyDetail?.[inningsKey]?.history)
+    ? historyDetail[inningsKey].history
+    : [];
+
+  if (detailedHistory.length) {
+    return detailedHistory;
+  }
+
   const activeInningsHistory =
     match?.innings === "second"
       ? match?.innings2?.history || []
@@ -27,7 +36,6 @@ export function buildSessionViewTrackerHistory(match) {
     return activeInningsHistory;
   }
 
-  const inningsKey = match?.innings === "second" ? "innings2" : "innings1";
   const reconstructedMatch = {
     innings: match?.innings === "second" ? "second" : "first",
     innings1: { history: [] },
@@ -41,7 +49,14 @@ export function buildSessionViewTrackerHistory(match) {
   return reconstructedMatch[inningsKey]?.history || activeInningsHistory;
 }
 
-export function buildSessionViewInningsCards({ match, teamA, teamB, isLiveMatch }) {
+export function buildSessionViewInningsCards({
+  match,
+  teamA,
+  teamB,
+  isLiveMatch,
+  historyDetail = null,
+  historyLoading = false,
+}) {
   const innings1Complete =
     match?.innings === "second" || Boolean(match?.result);
   const innings2Complete = match?.innings === "second" && !isLiveMatch;
@@ -50,13 +65,25 @@ export function buildSessionViewInningsCards({ match, teamA, teamB, isLiveMatch 
     0,
     targetRuns - Number(match?.innings2?.score || 0),
   );
+  const innings1Data = historyDetail?.innings1 || match?.innings1;
+  const innings2Data = historyDetail?.innings2 || match?.innings2;
+  const safeInnings1Data = {
+    team: innings1Data?.team || "",
+    score: Number(innings1Data?.score || 0),
+    history: Array.isArray(innings1Data?.history) ? innings1Data.history : [],
+  };
+  const safeInnings2Data = {
+    team: innings2Data?.team || "",
+    score: Number(innings2Data?.score || 0),
+    history: Array.isArray(innings2Data?.history) ? innings2Data.history : [],
+  };
 
   if (match?.innings === "second") {
     return [
       {
         key: "innings2",
-        title: match.innings2?.team || teamB.name,
-        inningsData: match.innings2,
+        title: safeInnings2Data.team || teamB.name,
+        inningsData: safeInnings2Data,
         statusLabel: innings2Complete ? "Innings completed" : "Live",
         targetSummary:
           Number(match?.innings1?.score || 0) > 0
@@ -64,16 +91,18 @@ export function buildSessionViewInningsCards({ match, teamA, teamB, isLiveMatch 
               ? `Target ${targetRuns} • Need ${runsNeeded} • ${formatOversLeftLocal(match)}`
               : `Target ${targetRuns}`
             : "",
+        loadingHistory: historyLoading,
       },
       {
         key: "innings1",
-        title: match.innings1?.team || teamA.name,
-        inningsData: match.innings1,
+        title: safeInnings1Data.team || teamA.name,
+        inningsData: safeInnings1Data,
         statusLabel: innings1Complete ? "Innings completed" : "",
         targetSummary:
           Number(match?.innings1?.score || 0) > 0
             ? `Target set: ${targetRuns}`
             : "",
+        loadingHistory: historyLoading,
       },
     ];
   }
@@ -81,23 +110,23 @@ export function buildSessionViewInningsCards({ match, teamA, teamB, isLiveMatch 
   return [
     {
       key: "innings1",
-      title: match.innings1?.team || teamA.name,
-      inningsData: match.innings1,
+      title: safeInnings1Data.team || teamA.name,
+      inningsData: safeInnings1Data,
       statusLabel: isLiveMatch
         ? "Live"
         : innings1Complete
           ? "Innings completed"
           : "",
       targetSummary: "",
+      loadingHistory: historyLoading,
     },
     {
       key: "innings2",
-      title: match.innings2?.team || teamB.name,
-      inningsData: match.innings2,
+      title: safeInnings2Data.team || teamB.name,
+      inningsData: safeInnings2Data,
       statusLabel: innings2Complete ? "Innings completed" : "",
       targetSummary: "",
+      loadingHistory: historyLoading,
     },
   ];
 }
-
-

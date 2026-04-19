@@ -20,6 +20,11 @@ import { getMatchAccessCookieName, hasValidMatchAccess } from "./match-access";
 import {
   serializePublicMatch,
   serializePublicSession,
+  serializeSessionCard,
+  serializeSessionViewBootstrap,
+  serializeSessionViewHistory,
+  serializeSessionViewMedia,
+  serializeSessionViewSession,
   serializeUmpireBootstrap,
 } from "./public-data";
 import {
@@ -125,6 +130,110 @@ function getHomeLiveBannerMatchQueryOptions(limit = 1) {
   };
 }
 
+const DEFAULT_SESSIONS_PAGE_LIMIT = 10;
+const MAX_SESSIONS_PAGE_LIMIT = 40;
+const DEFAULT_SESSIONS_SORT = "live-newest";
+const DEFAULT_SESSIONS_FILTER = "all";
+const SESSION_VIEW_MATCH_FIELDS =
+  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1.team innings1.score innings2.team innings2.score balls matchImageUrl announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled walkieTalkieEnabled mediaUpdatedAt lastLiveEvent lastEventType lastEventText updatedAt";
+const SESSION_VIEW_MATCH_DETAIL_FIELDS =
+  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy mediaUpdatedAt lastLiveEvent lastEventType lastEventText updatedAt";
+
+function normalizeSearchValue(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function buildSessionSearchText(session) {
+  return [
+    session.name,
+    session.teamAName,
+    session.teamBName,
+    session.date,
+    session.isLive ? "live live now" : "completed ended final score",
+    session.result,
+    session.updatedAt,
+    session.createdAt,
+  ]
+    .map(normalizeSearchValue)
+    .filter(Boolean)
+    .join(" ");
+}
+
+function getTimestampMs(value) {
+  const timestamp = Date.parse(String(value || ""));
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function sortSessionCards(items, sortValue) {
+  const sessions = [...items];
+  const byCreatedDesc = (left, right) => {
+    const createdDiff = Number(right.__createdAtMs || 0) - Number(left.__createdAtMs || 0);
+    if (createdDiff !== 0) {
+      return createdDiff;
+    }
+
+    const updatedDiff = Number(right.__updatedAtMs || 0) - Number(left.__updatedAtMs || 0);
+    if (updatedDiff !== 0) {
+      return updatedDiff;
+    }
+
+    return String(left.__sortName || "").localeCompare(String(right.__sortName || ""));
+  };
+
+  switch (sortValue) {
+    case "newest":
+      return sessions.sort(byCreatedDesc);
+    case "oldest":
+      return sessions.sort((left, right) => -byCreatedDesc(left, right));
+    case "recent-ended":
+      return sessions.sort((left, right) => {
+        if (left.isLive !== right.isLive) {
+          return left.isLive ? 1 : -1;
+        }
+        return byCreatedDesc(left, right);
+      });
+    case "a-z":
+      return sessions.sort((left, right) =>
+        String(left.__sortName || "").localeCompare(String(right.__sortName || ""))
+      );
+    case "z-a":
+      return sessions.sort((left, right) =>
+        String(right.__sortName || "").localeCompare(String(left.__sortName || ""))
+      );
+    case "live-newest":
+    default:
+      return sessions.sort((left, right) => {
+        if (left.isLive !== right.isLive) {
+          return left.isLive ? -1 : 1;
+        }
+        return byCreatedDesc(left, right);
+      });
+  }
+}
+
+function parseSessionCursor(cursor) {
+  const safeCursor = String(cursor || "").trim();
+  if (!safeCursor) {
+    return 0;
+  }
+
+  try {
+    const decoded = JSON.parse(Buffer.from(safeCursor, "base64url").toString("utf8"));
+    const offset = Number(decoded?.offset || 0);
+    return Number.isFinite(offset) && offset >= 0 ? offset : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function buildSessionCursor(offset) {
+  if (!Number.isFinite(offset) || offset <= 0) {
+    return "";
+  }
+
+  return Buffer.from(JSON.stringify({ offset }), "utf8").toString("base64url");
+}
+
 async function getCachedServerData(cacheEntry, loader) {
   if (!cacheEntry) {
     return loader();
@@ -153,18 +262,19 @@ async function getCachedServerData(cacheEntry, loader) {
   return cacheEntry.pending;
 }
 
-async function findMatchForSession(session) {
+async function findMatchForSession(
+  session,
+  fields = READ_ONLY_PUBLIC_MATCH_FIELDS,
+) {
   if (!session) return null;
 
   if (session.match) {
-    const match = await Match.findById(session.match).select(
-      READ_ONLY_PUBLIC_MATCH_FIELDS
-    );
+    const match = await Match.findById(session.match).select(fields);
     return finalizePendingResultIfExpired(match);
   }
 
   const match = await Match.findOne({ sessionId: session._id })
-    .select(READ_ONLY_PUBLIC_MATCH_FIELDS)
+    .select(fields)
     .sort({ updatedAt: -1 });
   return finalizePendingResultIfExpired(match);
 }
@@ -238,52 +348,31 @@ async function readSessionsIndexPageData() {
       resolvedMatch = normalizeLegacyTossState(resolvedMatch, session);
     }
 
-    return {
+    const coverImageUrl =
+      resolvedMatch?.matchImageUrl || session.matchImageUrl || "";
+
+    return serializeSessionCard({
       _id: getPublicId(session._id),
       name: session.name || "",
       date: session.date || "",
-      overs: null,
       isLive: resolvedMatch ? Boolean(resolvedMatch.isOngoing) : Boolean(session.isLive),
       match: getPublicId(resolvedMatch?._id || session.match) || null,
-      tossWinner: resolvedMatch?.tossWinner || session.tossWinner || "",
-      tossDecision: resolvedMatch?.tossDecision || session.tossDecision || "",
       teamAName: resolvedMatch?.teamAName || session.teamAName || "",
       teamBName: resolvedMatch?.teamBName || session.teamBName || "",
-      teamA: [],
-      teamB: [],
-      matchImageUrl: resolvedMatch?.matchImageUrl || session.matchImageUrl || "",
-      matchImages:
-        Array.isArray(resolvedMatch?.matchImages) && resolvedMatch.matchImages.length > 0
-          ? resolvedMatch.matchImages
-          : Array.isArray(session.matchImages)
-            ? session.matchImages
-            : [],
-      matchCreatedAt: resolvedMatch?.createdAt || null,
-      sortCreatedAt: getStableSessionSortTimestamp(
-        session.date,
-        resolvedMatch?.createdAt,
-        session.createdAt,
-      ),
+      matchImageUrl: coverImageUrl,
+      coverImageUrl,
       updatedAt: session.updatedAt || session.createdAt,
       createdAt: session.createdAt || null,
       score: Number(resolvedMatch?.score || 0),
       outs: Number(resolvedMatch?.outs || 0),
       innings: resolvedMatch?.innings || "",
-      innings1: resolvedMatch?.innings1 || null,
-      innings2: resolvedMatch?.innings2 || null,
       result: resolvedMatch?.result || session.result || "",
       tossReady:
         Boolean(
           (resolvedMatch?.tossWinner || session.tossWinner) &&
             (resolvedMatch?.tossDecision || session.tossDecision)
         ),
-      announcerEnabled: false,
-      announcerMode: "",
-      announcerScoreSoundEffectsEnabled: true,
-      announcerBroadcastScoreSoundEffectsEnabled: true,
-      lastEventType: "",
-      lastEventText: "",
-    };
+    });
   });
 
   return {
@@ -428,14 +517,67 @@ async function readHomeLiveBannerData() {
 }
 
 export async function loadSessionsIndexPageData(options = {}) {
-  if (options?.forceFresh) {
-    return readSessionsIndexPageData();
-  }
-
-  return getCachedServerData(
+  const baseData = options?.forceFresh
+    ? await readSessionsIndexPageData()
+    : await getCachedServerData(
     globalServerDataCache.sessionsIndex,
     readSessionsIndexPageData
   );
+
+  const normalizedLimit = Math.min(
+    MAX_SESSIONS_PAGE_LIMIT,
+    Math.max(1, Number(options?.limit || DEFAULT_SESSIONS_PAGE_LIMIT)),
+  );
+  const normalizedFilter = String(options?.filter || DEFAULT_SESSIONS_FILTER).trim();
+  const normalizedSort = String(options?.sort || DEFAULT_SESSIONS_SORT).trim();
+  const normalizedSearch = normalizeSearchValue(options?.search || "");
+  const searchTerms = normalizedSearch.split(/\s+/).filter(Boolean);
+  const filteredSessions = sortSessionCards(
+    (Array.isArray(baseData?.sessions) ? baseData.sessions : [])
+      .map((session) => {
+        const createdAtMs = getTimestampMs(
+          getStableSessionSortTimestamp(
+            session.date,
+            session.createdAt,
+            session.updatedAt,
+          ),
+        );
+        const updatedAtMs = getTimestampMs(session.updatedAt || session.createdAt);
+        return {
+          ...session,
+          __searchText: buildSessionSearchText(session),
+          __sortName: normalizeSearchValue(session.name || ""),
+          __createdAtMs: createdAtMs,
+          __updatedAtMs: updatedAtMs,
+        };
+      })
+      .filter((session) => {
+        if (normalizedFilter === "live" && !session.isLive) {
+          return false;
+        }
+        if (normalizedFilter === "completed" && session.isLive) {
+          return false;
+        }
+        if (!searchTerms.length) {
+          return true;
+        }
+        return searchTerms.every((term) => session.__searchText.includes(term));
+      }),
+    normalizedSort,
+  ).map(({ __searchText, __sortName, __createdAtMs, __updatedAtMs, ...session }) => session);
+
+  const offset = parseSessionCursor(options?.cursor);
+  const nextSessions = filteredSessions.slice(offset, offset + normalizedLimit);
+  const nextOffset = offset + nextSessions.length;
+
+  return {
+    sessions: nextSessions,
+    totalCount: filteredSessions.length,
+    unfilteredTotalCount: Number(baseData?.totalCount || 0),
+    hasMore: nextOffset < filteredSessions.length,
+    nextCursor:
+      nextOffset < filteredSessions.length ? buildSessionCursor(nextOffset) : "",
+  };
 }
 
 export async function loadSessionsIndexData(options = {}) {
@@ -457,12 +599,54 @@ export async function loadSessionViewData(sessionId) {
     return { found: false, session: null, match: null, updatedAt: "" };
   }
 
-  const match = await findMatchForSession(session);
+  const match = await findMatchForSession(session, SESSION_VIEW_MATCH_FIELDS);
 
   return {
     found: true,
-    session: serializePublicSession(session),
-    match: serializePublicMatch(match, session),
+    session: serializeSessionViewSession(session),
+    match: serializeSessionViewBootstrap(match, session),
+    updatedAt: getIsoTimestamp(match?.updatedAt, session.updatedAt),
+  };
+}
+
+export async function loadSessionViewHistoryData(sessionId) {
+  if (!isValidObjectId(sessionId)) {
+    return { found: false, history: null, updatedAt: "" };
+  }
+
+  await connectDB();
+  const session = await Session.findById(sessionId)
+    .select(PUBLIC_SESSION_FIELDS)
+    .lean();
+  if (!session) {
+    return { found: false, history: null, updatedAt: "" };
+  }
+
+  const match = await findMatchForSession(session, SESSION_VIEW_MATCH_DETAIL_FIELDS);
+  return {
+    found: true,
+    history: serializeSessionViewHistory(match, session),
+    updatedAt: getIsoTimestamp(match?.updatedAt, session.updatedAt),
+  };
+}
+
+export async function loadSessionViewMediaData(sessionId) {
+  if (!isValidObjectId(sessionId)) {
+    return { found: false, media: null, updatedAt: "" };
+  }
+
+  await connectDB();
+  const session = await Session.findById(sessionId)
+    .select(PUBLIC_SESSION_FIELDS)
+    .lean();
+  if (!session) {
+    return { found: false, media: null, updatedAt: "" };
+  }
+
+  const match = await findMatchForSession(session, SESSION_VIEW_MATCH_DETAIL_FIELDS);
+  return {
+    found: true,
+    media: serializeSessionViewMedia(match, session),
     updatedAt: getIsoTimestamp(match?.updatedAt, session.updatedAt),
   };
 }

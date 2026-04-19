@@ -28,7 +28,7 @@ export const HOME_LIVE_BANNER_MATCH_FIELDS =
 export const SESSIONS_INDEX_SESSION_FIELDS =
   "_id name date isLive match tossWinner tossDecision teamAName teamBName matchImages matchImageUrl createdAt updatedAt";
 export const SESSIONS_INDEX_MATCH_FIELDS =
-  "_id sessionId teamAName teamBName tossWinner tossDecision score outs innings innings1 innings2 isOngoing result pendingResult matchImages matchImageUrl createdAt updatedAt";
+  "_id sessionId teamAName teamBName tossWinner tossDecision score outs innings isOngoing result pendingResult matchImageUrl createdAt updatedAt";
 export const NON_DRAFT_SESSION_COLLECTION_FILTER = {
   isDraft: { $ne: true },
 };
