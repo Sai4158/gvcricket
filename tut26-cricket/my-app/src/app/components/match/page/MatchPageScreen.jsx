@@ -96,6 +96,7 @@ import { duckPageMedia, restorePageMedia } from "../../../lib/page-audio";
 import { buildMatchScorePreview } from "./match-score-preview";
 
 const SCORE_CONTROL_COOLDOWN_MS = 1000;
+const UNDO_CONTROL_KEY = "undo";
 
 export default function MatchPageClient({
   matchId,
@@ -1553,10 +1554,15 @@ export default function MatchPageClient({
   });
 
   const handleAnnouncedUndo = async () => {
-    if (!match?.undoCount || !currentInningsHasHistory) {
+    if (
+      !match?.undoCount ||
+      !currentInningsHasHistory ||
+      isScoreControlCoolingDown(UNDO_CONTROL_KEY)
+    ) {
       return;
     }
 
+    armScoreControlCooldown(UNDO_CONTROL_KEY);
     cancelBoundarySequence({ stopEffect: true });
     const undoEvent = createUndoLiveEvent(match);
     const undoSequence = buildLiveScoreAnnouncementSequence(
@@ -1911,13 +1917,17 @@ export default function MatchPageClient({
   });
 
   const handleStageCardUndo = useCallback(async () => {
-    if (stageCardUndoPending) {
+    if (
+      stageCardUndoPending ||
+      isScoreControlCoolingDown(UNDO_CONTROL_KEY)
+    ) {
       return;
     }
     if (!match?.undoCount || !currentInningsHasHistory) {
       return;
     }
 
+    armScoreControlCooldown(UNDO_CONTROL_KEY);
     setStageCardUndoPending(true);
     dismissVisibleStageCard();
     setStageContinuePrompt(null);
@@ -1931,12 +1941,14 @@ export default function MatchPageClient({
       setStageCardUndoPending(false);
     }
   }, [
+    armScoreControlCooldown,
     cancelBoundarySequence,
     clearAnnouncementDuck,
     clearSpeechEffectPlayerDuck,
     currentInningsHasHistory,
     dismissVisibleStageCard,
     handleUndo,
+    isScoreControlCoolingDown,
     match?.undoCount,
     stageCardUndoPending,
     setStageCardUndoPending,
@@ -2081,8 +2093,11 @@ export default function MatchPageClient({
         infoText,
         isLiveMatch,
         isReadScoreActionActive,
-        isStageCardUndoPending: stageCardUndoPending,
+        isStageCardUndoPending:
+          stageCardUndoPending ||
+          isScoreControlCoolingDown(UNDO_CONTROL_KEY),
         isTestSequenceActionActive,
+        isUndoCoolingDown: isScoreControlCoolingDown(UNDO_CONTROL_KEY),
         isUpdating,
         liveUpdatedLabel,
         loadSoundEffectsLibrary,

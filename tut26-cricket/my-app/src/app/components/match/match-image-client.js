@@ -9,10 +9,14 @@
  * Read next: ./README.md
  */
 
-const MAX_DIMENSION = 1280;
-const TARGET_MAX_BYTES = 450 * 1024;
-const FAST_PATH_MAX_BYTES = 450 * 1024;
-const FAST_PATH_PNG_MAX_BYTES = 350 * 1024;
+const MAX_DIMENSION = 1024;
+const TARGET_MAX_BYTES = 280 * 1024;
+const FAST_PATH_MAX_BYTES = 220 * 1024;
+const FAST_PATH_PNG_MAX_BYTES = 180 * 1024;
+const MIN_QUALITY = 0.46;
+const QUALITY_STEP = 0.08;
+const RESIZE_STEP = 0.82;
+const MAX_ATTEMPTS = 6;
 
 export function getAcceptedMatchImageTypes() {
   return "image/jpeg,image/png,image/webp";
@@ -64,13 +68,15 @@ export async function compressMatchImage(file) {
 
   let nextWidth = width;
   let nextHeight = height;
-  let quality = 0.82;
+  let quality = 0.76;
   let bestBlob = null;
 
-  for (let attempt = 0; attempt < 4; attempt += 1) {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     canvas.width = nextWidth;
     canvas.height = nextHeight;
     ctx.clearRect(0, 0, nextWidth, nextHeight);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
     ctx.drawImage(bitmap, 0, 0, nextWidth, nextHeight);
 
     const blob = await canvasToJpegBlob(canvas, quality);
@@ -80,9 +86,9 @@ export async function compressMatchImage(file) {
       break;
     }
 
-    quality = Math.max(0.58, quality - 0.1);
-    nextWidth = Math.max(1, Math.round(nextWidth * 0.86));
-    nextHeight = Math.max(1, Math.round(nextHeight * 0.86));
+    quality = Math.max(MIN_QUALITY, quality - QUALITY_STEP);
+    nextWidth = Math.max(1, Math.round(nextWidth * RESIZE_STEP));
+    nextHeight = Math.max(1, Math.round(nextHeight * RESIZE_STEP));
   }
 
   bitmap.close();

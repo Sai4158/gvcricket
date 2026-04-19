@@ -1,0 +1,4 @@
+Walkie state change stream error: MongoAPIError: ChangeStream is closed
+    at ignore-listed frames {
+  errorLabelSet: Set(0) {}
+}

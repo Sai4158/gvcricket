@@ -479,6 +479,7 @@ export default function MatchActionGrid({
   onEditOvers,
   editOversLabel = "Edit overs",
   onUndo,
+  undoDisabled = false,
   onHistory,
   onImage,
   onCommentary,
@@ -581,7 +582,7 @@ export default function MatchActionGrid({
             icon={<LuUndo2 />}
             label="Undo"
             colorClass="text-zinc-400"
-            disabled={historyStackLength === 0}
+            disabled={historyStackLength === 0 || undoDisabled}
             compact
           />
           {showLiveControls ? (

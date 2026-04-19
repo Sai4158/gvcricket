@@ -66,6 +66,7 @@ export default function MatchPageLayout({
   isReadScoreActionActive,
   isStageCardUndoPending,
   isTestSequenceActionActive,
+  isUndoCoolingDown,
   isUpdating,
   liveUpdatedLabel,
   loadSoundEffectsLibrary,
@@ -318,6 +319,7 @@ export default function MatchPageLayout({
               )
             }
             onUndo={handleAnnouncedUndo}
+            undoDisabled={isUndoCoolingDown}
             onHistory={() => setModal({ type: "history" })}
             onImage={() => setModal({ type: "image" })}
             onCommentary={() => {
