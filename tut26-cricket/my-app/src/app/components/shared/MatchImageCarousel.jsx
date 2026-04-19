@@ -11,6 +11,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import SafeMatchImage from "./SafeMatchImage";
 
 const HOLD_DELAY_MS = 520;
@@ -186,6 +187,21 @@ export default function MatchImageCarousel({
     releaseInteraction();
   };
 
+  const handleArrowClick = (event, direction) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (normalizedImages.length <= 1) {
+      return;
+    }
+
+    const nextIndex =
+      direction > 0
+        ? (resolvedActiveIndex + 1) % normalizedImages.length
+        : (resolvedActiveIndex - 1 + normalizedImages.length) % normalizedImages.length;
+    setCarouselIndex(nextIndex, direction);
+  };
+
   if (!activeImage && !showFallback) {
     return null;
   }
@@ -263,7 +279,7 @@ export default function MatchImageCarousel({
             <div className="absolute inset-0 pending-shimmer bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))]" />
           </div>
         ) : null}
-        {nextImage ? (
+        {!compact && nextImage ? (
           <div className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0">
             <SafeMatchImage
               src={nextImage.url || ""}
@@ -274,6 +290,28 @@ export default function MatchImageCarousel({
               loading="eager"
             />
           </div>
+        ) : null}
+        {normalizedImages.length > 1 ? (
+          <>
+            <button
+              type="button"
+              onClick={(event) => handleArrowClick(event, -1)}
+              onPointerDown={(event) => event.stopPropagation()}
+              className="absolute left-3 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/14 bg-black/55 text-white shadow-[0_12px_24px_rgba(0,0,0,0.24)] transition hover:bg-black/70"
+              aria-label="Previous image"
+            >
+              <FaChevronLeft className="text-sm" />
+            </button>
+            <button
+              type="button"
+              onClick={(event) => handleArrowClick(event, 1)}
+              onPointerDown={(event) => event.stopPropagation()}
+              className="absolute right-3 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/14 bg-black/55 text-white shadow-[0_12px_24px_rgba(0,0,0,0.24)] transition hover:bg-black/70"
+              aria-label="Next image"
+            >
+              <FaChevronRight className="text-sm" />
+            </button>
+          </>
         ) : null}
         {normalizedImages.length > 1 ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex items-center justify-center gap-1.5">

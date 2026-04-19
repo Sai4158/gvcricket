@@ -52,7 +52,7 @@ export const metadata = {
 // This loads the first batch of session data on the server,
 // then passes it into the client page component.
 export default async function SessionsPage({ searchParams }) {
-  const initialPayload = await loadSessionsIndexPageData({ limit: 10 });
+  const initialPayload = await loadSessionsIndexPageData({ limit: 28, page: 1 });
   // Optional refresh token from the URL, used by the client page when needed.
   const resolvedSearchParams = await searchParams;
   const refreshToken = String(resolvedSearchParams?.refresh || "").trim();

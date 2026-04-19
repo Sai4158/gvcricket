@@ -384,6 +384,10 @@ export function serializeSessionCard(sessionDocument) {
     tossReady: Boolean(session.tossReady),
     coverImageUrl: session.coverImageUrl || session.matchImageUrl || "",
     matchImageUrl: session.matchImageUrl || "",
+    imageCount: Math.max(0, Number(session.imageCount || 0)),
+    winningTeamName: session.winningTeamName || "",
+    winningScore: Number(session.winningScore || 0),
+    winningWickets: Number(session.winningWickets || 0),
     createdAt: session.createdAt || null,
     updatedAt: session.updatedAt || null,
   };

@@ -26,7 +26,7 @@ export const HOME_LIVE_BANNER_SESSION_FIELDS =
 export const HOME_LIVE_BANNER_MATCH_FIELDS =
   "_id sessionId teamAName teamBName score outs isOngoing result pendingResult matchImageUrl lastEventType lastEventText createdAt updatedAt";
 export const SESSIONS_INDEX_SESSION_FIELDS =
-  "_id name date isLive match tossWinner tossDecision teamAName teamBName matchImages matchImageUrl createdAt updatedAt";
+  "_id name date isLive match tossWinner tossDecision teamAName teamBName matchImageUrl createdAt updatedAt";
 export const SESSIONS_INDEX_MATCH_FIELDS =
   "_id sessionId teamAName teamBName tossWinner tossDecision score outs innings isOngoing result pendingResult matchImageUrl createdAt updatedAt";
 export const NON_DRAFT_SESSION_COLLECTION_FILTER = {

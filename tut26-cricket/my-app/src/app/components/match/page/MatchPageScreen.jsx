@@ -2013,14 +2013,14 @@ export default function MatchPageClient({
             <div className="mt-6 grid gap-3">
               <button
                 type="button"
-                onClick={() => router.push("/session/new")}
+                onClick={() => router.push("/session/new", { scroll: true })}
                 className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200"
               >
                 Create New Session
               </button>
               <button
                 type="button"
-                onClick={() => router.push("/session")}
+                onClick={() => router.push("/session", { scroll: true })}
                 className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
               >
                 All Sessions

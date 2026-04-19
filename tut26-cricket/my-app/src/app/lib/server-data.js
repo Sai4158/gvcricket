@@ -31,7 +31,12 @@ import {
   finalizePendingResultIfExpired,
   isFinalizedMatchComplete,
 } from "./pending-match-result";
-import { hasCompleteTossState, hydrateLegacyTossState, normalizeLegacyTossState } from "./match-toss";
+import { getWinningTeamName } from "./match-result-display";
+import {
+  hasCompleteTossState,
+  hydrateLegacyTossState,
+  normalizeLegacyTossState,
+} from "./match-toss";
 import {
   buildLockedTossPageData,
   FALLBACK_SESSION_FIELDS,
@@ -43,13 +48,10 @@ import {
   invalidateSessionsDataCache,
   loadFallbackSession,
   NON_DRAFT_SESSION_COLLECTION_FILTER,
-  PUBLIC_MATCH_FIELDS,
   PUBLIC_SESSION_FIELDS,
   PUBLIC_SESSION_PROJECTION,
   READ_ONLY_PUBLIC_MATCH_FIELDS,
   resolveSessionMatches,
-  SESSIONS_INDEX_MATCH_PROJECTION,
-  SESSIONS_INDEX_SESSION_PROJECTION,
   SERVER_DATA_CACHE_TTL_MS,
   SESSION_MATCH_SUMMARY_PROJECTION,
 } from "./server-data-helpers";
@@ -130,8 +132,8 @@ function getHomeLiveBannerMatchQueryOptions(limit = 1) {
   };
 }
 
-const DEFAULT_SESSIONS_PAGE_LIMIT = 10;
-const MAX_SESSIONS_PAGE_LIMIT = 40;
+const DEFAULT_SESSIONS_PAGE_LIMIT = 28;
+const MAX_SESSIONS_PAGE_LIMIT = 68;
 const DEFAULT_SESSIONS_SORT = "live-newest";
 const DEFAULT_SESSIONS_FILTER = "all";
 const SESSION_VIEW_MATCH_FIELDS =
@@ -139,99 +141,81 @@ const SESSION_VIEW_MATCH_FIELDS =
 const SESSION_VIEW_MATCH_DETAIL_FIELDS =
   "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy mediaUpdatedAt lastLiveEvent lastEventType lastEventText updatedAt";
 
+function buildInningsWicketsProjection(historyFieldPath) {
+  return {
+    $reduce: {
+      input: { $ifNull: [historyFieldPath, []] },
+      initialValue: 0,
+      in: {
+        $add: [
+          "$$value",
+          {
+            $size: {
+              $filter: {
+                input: { $ifNull: ["$$this.balls", []] },
+                as: "ball",
+                cond: { $eq: ["$$ball.isOut", true] },
+              },
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
 function normalizeSearchValue(value) {
   return String(value || "").trim().toLowerCase();
 }
 
-function buildSessionSearchText(session) {
-  return [
-    session.name,
-    session.teamAName,
-    session.teamBName,
-    session.date,
-    session.isLive ? "live live now" : "completed ended final score",
-    session.result,
-    session.updatedAt,
-    session.createdAt,
-  ]
-    .map(normalizeSearchValue)
-    .filter(Boolean)
-    .join(" ");
+function escapeRegex(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function getTimestampMs(value) {
-  const timestamp = Date.parse(String(value || ""));
-  return Number.isNaN(timestamp) ? 0 : timestamp;
+function buildSessionsIndexQuery({ search = "", filter = DEFAULT_SESSIONS_FILTER } = {}) {
+  const query = { ...NON_DRAFT_SESSION_COLLECTION_FILTER };
+  const normalizedFilter = String(filter || DEFAULT_SESSIONS_FILTER).trim();
+  const searchTerms = normalizeSearchValue(search).split(/\s+/).filter(Boolean);
+
+  if (normalizedFilter === "live") {
+    query.isLive = true;
+  } else if (normalizedFilter === "completed") {
+    query.isLive = false;
+  }
+
+  if (searchTerms.length) {
+    query.$and = searchTerms.map((term) => {
+      const pattern = new RegExp(escapeRegex(term), "i");
+      return {
+        $or: [
+          { name: pattern },
+          { teamAName: pattern },
+          { teamBName: pattern },
+          { date: pattern },
+        ],
+      };
+    });
+  }
+
+  return query;
 }
 
-function sortSessionCards(items, sortValue) {
-  const sessions = [...items];
-  const byCreatedDesc = (left, right) => {
-    const createdDiff = Number(right.__createdAtMs || 0) - Number(left.__createdAtMs || 0);
-    if (createdDiff !== 0) {
-      return createdDiff;
-    }
-
-    const updatedDiff = Number(right.__updatedAtMs || 0) - Number(left.__updatedAtMs || 0);
-    if (updatedDiff !== 0) {
-      return updatedDiff;
-    }
-
-    return String(left.__sortName || "").localeCompare(String(right.__sortName || ""));
-  };
-
-  switch (sortValue) {
+function getSessionsIndexSort(sortValue = DEFAULT_SESSIONS_SORT) {
+  switch (String(sortValue || DEFAULT_SESSIONS_SORT).trim()) {
     case "newest":
-      return sessions.sort(byCreatedDesc);
+      return { createdAt: -1, _id: -1 };
     case "oldest":
-      return sessions.sort((left, right) => -byCreatedDesc(left, right));
+      return { createdAt: 1, _id: 1 };
     case "recent-ended":
-      return sessions.sort((left, right) => {
-        if (left.isLive !== right.isLive) {
-          return left.isLive ? 1 : -1;
-        }
-        return byCreatedDesc(left, right);
-      });
+      return { isLive: 1, createdAt: -1, _id: -1 };
     case "a-z":
-      return sessions.sort((left, right) =>
-        String(left.__sortName || "").localeCompare(String(right.__sortName || ""))
-      );
+      return { name: 1, createdAt: -1, _id: -1 };
     case "z-a":
-      return sessions.sort((left, right) =>
-        String(right.__sortName || "").localeCompare(String(left.__sortName || ""))
-      );
+      return { name: -1, createdAt: -1, _id: -1 };
     case "live-newest":
     default:
-      return sessions.sort((left, right) => {
-        if (left.isLive !== right.isLive) {
-          return left.isLive ? -1 : 1;
-        }
-        return byCreatedDesc(left, right);
-      });
+      return { isLive: -1, createdAt: -1, _id: -1 };
   }
-}
-
-function parseSessionCursor(cursor) {
-  const safeCursor = String(cursor || "").trim();
-  if (!safeCursor) {
-    return 0;
-  }
-
-  try {
-    const decoded = JSON.parse(Buffer.from(safeCursor, "base64url").toString("utf8"));
-    const offset = Number(decoded?.offset || 0);
-    return Number.isFinite(offset) && offset >= 0 ? offset : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function buildSessionCursor(offset) {
-  if (!Number.isFinite(offset) || offset <= 0) {
-    return "";
-  }
-
-  return Buffer.from(JSON.stringify({ offset }), "utf8").toString("base64url");
 }
 
 async function getCachedServerData(cacheEntry, loader) {
@@ -279,19 +263,7 @@ async function findMatchForSession(
   return finalizePendingResultIfExpired(match);
 }
 
-async function readSessionsIndexPageData() {
-  await connectDB();
-
-  const [sessions, totalCount] = await Promise.all([
-    Session.collection
-      .find(NON_DRAFT_SESSION_COLLECTION_FILTER, {
-        projection: SESSIONS_INDEX_SESSION_PROJECTION,
-      })
-      .sort({ createdAt: -1, _id: -1 })
-      .toArray(),
-    Session.collection.countDocuments(NON_DRAFT_SESSION_COLLECTION_FILTER),
-  ]);
-
+async function resolveSessionsIndexCards(sessions) {
   const linkedMatchIds = sessions
     .map((session) => getPublicId(session.match))
     .filter((matchId) => isValidObjectId(matchId))
@@ -312,13 +284,44 @@ async function readSessionsIndexPageData() {
 
   const relatedMatches = matchQuery.length
     ? await Match.collection
-        .find(
-          matchQuery.length === 1 ? matchQuery[0] : { $or: matchQuery },
+        .aggregate([
           {
-            projection: SESSIONS_INDEX_MATCH_PROJECTION,
-            sort: { updatedAt: -1, createdAt: -1, _id: -1 },
-          }
-        )
+            $match: matchQuery.length === 1 ? matchQuery[0] : { $or: matchQuery },
+          },
+          {
+            $sort: { updatedAt: -1, createdAt: -1, _id: -1 },
+          },
+          {
+            $project: {
+              _id: 1,
+              sessionId: 1,
+              teamAName: 1,
+              teamBName: 1,
+              tossWinner: 1,
+              tossDecision: 1,
+              score: 1,
+              outs: 1,
+              innings: 1,
+              isOngoing: 1,
+              result: 1,
+              pendingResult: 1,
+              matchImageUrl: 1,
+              innings1Team: "$innings1.team",
+              innings1Score: "$innings1.score",
+              innings1Wickets: buildInningsWicketsProjection("$innings1.history"),
+              innings2Team: "$innings2.team",
+              innings2Score: "$innings2.score",
+              innings2Wickets: buildInningsWicketsProjection("$innings2.history"),
+              createdAt: 1,
+              updatedAt: 1,
+              matchImageCount: {
+                $size: {
+                  $ifNull: ["$matchImages", []],
+                },
+              },
+            },
+          },
+        ])
         .toArray()
     : [];
 
@@ -338,7 +341,7 @@ async function readSessionsIndexPageData() {
     }
   }
 
-  const mappedSessions = sessions.map((session) => {
+  return sessions.map((session) => {
     const linkedMatchId = getPublicId(session.match);
     let resolvedMatch =
       linkedMatchesById.get(linkedMatchId) ||
@@ -350,6 +353,35 @@ async function readSessionsIndexPageData() {
 
     const coverImageUrl =
       resolvedMatch?.matchImageUrl || session.matchImageUrl || "";
+    const resultText = resolvedMatch?.result || session.result || "";
+    const winnerName = getWinningTeamName(resultText);
+    const resultLower = String(resultText || "").toLowerCase();
+    const firstInningsWon = resultLower.includes(" won by ") && resultLower.includes(" runs");
+    const secondInningsWon =
+      resultLower.includes(" won by ") && resultLower.includes(" wickets");
+    const winningScore = firstInningsWon
+      ? Number(resolvedMatch?.innings1Score || 0)
+      : secondInningsWon
+        ? Number(
+            resolvedMatch?.innings2Score ??
+              resolvedMatch?.score ??
+              0
+          )
+        : Number(resolvedMatch?.score || 0);
+    const winningWickets = firstInningsWon
+      ? Number(resolvedMatch?.innings1Wickets || 0)
+      : secondInningsWon
+        ? Number(
+            resolvedMatch?.innings2Wickets ??
+              resolvedMatch?.outs ??
+              0
+          )
+        : Number(resolvedMatch?.outs || 0);
+    const imageCount = Math.max(
+      Number(session?.sessionImageCount || 0),
+      Number(resolvedMatch?.matchImageCount || 0),
+      coverImageUrl ? 1 : 0,
+    );
 
     return serializeSessionCard({
       _id: getPublicId(session._id),
@@ -367,18 +399,23 @@ async function readSessionsIndexPageData() {
       outs: Number(resolvedMatch?.outs || 0),
       innings: resolvedMatch?.innings || "",
       result: resolvedMatch?.result || session.result || "",
+      winningTeamName:
+        winnerName ||
+        (firstInningsWon
+          ? resolvedMatch?.innings1Team || ""
+          : secondInningsWon
+            ? resolvedMatch?.innings2Team || ""
+            : ""),
+      winningScore,
+      winningWickets,
       tossReady:
         Boolean(
           (resolvedMatch?.tossWinner || session.tossWinner) &&
             (resolvedMatch?.tossDecision || session.tossDecision)
         ),
+      imageCount,
     });
   });
-
-  return {
-    sessions: mappedSessions,
-    totalCount: Number(totalCount || 0),
-  };
 }
 
 async function readHomeLiveBannerData() {
@@ -517,66 +554,80 @@ async function readHomeLiveBannerData() {
 }
 
 export async function loadSessionsIndexPageData(options = {}) {
-  const baseData = options?.forceFresh
-    ? await readSessionsIndexPageData()
-    : await getCachedServerData(
-    globalServerDataCache.sessionsIndex,
-    readSessionsIndexPageData
-  );
+  await connectDB();
 
   const normalizedLimit = Math.min(
     MAX_SESSIONS_PAGE_LIMIT,
     Math.max(1, Number(options?.limit || DEFAULT_SESSIONS_PAGE_LIMIT)),
   );
+  const requestedPage = Math.max(1, Number(options?.page || 1));
   const normalizedFilter = String(options?.filter || DEFAULT_SESSIONS_FILTER).trim();
   const normalizedSort = String(options?.sort || DEFAULT_SESSIONS_SORT).trim();
   const normalizedSearch = normalizeSearchValue(options?.search || "");
-  const searchTerms = normalizedSearch.split(/\s+/).filter(Boolean);
-  const filteredSessions = sortSessionCards(
-    (Array.isArray(baseData?.sessions) ? baseData.sessions : [])
-      .map((session) => {
-        const createdAtMs = getTimestampMs(
-          getStableSessionSortTimestamp(
-            session.date,
-            session.createdAt,
-            session.updatedAt,
-          ),
-        );
-        const updatedAtMs = getTimestampMs(session.updatedAt || session.createdAt);
-        return {
-          ...session,
-          __searchText: buildSessionSearchText(session),
-          __sortName: normalizeSearchValue(session.name || ""),
-          __createdAtMs: createdAtMs,
-          __updatedAtMs: updatedAtMs,
-        };
-      })
-      .filter((session) => {
-        if (normalizedFilter === "live" && !session.isLive) {
-          return false;
-        }
-        if (normalizedFilter === "completed" && session.isLive) {
-          return false;
-        }
-        if (!searchTerms.length) {
-          return true;
-        }
-        return searchTerms.every((term) => session.__searchText.includes(term));
-      }),
-    normalizedSort,
-  ).map(({ __searchText, __sortName, __createdAtMs, __updatedAtMs, ...session }) => session);
+  const query = buildSessionsIndexQuery({
+    search: normalizedSearch,
+    filter: normalizedFilter,
+  });
+  const sort = getSessionsIndexSort(normalizedSort);
 
-  const offset = parseSessionCursor(options?.cursor);
-  const nextSessions = filteredSessions.slice(offset, offset + normalizedLimit);
-  const nextOffset = offset + nextSessions.length;
+  const [totalCount, unfilteredTotalCount] = await Promise.all([
+    Session.collection.countDocuments(query),
+    Session.collection.countDocuments(NON_DRAFT_SESSION_COLLECTION_FILTER),
+  ]);
+
+  const totalPages = totalCount > 0 ? Math.ceil(totalCount / normalizedLimit) : 1;
+  const page = Math.min(requestedPage, totalPages);
+  const skip = Math.max(0, (page - 1) * normalizedLimit);
+
+  const pageSessions = await Session.collection
+    .aggregate([
+      {
+        $match: query,
+      },
+      {
+        $sort: sort,
+      },
+      {
+        $skip: skip,
+      },
+      {
+        $limit: normalizedLimit,
+      },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          date: 1,
+          isLive: 1,
+          match: 1,
+          tossWinner: 1,
+          tossDecision: 1,
+          teamAName: 1,
+          teamBName: 1,
+          matchImageUrl: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          sessionImageCount: {
+            $size: {
+              $ifNull: ["$matchImages", []],
+            },
+          },
+        },
+      },
+    ])
+    .toArray();
+
+  const sessions = await resolveSessionsIndexCards(pageSessions);
 
   return {
-    sessions: nextSessions,
-    totalCount: filteredSessions.length,
-    unfilteredTotalCount: Number(baseData?.totalCount || 0),
-    hasMore: nextOffset < filteredSessions.length,
-    nextCursor:
-      nextOffset < filteredSessions.length ? buildSessionCursor(nextOffset) : "",
+    sessions,
+    page,
+    limit: normalizedLimit,
+    totalCount: Number(totalCount || 0),
+    totalPages,
+    unfilteredTotalCount: Number(unfilteredTotalCount || 0),
+    hasNextPage: page < totalPages,
+    hasPreviousPage: page > 1,
   };
 }
 

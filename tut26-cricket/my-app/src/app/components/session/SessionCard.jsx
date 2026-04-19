@@ -9,7 +9,7 @@
  * Read next: ./README.md
  */
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   FaArrowRight,
@@ -29,7 +29,6 @@ import {
 } from "../shared/SafeMatchImage";
 import MatchImageCarousel from "../shared/MatchImageCarousel";
 import { primeUiAudio } from "../../lib/page-audio";
-import { getWinningInningsSummary } from "../../lib/match-result-display";
 
 function buildStatusMeta(session) {
   const isLive = Boolean(session.isLive);
@@ -106,11 +105,31 @@ function SessionCard({
   const { startNavigation } = useRouteFeedback();
   const cardRef = useRef(null);
   const [shouldLoadGallery, setShouldLoadGallery] = useState(false);
+  const [galleryImages, setGalleryImages] = useState([]);
   const isLive = session.isLive;
   const statusMeta = buildStatusMeta(session);
-  const matchImages = Array.isArray(session.matchImages) ? session.matchImages : [];
+  const matchImages = useMemo(
+    () => (Array.isArray(session.matchImages) ? session.matchImages : []),
+    [session.matchImages]
+  );
   const cardImage =
     session.coverImageUrl || matchImages[0]?.url || session.matchImageUrl || "";
+  const baseGalleryImages = useMemo(
+    () =>
+      matchImages.length
+        ? matchImages
+        : cardImage
+          ? [{ id: "cover", url: cardImage }]
+          : [],
+    [cardImage, matchImages]
+  );
+  const imageCount = Math.max(
+    0,
+    Number(session.imageCount || matchImages.length || (cardImage ? 1 : 0))
+  );
+  const resolvedGalleryImages = galleryImages.length
+    ? galleryImages
+    : baseGalleryImages;
   const hasUploadedCardImage =
     resolveSafeMatchImage(cardImage) !== GV_MATCH_FALLBACK_IMAGE;
   const scoreHref =
@@ -125,8 +144,14 @@ function SessionCard({
       : "";
   const dateLabel = formatSessionDateLabel(session);
   const canOpenCard = Boolean(scoreHref);
-  const winningInningsSummary =
-    !isLive && session.result ? getWinningInningsSummary(session) : null;
+  const winningSummary =
+    !isLive && session.result
+      ? {
+          teamName: session.winningTeamName || "",
+          score: Number(session.winningScore || 0),
+          wickets: Number(session.winningWickets || 0),
+        }
+      : null;
   const hasScoreCard = Boolean(
     session.match &&
       (isLive ||
@@ -134,23 +159,23 @@ function SessionCard({
         Number(session.outs || 0) > 0 ||
         session.result)
   );
-  const displayScore = winningInningsSummary
-    ? winningInningsSummary.score
+  const displayScore = winningSummary
+    ? winningSummary.score
     : Number.isFinite(Number(session.score))
     ? Number(session.score)
     : 0;
-  const displayOuts = winningInningsSummary
-    ? winningInningsSummary.wickets
+  const displayOuts = winningSummary
+    ? winningSummary.wickets
     : Number.isFinite(Number(session.outs))
     ? Number(session.outs)
     : 0;
-  const scoreValue = winningInningsSummary
+  const scoreValue = winningSummary
     ? `${displayScore.toLocaleString()}/${displayOuts}`
     : displayScore.toLocaleString();
-  const scoreMetaLabel = isLive ? "Runs" : winningInningsSummary ? "Winner" : "Final";
+  const scoreMetaLabel = isLive ? "Runs" : winningSummary ? "Winner" : "Final";
   const scoreDetailLabel =
-    winningInningsSummary?.teamName
-      ? winningInningsSummary.teamName
+    winningSummary?.teamName
+      ? winningSummary.teamName
       : displayOuts > 0
       ? `${displayOuts} ${displayOuts === 1 ? "WKT" : "WKTS"}`
       : !isLive && session.result
@@ -191,6 +216,46 @@ function SessionCard({
     };
   }, [hasUploadedCardImage, shouldLoadGallery]);
 
+  useEffect(() => {
+    if (
+      !shouldLoadGallery ||
+      !session?._id ||
+      imageCount <= 1 ||
+      galleryImages.length > 1
+    ) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+
+    void fetch(`/api/sessions/${session._id}/view-media`, {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-store",
+      },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          return null;
+        }
+
+        return response.json().catch(() => null);
+      })
+      .then((payload) => {
+        if (!payload || !Array.isArray(payload.matchImages) || !payload.matchImages.length) {
+          return;
+        }
+
+        setGalleryImages(payload.matchImages);
+      })
+      .catch(() => {});
+
+    return () => {
+      controller.abort();
+    };
+  }, [galleryImages.length, imageCount, session?._id, shouldLoadGallery]);
+
   const handleCardOpen = () => {
     if (!scoreHref || shouldBlockCardOpen?.()) {
       return;
@@ -198,7 +263,7 @@ function SessionCard({
 
     void primeUiAudio().catch(() => {});
     startNavigation(isLive ? "Opening live score..." : "Opening final score...");
-    router.push(scoreHref);
+    router.push(scoreHref, { scroll: true });
   };
 
   return (
@@ -317,11 +382,11 @@ function SessionCard({
                 {scoreDetailLabel ? (
                   <p
                     className={`mt-1 text-[10px] font-semibold text-zinc-400 ${
-                      winningInningsSummary?.teamName
+                      winningSummary?.teamName
                         ? "normal-case tracking-[0.04em] text-zinc-300"
                         : "uppercase tracking-[0.2em]"
                     }`}
-                    title={winningInningsSummary?.teamName || undefined}
+                    title={winningSummary?.teamName || undefined}
                   >
                     {scoreDetailLabel}
                   </p>
@@ -369,7 +434,7 @@ function SessionCard({
           <div className="relative mt-6 overflow-hidden rounded-[20px] border border-white/8 bg-black/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-[linear-gradient(180deg,rgba(0,0,0,0.72),rgba(0,0,0,0))] px-4 py-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-zinc-300/85">
-                {matchImages.length > 1 ? "Match images" : "Match image"}
+                {imageCount > 1 ? "Match images" : "Match image"}
               </p>
             </div>
             <div
@@ -380,7 +445,7 @@ function SessionCard({
             >
               {shouldLoadGallery ? (
                 <MatchImageCarousel
-                  images={matchImages.length ? matchImages : [{ id: "cover", url: cardImage }]}
+                  images={resolvedGalleryImages}
                   alt={`${session.name || "Session"} match image`}
                   compact
                   className="relative"

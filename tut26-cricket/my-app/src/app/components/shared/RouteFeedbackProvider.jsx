@@ -16,12 +16,13 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import InlineSpinner from "./InlineSpinner";
 
 const RouteFeedbackContext = createContext({
@@ -69,7 +70,12 @@ function RouteTransitionLoader({ visible, label }) {
 
 export default function RouteFeedbackProvider({ children }) {
   const pathname = usePathname();
-  const currentUrl = pathname || "";
+  const searchParams = useSearchParams();
+  const currentUrl = useMemo(() => {
+    const path = pathname || "";
+    const query = searchParams?.toString() || "";
+    return query ? `${path}?${query}` : path;
+  }, [pathname, searchParams]);
   const [navigationState, setNavigationState] = useState({
     active: false,
     label: "",
@@ -77,6 +83,38 @@ export default function RouteFeedbackProvider({ children }) {
   });
   const currentUrlRef = useRef(currentUrl);
   const clearTimerRef = useRef(null);
+
+  const forceScrollToTop = useCallback(() => {
+    if (typeof window === "undefined") {
+      return () => {};
+    }
+
+    const applyScrollTop = () => {
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+      if (document.documentElement) {
+        document.documentElement.scrollTop = 0;
+      }
+      if (document.body) {
+        document.body.scrollTop = 0;
+      }
+    };
+
+    applyScrollTop();
+    const frameId = window.requestAnimationFrame(() => {
+      applyScrollTop();
+      window.requestAnimationFrame(applyScrollTop);
+    });
+    const timeoutId = window.setTimeout(applyScrollTop, 120);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(timeoutId);
+    };
+  }, []);
 
   const stopNavigation = useCallback(() => {
     if (clearTimerRef.current) {
@@ -89,12 +127,30 @@ export default function RouteFeedbackProvider({ children }) {
   }, []);
 
   const startNavigation = useCallback((label = "Opening...") => {
+    forceScrollToTop();
     setNavigationState({
       active: true,
       label,
       startedAt: Date.now(),
     });
+  }, [forceScrollToTop]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.history) {
+      return undefined;
+    }
+
+    const previousSetting = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+
+    return () => {
+      window.history.scrollRestoration = previousSetting;
+    };
   }, []);
+
+  useLayoutEffect(() => {
+    return forceScrollToTop();
+  }, [currentUrl, forceScrollToTop]);
 
   useEffect(() => {
     if (currentUrlRef.current !== currentUrl) {

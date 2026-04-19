@@ -89,28 +89,23 @@ export async function POST(req) {
 export async function GET(req) {
   try {
     const requestUrl = new URL(req.url);
-    const requestCacheControl = String(
-      req.headers.get("cache-control") || "",
-    ).toLowerCase();
-    const forceFresh =
-      requestUrl.searchParams.get("fresh") === "1" ||
-      requestCacheControl.includes("no-store") ||
-      requestCacheControl.includes("no-cache");
-    const limit = Number(requestUrl.searchParams.get("limit") || 10);
-    const cursor = String(requestUrl.searchParams.get("cursor") || "").trim();
+    const page = Number(requestUrl.searchParams.get("page") || 1);
+    const limit = Number(requestUrl.searchParams.get("limit") || 28);
     const search = String(requestUrl.searchParams.get("search") || "").trim();
     const filter = String(requestUrl.searchParams.get("filter") || "").trim();
     const sort = String(requestUrl.searchParams.get("sort") || "").trim();
     const {
       sessions,
+      page: resolvedPage,
+      limit: resolvedLimit,
       totalCount,
+      totalPages,
       unfilteredTotalCount,
-      nextCursor,
-      hasMore,
+      hasNextPage,
+      hasPreviousPage,
     } = await loadSessionsIndexPageData({
-      forceFresh,
+      page,
       limit,
-      cursor,
       search,
       filter,
       sort,
@@ -119,10 +114,13 @@ export async function GET(req) {
     return Response.json(
       {
         sessions,
-        nextCursor,
-        hasMore,
+        page: resolvedPage,
+        limit: resolvedLimit,
         totalCount,
+        totalPages,
         unfilteredTotalCount,
+        hasNextPage,
+        hasPreviousPage,
       },
       {
       headers: {
