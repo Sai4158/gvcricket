@@ -31,12 +31,12 @@ import {
   finalizePendingResultIfExpired,
   isFinalizedMatchComplete,
 } from "./pending-match-result";
-import { getWinningTeamName } from "./match-result-display";
 import {
   hasCompleteTossState,
   hydrateLegacyTossState,
   normalizeLegacyTossState,
 } from "./match-toss";
+import { buildSessionMirrorUpdate } from "./match-engine";
 import {
   buildLockedTossPageData,
   FALLBACK_SESSION_FIELDS,
@@ -141,29 +141,6 @@ const SESSION_VIEW_MATCH_FIELDS =
 const SESSION_VIEW_MATCH_DETAIL_FIELDS =
   "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy mediaUpdatedAt lastLiveEvent lastEventType lastEventText updatedAt";
 
-function buildInningsWicketsProjection(historyFieldPath) {
-  return {
-    $reduce: {
-      input: { $ifNull: [historyFieldPath, []] },
-      initialValue: 0,
-      in: {
-        $add: [
-          "$$value",
-          {
-            $size: {
-              $filter: {
-                input: { $ifNull: ["$$this.balls", []] },
-                as: "ball",
-                cond: { $eq: ["$$ball.isOut", true] },
-              },
-            },
-          },
-        ],
-      },
-    },
-  };
-}
-
 function normalizeSearchValue(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -218,6 +195,20 @@ function getSessionsIndexSort(sortValue = DEFAULT_SESSIONS_SORT) {
   }
 }
 
+function needsSessionCardMirrorBackfill(session) {
+  return Boolean(
+    getPublicId(session?.match) &&
+      (!Number.isFinite(Number(session?.score)) ||
+        !Number.isFinite(Number(session?.outs)) ||
+        typeof session?.innings !== "string" ||
+        typeof session?.result !== "string" ||
+        typeof session?.pendingResult !== "string" ||
+        typeof session?.winningTeamName !== "string" ||
+        !Number.isFinite(Number(session?.winningScore)) ||
+        !Number.isFinite(Number(session?.winningWickets)))
+  );
+}
+
 async function getCachedServerData(cacheEntry, loader) {
   if (!cacheEntry) {
     return loader();
@@ -261,161 +252,6 @@ async function findMatchForSession(
     .select(fields)
     .sort({ updatedAt: -1 });
   return finalizePendingResultIfExpired(match);
-}
-
-async function resolveSessionsIndexCards(sessions) {
-  const linkedMatchIds = sessions
-    .map((session) => getPublicId(session.match))
-    .filter((matchId) => isValidObjectId(matchId))
-    .map((matchId) => new Types.ObjectId(matchId));
-  const unresolvedSessionIds = sessions
-    .filter((session) => !session.match)
-    .map((session) => getPublicId(session._id))
-    .filter((sessionId) => isValidObjectId(sessionId))
-    .map((sessionId) => new Types.ObjectId(sessionId));
-
-  const matchQuery = [];
-  if (linkedMatchIds.length) {
-    matchQuery.push({ _id: { $in: linkedMatchIds } });
-  }
-  if (unresolvedSessionIds.length) {
-    matchQuery.push({ sessionId: { $in: unresolvedSessionIds } });
-  }
-
-  const relatedMatches = matchQuery.length
-    ? await Match.collection
-        .aggregate([
-          {
-            $match: matchQuery.length === 1 ? matchQuery[0] : { $or: matchQuery },
-          },
-          {
-            $sort: { updatedAt: -1, createdAt: -1, _id: -1 },
-          },
-          {
-            $project: {
-              _id: 1,
-              sessionId: 1,
-              teamAName: 1,
-              teamBName: 1,
-              tossWinner: 1,
-              tossDecision: 1,
-              score: 1,
-              outs: 1,
-              innings: 1,
-              isOngoing: 1,
-              result: 1,
-              pendingResult: 1,
-              matchImageUrl: 1,
-              innings1Team: "$innings1.team",
-              innings1Score: "$innings1.score",
-              innings1Wickets: buildInningsWicketsProjection("$innings1.history"),
-              innings2Team: "$innings2.team",
-              innings2Score: "$innings2.score",
-              innings2Wickets: buildInningsWicketsProjection("$innings2.history"),
-              createdAt: 1,
-              updatedAt: 1,
-              matchImageCount: {
-                $size: {
-                  $ifNull: ["$matchImages", []],
-                },
-              },
-            },
-          },
-        ])
-        .toArray()
-    : [];
-
-  const linkedMatchesById = new Map();
-  const fallbackMatchesBySessionId = new Map();
-
-  for (const match of relatedMatches) {
-    const matchId = getPublicId(match._id);
-    const sessionId = getPublicId(match.sessionId);
-
-    if (matchId && !linkedMatchesById.has(matchId)) {
-      linkedMatchesById.set(matchId, match);
-    }
-
-    if (sessionId && !fallbackMatchesBySessionId.has(sessionId)) {
-      fallbackMatchesBySessionId.set(sessionId, match);
-    }
-  }
-
-  return sessions.map((session) => {
-    const linkedMatchId = getPublicId(session.match);
-    let resolvedMatch =
-      linkedMatchesById.get(linkedMatchId) ||
-      fallbackMatchesBySessionId.get(getPublicId(session._id)) ||
-      null;
-    if (resolvedMatch && !hasCompleteTossState(resolvedMatch, session)) {
-      resolvedMatch = normalizeLegacyTossState(resolvedMatch, session);
-    }
-
-    const coverImageUrl =
-      resolvedMatch?.matchImageUrl || session.matchImageUrl || "";
-    const resultText = resolvedMatch?.result || session.result || "";
-    const winnerName = getWinningTeamName(resultText);
-    const resultLower = String(resultText || "").toLowerCase();
-    const firstInningsWon = resultLower.includes(" won by ") && resultLower.includes(" runs");
-    const secondInningsWon =
-      resultLower.includes(" won by ") && resultLower.includes(" wickets");
-    const winningScore = firstInningsWon
-      ? Number(resolvedMatch?.innings1Score || 0)
-      : secondInningsWon
-        ? Number(
-            resolvedMatch?.innings2Score ??
-              resolvedMatch?.score ??
-              0
-          )
-        : Number(resolvedMatch?.score || 0);
-    const winningWickets = firstInningsWon
-      ? Number(resolvedMatch?.innings1Wickets || 0)
-      : secondInningsWon
-        ? Number(
-            resolvedMatch?.innings2Wickets ??
-              resolvedMatch?.outs ??
-              0
-          )
-        : Number(resolvedMatch?.outs || 0);
-    const imageCount = Math.max(
-      Number(session?.sessionImageCount || 0),
-      Number(resolvedMatch?.matchImageCount || 0),
-      coverImageUrl ? 1 : 0,
-    );
-
-    return serializeSessionCard({
-      _id: getPublicId(session._id),
-      name: session.name || "",
-      date: session.date || "",
-      isLive: resolvedMatch ? Boolean(resolvedMatch.isOngoing) : Boolean(session.isLive),
-      match: getPublicId(resolvedMatch?._id || session.match) || null,
-      teamAName: resolvedMatch?.teamAName || session.teamAName || "",
-      teamBName: resolvedMatch?.teamBName || session.teamBName || "",
-      matchImageUrl: coverImageUrl,
-      coverImageUrl,
-      updatedAt: session.updatedAt || session.createdAt,
-      createdAt: session.createdAt || null,
-      score: Number(resolvedMatch?.score || 0),
-      outs: Number(resolvedMatch?.outs || 0),
-      innings: resolvedMatch?.innings || "",
-      result: resolvedMatch?.result || session.result || "",
-      winningTeamName:
-        winnerName ||
-        (firstInningsWon
-          ? resolvedMatch?.innings1Team || ""
-          : secondInningsWon
-            ? resolvedMatch?.innings2Team || ""
-            : ""),
-      winningScore,
-      winningWickets,
-      tossReady:
-        Boolean(
-          (resolvedMatch?.tossWinner || session.tossWinner) &&
-            (resolvedMatch?.tossDecision || session.tossDecision)
-        ),
-      imageCount,
-    });
-  });
 }
 
 async function readHomeLiveBannerData() {
@@ -556,6 +392,7 @@ async function readHomeLiveBannerData() {
 export async function loadSessionsIndexPageData(options = {}) {
   await connectDB();
 
+  const includeCounts = options?.includeCounts !== false;
   const normalizedLimit = Math.min(
     MAX_SESSIONS_PAGE_LIMIT,
     Math.max(1, Number(options?.limit || DEFAULT_SESSIONS_PAGE_LIMIT)),
@@ -570,16 +407,22 @@ export async function loadSessionsIndexPageData(options = {}) {
   });
   const sort = getSessionsIndexSort(normalizedSort);
 
-  const [totalCount, unfilteredTotalCount] = await Promise.all([
-    Session.collection.countDocuments(query),
-    Session.collection.countDocuments(NON_DRAFT_SESSION_COLLECTION_FILTER),
-  ]);
+  let totalCount = null;
+  let unfilteredTotalCount = null;
+  let totalPages = 1;
 
-  const totalPages = totalCount > 0 ? Math.ceil(totalCount / normalizedLimit) : 1;
-  const page = Math.min(requestedPage, totalPages);
+  if (includeCounts) {
+    [totalCount, unfilteredTotalCount] = await Promise.all([
+      Session.collection.countDocuments(query),
+      Session.collection.countDocuments(NON_DRAFT_SESSION_COLLECTION_FILTER),
+    ]);
+    totalPages = totalCount > 0 ? Math.ceil(totalCount / normalizedLimit) : 1;
+  }
+
+  const page = includeCounts ? Math.min(requestedPage, totalPages) : requestedPage;
   const skip = Math.max(0, (page - 1) * normalizedLimit);
 
-  const pageSessions = await Session.collection
+  const pageSessionsWithPeek = await Session.collection
     .aggregate([
       {
         $match: query,
@@ -591,7 +434,7 @@ export async function loadSessionsIndexPageData(options = {}) {
         $skip: skip,
       },
       {
-        $limit: normalizedLimit,
+        $limit: includeCounts ? normalizedLimit : normalizedLimit + 1,
       },
       {
         $project: {
@@ -602,6 +445,14 @@ export async function loadSessionsIndexPageData(options = {}) {
           match: 1,
           tossWinner: 1,
           tossDecision: 1,
+          score: 1,
+          outs: 1,
+          innings: 1,
+          result: 1,
+          pendingResult: 1,
+          winningTeamName: 1,
+          winningScore: 1,
+          winningWickets: 1,
           teamAName: 1,
           teamBName: 1,
           matchImageUrl: 1,
@@ -617,17 +468,137 @@ export async function loadSessionsIndexPageData(options = {}) {
     ])
     .toArray();
 
-  const sessions = await resolveSessionsIndexCards(pageSessions);
+  const hasPeekSession =
+    !includeCounts && pageSessionsWithPeek.length > normalizedLimit;
+  const pageSessions = includeCounts
+    ? pageSessionsWithPeek
+    : pageSessionsWithPeek.slice(0, normalizedLimit);
+
+  const backfillSessions = pageSessions.filter(needsSessionCardMirrorBackfill);
+  const backfilledMirrorBySessionId = new Map();
+
+  if (backfillSessions.length) {
+    const backfillMatchIds = backfillSessions
+      .map((session) => getPublicId(session.match))
+      .filter((matchId) => isValidObjectId(matchId))
+      .map((matchId) => new Types.ObjectId(matchId));
+
+    if (backfillMatchIds.length) {
+      const backfillMatches = await Match.collection
+        .find(
+          {
+            _id: { $in: backfillMatchIds },
+          },
+          {
+            projection: {
+              _id: 1,
+              sessionId: 1,
+              teamA: 1,
+              teamB: 1,
+              teamAName: 1,
+              teamBName: 1,
+              overs: 1,
+              tossWinner: 1,
+              tossDecision: 1,
+              score: 1,
+              outs: 1,
+              isOngoing: 1,
+              innings: 1,
+              result: 1,
+              pendingResult: 1,
+              innings1: 1,
+              innings2: 1,
+              matchImages: 1,
+              matchImageUrl: 1,
+              matchImagePublicId: 1,
+              matchImageUploadedAt: 1,
+              matchImageUploadedBy: 1,
+              announcerEnabled: 1,
+              announcerMode: 1,
+              announcerScoreSoundEffectsEnabled: 1,
+              announcerBroadcastScoreSoundEffectsEnabled: 1,
+              lastEventType: 1,
+              lastEventText: 1,
+              adminAccessVersion: 1,
+            },
+          }
+        )
+        .toArray();
+
+      const bulkUpdates = [];
+
+      for (const backfillMatch of backfillMatches) {
+        const sessionId = getPublicId(backfillMatch.sessionId);
+        if (!sessionId) {
+          continue;
+        }
+
+        const mirrorUpdate = buildSessionMirrorUpdate(backfillMatch);
+        backfilledMirrorBySessionId.set(sessionId, mirrorUpdate);
+        bulkUpdates.push({
+          updateOne: {
+            filter: { _id: backfillMatch.sessionId },
+            update: { $set: mirrorUpdate },
+            timestamps: false,
+          },
+        });
+      }
+
+      if (bulkUpdates.length) {
+        await Session.bulkWrite(bulkUpdates, { ordered: false });
+      }
+    }
+  }
+
+  const sessions = pageSessions.map((session) =>
+    {
+      const backfilledMirror =
+        backfilledMirrorBySessionId.get(getPublicId(session._id)) || null;
+      const resolvedSession = backfilledMirror
+        ? { ...session, ...backfilledMirror }
+        : session;
+
+      return serializeSessionCard({
+        _id: getPublicId(resolvedSession._id || session._id),
+        name: resolvedSession.name || "",
+        date: resolvedSession.date || "",
+        isLive: Boolean(resolvedSession.isLive),
+        match: getPublicId(resolvedSession.match) || null,
+        teamAName: resolvedSession.teamAName || "",
+        teamBName: resolvedSession.teamBName || "",
+        matchImageUrl: resolvedSession.matchImageUrl || "",
+        coverImageUrl: resolvedSession.matchImageUrl || "",
+        updatedAt: resolvedSession.updatedAt || resolvedSession.createdAt,
+        createdAt: resolvedSession.createdAt || null,
+        score: Number(resolvedSession.score || 0),
+        outs: Number(resolvedSession.outs || 0),
+        innings: resolvedSession.innings || "",
+        result: resolvedSession.result || "",
+        pendingResult: resolvedSession.pendingResult || "",
+        winningTeamName: resolvedSession.winningTeamName || "",
+        winningScore: Number(resolvedSession.winningScore || 0),
+        winningWickets: Number(resolvedSession.winningWickets || 0),
+        tossReady: Boolean(resolvedSession.tossWinner && resolvedSession.tossDecision),
+        imageCount: Math.max(
+          Number(resolvedSession?.sessionImageCount || 0),
+          resolvedSession.matchImageUrl ? 1 : 0,
+        ),
+      });
+    }
+  );
 
   return {
     sessions,
     page,
     limit: normalizedLimit,
-    totalCount: Number(totalCount || 0),
-    totalPages,
-    unfilteredTotalCount: Number(unfilteredTotalCount || 0),
-    hasNextPage: page < totalPages,
+    totalCount: includeCounts ? Number(totalCount || 0) : null,
+    totalPages: includeCounts
+      ? totalPages
+      : Math.max(1, page + (hasPeekSession ? 1 : 0)),
+    unfilteredTotalCount: includeCounts ? Number(unfilteredTotalCount || 0) : null,
+    hasNextPage: includeCounts ? page < totalPages : hasPeekSession,
     hasPreviousPage: page > 1,
+    countsPending: !includeCounts,
   };
 }
 

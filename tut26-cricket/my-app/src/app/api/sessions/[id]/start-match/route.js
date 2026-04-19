@@ -22,6 +22,7 @@ import {
   rebaseStoredMatchImagesForMatch,
 } from "../../../../lib/match-image-gallery";
 import { serializePublicMatch } from "../../../../lib/public-data";
+import { buildSessionMirrorUpdate } from "../../../../lib/match-engine";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../../lib/request-security";
@@ -205,6 +206,7 @@ export async function POST(req, { params }) {
       session.isLive = true;
       session.isDraft = false;
       session.draftTokenHash = "";
+      Object.assign(session, buildSessionMirrorUpdate(finalMatch));
       await session.save({ session: transactionSession });
     });
 

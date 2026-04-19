@@ -24,6 +24,7 @@ import {
   createScoreLiveEvent,
   createUndoLiveEvent,
 } from "./live-announcements";
+import { getWinningTeamName } from "./match-result-display";
 import { getBattingTeamBundle, getTotalDismissalsAllowed } from "./team-utils";
 
 // These are the match fields we save for undo and fixes.
@@ -68,6 +69,13 @@ function cloneValue(value) {
   }
 
   return JSON.parse(JSON.stringify(value));
+}
+
+function countInningsWickets(history = []) {
+  return (Array.isArray(history) ? history : []).reduce((total, over) => {
+    const balls = Array.isArray(over?.balls) ? over.balls : [];
+    return total + balls.filter((ball) => Boolean(ball?.isOut)).length;
+  }, 0);
 }
 
 // Turn a Mongoose document into a plain object we can safely edit.
@@ -756,6 +764,14 @@ export function applySafeMatchPatch(matchDocument, patch) {
 // Build the smaller match data object used on session screens.
 export function buildSessionMirrorUpdate(matchDocument) {
   const match = toPlainMatch(matchDocument);
+  const resultText = String(match?.result || "").trim();
+  const winnerName = getWinningTeamName(resultText);
+  const resultLower = resultText.toLowerCase();
+  const firstInningsWon = resultLower.includes(" won by ") && resultLower.includes(" runs");
+  const secondInningsWon =
+    resultLower.includes(" won by ") && resultLower.includes(" wickets");
+  const innings1 = match?.innings1 || { team: "", score: 0, history: [] };
+  const innings2 = match?.innings2 || { team: "", score: 0, history: [] };
 
   // Only include the fields needed by session pages.
   return {
@@ -766,6 +782,24 @@ export function buildSessionMirrorUpdate(matchDocument) {
     overs: match?.overs ?? null,
     tossWinner: match?.tossWinner || "",
     tossDecision: match?.tossDecision || "",
+    score: Number(match?.score || 0),
+    outs: Number(match?.outs || 0),
+    innings: match?.innings || "",
+    result: resultText,
+    pendingResult: match?.pendingResult || "",
+    winningTeamName:
+      winnerName ||
+      (firstInningsWon ? innings1.team || "" : secondInningsWon ? innings2.team || "" : ""),
+    winningScore: firstInningsWon
+      ? Number(innings1.score || 0)
+      : secondInningsWon
+        ? Number(innings2.score ?? match?.score ?? 0)
+        : Number(match?.score || 0),
+    winningWickets: firstInningsWon
+      ? countInningsWickets(innings1.history)
+      : secondInningsWon
+        ? countInningsWickets(innings2.history)
+        : Number(match?.outs || 0),
     matchImages: Array.isArray(match?.matchImages) ? match.matchImages : [],
     matchImageUrl: match?.matchImageUrl || "",
     matchImagePublicId: match?.matchImagePublicId || "",

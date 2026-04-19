@@ -13,7 +13,6 @@
 
 import SessionsPageClient from "../components/session/SessionsPageClient";
 import { absoluteUrl, siteConfig } from "../lib/site-metadata";
-import { loadSessionsIndexPageData } from "../lib/server-data";
 
 // Refresh this page data every 15 seconds.
 export const revalidate = 15;
@@ -49,16 +48,15 @@ export const metadata = {
 };
 
 // Main session page route.
-// This loads the first batch of session data on the server,
-// then passes it into the client page component.
+// This renders the shell immediately and lets the client fetch
+// the first sessions page after paint, which keeps first load fast.
 export default async function SessionsPage({ searchParams }) {
-  const initialPayload = await loadSessionsIndexPageData({ limit: 28, page: 1 });
   // Optional refresh token from the URL, used by the client page when needed.
   const resolvedSearchParams = await searchParams;
   const refreshToken = String(resolvedSearchParams?.refresh || "").trim();
   return (
     <SessionsPageClient
-      initialPayload={initialPayload}
+      initialPayload={null}
       refreshToken={refreshToken}
     />
   );

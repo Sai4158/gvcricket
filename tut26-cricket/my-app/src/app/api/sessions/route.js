@@ -94,6 +94,7 @@ export async function GET(req) {
     const search = String(requestUrl.searchParams.get("search") || "").trim();
     const filter = String(requestUrl.searchParams.get("filter") || "").trim();
     const sort = String(requestUrl.searchParams.get("sort") || "").trim();
+    const includeCounts = requestUrl.searchParams.get("counts") !== "0";
     const {
       sessions,
       page: resolvedPage,
@@ -103,12 +104,14 @@ export async function GET(req) {
       unfilteredTotalCount,
       hasNextPage,
       hasPreviousPage,
+      countsPending,
     } = await loadSessionsIndexPageData({
       page,
       limit,
       search,
       filter,
       sort,
+      includeCounts,
     });
 
     return Response.json(
@@ -121,6 +124,7 @@ export async function GET(req) {
         unfilteredTotalCount,
         hasNextPage,
         hasPreviousPage,
+        countsPending,
       },
       {
       headers: {

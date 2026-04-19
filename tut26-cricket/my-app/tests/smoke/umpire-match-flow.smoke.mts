@@ -186,15 +186,17 @@ async function main() {
 
   for (const [index, action] of scoreSequence.entries()) {
     const result = await json(
-      `/api/matches/${matchId}/actions`,
+      `/api/matches/${matchId}/score`,
       {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          ...action,
           actionId: actionId(`first-${index}`),
+          runs: action.runs,
+          isOut: action.isOut,
+          extraType: action.extraType,
         }),
       },
       umpire
@@ -224,15 +226,17 @@ async function main() {
     { type: "score_ball", runs: 6, isOut: false, extraType: null },
   ].entries()) {
     const result = await json(
-      `/api/matches/${matchId}/actions`,
+      `/api/matches/${matchId}/score`,
       {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          ...action,
           actionId: actionId(`first-finish-${index}`),
+          runs: action.runs,
+          isOut: action.isOut,
+          extraType: action.extraType,
         }),
       },
       umpire
@@ -305,15 +309,25 @@ async function main() {
 
   for (const [index, action] of secondInningsActions.entries()) {
     const result = await json(
-      `/api/matches/${matchId}/actions`,
+      action.type === "score_ball"
+        ? `/api/matches/${matchId}/score`
+        : `/api/matches/${matchId}/actions`,
       {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          ...action,
           actionId: actionId(`second-${index}`),
+          ...(action.type === "score_ball"
+            ? {
+                runs: action.runs,
+                isOut: action.isOut,
+                extraType: action.extraType,
+              }
+            : {
+                type: action.type,
+              }),
         }),
       },
       umpire

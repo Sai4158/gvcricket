@@ -20,7 +20,10 @@
     "verify:typecheck": "npm run typecheck",
     "verify:build": "npm run build",
     "verify:audit": "powershell -ExecutionPolicy Bypass -File .\\scripts\\verification\\audit-probes.ps1",
-    "verify:root": "node scripts/verification/check-root-cleanliness.mjs"
+    "verify:root": "node scripts/verification/check-root-cleanliness.mjs",
+    "test:umpire:stress": "tsx --test tests/stress/umpire-stress.generated.mjs",
+    "test:umpire:smoke": "tsx tests/smoke/umpire-match-flow.smoke.mts && tsx tests/smoke/umpire-long-match.smoke.mts",
+    "test:umpire:perf": "tsx tests/smoke/umpire-hot-path-perf.smoke.mts && tsx tests/smoke/umpire-mobile-profile.smoke.mts"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^4.22.0",
@@ -52,6 +55,7 @@
     "@types/react": "^19.2.14",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.1.6",
+    "playwright": "^1.55.1",
     "tailwindcss": "^4.2.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

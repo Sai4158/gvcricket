@@ -21,6 +21,7 @@ import {
   useRef,
   useState,
 } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
@@ -35,19 +36,33 @@ import {
   FaTimes,
 } from "react-icons/fa";
 import DarkSelect from "../shared/DarkSelect";
-import InfoModal from "./InfoModal";
-import PinModal from "./PinModal";
 import LoadingButton from "../shared/LoadingButton";
 import PendingLink from "../shared/PendingLink";
-import SiteFooter from "../shared/SiteFooter";
 import SessionCard from "./SessionCard";
-import LiquidSportText from "../home/LiquidSportText";
-import ImagePinModal from "../shared/ImagePinModal";
-import { ModalBase } from "../match/MatchBaseModals";
-import MatchImageUploader from "../match/MatchImageUploader";
 import { verifyImageActionPin } from "../../lib/image-pin-client";
 import { buildPinRequestError } from "../../lib/pin-attempt-client";
 import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
+
+const InfoModal = dynamic(() => import("./InfoModal"), { ssr: false });
+const PinModal = dynamic(() => import("./PinModal"), { ssr: false });
+const SiteFooter = dynamic(() => import("../shared/SiteFooter"));
+const ImagePinModal = dynamic(() => import("../shared/ImagePinModal"), {
+  ssr: false,
+});
+const ModalBase = dynamic(
+  () => import("../match/MatchBaseModals").then((module) => module.ModalBase),
+  { ssr: false },
+);
+const MatchImageUploader = dynamic(() => import("../match/MatchImageUploader"), {
+  ssr: false,
+});
+const LiquidSportText = dynamic(() => import("../home/LiquidSportText"), {
+  loading: () => (
+    <span className="relative z-10 block text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
+      All Sessions
+    </span>
+  ),
+});
 
 const SORT_OPTIONS = [
   { value: "live-newest", label: "Live first" },
@@ -114,6 +129,33 @@ function EmptyState({ title, text, href, label }) {
           {label}
         </Link>
       ) : null}
+    </div>
+  );
+}
+
+function SessionsGridSkeleton({ count = 8 }) {
+  return (
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] gap-5 2xl:gap-6">
+      {Array.from({ length: count }, (_, index) => (
+        <div
+          key={`session-skeleton-${index}`}
+          className="overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.05),transparent_20%),linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,8,12,0.98))] p-6 shadow-[0_20px_44px_rgba(0,0,0,0.24)]"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="h-8 w-40 animate-pulse rounded-2xl bg-white/10" />
+              <div className="mt-4 h-5 w-52 animate-pulse rounded-xl bg-white/8" />
+              <div className="mt-3 h-4 w-32 animate-pulse rounded-xl bg-white/6" />
+            </div>
+            <div className="w-20 shrink-0">
+              <div className="ml-auto h-12 w-20 animate-pulse rounded-2xl bg-amber-300/12" />
+              <div className="mt-2 ml-auto h-4 w-16 animate-pulse rounded-xl bg-white/6" />
+            </div>
+          </div>
+          <div className="mt-10 h-[172px] animate-pulse rounded-[26px] border border-white/6 bg-white/[0.03]" />
+          <div className="mt-5 h-14 animate-pulse rounded-[20px] bg-emerald-400/10" />
+        </div>
+      ))}
     </div>
   );
 }
@@ -202,6 +244,7 @@ export default function SessionsPageClient({
   initialPayload,
   refreshToken = "",
 }) {
+  const hasInitialPayload = Array.isArray(initialPayload?.sessions);
   const initialSessions = useMemo(
     () => (Array.isArray(initialPayload?.sessions) ? initialPayload.sessions : []),
     [initialPayload?.sessions]
@@ -226,6 +269,10 @@ export default function SessionsPageClient({
     () => Math.max(1, Number(initialPayload?.totalPages || 1)),
     [initialPayload?.totalPages]
   );
+  const initialCountsPending = useMemo(
+    () => Boolean(initialPayload?.countsPending),
+    [initialPayload?.countsPending]
+  );
 
   // Main page state.
   const [sessions, setSessions] = useState(initialSessions ?? []);
@@ -242,7 +289,9 @@ export default function SessionsPageClient({
   const [hasPreviousPage, setHasPreviousPage] = useState(
     Boolean(initialPayload?.hasPreviousPage)
   );
-  const [isRefreshingList, setIsRefreshingList] = useState(false);
+  const [isRefreshingList, setIsRefreshingList] = useState(!hasInitialPayload);
+  const [hasLoadedFirstPage, setHasLoadedFirstPage] = useState(hasInitialPayload);
+  const [countsPending, setCountsPending] = useState(initialCountsPending);
   const [pinPrompt, setPinPrompt] = useState(null);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [pinError, setPinError] = useState("");
@@ -275,6 +324,7 @@ export default function SessionsPageClient({
   const suppressCardOpenUntilRef = useRef(0);
   const hasMountedFiltersRef = useRef(false);
   const activeRequestIdRef = useRef(0);
+  const hasPrimedInitialLoadRef = useRef(false);
   const previousPageSizeRef = useRef(initialPageSize);
 
   // Turn text selection on or off during hidden hold mode.
@@ -309,9 +359,11 @@ export default function SessionsPageClient({
     setPageSizeValue(initialPageSize);
     setHasNextPage(Boolean(initialPayload?.hasNextPage));
     setHasPreviousPage(Boolean(initialPayload?.hasPreviousPage));
+    setCountsPending(Boolean(initialPayload?.countsPending));
   }, [
     initialPage,
     initialPageSize,
+    initialPayload?.countsPending,
     initialPayload?.hasNextPage,
     initialPayload?.hasPreviousPage,
     initialSessions,
@@ -382,6 +434,83 @@ export default function SessionsPageClient({
     () => buildVisiblePageNumbers(currentPage, totalPages),
     [currentPage, totalPages]
   );
+  const showInitialSkeleton = !hasLoadedFirstPage && isRefreshingList;
+
+  const buildSessionsQuery = useCallback(
+    ({ forceFresh = false, pageOverride, limitOverride, includeCounts = true } = {}) => {
+      const query = new URLSearchParams({
+        page: String(Math.max(1, Number(pageOverride || currentPage || 1))),
+        limit: String(
+          Math.min(
+            68,
+            Math.max(1, Number(limitOverride || pageSizeValue || SESSIONS_PAGE_SIZE))
+          )
+        ),
+        search: searchQuery,
+        filter: filterBy,
+        sort: sortBy,
+      });
+
+      if (!includeCounts) {
+        query.set("counts", "0");
+      }
+
+      if (forceFresh) {
+        query.set("fresh", "1");
+        query.set("t", String(Date.now()));
+      }
+
+      return query;
+    },
+    [currentPage, filterBy, pageSizeValue, searchQuery, sortBy]
+  );
+
+  const fetchSessionsPayload = useCallback(
+    async ({
+      forceFresh = false,
+      pageOverride,
+      limitOverride,
+      includeCounts = true,
+    } = {}) => {
+      const response = await fetch(
+        `/api/sessions?${buildSessionsQuery({
+          forceFresh,
+          pageOverride,
+          limitOverride,
+          includeCounts,
+        }).toString()}`,
+        {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Could not refresh sessions.");
+      }
+
+      const payload = await response.json().catch(() => null);
+      if (!payload || !Array.isArray(payload.sessions)) {
+        throw new Error("Could not refresh sessions.");
+      }
+
+      return payload;
+    },
+    [buildSessionsQuery]
+  );
+
+  const applySessionsPayload = useCallback((payload) => {
+    setSessions(payload.sessions);
+    setTotalCount(Number(payload.totalCount || 0));
+    setUnfilteredTotalCount(Number(payload.unfilteredTotalCount || 0));
+    setCurrentPage(Math.max(1, Number(payload.page || 1)));
+    setTotalPages(Math.max(1, Number(payload.totalPages || 1)));
+    setHasNextPage(Boolean(payload.hasNextPage));
+    setHasPreviousPage(Boolean(payload.hasPreviousPage));
+    setCountsPending(Boolean(payload.countsPending));
+  }, []);
 
   const selectedSessionForManage =
     selectedSessions.length === 1 ? selectedSessions[0] : null;
@@ -644,68 +773,33 @@ export default function SessionsPageClient({
 
   const reloadSessionsFromServer = useCallback(
     async ({ forceFresh = false, pageOverride, limitOverride } = {}) => {
-      const query = new URLSearchParams({
-        page: String(Math.max(1, Number(pageOverride || currentPage || 1))),
-        limit: String(
-          Math.min(
-            68,
-            Math.max(28, Number(limitOverride || pageSizeValue || SESSIONS_PAGE_SIZE))
-          )
-        ),
-        search: searchQuery,
-        filter: filterBy,
-        sort: sortBy,
-      });
-      if (forceFresh) {
-        query.set("fresh", "1");
-        query.set("t", String(Date.now()));
-      }
-
       const requestId = activeRequestIdRef.current + 1;
       activeRequestIdRef.current = requestId;
       setIsRefreshingList(true);
 
       try {
-        const response = await fetch(`/api/sessions?${query.toString()}`, {
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-store",
-          },
+        const payload = await fetchSessionsPayload({
+          forceFresh,
+          pageOverride,
+          limitOverride,
+          includeCounts: true,
         });
-
-        if (!response.ok) {
-          throw new Error("Could not refresh sessions.");
-        }
-
-        const payload = await response
-          .json()
-          .catch(() => null);
-
-        if (!payload || !Array.isArray(payload.sessions)) {
-          throw new Error("Could not refresh sessions.");
-        }
 
         if (requestId !== activeRequestIdRef.current) {
           return payload.sessions;
         }
 
-        setSessions((current) =>
-          requestId === activeRequestIdRef.current ? payload.sessions : current
-        );
-        setTotalCount(Number(payload.totalCount || 0));
-        setUnfilteredTotalCount(Number(payload.unfilteredTotalCount || 0));
-        setCurrentPage(Math.max(1, Number(payload.page || 1)));
-        setTotalPages(Math.max(1, Number(payload.totalPages || 1)));
-        setHasNextPage(Boolean(payload.hasNextPage));
-        setHasPreviousPage(Boolean(payload.hasPreviousPage));
+        applySessionsPayload(payload);
+        setHasLoadedFirstPage(true);
         return payload.sessions;
       } finally {
         if (requestId === activeRequestIdRef.current) {
+          setHasLoadedFirstPage(true);
           setIsRefreshingList(false);
         }
       }
     },
-    [currentPage, filterBy, pageSizeValue, searchQuery, sortBy]
+    [applySessionsPayload, fetchSessionsPayload]
   );
 
   useEffect(() => {
@@ -715,6 +809,65 @@ export default function SessionsPageClient({
 
     void reloadSessionsFromServer({ forceFresh: true }).catch(() => {});
   }, [refreshToken, reloadSessionsFromServer]);
+
+  useEffect(() => {
+    if (hasInitialPayload || hasPrimedInitialLoadRef.current) {
+      return;
+    }
+
+    hasPrimedInitialLoadRef.current = true;
+    let cancelled = false;
+
+    const primeSessionsIncrementally = async () => {
+      try {
+        const firstPayload = await fetchSessionsPayload({
+          pageOverride: 1,
+          limitOverride: 1,
+          includeCounts: false,
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        applySessionsPayload(firstPayload);
+        setHasLoadedFirstPage(true);
+
+        const fivePayload = await fetchSessionsPayload({
+          pageOverride: 1,
+          limitOverride: 5,
+          includeCounts: false,
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        applySessionsPayload(fivePayload);
+
+        if (cancelled) {
+          return;
+        }
+
+        await reloadSessionsFromServer({ pageOverride: 1 });
+      } catch {
+        if (!cancelled) {
+          void reloadSessionsFromServer({ pageOverride: 1 }).catch(() => {});
+        }
+      }
+    };
+
+    void primeSessionsIncrementally();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    applySessionsPayload,
+    fetchSessionsPayload,
+    hasInitialPayload,
+    reloadSessionsFromServer,
+  ]);
 
   useEffect(() => {
     if (!hasMountedFiltersRef.current) {
@@ -733,6 +886,7 @@ export default function SessionsPageClient({
     currentPage,
     filterBy,
     pageSizeValue,
+    hasInitialPayload,
     reloadSessionsFromServer,
     scrollSessionsToTop,
     searchQuery,
@@ -1051,7 +1205,7 @@ export default function SessionsPageClient({
     }
   };
 
-  if (!sessions.length && !isFilteredView && !isRefreshingList) {
+  if (!sessions.length && !isFilteredView && !isRefreshingList && hasLoadedFirstPage) {
     return (
       <main id="top" className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_22%),radial-gradient(circle_at_82%_14%,rgba(14,165,233,0.1),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.08),transparent_20%),linear-gradient(180deg,#16181d_0%,#090a0f_100%)] px-5 py-8 text-zinc-100">
         <div className="mx-auto flex min-h-[80vh] max-w-4xl items-center justify-center">
@@ -1123,7 +1277,9 @@ export default function SessionsPageClient({
                 </button>
               </div>
               <p className="mt-3 text-sm text-zinc-400">
-                {isFilteredView
+                {showInitialSkeleton
+                  ? "Loading the latest sessions..."
+                  : isFilteredView
                   ? `Showing ${showingFrom.toLocaleString()}-${showingTo.toLocaleString()} of ${totalSessionCount.toLocaleString()} matches`
                   : `Showing ${showingFrom.toLocaleString()}-${showingTo.toLocaleString()} of ${overallSessionCount.toLocaleString()} total`}
               </p>
@@ -1185,7 +1341,9 @@ export default function SessionsPageClient({
         </section>
 
         <div className="mt-8">
-          {!sessions.length && !isRefreshingList ? (
+          {showInitialSkeleton ? (
+            <SessionsGridSkeleton count={8} />
+          ) : !sessions.length && !isRefreshingList ? (
             <EmptyState
               title={searchQuery ? "No matching sessions" : "No sessions in this view"}
               text={
@@ -1242,7 +1400,9 @@ export default function SessionsPageClient({
                       </p>
                     ) : null}
                     <p className="mt-1 text-sm text-zinc-500">
-                      Showing page {currentPage.toLocaleString()} of {totalPages.toLocaleString()}
+                      {countsPending
+                        ? "Loading full session count..."
+                        : `Showing page ${currentPage.toLocaleString()} of ${totalPages.toLocaleString()}`}
                     </p>
                   </div>
 
