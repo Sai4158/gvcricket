@@ -89,24 +89,81 @@ function toPlainMatch(matchDocument) {
 
 // Save the current match state so undo can go back to it.
 function getSnapshot(match) {
-  const snapshot = {};
+  const activeInningsKey = getActiveInningsKey(match);
 
-  for (const key of MUTABLE_STATE_KEYS) {
-    snapshot[key] = cloneValue(match?.[key]);
-  }
-
-  return snapshot;
+  return {
+    snapshotVersion: 2,
+    tossWinner: cloneValue(match?.tossWinner),
+    tossDecision: cloneValue(match?.tossDecision),
+    score: cloneValue(match?.score),
+    outs: cloneValue(match?.outs),
+    isOngoing: cloneValue(match?.isOngoing),
+    innings: cloneValue(match?.innings),
+    result: cloneValue(match?.result),
+    pendingResult: cloneValue(match?.pendingResult),
+    pendingResultAt: cloneValue(match?.pendingResultAt),
+    resultAutoFinalizeAt: cloneValue(match?.resultAutoFinalizeAt),
+    innings1: {
+      team: cloneValue(match?.innings1?.team || ""),
+      score: cloneValue(match?.innings1?.score || 0),
+      history:
+        activeInningsKey === "second"
+          ? cloneValue(match?.innings1?.history || [])
+          : [],
+    },
+    innings2: {
+      team: cloneValue(match?.innings2?.team || ""),
+      score: cloneValue(match?.innings2?.score || 0),
+      history: [],
+    },
+    balls: cloneValue(match?.balls || []),
+    lastLiveEvent: cloneValue(match?.lastLiveEvent),
+    lastEventType: cloneValue(match?.lastEventType),
+    lastEventText: cloneValue(match?.lastEventText),
+  };
 }
 
 // Put back the saved match state.
 function restoreSnapshot(match, snapshot) {
+  if (Number(snapshot?.snapshotVersion || 0) >= 2) {
+    match.tossWinner = cloneValue(snapshot?.tossWinner);
+    match.tossDecision = cloneValue(snapshot?.tossDecision);
+    match.score = cloneValue(snapshot?.score);
+    match.outs = cloneValue(snapshot?.outs);
+    match.isOngoing = cloneValue(snapshot?.isOngoing);
+    match.innings = cloneValue(snapshot?.innings);
+    match.result = cloneValue(snapshot?.result);
+    match.pendingResult = cloneValue(snapshot?.pendingResult);
+    match.pendingResultAt = cloneValue(snapshot?.pendingResultAt);
+    match.resultAutoFinalizeAt = cloneValue(snapshot?.resultAutoFinalizeAt);
+    match.innings1 = {
+      team: cloneValue(snapshot?.innings1?.team || ""),
+      score: cloneValue(snapshot?.innings1?.score || 0),
+      history: cloneValue(snapshot?.innings1?.history || []),
+    };
+    match.innings2 = {
+      team: cloneValue(snapshot?.innings2?.team || ""),
+      score: cloneValue(snapshot?.innings2?.score || 0),
+      history: [],
+    };
+    match.balls = cloneValue(snapshot?.balls || []);
+    match.lastLiveEvent = cloneValue(snapshot?.lastLiveEvent);
+    match.lastEventType = cloneValue(snapshot?.lastEventType);
+    match.lastEventText = cloneValue(snapshot?.lastEventText);
+
+    for (const ball of match.balls) {
+      addBallToHistory(match, ball);
+    }
+    return;
+  }
+
   for (const key of MUTABLE_STATE_KEYS) {
     match[key] = cloneValue(snapshot?.[key]);
   }
 }
 
 export function createMatchUndoSnapshot(matchDocument) {
-  return getSnapshot(toPlainMatch(matchDocument));
+  return getSnapshot(matchDocument);
 }
 
 export function restoreMatchUndoSnapshot(matchDocument, snapshot) {

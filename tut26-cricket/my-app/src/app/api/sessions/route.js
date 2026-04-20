@@ -11,11 +11,11 @@ import Session from "../../../models/Session.js";
 import { jsonError, jsonRateLimit } from "../../lib/api-response";
 import { writeAuditLog } from "../../lib/audit-log";
 import { connectDB } from "../../lib/db";
-import { loadSessionsIndexPageData } from "../../lib/server-data";
 import { serializePublicSession } from "../../lib/public-data";
 import { getRequestMeta } from "../../lib/request-meta";
 import { enforceRateLimit } from "../../lib/rate-limit";
 import { parseJsonRequest } from "../../lib/request-security";
+import { loadSessionsIndexPageData } from "../../lib/sessions-index-data";
 import { createDraftToken, createDraftTokenHash } from "../../lib/session-draft";
 import { sessionCreateSchema } from "../../lib/validators";
 

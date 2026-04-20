@@ -17,11 +17,9 @@ import {
 } from "../../../lib/site-metadata";
 import { loadSessionViewData } from "../../../lib/server-data";
 import { notFound, redirect } from "next/navigation";
-import { cache } from "react";
 
 export const dynamic = "force-dynamic";
 const SHARE_IMAGE_SIZE = { width: 1200, height: 630 };
-const loadSessionViewDataCached = cache(loadSessionViewData);
 
 function buildUnavailableMetadata(id) {
   return {
@@ -67,7 +65,7 @@ export async function generateMetadata({ params }) {
   let initialData = null;
 
   try {
-    initialData = await loadSessionViewDataCached(id);
+    initialData = await loadSessionViewData(id);
   } catch {
     return buildUnavailableMetadata(id);
   }
@@ -134,7 +132,7 @@ export default async function ViewSessionPage({ params }) {
   let initialData = null;
 
   try {
-    initialData = await loadSessionViewDataCached(id);
+    initialData = await loadSessionViewData(id);
   } catch {
     return <SessionViewUnavailableState />;
   }

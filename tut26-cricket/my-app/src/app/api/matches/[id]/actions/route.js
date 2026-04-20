@@ -8,6 +8,7 @@
  */
 
 import { cookies } from "next/headers";
+import { Types } from "mongoose";
 import { jsonError, jsonRateLimit } from "../../../../lib/api-response";
 import { writeAuditLog } from "../../../../lib/audit-log";
 import { connectDB } from "../../../../lib/db";
@@ -35,7 +36,7 @@ import { parseJsonRequest } from "../../../../lib/request-security";
 import { hydrateLegacyTossState } from "../../../../lib/match-toss";
 import { createUndoLiveEvent } from "../../../../lib/live-announcements";
 import { matchActionSchema } from "../../../../lib/validators";
-import { invalidateSessionsDataCache } from "../../../../lib/server-data";
+import { invalidateSessionsDataCache } from "../../../../lib/server-data-helpers";
 import Match from "../../../../../models/Match";
 import MatchUndoEntry from "../../../../../models/MatchUndoEntry";
 import Session from "../../../../../models/Session";
@@ -66,6 +67,43 @@ const MUTABLE_ACTION_KEYS = [
   "processedActionIds",
   "actionHistory",
 ];
+const UNDO_MATCH_FIELDS =
+  "_id sessionId adminAccessVersion teamA teamB teamAName teamBName overs tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageUploadedAt matchImageUploadedBy announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText recentActionIds undoCount undoSequence processedActionIds createdAt updatedAt";
+const UNDO_MATCH_PROJECTION = String(UNDO_MATCH_FIELDS)
+  .split(/\s+/)
+  .filter(Boolean)
+  .reduce((projection, field) => {
+    projection[field] = 1;
+    return projection;
+  }, {});
+
+function buildHotSessionMirrorUpdate(match) {
+  const resultText = String(match?.result || "").trim();
+  const pendingResultText = String(match?.pendingResult || "").trim();
+
+  if (resultText || pendingResultText) {
+    return buildSessionMirrorUpdate(match);
+  }
+
+  return {
+    teamA: Array.isArray(match?.teamA) ? match.teamA : [],
+    teamB: Array.isArray(match?.teamB) ? match.teamB : [],
+    teamAName: match?.teamAName || "",
+    teamBName: match?.teamBName || "",
+    overs: match?.overs ?? null,
+    tossWinner: match?.tossWinner || "",
+    tossDecision: match?.tossDecision || "",
+    score: Number(match?.score || 0),
+    outs: Number(match?.outs || 0),
+    innings: match?.innings || "",
+    result: "",
+    pendingResult: "",
+    lastEventType: match?.lastEventType || "",
+    lastEventText: match?.lastEventText || "",
+    adminAccessVersion: Number(match?.adminAccessVersion || 1),
+    isLive: Boolean(match?.isOngoing),
+  };
+}
 
 function isMatchCompleted(match) {
   return isFinalizedMatchComplete(match);
@@ -90,7 +128,17 @@ export async function POST(req, { params }) {
     }
 
     await connectDB();
-    const match = await Match.findById(id);
+    const shouldUseFastUndoPath = parsedRequest.value.type === "undo_last";
+    if (!Types.ObjectId.isValid(id)) {
+      return jsonError("Match not found.", 404);
+    }
+
+    const match = shouldUseFastUndoPath
+      ? await Match.collection.findOne(
+          { _id: new Types.ObjectId(id) },
+          { projection: UNDO_MATCH_PROJECTION },
+        )
+      : await Match.findById(id);
     if (!match) {
       return jsonError("Match not found.", 404);
     }
@@ -128,20 +176,13 @@ export async function POST(req, { params }) {
       return jsonError("This match is complete. Open the result page instead.", 409);
     }
 
-    const fallbackSession = finalizedMatch.sessionId
-      ? await Session.findById(finalizedMatch.sessionId).select(
-          FALLBACK_SESSION_FIELDS
-        )
-      : null;
-
-    if (hydrateLegacyTossState(finalizedMatch, fallbackSession)) {
-      await finalizedMatch.save();
-      await Session.findByIdAndUpdate(finalizedMatch.sessionId, {
-        $set: buildSessionMirrorUpdate(finalizedMatch),
-      });
-    }
-
     if (isProcessedAction(finalizedMatch, parsedRequest.value.actionId)) {
+      const fallbackSession = finalizedMatch.sessionId
+        ? await Session.findById(finalizedMatch.sessionId).select(
+            FALLBACK_SESSION_FIELDS
+          )
+        : null;
+
       return Response.json(
         {
           match: serializePublicMatch(finalizedMatch, fallbackSession),
@@ -201,25 +242,48 @@ export async function POST(req, { params }) {
           undoSequence: Math.max(0, Number(finalizedMatch.undoSequence || 0)),
         };
 
-        const updatedMatch = await Match.findByIdAndUpdate(
-          id,
-          { $set: updatePayload },
-          { new: true, runValidators: true },
+        const updatedAt = new Date();
+        const undoUpdateResult = await Match.collection.updateOne(
+          { _id: finalizedMatch._id },
+          {
+            $set: {
+              ...updatePayload,
+              updatedAt,
+            },
+          },
         );
-        if (!updatedMatch) {
+        if (!undoUpdateResult?.matchedCount) {
           return jsonError("Match not found.", 404);
         }
 
-        await MatchUndoEntry.findByIdAndDelete(latestUndoEntry._id);
+        const updatedMatch = {
+          ...restoredMatch,
+          ...updatePayload,
+          updatedAt,
+        };
 
-        await Session.findByIdAndUpdate(updatedMatch.sessionId, {
-          $set: buildSessionMirrorUpdate(updatedMatch),
-        });
+        await MatchUndoEntry.collection.deleteOne({ _id: latestUndoEntry._id });
+
         invalidateSessionsDataCache();
         publishMatchUpdate(updatedMatch._id);
-        publishSessionUpdate(updatedMatch.sessionId);
 
-        await writeAuditLog({
+        void Session.findByIdAndUpdate(
+          updatedMatch.sessionId,
+          {
+            $set: buildHotSessionMirrorUpdate(updatedMatch),
+          },
+          {
+            timestamps: false,
+          },
+        )
+          .then(() => {
+            publishSessionUpdate(updatedMatch.sessionId);
+          })
+          .catch((error) => {
+            console.error("Could not update session undo mirror:", error);
+          });
+
+        void writeAuditLog({
           action: parsedRequest.value.type,
           targetType: "match",
           targetId: id,
@@ -240,6 +304,19 @@ export async function POST(req, { params }) {
           },
         );
       }
+    }
+
+    const fallbackSession = finalizedMatch.sessionId
+      ? await Session.findById(finalizedMatch.sessionId).select(
+          FALLBACK_SESSION_FIELDS
+        )
+      : null;
+
+    if (hydrateLegacyTossState(finalizedMatch, fallbackSession)) {
+      await finalizedMatch.save();
+      await Session.findByIdAndUpdate(finalizedMatch.sessionId, {
+        $set: buildSessionMirrorUpdate(finalizedMatch),
+      });
     }
 
     const nextState = applyMatchAction(finalizedMatch, parsedRequest.value);
@@ -317,6 +394,7 @@ export async function POST(req, { params }) {
       return jsonError(error.message, error.status);
     }
 
+    console.error("Match action update failed:", error);
     return jsonError("Could not update the match.", 500);
   }
 }

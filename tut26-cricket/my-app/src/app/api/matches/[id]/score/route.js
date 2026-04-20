@@ -8,11 +8,13 @@
  */
 
 import { cookies } from "next/headers";
+import { Types } from "mongoose";
 import { jsonError } from "../../../../lib/api-response";
 import { writeAuditLog } from "../../../../lib/audit-log";
 import { connectDB } from "../../../../lib/db";
 import {
   applyMatchAction,
+  buildSessionMirrorUpdate,
   buildRecentActionIds,
   createMatchUndoSnapshot,
   getMatchUndoCount,
@@ -31,51 +33,146 @@ import {
 } from "../../../../lib/pending-match-result";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { parseJsonRequest } from "../../../../lib/request-security";
-import { invalidateSessionsDataCache } from "../../../../lib/server-data";
+import { invalidateSessionsDataCache } from "../../../../lib/server-data-helpers";
 import { matchScoreSchema } from "../../../../lib/validators";
 import Match from "../../../../../models/Match";
 import MatchUndoEntry from "../../../../../models/MatchUndoEntry";
 import Session from "../../../../../models/Session";
 
-const SCORE_MUTABLE_KEYS = [
-  "score",
-  "outs",
-  "isOngoing",
-  "innings",
-  "result",
-  "pendingResult",
-  "pendingResultAt",
-  "resultAutoFinalizeAt",
-  "innings1",
-  "innings2",
-  "balls",
-  "lastLiveEvent",
-  "lastEventType",
-  "lastEventText",
-];
+const SCORE_MATCH_FIELDS =
+  "_id sessionId adminAccessVersion teamA teamB teamAName teamBName overs tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageUploadedAt matchImageUploadedBy announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText recentActionIds undoCount undoSequence processedActionIds createdAt updatedAt";
+const SCORE_MATCH_PROJECTION = String(SCORE_MATCH_FIELDS)
+  .split(/\s+/)
+  .filter(Boolean)
+  .reduce((projection, field) => {
+    projection[field] = 1;
+    return projection;
+  }, {});
 
-function buildScoreUpdatePayload(nextState, currentMatch, actionId) {
-  const updatePayload = {};
+function buildHotSessionMirrorUpdate(match) {
+  const resultText = String(match?.result || "").trim();
+  const pendingResultText = String(match?.pendingResult || "").trim();
 
-  for (const key of SCORE_MUTABLE_KEYS) {
-    updatePayload[key] = nextState[key];
+  if (resultText || pendingResultText) {
+    return buildSessionMirrorUpdate(match);
   }
 
-  updatePayload.recentActionIds = buildRecentActionIds(
+  return {
+    teamA: Array.isArray(match?.teamA) ? match.teamA : [],
+    teamB: Array.isArray(match?.teamB) ? match.teamB : [],
+    teamAName: match?.teamAName || "",
+    teamBName: match?.teamBName || "",
+    overs: match?.overs ?? null,
+    tossWinner: match?.tossWinner || "",
+    tossDecision: match?.tossDecision || "",
+    score: Number(match?.score || 0),
+    outs: Number(match?.outs || 0),
+    innings: match?.innings || "",
+    result: "",
+    pendingResult: "",
+    lastEventType: match?.lastEventType || "",
+    lastEventText: match?.lastEventText || "",
+    adminAccessVersion: Number(match?.adminAccessVersion || 1),
+    isLive: Boolean(match?.isOngoing),
+  };
+}
+
+function buildScoreWriteOperation(nextState, currentMatch, actionId) {
+  const activeInningsKey = currentMatch?.innings === "second" ? "innings2" : "innings1";
+  const inactiveInningsKey = activeInningsKey === "innings2" ? "innings1" : "innings2";
+  const currentHistory = Array.isArray(currentMatch?.[activeInningsKey]?.history)
+    ? currentMatch[activeInningsKey].history
+    : [];
+  const nextHistory = Array.isArray(nextState?.[activeInningsKey]?.history)
+    ? nextState[activeInningsKey].history
+    : [];
+  const nextBall = Array.isArray(nextState?.balls) ? nextState.balls.at(-1) : null;
+  const recentActionIds = buildRecentActionIds(
     currentMatch?.recentActionIds || currentMatch?.processedActionIds || [],
     actionId,
   );
-  updatePayload.processedActionIds = buildRecentActionIds(
+  const processedActionIds = buildRecentActionIds(
     currentMatch?.processedActionIds || currentMatch?.recentActionIds || [],
     actionId,
   );
-  updatePayload.undoCount = getMatchUndoCount(currentMatch) + 1;
-  updatePayload.undoSequence = Math.max(
-    0,
-    Number(currentMatch?.undoSequence || 0),
-  ) + 1;
+  const undoCount = getMatchUndoCount(currentMatch) + 1;
+  const undoSequence = Math.max(0, Number(currentMatch?.undoSequence || 0)) + 1;
+  const updatedAt = new Date();
+  const $set = {
+    score: nextState?.score ?? 0,
+    outs: nextState?.outs ?? 0,
+    isOngoing: Boolean(nextState?.isOngoing),
+    innings: nextState?.innings || "first",
+    result: nextState?.result || "",
+    pendingResult: nextState?.pendingResult || "",
+    pendingResultAt: nextState?.pendingResultAt || null,
+    resultAutoFinalizeAt: nextState?.resultAutoFinalizeAt || null,
+    lastLiveEvent: nextState?.lastLiveEvent || null,
+    lastEventType: nextState?.lastEventType || "",
+    lastEventText: nextState?.lastEventText || "",
+    [`${activeInningsKey}.team`]: nextState?.[activeInningsKey]?.team || "",
+    [`${activeInningsKey}.score`]: Number(nextState?.[activeInningsKey]?.score || 0),
+    [`${inactiveInningsKey}.team`]: nextState?.[inactiveInningsKey]?.team || "",
+    [`${inactiveInningsKey}.score`]: Number(nextState?.[inactiveInningsKey]?.score || 0),
+    updatedAt,
+  };
+  const $push = {
+    recentActionIds: { $each: [actionId], $slice: -256 },
+    processedActionIds: { $each: [actionId], $slice: -256 },
+  };
+  const $inc = {
+    undoCount: 1,
+    undoSequence: 1,
+  };
 
-  return updatePayload;
+  let useFastHistoryWrite = Boolean(nextBall);
+  if (useFastHistoryWrite) {
+    if (nextHistory.length === currentHistory.length && nextHistory.length > 0) {
+      const overIndex = nextHistory.length - 1;
+      $push[`${activeInningsKey}.history.${overIndex}.balls`] = nextBall;
+    } else if (nextHistory.length === currentHistory.length + 1 && nextHistory.length > 0) {
+      $push[`${activeInningsKey}.history`] = nextHistory.at(-1);
+    } else {
+      useFastHistoryWrite = false;
+    }
+  }
+
+  if (useFastHistoryWrite) {
+    $push.balls = nextBall;
+  } else {
+    delete $set[`${activeInningsKey}.team`];
+    delete $set[`${activeInningsKey}.score`];
+    delete $set[`${inactiveInningsKey}.team`];
+    delete $set[`${inactiveInningsKey}.score`];
+    $set[activeInningsKey] = nextState?.[activeInningsKey] || {
+      team: "",
+      score: 0,
+      history: [],
+    };
+    $set[inactiveInningsKey] = nextState?.[inactiveInningsKey] || {
+      team: "",
+      score: 0,
+      history: [],
+    };
+    $set.balls = Array.isArray(nextState?.balls) ? nextState.balls : [];
+  }
+
+  return {
+    writeOperation: {
+      $set,
+      $push,
+      $inc,
+    },
+    updatedMatch: {
+      ...currentMatch,
+      ...nextState,
+      recentActionIds,
+      processedActionIds,
+      undoCount,
+      undoSequence,
+      updatedAt,
+    },
+  };
 }
 
 async function hasMatchAccess(matchId, accessVersion) {
@@ -101,7 +198,14 @@ export async function POST(req, { params }) {
     }
 
     await connectDB();
-    const match = await Match.findById(id);
+    if (!Types.ObjectId.isValid(id)) {
+      return jsonError("Match not found.", 404);
+    }
+
+    const match = await Match.collection.findOne(
+      { _id: new Types.ObjectId(id) },
+      { projection: SCORE_MATCH_PROJECTION },
+    );
     if (!match) {
       return jsonError("Match not found.", 404);
     }
@@ -148,49 +252,46 @@ export async function POST(req, { params }) {
       ...parsedRequest.value,
       type: "score_ball",
     });
-    const updatePayload = buildScoreUpdatePayload(
+    const { writeOperation, updatedMatch } = buildScoreWriteOperation(
       nextState,
       finalizedMatch,
       parsedRequest.value.actionId,
     );
 
-    let createdUndoEntry = null;
+    let createdUndoEntryId = null;
     try {
-      createdUndoEntry = await MatchUndoEntry.create({
+      const createdUndoEntry = await MatchUndoEntry.collection.insertOne({
         matchId: finalizedMatch._id,
-        sequence: updatePayload.undoSequence,
+        sequence: updatedMatch.undoSequence,
         actionId: parsedRequest.value.actionId,
         type: "score_ball",
         snapshot: createMatchUndoSnapshot(finalizedMatch),
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
+      createdUndoEntryId = createdUndoEntry?.insertedId || null;
     } catch (error) {
       console.error("Could not create score undo snapshot:", error);
       return jsonError("Could not update the match.", 500);
     }
 
-    const updatedMatch = await Match.findByIdAndUpdate(
-      id,
-      { $set: updatePayload },
-      { new: true, runValidators: true },
+    const scoreUpdateResult = await Match.collection.updateOne(
+      { _id: finalizedMatch._id },
+      writeOperation,
     );
-    if (!updatedMatch) {
-      if (createdUndoEntry?._id) {
-        void MatchUndoEntry.findByIdAndDelete(createdUndoEntry._id).catch(() => {});
+    if (!scoreUpdateResult?.matchedCount) {
+      if (createdUndoEntryId) {
+        void MatchUndoEntry.collection.deleteOne({ _id: createdUndoEntryId }).catch(() => {});
       }
       return jsonError("Match not found.", 404);
     }
-
     invalidateSessionsDataCache();
     publishMatchUpdate(updatedMatch._id);
 
     void Session.findByIdAndUpdate(
       updatedMatch.sessionId,
       {
-        $set: {
-          isLive: Boolean(updatedMatch.isOngoing),
-          lastEventType: updatedMatch.lastEventType || "",
-          lastEventText: updatedMatch.lastEventText || "",
-        },
+        $set: buildHotSessionMirrorUpdate(updatedMatch),
       },
       {
         timestamps: false,

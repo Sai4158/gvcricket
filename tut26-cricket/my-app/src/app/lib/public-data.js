@@ -156,7 +156,6 @@ export function serializeLiveMatchPatch(matchDocument) {
     innings: match?.innings || "first",
     innings1: buildUmpireInnings(match, "innings1", false),
     innings2: buildUmpireInnings(match, "innings2", false),
-    balls: Array.isArray(match?.balls) ? match.balls : [],
     result: match?.result || "",
     pendingResult: match?.pendingResult || "",
     pendingResultAt: match?.pendingResultAt || null,

@@ -16,6 +16,9 @@ import Session from "../../src/models/Session.js";
 import { applyStoredMatchImages, createStoredMatchImageEntry } from "../../src/app/lib/match-image-gallery.js";
 import { buildSessionMirrorUpdate } from "../../src/app/lib/match-engine.js";
 
+const MatchModel = Match?.default || Match;
+const SessionModel = Session?.default || Session;
+
 export const DEFAULT_BASE_URL =
   process.env.UMPIRE_STRESS_BASE_URL ||
   process.env.TEST_BASE_URL ||
@@ -94,8 +97,10 @@ export class CookieJar {
     return [...this.store.entries()].map(([name, value]) => ({
       name,
       value,
-      url: `${target.protocol}//${target.host}`,
+      domain: target.hostname,
       path: "/",
+      secure: target.protocol === "https:",
+      httpOnly: false,
       sameSite: "Lax" as const,
     }));
   }
@@ -463,9 +468,9 @@ export async function seedMatchImages(matchId: string, count = 12) {
     throw new Error("MONGODB_URI is required to seed match images.");
   }
 
-  await mongoose.connect(process.env.MONGODB_URI);
+    await mongoose.connect(process.env.MONGODB_URI);
   try {
-    const match = await Match.findById(matchId);
+    const match = await MatchModel.findById(matchId);
     if (!match) {
       throw new Error(`Match ${matchId} not found while seeding images.`);
     }
@@ -485,7 +490,7 @@ export async function seedMatchImages(matchId: string, count = 12) {
     match.mediaUpdatedAt = new Date();
     await Promise.all([
       match.save(),
-      Session.findByIdAndUpdate(match.sessionId, {
+      SessionModel.findByIdAndUpdate(match.sessionId, {
         $set: buildSessionMirrorUpdate(match),
       }, {
         timestamps: false,

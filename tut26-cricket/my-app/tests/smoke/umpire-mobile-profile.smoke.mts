@@ -57,57 +57,80 @@ async function configureMobileThrottle(page) {
 
 async function readVisibleScore(page) {
   const scoreText = await page.evaluate(() => {
-    const match = document.body.innerText.match(/(\d+)\s*\/\s*(\d+)/);
-    return match ? `${match[1]}/${match[2]}` : "";
+    const matches = [...document.body.innerText.matchAll(/(\d+)\s*\/\s*(\d+)/g)];
+    return matches.length
+      ? matches.map((match) => `${match[1]}/${match[2]}`).join("|")
+      : "";
   });
   return String(scoreText || "");
 }
 
-async function waitForScoreChange(page, previousScore) {
+async function readActiveOverSignature(page) {
+  const signature = await page.evaluate(() => {
+    const balls = [...document.querySelectorAll('div[class*="h-10 w-10 shrink-0 items-center justify-center rounded-full"]')]
+      .map((node) => (node.textContent || "").trim())
+      .filter(Boolean);
+    return balls.join("|");
+  });
+
+  return String(signature || "");
+}
+
+async function waitForScoreChange(page, previousSignature) {
   await page.waitForFunction(
     (prev) => {
-      const match = document.body.innerText.match(/(\d+)\s*\/\s*(\d+)/);
-      if (!match) {
-        return false;
-      }
-      return `${match[1]}/${match[2]}` !== prev;
+      const balls = [...document.querySelectorAll('div[class*="h-10 w-10 shrink-0 items-center justify-center rounded-full"]')]
+        .map((node) => (node.textContent || "").trim())
+        .filter(Boolean)
+        .join("|");
+      return balls !== prev;
     },
-    previousScore,
+    previousSignature,
     { timeout: 6000 },
   );
 }
 
 async function measureScoreTap(page, matchId: string, buttonName: string) {
-  const previousScore = await readVisibleScore(page);
+  const previousSignature = await readActiveOverSignature(page);
   const responsePromise = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
       response.url().includes(`/api/matches/${matchId}/score`),
-  );
+  ).catch((error) => ({ __error: error }));
 
   const startedAt = performance.now();
-  await page.getByRole("button", { name: buttonName }).first().click();
-  await waitForScoreChange(page, previousScore);
+  const button = page.locator(`button:has-text("${buttonName}")`).last();
+  await button.scrollIntoViewIfNeeded();
+  await button.evaluate((node) => node.click());
+  await waitForScoreChange(page, previousSignature);
   const visibleMs = performance.now() - startedAt;
-  await responsePromise;
+  const response = await responsePromise;
+  if (response?.__error) {
+    throw response.__error;
+  }
   const networkMs = performance.now() - startedAt;
 
   return { visibleMs, networkMs };
 }
 
 async function measureUndoTap(page, matchId: string) {
-  const previousScore = await readVisibleScore(page);
+  const previousSignature = await readActiveOverSignature(page);
   const responsePromise = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
       response.url().includes(`/api/matches/${matchId}/actions`),
-  );
+  ).catch((error) => ({ __error: error }));
 
   const startedAt = performance.now();
-  await page.getByRole("button", { name: /Undo/i }).first().click();
-  await waitForScoreChange(page, previousScore);
+  const button = page.locator('button:has-text("Undo")').last();
+  await button.scrollIntoViewIfNeeded();
+  await button.evaluate((node) => node.click());
+  await waitForScoreChange(page, previousSignature);
   const visibleMs = performance.now() - startedAt;
-  await responsePromise;
+  const response = await responsePromise;
+  if (response?.__error) {
+    throw response.__error;
+  }
   const networkMs = performance.now() - startedAt;
 
   return { visibleMs, networkMs };
@@ -148,7 +171,7 @@ async function runBrowserScenario(
     await page.goto(`${environment.baseUrl}/match/${setup.matchId}`, {
       waitUntil: "domcontentloaded",
     });
-    await page.getByRole("button", { name: "1" }).first().waitFor({ state: "visible", timeout: 8000 });
+    await page.locator('button:has-text("1")').last().waitFor({ state: "visible", timeout: 8000 });
     const shellVisibleMs = performance.now() - navStartedAt;
 
     const scoreVisibleSamples: number[] = [];
@@ -160,13 +183,16 @@ async function runBrowserScenario(
       void uploadTinyImage(environment.baseUrl, setup.matchId, setup.umpireJar);
     }
 
-    for (const label of ["1", "2", "4", "6", "Dot", "1"]) {
+    for (const label of ["1", "2", "4", "6", "Dot", "3"]) {
       const timing = await measureScoreTap(page, setup.matchId, label);
       scoreVisibleSamples.push(timing.visibleMs);
       scoreNetworkSamples.push(timing.networkMs);
     }
 
     for (let index = 0; index < 3; index += 1) {
+      if (index > 0) {
+        await page.waitForTimeout(1100);
+      }
       const timing = await measureUndoTap(page, setup.matchId);
       undoVisibleSamples.push(timing.visibleMs);
       undoNetworkSamples.push(timing.networkMs);
