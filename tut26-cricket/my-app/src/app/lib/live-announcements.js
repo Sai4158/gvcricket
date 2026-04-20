@@ -236,6 +236,22 @@ function getActiveHistory(match) {
   return match?.[getActiveInningsKey(match)]?.history ?? [];
 }
 
+function getCurrentOverBalls(match) {
+  if (Array.isArray(match?.activeOverBalls) && match.activeOverBalls.length) {
+    return match.activeOverBalls;
+  }
+
+  const activeHistory = getActiveHistory(match);
+  const activeOver = activeHistory.at(-1);
+  return Array.isArray(activeOver?.balls) ? activeOver.balls : [];
+}
+
+function countLegalBallsInBalls(balls = []) {
+  return (Array.isArray(balls) ? balls : []).filter(
+    (ball) => ball?.extraType !== "wide" && ball?.extraType !== "noball",
+  ).length;
+}
+
 // Counts completed overs in the active innings.
 function getCompletedOvers(match) {
   return Math.floor(countLegalBalls(getActiveHistory(match)) / 6);
@@ -243,6 +259,11 @@ function getCompletedOvers(match) {
 
 // Counts completed legal balls in the active innings.
 function getCompletedLegalBalls(match) {
+  const compactLegalBallCount = Number(match?.legalBallCount);
+  if (Number.isFinite(compactLegalBallCount) && compactLegalBallCount >= 0) {
+    return compactLegalBallCount;
+  }
+
   return countLegalBalls(getActiveHistory(match));
 }
 
@@ -253,16 +274,21 @@ function getOversLeft(match) {
 
 // Returns the current legal-ball number within the over.
 function getBallNumberInOver(match) {
-  const legalBalls = countLegalBalls(getActiveHistory(match));
+  const currentOverLegalBalls = countLegalBallsInBalls(
+    getCurrentOverBalls(match),
+  );
+  if (currentOverLegalBalls > 0) {
+    return currentOverLegalBalls;
+  }
+
+  const legalBalls = getCompletedLegalBalls(match);
   const ballsIntoOver = legalBalls % 6;
   return ballsIntoOver === 0 ? 6 : ballsIntoOver;
 }
 
 // Counts wickets that fell in the current over.
 function getWicketsInCurrentOver(match) {
-  const history = getActiveHistory(match);
-  const over = history.at(-1);
-  return over?.balls?.filter((ball) => ball?.isOut).length || 0;
+  return getCurrentOverBalls(match).filter((ball) => ball?.isOut).length || 0;
 }
 
 // Calculates how many legal balls remain in the innings.
@@ -324,7 +350,13 @@ function getBallsLeftInCurrentOver(match) {
     return 0;
   }
 
-  const ballsIntoCurrentOver = getCompletedLegalBalls(match) % 6;
+  const currentOverLegalBalls = countLegalBallsInBalls(
+    getCurrentOverBalls(match),
+  );
+  const ballsIntoCurrentOver =
+    currentOverLegalBalls > 0
+      ? currentOverLegalBalls % 6
+      : getCompletedLegalBalls(match) % 6;
   const ballsLeftInCurrentOver =
     ballsIntoCurrentOver === 0 ? 6 : 6 - ballsIntoCurrentOver;
 
@@ -480,7 +512,7 @@ function buildBallEventLine(ball) {
 
 // Spoken line used when the umpire undoes the previous ball.
 function buildUndoAnnouncementLine() {
-  return "Umpire has removed the score for that ball. Umpire will redo this ball.";
+  return "Umpire has removed the score for this ball and will redo it.";
 }
 
 // Adds simple progress reminders at selected ball numbers.
@@ -490,10 +522,10 @@ function buildProgressReminder(event, match) {
   }
 
   const ballNumber = getBallNumberInOver(match);
-  if (ballNumber === 2) return "Ball 2 completed.";
-  if (ballNumber === 3) return "3 balls left.";
-  if (ballNumber === 4) return "Ball 4 completed.";
-  if (ballNumber === 5) return "One ball left.";
+  if (ballNumber === 1) return "Ball 2 completed.";
+  if (ballNumber === 2) return "3 balls left.";
+  if (ballNumber === 3) return "Ball 4 completed.";
+  if (ballNumber === 4) return "One ball left.";
   return "";
 }
 
