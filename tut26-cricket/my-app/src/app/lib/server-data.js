@@ -566,6 +566,9 @@ export async function loadSessionsIndexPageData(options = {}) {
         match: getPublicId(resolvedSession.match) || null,
         teamAName: resolvedSession.teamAName || "",
         teamBName: resolvedSession.teamBName || "",
+        matchImages: Array.isArray(resolvedSession.matchImages)
+          ? resolvedSession.matchImages.slice(0, 6)
+          : [],
         matchImageUrl: resolvedSession.matchImageUrl || "",
         coverImageUrl: resolvedSession.matchImageUrl || "",
         updatedAt: resolvedSession.updatedAt || resolvedSession.createdAt,

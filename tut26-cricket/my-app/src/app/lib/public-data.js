@@ -368,6 +368,10 @@ export function serializeSessionCard(sessionDocument) {
       ? sessionDocument.toObject()
       : sessionDocument;
 
+  const publicImages = getPublicMatchImages(session, {
+    matchId: String(session.match?._id || session.match || ""),
+  }).slice(0, 6);
+
   return {
     _id: String(session._id),
     name: session.name || "",
@@ -383,6 +387,7 @@ export function serializeSessionCard(sessionDocument) {
     tossReady: Boolean(session.tossReady),
     coverImageUrl: session.coverImageUrl || session.matchImageUrl || "",
     matchImageUrl: session.matchImageUrl || "",
+    matchImages: publicImages,
     imageCount: Math.max(0, Number(session.imageCount || 0)),
     winningTeamName: session.winningTeamName || "",
     winningScore: Number(session.winningScore || 0),

@@ -127,6 +127,7 @@ function SessionCard({
     0,
     Number(session.imageCount || matchImages.length || (cardImage ? 1 : 0))
   );
+  const shouldRenderGallery = shouldLoadGallery || baseGalleryImages.length > 1;
   const resolvedGalleryImages = galleryImages.length
     ? galleryImages
     : baseGalleryImages;
@@ -443,14 +444,15 @@ function SessionCard({
               onPointerLeave={(event) => event.stopPropagation()}
               onPointerCancel={(event) => event.stopPropagation()}
             >
-              {shouldLoadGallery ? (
+              {shouldRenderGallery ? (
                 <MatchImageCarousel
                   images={resolvedGalleryImages}
                   alt={`${session.name || "Session"} match image`}
                   compact
                   className="relative"
-                  autoPlayDelayMs={1000}
-                  autoPlayInitialDelayMs={1000}
+                  autoPlay={resolvedGalleryImages.length > 1}
+                  autoPlayDelayMs={2400}
+                  autoPlayInitialDelayMs={1600}
                   transitionStyle="slide"
                   imageClassName="object-cover object-center"
                   fallbackClassName="object-cover object-center"

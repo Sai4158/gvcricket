@@ -136,7 +136,7 @@ test("[security] spectator commentary handles last-ball warnings and over summar
   assert.equal(fullLine, "Umpire has given 1 run.");
 
   const scoreLine = buildSpectatorScoreAnnouncement(event, after);
-  assert.equal(scoreLine, "Score is 5 for 2. One ball to finish the over.");
+  assert.equal(scoreLine, "Score is 5 for 2. One ball left.");
 
   const overLine = buildSpectatorOverCompleteAnnouncement({
     ...after,
@@ -294,12 +294,12 @@ test("[security] spectator commentary gives progress reminders and clean undo li
         ],
       },
     }),
-    "Score is 2 for 0. This is ball 2."
+    "Score is 2 for 0. Ball 2 completed."
   );
 
   assert.equal(
     buildSpectatorScoreAnnouncement(ballFourEvent, match),
-    "Score is 4 for 0. This is ball 4."
+    "Score is 4 for 0. Ball 4 completed."
   );
   assert.equal(
     buildSpectatorAnnouncement(undoEvent, match, "full"),

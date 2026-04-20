@@ -129,6 +129,7 @@ function getSessionsIndexSort(sortValue = DEFAULT_SESSIONS_SORT) {
 function toSessionCard(session) {
   const imageCount = Math.max(
     Number(session?.sessionImageCount || 0),
+    Array.isArray(session?.matchImages) ? session.matchImages.length : 0,
     session?.matchImageUrl ? 1 : 0,
   );
 
@@ -147,6 +148,7 @@ function toSessionCard(session) {
     tossReady: Boolean(session?.tossWinner && session?.tossDecision),
     coverImageUrl: session?.matchImageUrl || "",
     matchImageUrl: session?.matchImageUrl || "",
+    matchImages: Array.isArray(session?.matchImages) ? session.matchImages : [],
     imageCount,
     winningTeamName: session?.winningTeamName || "",
     winningScore: Number(session?.winningScore || 0),
@@ -223,6 +225,9 @@ export async function loadSessionsIndexPageData(options = {}) {
               winningTeamName: 1,
               winningScore: 1,
               winningWickets: 1,
+              matchImages: {
+                $slice: [{ $ifNull: ["$matchImages", []] }, 6],
+              },
               teamAName: 1,
               teamBName: 1,
               sessionImageCount: 1,

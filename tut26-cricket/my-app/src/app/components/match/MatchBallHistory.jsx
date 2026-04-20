@@ -30,7 +30,7 @@ export function buildBallSlotLabels(balls = []) {
 
   return (Array.isArray(balls) ? balls : []).map((ball) => {
     if (!isCountableBall(ball)) {
-      return "•";
+      return ".";
     }
 
     legalBallCount += 1;
@@ -81,29 +81,30 @@ export const Ball = memo(function Ball({ ball, ballNumber }) {
 
 export function BallTracker({
   history = null,
-  activeOverBalls = [],
-  activeOverNumber = 1,
+  activeOverBalls = null,
+  activeOverNumber = null,
 }) {
   const trackerRef = useRef(null);
   const fallbackOver = useMemo(
-    () =>
-      Array.isArray(history) && history.length
-        ? history.at(-1)
-        : { overNumber: activeOverNumber, balls: activeOverBalls },
-    [activeOverBalls, activeOverNumber, history]
+    () => (Array.isArray(history) && history.length ? history.at(-1) : null),
+    [history],
   );
+  const resolvedOverNumber = Number.isFinite(Number(activeOverNumber)) &&
+    Number(activeOverNumber) > 0
+      ? Number(activeOverNumber)
+      : Number(fallbackOver?.overNumber || 1);
   const currentBalls = useMemo(
     () =>
-      Array.isArray(activeOverBalls) && activeOverBalls.length
+      Array.isArray(activeOverBalls)
         ? activeOverBalls
         : Array.isArray(fallbackOver?.balls)
           ? fallbackOver.balls
           : [],
-    [activeOverBalls, fallbackOver]
+    [activeOverBalls, fallbackOver],
   );
   const currentBallSlotLabels = useMemo(
     () => buildBallSlotLabels(currentBalls),
-    [currentBalls]
+    [currentBalls],
   );
   const currentBallSignature = useMemo(
     () =>
@@ -114,10 +115,10 @@ export function BallTracker({
             Number(ball?.runs || 0),
             ball?.isOut ? "out" : "in",
             ball?.extraType || "legal",
-          ].join(":")
+          ].join(":"),
         )
         .join("|"),
-    [currentBalls]
+    [currentBalls],
   );
 
   useLayoutEffect(() => {
@@ -139,14 +140,14 @@ export function BallTracker({
     return () => {
       window.cancelAnimationFrame(frameId);
     };
-  }, [activeOverNumber, currentBallSignature, fallbackOver?.overNumber]);
+  }, [resolvedOverNumber, currentBallSignature]);
 
   return (
     <div className="mb-6 rounded-2xl bg-zinc-900/50 p-4 ring-1 ring-white/10">
       <h3
         className={`${matchControlsFont.className} mb-4 text-center font-bold text-white`}
       >
-        Over {Number(activeOverNumber || fallbackOver?.overNumber || 1)}
+        Over {resolvedOverNumber}
       </h3>
       <div
         ref={trackerRef}
@@ -154,15 +155,10 @@ export function BallTracker({
       >
         <div className="ml-auto flex min-h-18 min-w-max items-start gap-4">
           {currentBalls.map((ball, index) => (
-            <div
-              key={getBallKey(
-                index + 1,
-                Number(activeOverNumber || fallbackOver?.overNumber || 1),
-              )}
-            >
+            <div key={getBallKey(index + 1, resolvedOverNumber)}>
               <Ball
                 ball={ball}
-                ballNumber={currentBallSlotLabels[index] || "•"}
+                ballNumber={currentBallSlotLabels[index] || "."}
               />
             </div>
           ))}
@@ -171,5 +167,3 @@ export function BallTracker({
     </div>
   );
 }
-
-

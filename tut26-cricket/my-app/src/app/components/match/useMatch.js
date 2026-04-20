@@ -24,6 +24,12 @@ import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
 
 const ACTION_QUEUE_RETRY_DELAY_MS = 2500;
 
+function countLegalBallsInBalls(balls = []) {
+  return (Array.isArray(balls) ? balls : []).filter(
+    (ball) => ball?.extraType !== "wide" && ball?.extraType !== "noball",
+  ).length;
+}
+
 function wait(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -123,6 +129,43 @@ function normalizeOptimisticMatch(nextMatch) {
     ? nextMatch[activeInningsKey].history
     : [];
   const activeOver = activeHistory.at(-1) || null;
+  const hasCompactActiveOverBalls = Array.isArray(nextMatch?.activeOverBalls);
+  const compactActiveOverBalls = hasCompactActiveOverBalls
+    ? nextMatch.activeOverBalls
+    : [];
+  const compactActiveOverNumber = Number(nextMatch?.activeOverNumber || 1);
+  const derivedActiveOverBalls = Array.isArray(activeOver?.balls)
+    ? activeOver.balls
+    : [];
+  const activeOverBalls = hasCompactActiveOverBalls
+    ? compactActiveOverBalls
+    : derivedActiveOverBalls;
+  const activeOverNumber = Number.isFinite(compactActiveOverNumber) &&
+    compactActiveOverNumber > 0
+      ? compactActiveOverNumber
+      : Number(activeOver?.overNumber || 1);
+  const derivedLegalBallCount = activeHistory.length
+    ? countLegalBalls(activeHistory)
+    : countLegalBallsInBalls(activeOverBalls);
+  const legalBallCount = Number.isFinite(Number(nextMatch?.legalBallCount))
+    ? Math.max(derivedLegalBallCount, Number(nextMatch.legalBallCount || 0))
+    : derivedLegalBallCount;
+  const firstInningsLegalBallCount = Array.isArray(nextMatch?.innings1?.history) &&
+    nextMatch.innings1.history.length
+      ? countLegalBalls(nextMatch.innings1.history)
+      : Number.isFinite(Number(nextMatch?.firstInningsLegalBallCount))
+        ? Number(nextMatch.firstInningsLegalBallCount || 0)
+        : nextMatch?.innings === "first"
+          ? legalBallCount
+          : 0;
+  const secondInningsLegalBallCount = Array.isArray(nextMatch?.innings2?.history) &&
+    nextMatch.innings2.history.length
+      ? countLegalBalls(nextMatch.innings2.history)
+      : Number.isFinite(Number(nextMatch?.secondInningsLegalBallCount))
+        ? Number(nextMatch.secondInningsLegalBallCount || 0)
+        : nextMatch?.innings === "second"
+          ? legalBallCount
+          : 0;
   const historyUndoCount = Array.isArray(nextMatch.actionHistory)
     ? nextMatch.actionHistory.length
     : 0;
@@ -134,11 +177,11 @@ function normalizeOptimisticMatch(nextMatch) {
     recentActionIds: Array.isArray(nextMatch.recentActionIds)
       ? nextMatch.recentActionIds
       : [],
-    legalBallCount: countLegalBalls(activeHistory),
-    activeOverNumber: Number(activeOver?.overNumber || 1),
-    activeOverBalls: Array.isArray(activeOver?.balls) ? activeOver.balls : [],
-    firstInningsLegalBallCount: countLegalBalls(nextMatch?.innings1?.history || []),
-    secondInningsLegalBallCount: countLegalBalls(nextMatch?.innings2?.history || []),
+    legalBallCount,
+    activeOverNumber,
+    activeOverBalls,
+    firstInningsLegalBallCount,
+    secondInningsLegalBallCount,
     historyVersion: nextMatch?.updatedAt || new Date().toISOString(),
     undoCount: Math.max(
       0,
@@ -297,29 +340,15 @@ function updateQueuedActionRetryFlag(
 }
 
 function readStoredActionQueue(matchId) {
-  if (typeof window === "undefined" || !matchId) {
-    return [];
+  if (typeof window !== "undefined" && matchId) {
+    try {
+      window.sessionStorage.removeItem(getActionQueueStorageKey(matchId));
+    } catch {
+      // Ignore storage cleanup failures.
+    }
   }
 
-  try {
-    const rawValue = window.sessionStorage.getItem(
-      getActionQueueStorageKey(matchId)
-    );
-    if (!rawValue) {
-      return [];
-    }
-
-    const parsed = JSON.parse(rawValue);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed
-      .map(normalizeQueuedActionEntry)
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
+  return [];
 }
 
 function writeStoredActionQueue(matchId, entries) {
@@ -328,17 +357,9 @@ function writeStoredActionQueue(matchId, entries) {
   }
 
   try {
-    if (!entries.length) {
-      window.sessionStorage.removeItem(getActionQueueStorageKey(matchId));
-      return;
-    }
-
-    window.sessionStorage.setItem(
-      getActionQueueStorageKey(matchId),
-      JSON.stringify(entries),
-    );
+    window.sessionStorage.removeItem(getActionQueueStorageKey(matchId));
   } catch {
-    // Ignore storage failures and continue with in-memory queueing.
+    // Ignore storage cleanup failures and continue with in-memory queueing.
   }
 }
 

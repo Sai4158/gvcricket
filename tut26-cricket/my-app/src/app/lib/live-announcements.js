@@ -512,7 +512,7 @@ function buildBallEventLine(ball) {
 
 // Spoken line used when the umpire undoes the previous ball.
 function buildUndoAnnouncementLine() {
-  return "Umpire has removed the score for this ball and will redo it.";
+  return "Umpire has removed the score for that ball. Umpire will redo this ball.";
 }
 
 // Adds simple progress reminders at selected ball numbers.
@@ -522,10 +522,10 @@ function buildProgressReminder(event, match) {
   }
 
   const ballNumber = getBallNumberInOver(match);
-  if (ballNumber === 1) return "Ball 2 completed.";
-  if (ballNumber === 2) return "3 balls left.";
-  if (ballNumber === 3) return "Ball 4 completed.";
-  if (ballNumber === 4) return "One ball left.";
+  if (ballNumber === 2) return "Ball 2 completed.";
+  if (ballNumber === 3) return "3 balls left.";
+  if (ballNumber === 4) return "Ball 4 completed.";
+  if (ballNumber === 5) return "One ball left.";
   return "";
 }
 

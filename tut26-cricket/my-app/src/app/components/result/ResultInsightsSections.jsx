@@ -283,9 +283,9 @@ export default function ResultInsightsSections({ match }) {
       <SectionShell title="Over Summary" icon={<FaChartBar />}>
         <div className="grid max-h-[420px] gap-3 overflow-y-auto pr-1 md:grid-cols-2">
           {allOverSummaries.length ? (
-            allOverSummaries.map((over) => (
+            allOverSummaries.map((over, index) => (
               <div
-                key={`${over.inningsLabel}-${over.over}`}
+                key={`${over.inningsLabel}-${over.over}-${index}`}
                 className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
               >
                 <div className="flex items-center justify-between gap-3">
@@ -308,9 +308,9 @@ export default function ResultInsightsSections({ match }) {
       {allWickets.length ? (
         <SectionShell title="Wicket Timeline" icon={<FaBolt />}>
           <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
-            {allWickets.map((wicket) => (
+            {allWickets.map((wicket, index) => (
               <div
-                key={`${wicket.inningsLabel}-${wicket.overBall}`}
+                key={`${wicket.inningsLabel}-${wicket.overBall}-${index}`}
                 className="flex items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
               >
                 <div>
