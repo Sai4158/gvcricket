@@ -16,7 +16,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -83,37 +82,24 @@ export default function RouteFeedbackProvider({ children }) {
   });
   const currentUrlRef = useRef(currentUrl);
   const clearTimerRef = useRef(null);
+  const pendingScrollResetRef = useRef(false);
 
   const forceScrollToTop = useCallback(() => {
     if (typeof window === "undefined") {
-      return () => {};
+      return;
     }
 
-    const applyScrollTop = () => {
-      window.scrollTo({
-        top: 0,
-        left: 0,
-        behavior: "auto",
-      });
-      if (document.documentElement) {
-        document.documentElement.scrollTop = 0;
-      }
-      if (document.body) {
-        document.body.scrollTop = 0;
-      }
-    };
-
-    applyScrollTop();
-    const frameId = window.requestAnimationFrame(() => {
-      applyScrollTop();
-      window.requestAnimationFrame(applyScrollTop);
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: "auto",
     });
-    const timeoutId = window.setTimeout(applyScrollTop, 120);
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      window.clearTimeout(timeoutId);
-    };
+    if (document.documentElement) {
+      document.documentElement.scrollTop = 0;
+    }
+    if (document.body) {
+      document.body.scrollTop = 0;
+    }
   }, []);
 
   const stopNavigation = useCallback(() => {
@@ -127,13 +113,13 @@ export default function RouteFeedbackProvider({ children }) {
   }, []);
 
   const startNavigation = useCallback((label = "Opening...") => {
-    forceScrollToTop();
+    pendingScrollResetRef.current = true;
     setNavigationState({
       active: true,
       label,
       startedAt: Date.now(),
     });
-  }, [forceScrollToTop]);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.history) {
@@ -148,13 +134,15 @@ export default function RouteFeedbackProvider({ children }) {
     };
   }, []);
 
-  useLayoutEffect(() => {
-    return forceScrollToTop();
-  }, [currentUrl, forceScrollToTop]);
-
   useEffect(() => {
     if (currentUrlRef.current !== currentUrl) {
       currentUrlRef.current = currentUrl;
+      if (pendingScrollResetRef.current) {
+        pendingScrollResetRef.current = false;
+        window.requestAnimationFrame(() => {
+          forceScrollToTop();
+        });
+      }
       const elapsed = Date.now() - navigationState.startedAt;
       const delay = navigationState.active ? Math.max(0, 220 - elapsed) : 0;
       if (clearTimerRef.current) {
@@ -175,7 +163,7 @@ export default function RouteFeedbackProvider({ children }) {
     }, 8000);
 
     return () => window.clearTimeout(staleTimer);
-  }, [currentUrl, navigationState.active, navigationState.startedAt, stopNavigation]);
+  }, [currentUrl, forceScrollToTop, navigationState.active, navigationState.startedAt, stopNavigation]);
 
   useEffect(() => {
     return () => {
