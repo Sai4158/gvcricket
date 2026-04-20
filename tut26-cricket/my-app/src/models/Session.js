@@ -51,6 +51,7 @@ const SessionSchema = new mongoose.Schema(
     teamB: { type: [String], default: [] },
     images: { type: [String], default: [] },
     matchImages: { type: [MatchImageEntrySchema], default: [] },
+    sessionImageCount: { type: Number, default: 0 },
     announcer: { type: mongoose.Schema.Types.Mixed, default: {} },
     uiMeta: { type: mongoose.Schema.Types.Mixed, default: {} },
     mediaUpdatedAt: { type: Date, default: null },

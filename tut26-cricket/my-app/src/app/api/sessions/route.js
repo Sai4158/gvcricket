@@ -15,7 +15,10 @@ import { serializePublicSession } from "../../lib/public-data";
 import { getRequestMeta } from "../../lib/request-meta";
 import { enforceRateLimit } from "../../lib/rate-limit";
 import { parseJsonRequest } from "../../lib/request-security";
-import { loadSessionsIndexPageData } from "../../lib/sessions-index-data";
+import {
+  loadSessionsIndexCounts,
+  loadSessionsIndexPageData,
+} from "../../lib/sessions-index-data";
 import { createDraftToken, createDraftTokenHash } from "../../lib/session-draft";
 import { sessionCreateSchema } from "../../lib/validators";
 
@@ -95,6 +98,28 @@ export async function GET(req) {
     const filter = String(requestUrl.searchParams.get("filter") || "").trim();
     const sort = String(requestUrl.searchParams.get("sort") || "").trim();
     const includeCounts = requestUrl.searchParams.get("counts") !== "0";
+    const summary = String(requestUrl.searchParams.get("summary") || "").trim();
+    const bypassCache =
+      requestUrl.searchParams.get("fresh") === "1" ||
+      requestUrl.searchParams.get("t");
+
+    if (summary === "counts") {
+      const counts = await loadSessionsIndexCounts({
+        page,
+        limit,
+        search,
+        filter,
+        bypassCache,
+      });
+
+      return Response.json(counts, {
+        headers: {
+          "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=45",
+          "X-Total-Count": String(Number(counts.totalCount || 0)),
+        },
+      });
+    }
+
     const {
       sessions,
       page: resolvedPage,
@@ -112,6 +137,7 @@ export async function GET(req) {
       filter,
       sort,
       includeCounts,
+      bypassCache,
     });
 
     return Response.json(

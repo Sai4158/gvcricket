@@ -859,6 +859,10 @@ export function buildSessionMirrorUpdate(matchDocument) {
         ? countInningsWickets(innings2.history)
         : Number(match?.outs || 0),
     matchImages: Array.isArray(match?.matchImages) ? match.matchImages : [],
+    sessionImageCount: Math.max(
+      Array.isArray(match?.matchImages) ? match.matchImages.length : 0,
+      match?.matchImageUrl ? 1 : 0,
+    ),
     matchImageUrl: match?.matchImageUrl || "",
     matchImagePublicId: match?.matchImagePublicId || "",
     matchImageUploadedAt: match?.matchImageUploadedAt || null,

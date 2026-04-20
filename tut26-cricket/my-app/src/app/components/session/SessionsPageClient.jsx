@@ -501,11 +501,51 @@ export default function SessionsPageClient({
     [buildSessionsQuery]
   );
 
+  const fetchSessionCountsPayload = useCallback(
+    async ({ forceFresh = false, pageOverride, limitOverride } = {}) => {
+      const query = buildSessionsQuery({
+        forceFresh,
+        pageOverride,
+        limitOverride,
+        includeCounts: true,
+      });
+      query.set("summary", "counts");
+
+      const response = await fetch(`/api/sessions?${query.toString()}`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Could not load session counts.");
+      }
+
+      const payload = await response.json().catch(() => null);
+      if (!payload || typeof payload.totalCount !== "number") {
+        throw new Error("Could not load session counts.");
+      }
+
+      return payload;
+    },
+    [buildSessionsQuery]
+  );
+
   const applySessionsPayload = useCallback((payload) => {
     setSessions(payload.sessions);
+    setCurrentPage(Math.max(1, Number(payload.page || 1)));
+    if (Number.isFinite(Number(payload.totalPages))) {
+      setTotalPages(Math.max(1, Number(payload.totalPages || 1)));
+    }
+    setHasNextPage(Boolean(payload.hasNextPage));
+    setHasPreviousPage(Boolean(payload.hasPreviousPage));
+    setCountsPending(Boolean(payload.countsPending));
+  }, []);
+
+  const applyCountsPayload = useCallback((payload) => {
     setTotalCount(Number(payload.totalCount || 0));
     setUnfilteredTotalCount(Number(payload.unfilteredTotalCount || 0));
-    setCurrentPage(Math.max(1, Number(payload.page || 1)));
     setTotalPages(Math.max(1, Number(payload.totalPages || 1)));
     setHasNextPage(Boolean(payload.hasNextPage));
     setHasPreviousPage(Boolean(payload.hasPreviousPage));
@@ -778,20 +818,32 @@ export default function SessionsPageClient({
       setIsRefreshingList(true);
 
       try {
-        const payload = await fetchSessionsPayload({
+        const cardsPayload = await fetchSessionsPayload({
           forceFresh,
           pageOverride,
           limitOverride,
-          includeCounts: true,
+          includeCounts: false,
         });
 
         if (requestId !== activeRequestIdRef.current) {
-          return payload.sessions;
+          return cardsPayload.sessions;
         }
 
-        applySessionsPayload(payload);
+        applySessionsPayload(cardsPayload);
         setHasLoadedFirstPage(true);
-        return payload.sessions;
+        void fetchSessionCountsPayload({
+          forceFresh,
+          pageOverride: cardsPayload.page,
+          limitOverride: limitOverride || cardsPayload.limit,
+        })
+          .then((countsPayload) => {
+            if (requestId !== activeRequestIdRef.current) {
+              return;
+            }
+            applyCountsPayload(countsPayload);
+          })
+          .catch(() => {});
+        return cardsPayload.sessions;
       } finally {
         if (requestId === activeRequestIdRef.current) {
           setHasLoadedFirstPage(true);
@@ -799,7 +851,7 @@ export default function SessionsPageClient({
         }
       }
     },
-    [applySessionsPayload, fetchSessionsPayload]
+    [applyCountsPayload, applySessionsPayload, fetchSessionCountsPayload, fetchSessionsPayload]
   );
 
   useEffect(() => {
@@ -849,7 +901,30 @@ export default function SessionsPageClient({
           return;
         }
 
-        await reloadSessionsFromServer({ pageOverride: 1 });
+        const fullCardsPayload = await fetchSessionsPayload({
+          pageOverride: 1,
+          limitOverride: Number(pageSizeValue || SESSIONS_PAGE_SIZE),
+          includeCounts: false,
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        applySessionsPayload(fullCardsPayload);
+        setHasLoadedFirstPage(true);
+
+        void fetchSessionCountsPayload({
+          pageOverride: 1,
+          limitOverride: Number(pageSizeValue || SESSIONS_PAGE_SIZE),
+        })
+          .then((countsPayload) => {
+            if (cancelled) {
+              return;
+            }
+            applyCountsPayload(countsPayload);
+          })
+          .catch(() => {});
       } catch {
         if (!cancelled) {
           void reloadSessionsFromServer({ pageOverride: 1 }).catch(() => {});
@@ -863,7 +938,10 @@ export default function SessionsPageClient({
       cancelled = true;
     };
   }, [
+    applyCountsPayload,
     applySessionsPayload,
+    pageSizeValue,
+    fetchSessionCountsPayload,
     fetchSessionsPayload,
     hasInitialPayload,
     reloadSessionsFromServer,

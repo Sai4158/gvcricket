@@ -22,7 +22,9 @@ function safeNumber(value) {
 // Clean one word so it sounds better when spoken.
 function normalizeSpeechToken(token) {
   const safeToken = String(token || "");
-  const match = safeToken.match(/^([^A-Za-z0-9]*)([A-Za-z0-9][A-Za-z0-9'-]*)([^A-Za-z0-9]*)$/);
+  const match = safeToken.match(
+    /^([^A-Za-z0-9]*)([A-Za-z0-9][A-Za-z0-9'-]*)([^A-Za-z0-9]*)$/,
+  );
   if (!match) {
     return safeToken;
   }
@@ -44,7 +46,9 @@ function normalizeSpeechToken(token) {
 
 // Clean names before they are spoken.
 function normalizeSpeechName(value) {
-  const safeValue = String(value || "").trim().replace(/\s+/g, " ");
+  const safeValue = String(value || "")
+    .trim()
+    .replace(/\s+/g, " ");
   if (!safeValue) {
     return "";
   }
@@ -199,7 +203,9 @@ function buildUmpireFirstInningsTransitionDetails(match) {
   const firstInningsOuts = safeNumber(match?.innings1?.outs ?? match?.outs);
   const target = firstInningsScore + 1;
   const inningsHistory = match?.innings1?.history ?? [];
-  const oversSummary = formatOversForAnnouncement(countLegalBalls(inningsHistory));
+  const oversSummary = formatOversForAnnouncement(
+    countLegalBalls(inningsHistory),
+  );
   const goodLuckLine =
     firstInningsTeam && secondInningsTeam
       ? `Good luck, ${firstInningsTeam} and ${secondInningsTeam}.`
@@ -361,7 +367,9 @@ function formatOversLeftAfterCurrentOver(match) {
     0,
     ballsRemaining - ballsLeftInCurrentOver,
   );
-  const oversLeftAfterCurrentOver = Math.floor(ballsRemainingAfterCurrentOver / 6);
+  const oversLeftAfterCurrentOver = Math.floor(
+    ballsRemainingAfterCurrentOver / 6,
+  );
 
   if (oversLeftAfterCurrentOver <= 0) {
     return "Final over.";
@@ -482,8 +490,8 @@ function buildProgressReminder(event, match) {
   }
 
   const ballNumber = getBallNumberInOver(match);
-  if (ballNumber === 2) return "This is ball 2.";
-  if (ballNumber === 4) return "This is ball 4.";
+  if (ballNumber === 2) return "Ball 2 completed.";
+  if (ballNumber === 4) return "Ball 4 completed.";
   if (ballNumber === 5) return "One ball to finish the over.";
   return "";
 }
@@ -702,7 +710,12 @@ export function buildSpectatorOverCompleteAnnouncement(match) {
 }
 
 // Live-event factory functions below create the event objects stored on match.lastLiveEvent.
-export function createScoreLiveEvent(matchBefore, matchAfter, ball, options = {}) {
+export function createScoreLiveEvent(
+  matchBefore,
+  matchAfter,
+  ball,
+  options = {},
+) {
   // Use the innings that was active after this ball.
   const activeInningsKey =
     matchAfter.innings === "first" ? "innings1" : "innings2";
@@ -793,11 +806,15 @@ export function createMatchCorrectionLiveEvent(matchBefore, matchAfter, patch) {
     previousTeamASize: Array.isArray(matchBefore?.teamA)
       ? matchBefore.teamA.length
       : 0,
-    nextTeamASize: Array.isArray(matchAfter?.teamA) ? matchAfter.teamA.length : 0,
+    nextTeamASize: Array.isArray(matchAfter?.teamA)
+      ? matchAfter.teamA.length
+      : 0,
     previousTeamBSize: Array.isArray(matchBefore?.teamB)
       ? matchBefore.teamB.length
       : 0,
-    nextTeamBSize: Array.isArray(matchAfter?.teamB) ? matchAfter.teamB.length : 0,
+    nextTeamBSize: Array.isArray(matchAfter?.teamB)
+      ? matchAfter.teamB.length
+      : 0,
     createdAt: new Date().toISOString(),
   };
 }
@@ -1022,7 +1039,9 @@ export function buildUmpireStageAnnouncement(match) {
     return "";
   }
 
-  const displayResult = String(match?.pendingResult || match?.result || "").trim();
+  const displayResult = String(
+    match?.pendingResult || match?.result || "",
+  ).trim();
 
   if (displayResult) {
     const winnerName = getWinnerName(displayResult);
@@ -1092,7 +1111,7 @@ export function buildUmpireSecondInningsStartSequence(match) {
         rate: 0.79,
       },
       {
-        text: [ 
+        text: [
           transition.targetLine,
           transition.chaseLine,
           transition.requiredRateLine,
@@ -1238,5 +1257,3 @@ export function buildUmpireTapAnnouncement(event, mode = "simple") {
 
   return `${pluralizeRuns(safeNumber(ball.runs))}.`;
 }
-
-
