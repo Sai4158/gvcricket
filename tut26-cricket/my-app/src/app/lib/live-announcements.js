@@ -521,7 +521,7 @@ function buildBallEventLine(ball) {
 
 // Spoken line used when the umpire undoes the previous ball.
 function buildUndoAnnouncementLine() {
-  return "Umpire has removed the score for that ball. Umpire will redo this ball.";
+  return "Umpire has removed the score for this ball and will redo it.";
 }
 
 // Adds simple progress reminders at selected ball numbers.
