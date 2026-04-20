@@ -91,9 +91,12 @@ export function SessionViewTopShell({
   );
 }
 
-export function SessionViewInningsGrid({ inningsCards, teamBName }) {
+export function SessionViewInningsGrid({ inningsCards, teamBName, gridRef = null }) {
   return (
-    <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
+    <div
+      ref={gridRef}
+      className="w-full max-w-4xl grid grid-cols-1 gap-6 mt-10 md:grid-cols-2"
+    >
       {inningsCards.map((inningsCard) => (
         <TeamInningsDetail
           key={inningsCard.key}

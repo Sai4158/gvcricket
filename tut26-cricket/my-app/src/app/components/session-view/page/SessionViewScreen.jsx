@@ -83,9 +83,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const [isLeavingToSessions, setIsLeavingToSessions] = useState(false);
   const [data, setData] = useState(initialData || null);
   const [historyDetail, setHistoryDetail] = useState(null);
-  const [mediaDetail, setMediaDetail] = useState(null);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-  const [isMediaLoading, setIsMediaLoading] = useState(false);
   const [liveToolsReady, setLiveToolsReady] = useState(false);
   const [activePanel, setActivePanel] = useState(null);
   const [localWalkieNotice, setLocalWalkieNotice] = useState("");
@@ -93,6 +91,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const [spectatorWalkieEnabled, setSpectatorWalkieEnabled] = useState(false);
   const [quickWalkieTalking, setQuickWalkieTalking] = useState(false);
   const [quickSpeakerTalking, setQuickSpeakerTalking] = useState(false);
+  const [shouldLoadHistoryDetail, setShouldLoadHistoryDetail] = useState(false);
   const lastAnnouncedEventRef = useRef("");
   const announcementDuckRef = useRef([]);
   const announcementRestoreTimerRef = useRef(null);
@@ -136,7 +135,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const handledDerivedScoreSoundActionIdsRef = useRef(new Map());
   const pendingResultNavigationRef = useRef("");
   const requestedHistoryVersionRef = useRef("");
-  const requestedMediaVersionRef = useRef("");
+  const inningsGridRef = useRef(null);
   const router = useRouter();
   const { startNavigation } = useRouteFeedback();
   const sessionData = data?.session;
@@ -150,14 +149,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
       ...baseMatch,
       innings1: historyDetail?.innings1 || baseMatch.innings1,
       innings2: historyDetail?.innings2 || baseMatch.innings2,
-      matchImageUrl: mediaDetail?.matchImageUrl || baseMatch.matchImageUrl || "",
-      matchImages: Array.isArray(mediaDetail?.matchImages)
-        ? mediaDetail.matchImages
-        : Array.isArray(baseMatch.matchImages)
-          ? baseMatch.matchImages
-          : [],
     };
-  }, [data?.match, historyDetail, mediaDetail]);
+  }, [data?.match, historyDetail]);
   const { settings, updateSetting } = useAnnouncementSettings(
     "spectator",
     match?._id || sessionId || "",
@@ -212,42 +205,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
   }, [isHistoryLoading, sessionId]);
 
-  const loadSessionMedia = useCallback(async () => {
-    if (!sessionId || isMediaLoading) {
-      return;
-    }
-
-    setIsMediaLoading(true);
-    try {
-      const response = await fetch(`/api/sessions/${sessionId}/view-media`, {
-        cache: "no-store",
-        headers: {
-          "Cache-Control": "no-store",
-        },
-      });
-      if (!response.ok) {
-        throw new Error("Could not load match media.");
-      }
-
-      const payload = await response.json().catch(() => null);
-      if (!payload) {
-        throw new Error("Could not load match media.");
-      }
-
-      setMediaDetail(payload);
-    } catch {
-      // Ignore deferred media failures; the shell already has a cover image URL.
-    } finally {
-      setIsMediaLoading(false);
-    }
-  }, [isMediaLoading, sessionId]);
-
   useEffect(() => {
     setHistoryDetail(null);
-    setMediaDetail(null);
     setLiveToolsReady(false);
+    setShouldLoadHistoryDetail(false);
     requestedHistoryVersionRef.current = "";
-    requestedMediaVersionRef.current = "";
 
     const frameId = window.requestAnimationFrame(() => {
       setLiveToolsReady(true);
@@ -259,7 +221,32 @@ export default function SessionViewClient({ sessionId, initialData }) {
   }, [sessionId]);
 
   useEffect(() => {
-    if (!match?._id) {
+    const element = inningsGridRef.current;
+    if (!element || shouldLoadHistoryDetail || typeof IntersectionObserver === "undefined") {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldLoadHistoryDetail(true);
+          observer.disconnect();
+        }
+      },
+      {
+        rootMargin: "240px 0px",
+        threshold: 0.05,
+      },
+    );
+
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+    };
+  }, [shouldLoadHistoryDetail, match?._id]);
+
+  useEffect(() => {
+    if (!match?._id || !shouldLoadHistoryDetail) {
       return;
     }
     const nextHistoryVersion = String(match.historyVersion || "");
@@ -269,20 +256,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
     requestedHistoryVersionRef.current = nextHistoryVersion;
     void loadSessionHistory();
-  }, [loadSessionHistory, match?._id, match?.historyVersion]);
-
-  useEffect(() => {
-    if (!match?._id) {
-      return;
-    }
-    const nextMediaVersion = String(match.mediaVersion || "");
-    if (!nextMediaVersion || requestedMediaVersionRef.current === nextMediaVersion) {
-      return;
-    }
-
-    requestedMediaVersionRef.current = nextMediaVersion;
-    void loadSessionMedia();
-  }, [loadSessionMedia, match?._id, match?.mediaVersion]);
+  }, [loadSessionHistory, match?._id, match?.historyVersion, shouldLoadHistoryDetail]);
 
   useEventSource({
     url: sessionId ? `/api/live/sessions/${sessionId}` : null,
@@ -2069,7 +2043,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
         </div>
       </OptionalFeatureBoundary>
 
-      <SessionViewInningsGrid inningsCards={inningsCards} teamBName={teamB.name} />
+      <SessionViewInningsGrid
+        inningsCards={inningsCards}
+        teamBName={teamB.name}
+        gridRef={inningsGridRef}
+      />
 
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {
