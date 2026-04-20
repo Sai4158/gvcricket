@@ -19,16 +19,23 @@ export const revalidate = 15;
 
 // Page title and social-preview data for /session.
 export const metadata = {
-  title: "All Cricket Sessions - Live and Completed Matches",
+  title: "Live Cricket Scores, Match Results, and All Sessions",
   description:
-    "Browse live cricket scores, finished matches, saved results, and match history in GV Cricket.",
+    "Browse live cricket scores, completed match results, scoreboards, and saved cricket sessions in GV Cricket.",
+  keywords: [
+    "live cricket scores",
+    "cricket match results",
+    "cricket scoreboard",
+    "cricket live score sessions",
+    "free cricket score viewer",
+  ],
   alternates: {
     canonical: absoluteUrl("/session"),
   },
   openGraph: {
-    title: "All Cricket Sessions | GV Cricket",
+    title: "Live Cricket Scores and Match Results | GV Cricket",
     description:
-      "Open live scoreboards, finished results, and saved cricket sessions in one place.",
+      "Open live cricket scoreboards, finished results, and saved sessions in one fast index.",
     url: absoluteUrl("/session"),
     images: [
       {
@@ -40,9 +47,9 @@ export const metadata = {
     ],
   },
   twitter: {
-    title: "All Cricket Sessions | GV Cricket",
+    title: "Live Cricket Scores and Match Results | GV Cricket",
     description:
-      "Open live scoreboards, finished results, and saved cricket sessions in one place.",
+      "Open live cricket scoreboards, finished results, and saved sessions in one place.",
     images: [absoluteUrl(siteConfig.twitterImagePath)],
   },
 };

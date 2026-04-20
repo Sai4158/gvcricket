@@ -18,16 +18,23 @@ import {
 } from "../components/rules/rule-sections";
 
 export const metadata = {
-  title: "Cricket Scoring Rules and App Guide",
+  title: "Cricket Scoring Rules, Overs, Wickets, and App Guide",
   description:
-    "Read the cricket scoring rules, app guide, and match flow used inside GV Cricket.",
+    "Read cricket scoring rules, overs, wickets, no-balls, wides, and the GV Cricket app guide for live scoring.",
+  keywords: [
+    "cricket scoring rules",
+    "how cricket scoring works",
+    "cricket overs and wickets rules",
+    "cricket wide and no ball rules",
+    "cricket scorekeeping guide",
+  ],
   alternates: {
     canonical: absoluteUrl("/rules"),
   },
   openGraph: {
     title: "Cricket Scoring Rules and App Guide | GV Cricket",
     description:
-      "Read the cricket scoring rules, app guide, and match flow used inside GV Cricket.",
+      "Read cricket scoring rules, overs, wickets, no-balls, wides, and the GV Cricket app guide.",
     url: absoluteUrl("/rules"),
     images: [
       {
@@ -41,7 +48,7 @@ export const metadata = {
   twitter: {
     title: "Cricket Scoring Rules and App Guide | GV Cricket",
     description:
-      "Read the cricket scoring rules, app guide, and match flow used inside GV Cricket.",
+      "Read cricket scoring rules and the GV Cricket app guide.",
     images: [absoluteUrl(siteConfig.twitterImagePath)],
   },
 };

@@ -86,16 +86,22 @@ export async function generateMetadata({ params }) {
   const shareImageAlt = `${matchup} live score preview with GV Cricket branding`;
 
   return {
-    title: `${matchup} Live Score`,
+    title: `${matchup} Live Cricket Score`,
     description:
-      "Follow the live score, wickets, overs, and match updates in GV Cricket spectator view.",
+      `Follow the live cricket score, wickets, overs, and match updates for ${matchup} in GV Cricket spectator view.`,
+    keywords: [
+      `${matchup} live score`,
+      "live cricket score",
+      "cricket scoreboard",
+      "cricket overs and wickets",
+    ],
     alternates: {
       canonical: absoluteUrl(`/session/${id}/view`),
     },
     openGraph: {
-      title: `${matchup} Live Score | GV Cricket`,
+      title: `${matchup} Live Cricket Score | GV Cricket`,
       description:
-        "Live cricket score, overs, wickets, and spectator updates in one clean match view.",
+        `Live cricket score, overs, wickets, and spectator updates for ${matchup}.`,
       url: absoluteUrl(`/session/${id}/view`),
       images: [
         {
@@ -108,9 +114,9 @@ export async function generateMetadata({ params }) {
     },
     twitter: {
       card: "summary_large_image",
-      title: `${matchup} Live Score | GV Cricket`,
+      title: `${matchup} Live Cricket Score | GV Cricket`,
       description:
-        "Watch the live score and match updates in the spectator view.",
+        `Watch the live cricket score and match updates for ${matchup}.`,
       images: [
         {
           url: twitterImageUrl,

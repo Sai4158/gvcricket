@@ -45,6 +45,12 @@ export default async function sitemap() {
       changeFrequency: "monthly",
       priority: 0.5,
     },
+    {
+      url: absoluteUrl("/update"),
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.45,
+    },
   ];
 
   const publishedSessions = sessions.filter((session) => !session?.isDraft);

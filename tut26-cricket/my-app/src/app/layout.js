@@ -7,6 +7,7 @@
  * Read next: ./README.md
  */
 
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SmoothScroll from "./components/SmoothScroll";
@@ -121,6 +122,8 @@ const jsonLd = [
 ];
 
 export default function RootLayout({ children }) {
+  const appShell = <SmoothScroll>{children}</SmoothScroll>;
+
   return (
     <html lang="en">
       <head>
@@ -133,9 +136,9 @@ export default function RootLayout({ children }) {
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}
       >
-        <RouteFeedbackProvider>
-          <SmoothScroll>{children}</SmoothScroll>
-        </RouteFeedbackProvider>
+        <Suspense fallback={appShell}>
+          <RouteFeedbackProvider>{appShell}</RouteFeedbackProvider>
+        </Suspense>
         <Analytics />
       </body>
     </html>

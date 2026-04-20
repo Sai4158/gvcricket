@@ -46,6 +46,13 @@ export async function generateMetadata({ params }) {
   return {
     title: pageLabel,
     description: `See the final score, winner, over summary, and match stats for ${matchup}.${resultText}`.trim(),
+    keywords: [
+      `${matchup} result`,
+      `${matchup} scorecard`,
+      "cricket result",
+      "cricket final score",
+      "cricket match stats",
+    ],
     alternates: {
       canonical: absoluteUrl(`/result/${id}`),
     },

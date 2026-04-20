@@ -10,6 +10,7 @@
 import nextDynamic from "next/dynamic";
 import HeroSection from "./components/home/HeroSection";
 import HomeHeader from "./components/home/HomeHeader";
+import HomeSeoSection, { faqItems } from "./components/home/HomeSeoSection";
 import PrimaryActionsSection from "./components/home/PrimaryActionsSection";
 import SiteFooter from "./components/shared/SiteFooter";
 import { absoluteUrl, siteConfig } from "./lib/site-metadata";
@@ -19,17 +20,19 @@ const CommunityHighlightsSection = nextDynamic(() => import("./components/home/C
 const LearnCricketCard = nextDynamic(() => import("./components/home/LearnCricketCard"), { ssr: true });
 
 export const metadata = {
-  title: "GV Cricket | Live Cricket Scoring, Umpire Mode, Match Control",
+  title: "GV Cricket | Free Live Cricket Scoring App, Umpire Mode, Scoreboard",
   description:
-    "Score every match from toss to result with live score, umpire mode, spectator view, director controls, walkie-talkie, loudspeaker, match images, and final results in one fast mobile flow.",
+    "Free live cricket scoring app for local matches, leagues, tournaments, school cricket, box cricket, and tennis-ball cricket with umpire mode, spectator scoreboards, and instant results.",
+  keywords: siteConfig.keywords,
   alternates: {
     canonical: absoluteUrl("/"),
   },
   openGraph: {
-    title: "GV Cricket | Live Cricket Scoring, Umpire Mode, Match Control",
+    title: "GV Cricket | Free Live Cricket Scoring App and Match Control",
     description:
-      "Live cricket scoring with umpire mode, spectator scoreboards, director controls, walkie-talkie, loudspeaker, match images, and instant results.",
+      "Free live cricket scoring with umpire mode, spectator scoreboards, instant results, and mobile-first match control.",
     url: absoluteUrl("/"),
+    type: "website",
     images: [
       {
         url: absoluteUrl(siteConfig.ogImagePath),
@@ -40,11 +43,25 @@ export const metadata = {
     ],
   },
   twitter: {
-    title: "GV Cricket | Live Cricket Scoring, Umpire Mode, Match Control",
+    card: "summary_large_image",
+    title: "GV Cricket | Free Live Cricket Scoring App and Match Control",
     description:
-      "Live cricket scoring with umpire mode, spectator scoreboards, director controls, walkie-talkie, loudspeaker, match images, and final results.",
+      "Free live cricket scoring app for local matches, tournaments, and spectators with fast umpire mode and instant results.",
     images: [absoluteUrl(siteConfig.twitterImagePath)],
   },
+};
+
+const homeFaqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqItems.map((item) => ({
+    "@type": "Question",
+    name: item.question,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: item.answer,
+    },
+  })),
 };
 
 export default function HomePage() {
@@ -52,12 +69,17 @@ export default function HomePage() {
     <>
       <HomeHeader />
       <main id="top" className="home-liquid-surface overflow-x-hidden bg-black text-zinc-200 font-sans">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(homeFaqJsonLd) }}
+        />
         <HeroSection />
         <div className="relative z-10 space-y-14 bg-[linear-gradient(155deg,var(--color-red-900)_0%,var(--color-black)_40%)] px-5 py-20 md:space-y-24 md:py-28 xl:space-y-20 xl:px-8 xl:py-24 2xl:px-10 2xl:py-28">
           <PrimaryActionsSection />
           <HowItWorksSection />
           <CommunityHighlightsSection />
           <LearnCricketCard />
+          <HomeSeoSection />
           <SiteFooter />
         </div>
       </main>

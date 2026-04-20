@@ -491,8 +491,9 @@ function buildProgressReminder(event, match) {
 
   const ballNumber = getBallNumberInOver(match);
   if (ballNumber === 2) return "Ball 2 completed.";
+  if (ballNumber === 3) return "3 balls left.";
   if (ballNumber === 4) return "Ball 4 completed.";
-  if (ballNumber === 5) return "One ball to finish the over.";
+  if (ballNumber === 5) return "One ball left.";
   return "";
 }
 
