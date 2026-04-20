@@ -451,8 +451,8 @@ function SessionCard({
                   compact
                   className="relative"
                   autoPlay={resolvedGalleryImages.length > 1}
-                  autoPlayDelayMs={2400}
-                  autoPlayInitialDelayMs={1600}
+                  autoPlayDelayMs={1700}
+                  autoPlayInitialDelayMs={850}
                   transitionStyle="slide"
                   imageClassName="object-cover object-center"
                   fallbackClassName="object-cover object-center"

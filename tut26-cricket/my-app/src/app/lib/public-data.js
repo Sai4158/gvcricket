@@ -119,11 +119,16 @@ function getCompactOverStateFromBalls(match) {
 
 function buildUmpireInnings(match, inningsKey, includeHistory) {
   const source = match?.[inningsKey] || {};
-  return {
+  const innings = {
     team: source.team || "",
     score: Number(source.score || 0),
-    history: includeHistory && Array.isArray(source.history) ? source.history : [],
   };
+
+  if (includeHistory) {
+    innings.history = Array.isArray(source.history) ? source.history : [];
+  }
+
+  return innings;
 }
 
 function buildCompactInnings(match, inningsKey) {

@@ -392,6 +392,43 @@ test("[security] score correction announcements stay smart for umpire and specta
   );
 });
 
+test("[security] spectator progress reminders prefer the event ball number over a newer match state", () => {
+  const staleEvent = {
+    id: "evt-ball-2-stable",
+    type: "score_update",
+    ball: { runs: 1, isOut: false, extraType: null },
+    score: 2,
+    outs: 0,
+    overCompleted: false,
+    ballNumberInOver: 2,
+  };
+
+  const newerMatchState = {
+    ...buildBaseMatch(),
+    score: 3,
+    outs: 0,
+    innings1: {
+      team: "Falcons",
+      score: 3,
+      history: [
+        {
+          overNumber: 1,
+          balls: [
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+          ],
+        },
+      ],
+    },
+  };
+
+  assert.equal(
+    buildSpectatorScoreAnnouncement(staleEvent, newerMatchState),
+    "Score is 2 for 0. Ball 2 completed."
+  );
+});
+
 test("[security] roster size corrections announce equal and split team sizes cleanly", () => {
   const baseMatch = buildBaseMatch();
 

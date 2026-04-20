@@ -286,6 +286,15 @@ function getBallNumberInOver(match) {
   return ballsIntoOver === 0 ? 6 : ballsIntoOver;
 }
 
+function getEventBallNumberInOver(event, match) {
+  const eventBallNumber = Number(event?.ballNumberInOver);
+  if (Number.isFinite(eventBallNumber) && eventBallNumber > 0) {
+    return eventBallNumber;
+  }
+
+  return getBallNumberInOver(match);
+}
+
 // Counts wickets that fell in the current over.
 function getWicketsInCurrentOver(match) {
   return getCurrentOverBalls(match).filter((ball) => ball?.isOut).length || 0;
@@ -521,7 +530,7 @@ function buildProgressReminder(event, match) {
     return "";
   }
 
-  const ballNumber = getBallNumberInOver(match);
+  const ballNumber = getEventBallNumberInOver(event, match);
   if (ballNumber === 2) return "Ball 2 completed.";
   if (ballNumber === 3) return "3 balls left.";
   if (ballNumber === 4) return "Ball 4 completed.";
@@ -569,7 +578,7 @@ function shouldCallChaseEquation(event, match) {
     return false;
   }
 
-  const ballNumber = getBallNumberInOver(match);
+  const ballNumber = getEventBallNumberInOver(event, match);
   return ballNumber === 3 || ballNumber === 5;
 }
 
@@ -754,11 +763,13 @@ export function createScoreLiveEvent(
     matchAfter.innings === "first" ? "innings1" : "innings2";
   const history = matchAfter[activeInningsKey]?.history ?? [];
   const battingTeam = getBattingTeamBundle(matchAfter);
+  const completedLegalBalls = countLegalBalls(history);
+  const ballNumberInOver = completedLegalBalls % 6 || 6;
   // A legal ball ends an over when the count reaches a multiple of 6.
   const overCompleted =
     isLegalBall(ball) &&
-    countLegalBalls(history) > 0 &&
-    countLegalBalls(history) % 6 === 0;
+    completedLegalBalls > 0 &&
+    completedLegalBalls % 6 === 0;
   // In second innings, going past the target ends the chase.
   const targetChased =
     matchAfter.innings === "second" &&
@@ -772,7 +783,8 @@ export function createScoreLiveEvent(
     score: matchAfter.score,
     outs: matchAfter.outs,
     battingTeam: battingTeam.name,
-    overs: `${Math.floor(countLegalBalls(history) / 6)}.${countLegalBalls(history) % 6}`,
+    overs: `${Math.floor(completedLegalBalls / 6)}.${completedLegalBalls % 6}`,
+    ballNumberInOver: isLegalBall(ball) ? ballNumberInOver : null,
     overCompleted,
     targetChased,
     result: matchAfter.result || "",

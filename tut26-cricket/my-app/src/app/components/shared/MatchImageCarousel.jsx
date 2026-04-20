@@ -255,8 +255,8 @@ export default function MatchImageCarousel({
             variants={transitionStyle === "slide" ? slideVariants : undefined}
             transition={
               transitionStyle === "slide"
-                ? { duration: 0.42, ease: [0.22, 1, 0.36, 1] }
-                : { duration: 0.24, ease: "easeOut" }
+                ? { duration: 0.3, ease: [0.22, 1, 0.36, 1] }
+                : { duration: 0.18, ease: "easeOut" }
             }
           >
             <SafeMatchImage
