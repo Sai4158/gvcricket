@@ -240,7 +240,8 @@ export function getPublicMatchImagePath(match) {
   const version =
     match?.matchImagePublicId ||
     match?.matchImageUploadedAt ||
-    match?.updatedAt ||
+    match?.mediaUpdatedAt ||
+    match?.matchImageStorageUrlHash ||
     "";
 
   return buildSignedMatchImageUrl(match._id, version);

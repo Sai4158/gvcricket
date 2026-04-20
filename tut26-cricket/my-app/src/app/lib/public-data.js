@@ -67,7 +67,11 @@ function getHistoryVersion(match) {
 }
 
 function getMediaVersion(match) {
-  return match?.mediaUpdatedAt || match?.updatedAt || null;
+  return (
+    match?.mediaUpdatedAt ||
+    match?.matchImageUploadedAt ||
+    null
+  );
 }
 
 function getActiveInningsKey(match) {

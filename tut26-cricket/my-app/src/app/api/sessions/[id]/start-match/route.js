@@ -146,6 +146,11 @@ export async function POST(req, { params }) {
         applyStoredMatchImages(existingMatch, existingMatchImages, {
           matchId: String(existingMatch._id),
         });
+        existingMatch.mediaUpdatedAt =
+          session.mediaUpdatedAt ||
+          existingMatch.matchImageUploadedAt ||
+          existingMatch.mediaUpdatedAt ||
+          null;
         await existingMatch.save({ session: transactionSession });
         await MatchUndoEntry.deleteMany({
           matchId: existingMatch._id,
@@ -192,6 +197,11 @@ export async function POST(req, { params }) {
         applyStoredMatchImages(finalMatch, nextMatchImages, {
           matchId: String(finalMatch._id),
         });
+        finalMatch.mediaUpdatedAt =
+          session.mediaUpdatedAt ||
+          finalMatch.matchImageUploadedAt ||
+          finalMatch.mediaUpdatedAt ||
+          null;
         await finalMatch.save({ session: transactionSession });
       }
 
