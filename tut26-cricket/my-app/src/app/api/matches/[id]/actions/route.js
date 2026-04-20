@@ -203,14 +203,21 @@ export async function POST(req, { params }) {
     let updatePayload = {};
 
     if (parsedRequest.value.type === "undo_last") {
-      const latestUndoEntry = await MatchUndoEntry.findOne({
-        matchId: finalizedMatch._id,
-      })
-        .sort({ sequence: -1, createdAt: -1 })
-        .lean();
+      const latestUndoEntry = await MatchUndoEntry.collection.findOne(
+        {
+          matchId: finalizedMatch._id,
+        },
+        {
+          sort: { sequence: -1, createdAt: -1 },
+        },
+      );
 
       if (latestUndoEntry?.snapshot) {
-        const restoredMatch = restoreMatchUndoSnapshot(finalizedMatch, latestUndoEntry.snapshot);
+        const restoredMatch = restoreMatchUndoSnapshot(
+          finalizedMatch,
+          latestUndoEntry.snapshot,
+          { clone: false },
+        );
         const undoEvent = createUndoLiveEvent(restoredMatch);
 
         updatePayload = {

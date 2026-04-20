@@ -64,6 +64,15 @@ async function runScenario(
     await seedMatchImages(setup.matchId, 12);
   }
 
+  // Warm the dedicated hot routes before measuring latency on the dev server.
+  const warmScore = await scoreBall(environment.baseUrl, setup.matchId, setup.umpireJar, {
+    runs: 1,
+    actionId: createActionId(`${name}-warm-score`),
+  });
+  assert.equal(warmScore.response.status, 200, "warm score should succeed");
+  const warmUndo = await undoLast(environment.baseUrl, setup.matchId, setup.umpireJar);
+  assert.equal(warmUndo.response.status, 200, "warm undo should succeed");
+
   await scoreSingles(environment.baseUrl, setup.matchId, setup.umpireJar, 24);
 
   const scoreSamples: number[] = [];

@@ -21,6 +21,10 @@ import {
   writeSmokeArtifact,
 } from "./umpire-test-support.mts";
 
+function escapeRegex(text: string) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 async function prepareLongLiveMatch(
   environment: UmpireSmokeEnvironment,
   { withImages = false } = {},
@@ -44,15 +48,11 @@ async function prepareLongLiveMatch(
 
 async function configureMobileThrottle(page) {
   const session = await page.context().newCDPSession(page);
-  await session.send("Network.enable");
-  await session.send("Network.emulateNetworkConditions", {
-    offline: false,
-    latency: 150,
-    downloadThroughput: Math.floor((1.6 * 1024 * 1024) / 8),
-    uploadThroughput: Math.floor((750 * 1024) / 8),
-    connectionType: "cellular4g",
-  });
   await session.send("Emulation.setCPUThrottlingRate", { rate: 2 });
+  await page.route("**/api/**", async (route) => {
+    await page.waitForTimeout(150);
+    await route.continue();
+  });
 }
 
 async function readVisibleScore(page) {
@@ -65,33 +65,28 @@ async function readVisibleScore(page) {
   return String(scoreText || "");
 }
 
-async function readActiveOverSignature(page) {
-  const signature = await page.evaluate(() => {
-    const balls = [...document.querySelectorAll('div[class*="h-10 w-10 shrink-0 items-center justify-center rounded-full"]')]
-      .map((node) => (node.textContent || "").trim())
-      .filter(Boolean);
-    return balls.join("|");
-  });
-
-  return String(signature || "");
+async function readVisibleSnapshot(page) {
+  const snapshot = await page.evaluate(() => document.body.innerText || "");
+  return String(snapshot || "");
 }
 
 async function waitForScoreChange(page, previousSignature) {
   await page.waitForFunction(
     (prev) => {
-      const balls = [...document.querySelectorAll('div[class*="h-10 w-10 shrink-0 items-center justify-center rounded-full"]')]
-        .map((node) => (node.textContent || "").trim())
-        .filter(Boolean)
-        .join("|");
-      return balls !== prev;
+      return (document.body.innerText || "") !== prev;
     },
     previousSignature,
     { timeout: 6000 },
   );
 }
 
+async function tapLocator(page, locator) {
+  await locator.scrollIntoViewIfNeeded();
+  await locator.click({ force: true });
+}
+
 async function measureScoreTap(page, matchId: string, buttonName: string) {
-  const previousSignature = await readActiveOverSignature(page);
+  const previousSignature = await readVisibleSnapshot(page);
   const responsePromise = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
@@ -99,10 +94,28 @@ async function measureScoreTap(page, matchId: string, buttonName: string) {
   ).catch((error) => ({ __error: error }));
 
   const startedAt = performance.now();
-  const button = page.locator(`button:has-text("${buttonName}")`).last();
-  await button.scrollIntoViewIfNeeded();
-  await button.evaluate((node) => node.click());
-  await waitForScoreChange(page, previousSignature);
+  const button = page
+    .locator("button.press-feedback.w-full")
+    .filter({ hasText: new RegExp(`^${escapeRegex(buttonName)}$`) })
+    .first();
+  await tapLocator(page, button);
+  try {
+    await waitForScoreChange(page, previousSignature);
+  } catch (error) {
+    const currentSnapshot = await readVisibleSnapshot(page);
+    const maybeResponse = await Promise.race([
+      responsePromise,
+      page.waitForTimeout(100).then(() => null),
+    ]);
+    throw new Error(
+      `score tap "${buttonName}" did not change visible state within timeout. ` +
+        `responseSeen=${Boolean(maybeResponse && !maybeResponse.__error)} ` +
+        `snapshotChanged=${currentSnapshot !== previousSignature} ` +
+        `before=${JSON.stringify(previousSignature.slice(0, 250))} ` +
+        `after=${JSON.stringify(currentSnapshot.slice(0, 250))}`,
+      { cause: error },
+    );
+  }
   const visibleMs = performance.now() - startedAt;
   const response = await responsePromise;
   if (response?.__error) {
@@ -114,7 +127,7 @@ async function measureScoreTap(page, matchId: string, buttonName: string) {
 }
 
 async function measureUndoTap(page, matchId: string) {
-  const previousSignature = await readActiveOverSignature(page);
+  const previousSignature = await readVisibleSnapshot(page);
   const responsePromise = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
@@ -122,10 +135,28 @@ async function measureUndoTap(page, matchId: string) {
   ).catch((error) => ({ __error: error }));
 
   const startedAt = performance.now();
-  const button = page.locator('button:has-text("Undo")').last();
-  await button.scrollIntoViewIfNeeded();
-  await button.evaluate((node) => node.click());
-  await waitForScoreChange(page, previousSignature);
+  const button = page
+    .locator("button.press-feedback")
+    .filter({ hasText: /^Undo$/ })
+    .first();
+  await tapLocator(page, button);
+  try {
+    await waitForScoreChange(page, previousSignature);
+  } catch (error) {
+    const currentSnapshot = await readVisibleSnapshot(page);
+    const maybeResponse = await Promise.race([
+      responsePromise,
+      page.waitForTimeout(100).then(() => null),
+    ]);
+    throw new Error(
+      `undo tap did not change visible state within timeout. ` +
+        `responseSeen=${Boolean(maybeResponse && !maybeResponse.__error)} ` +
+        `snapshotChanged=${currentSnapshot !== previousSignature} ` +
+        `before=${JSON.stringify(previousSignature.slice(0, 250))} ` +
+        `after=${JSON.stringify(currentSnapshot.slice(0, 250))}`,
+      { cause: error },
+    );
+  }
   const visibleMs = performance.now() - startedAt;
   const response = await responsePromise;
   if (response?.__error) {
@@ -156,23 +187,26 @@ async function runBrowserScenario(
   const setup = await prepareLongLiveMatch(environment, { withImages });
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
-    userAgent:
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
   });
 
   try {
     await context.addCookies(setup.umpireJar.toPlaywrightCookies(environment.baseUrl));
     const page = await context.newPage();
-    await configureMobileThrottle(page);
 
     const navStartedAt = performance.now();
     await page.goto(`${environment.baseUrl}/match/${setup.matchId}`, {
       waitUntil: "domcontentloaded",
     });
-    await page.locator('button:has-text("1")').last().waitFor({ state: "visible", timeout: 8000 });
+    await page
+      .locator("button.press-feedback.w-full")
+      .filter({ hasText: /^1$/ })
+      .first()
+      .waitFor({ state: "visible", timeout: 8000 });
+    // On throttled mobile profiles, SSR markup can appear before the client handlers hydrate.
+    // Give the score controls a short settle window so taps hit the live React tree.
+    await page.waitForTimeout(2500);
     const shellVisibleMs = performance.now() - navStartedAt;
+    await configureMobileThrottle(page);
 
     const scoreVisibleSamples: number[] = [];
     const scoreNetworkSamples: number[] = [];

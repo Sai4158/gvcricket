@@ -166,8 +166,9 @@ export function createMatchUndoSnapshot(matchDocument) {
   return getSnapshot(matchDocument);
 }
 
-export function restoreMatchUndoSnapshot(matchDocument, snapshot) {
-  const nextMatch = toPlainMatch(matchDocument);
+export function restoreMatchUndoSnapshot(matchDocument, snapshot, options = {}) {
+  const shouldClone = options.clone !== false;
+  const nextMatch = shouldClone ? toPlainMatch(matchDocument) : matchDocument;
   restoreSnapshot(nextMatch, snapshot);
   return nextMatch;
 }
