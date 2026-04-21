@@ -13,14 +13,7 @@
  * Read next: ./README.md
  */
 
-
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -53,9 +46,12 @@ const ModalBase = dynamic(
   () => import("../match/MatchBaseModals").then((module) => module.ModalBase),
   { ssr: false },
 );
-const MatchImageUploader = dynamic(() => import("../match/MatchImageUploader"), {
-  ssr: false,
-});
+const MatchImageUploader = dynamic(
+  () => import("../match/MatchImageUploader"),
+  {
+    ssr: false,
+  },
+);
 const LiquidSportText = dynamic(() => import("../home/LiquidSportText"), {
   loading: () => (
     <span className="relative z-10 block text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
@@ -94,7 +90,9 @@ const EMPTY_MANAGE_FORM = {
 
 // Small helpers for search and sorting.
 function normalizeSearchValue(value) {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 function buildVisiblePageNumbers(currentPage, totalPages, maxVisible = 5) {
@@ -117,8 +115,12 @@ function buildVisiblePageNumbers(currentPage, totalPages, maxVisible = 5) {
 function EmptyState({ title, text, href, label }) {
   return (
     <div className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.08),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.08),transparent_28%),linear-gradient(180deg,rgba(18,18,24,0.97),rgba(8,8,12,0.99))] px-6 py-12 text-center shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
-      <h2 className="text-2xl font-semibold tracking-[-0.03em] text-white">{title}</h2>
-      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-zinc-400">{text}</p>
+      <h2 className="text-2xl font-semibold tracking-[-0.03em] text-white">
+        {title}
+      </h2>
+      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-zinc-400">
+        {text}
+      </p>
       {href && label ? (
         <Link
           href={href}
@@ -186,7 +188,9 @@ function ActionSummaryModal({ summary, onClose }) {
             <FaCheck />
           </span>
           <div className="min-w-0">
-            <p className="text-base font-semibold text-white">{summary.heading}</p>
+            <p className="text-base font-semibold text-white">
+              {summary.heading}
+            </p>
             {summary.description ? (
               <p className="mt-1 text-sm leading-6 text-zinc-300">
                 {summary.description}
@@ -245,51 +249,55 @@ export default function SessionsPageClient({
 }) {
   const hasInitialPayload = Array.isArray(initialPayload?.sessions);
   const initialSessions = useMemo(
-    () => (Array.isArray(initialPayload?.sessions) ? initialPayload.sessions : []),
-    [initialPayload?.sessions]
+    () =>
+      Array.isArray(initialPayload?.sessions) ? initialPayload.sessions : [],
+    [initialPayload?.sessions],
   );
   const initialTotalCount = useMemo(
     () => Number(initialPayload?.totalCount || 0),
-    [initialPayload?.totalCount]
+    [initialPayload?.totalCount],
   );
   const initialUnfilteredTotalCount = useMemo(
-    () => Number(initialPayload?.unfilteredTotalCount || initialTotalCount || 0),
-    [initialPayload?.unfilteredTotalCount, initialTotalCount]
+    () =>
+      Number(initialPayload?.unfilteredTotalCount || initialTotalCount || 0),
+    [initialPayload?.unfilteredTotalCount, initialTotalCount],
   );
   const initialPage = useMemo(
     () => Math.max(1, Number(initialPayload?.page || 1)),
-    [initialPayload?.page]
+    [initialPayload?.page],
   );
   const initialPageSize = useMemo(
-    () => String(Math.min(68, Math.max(28, Number(initialPayload?.limit || 28)))),
-    [initialPayload?.limit]
+    () =>
+      String(Math.min(68, Math.max(28, Number(initialPayload?.limit || 28)))),
+    [initialPayload?.limit],
   );
   const initialTotalPages = useMemo(
     () => Math.max(1, Number(initialPayload?.totalPages || 1)),
-    [initialPayload?.totalPages]
+    [initialPayload?.totalPages],
   );
   const initialCountsPending = useMemo(
     () => Boolean(initialPayload?.countsPending),
-    [initialPayload?.countsPending]
+    [initialPayload?.countsPending],
   );
 
   // Main page state.
   const [sessions, setSessions] = useState(initialSessions ?? []);
   const [totalCount, setTotalCount] = useState(Number(initialTotalCount || 0));
   const [unfilteredTotalCount, setUnfilteredTotalCount] = useState(
-    Number(initialUnfilteredTotalCount || 0)
+    Number(initialUnfilteredTotalCount || 0),
   );
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [totalPages, setTotalPages] = useState(initialTotalPages);
   const [pageSizeValue, setPageSizeValue] = useState(initialPageSize);
   const [hasNextPage, setHasNextPage] = useState(
-    Boolean(initialPayload?.hasNextPage)
+    Boolean(initialPayload?.hasNextPage),
   );
   const [hasPreviousPage, setHasPreviousPage] = useState(
-    Boolean(initialPayload?.hasPreviousPage)
+    Boolean(initialPayload?.hasPreviousPage),
   );
   const [isRefreshingList, setIsRefreshingList] = useState(!hasInitialPayload);
-  const [hasLoadedFirstPage, setHasLoadedFirstPage] = useState(hasInitialPayload);
+  const [hasLoadedFirstPage, setHasLoadedFirstPage] =
+    useState(hasInitialPayload);
   const [countsPending, setCountsPending] = useState(initialCountsPending);
   const [pinPrompt, setPinPrompt] = useState(null);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
@@ -349,8 +357,8 @@ export default function SessionsPageClient({
   useEffect(() => {
     setSelectedSessionIds((current) =>
       current.filter((sessionId) =>
-        sessions.some((session) => session._id === sessionId)
-      )
+        sessions.some((session) => session._id === sessionId),
+      ),
     );
   }, [sessions]);
 
@@ -372,7 +380,9 @@ export default function SessionsPageClient({
   }, [searchInput]);
 
   const totalSessionCount =
-    Number.isFinite(totalCount) && totalCount > 0 ? totalCount : sessions.length;
+    Number.isFinite(totalCount) && totalCount > 0
+      ? totalCount
+      : sessions.length;
   const overallSessionCount =
     Number.isFinite(unfilteredTotalCount) && unfilteredTotalCount > 0
       ? unfilteredTotalCount
@@ -383,39 +393,50 @@ export default function SessionsPageClient({
   const showingFrom = sessions.length
     ? (currentPage - 1) * Number(pageSizeValue || 30) + 1
     : 0;
-  const showingTo = sessions.length
-    ? showingFrom + sessions.length - 1
-    : 0;
+  const showingTo = sessions.length ? showingFrom + sessions.length - 1 : 0;
   const isFilteredView = filterBy !== "all" || Boolean(searchQuery);
   const imageReplaceSession = imageReplaceContext
-    ? sessions.find((session) => session._id === imageReplaceContext.sessionId) || null
+    ? sessions.find(
+        (session) => session._id === imageReplaceContext.sessionId,
+      ) || null
     : null;
   const selectedSessions = useMemo(
-    () => sessions.filter((session) => selectedSessionIds.includes(session._id)),
-    [selectedSessionIds, sessions]
+    () =>
+      sessions.filter((session) => selectedSessionIds.includes(session._id)),
+    [selectedSessionIds, sessions],
   );
   const visiblePageNumbers = useMemo(
     () => buildVisiblePageNumbers(currentPage, totalPages),
-    [currentPage, totalPages]
+    [currentPage, totalPages],
   );
   const showInitialSkeleton = !hasLoadedFirstPage && isRefreshingList;
   const managedSession = useMemo(
     () =>
       manageSessionContext?.sessionId
-        ? sessions.find((session) => session._id === manageSessionContext.sessionId) || null
+        ? sessions.find(
+            (session) => session._id === manageSessionContext.sessionId,
+          ) || null
         : null,
     [manageSessionContext?.sessionId, sessions],
   );
 
   const buildSessionsQuery = useCallback(
-    ({ forceFresh = false, pageOverride, limitOverride, includeCounts = true } = {}) => {
+    ({
+      forceFresh = false,
+      pageOverride,
+      limitOverride,
+      includeCounts = true,
+    } = {}) => {
       const query = new URLSearchParams({
         page: String(Math.max(1, Number(pageOverride || currentPage || 1))),
         limit: String(
           Math.min(
             68,
-            Math.max(1, Number(limitOverride || pageSizeValue || SESSIONS_PAGE_SIZE))
-          )
+            Math.max(
+              1,
+              Number(limitOverride || pageSizeValue || SESSIONS_PAGE_SIZE),
+            ),
+          ),
         ),
         search: searchQuery,
         filter: filterBy,
@@ -433,7 +454,7 @@ export default function SessionsPageClient({
 
       return query;
     },
-    [currentPage, filterBy, pageSizeValue, searchQuery, sortBy]
+    [currentPage, filterBy, pageSizeValue, searchQuery, sortBy],
   );
 
   const fetchSessionsPayload = useCallback(
@@ -455,7 +476,7 @@ export default function SessionsPageClient({
           headers: {
             "Cache-Control": "no-store",
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -469,7 +490,7 @@ export default function SessionsPageClient({
 
       return payload;
     },
-    [buildSessionsQuery]
+    [buildSessionsQuery],
   );
 
   const fetchSessionCountsPayload = useCallback(
@@ -500,7 +521,7 @@ export default function SessionsPageClient({
 
       return payload;
     },
-    [buildSessionsQuery]
+    [buildSessionsQuery],
   );
 
   const applySessionsPayload = useCallback((payload) => {
@@ -531,7 +552,7 @@ export default function SessionsPageClient({
       teamAName: String(manageForm.teamAName || "").trim(),
       teamBName: String(manageForm.teamBName || "").trim(),
     }),
-    [manageForm.name, manageForm.teamAName, manageForm.teamBName]
+    [manageForm.name, manageForm.teamAName, manageForm.teamBName],
   );
   const normalizedManageInitialForm = useMemo(
     () => ({
@@ -539,12 +560,17 @@ export default function SessionsPageClient({
       teamAName: String(manageInitialForm.teamAName || "").trim(),
       teamBName: String(manageInitialForm.teamBName || "").trim(),
     }),
-    [manageInitialForm.name, manageInitialForm.teamAName, manageInitialForm.teamBName]
+    [
+      manageInitialForm.name,
+      manageInitialForm.teamAName,
+      manageInitialForm.teamBName,
+    ],
   );
   const isManageFormDirty = useMemo(
     () =>
       normalizedManageForm.name !== normalizedManageInitialForm.name ||
-      normalizedManageForm.teamAName !== normalizedManageInitialForm.teamAName ||
+      normalizedManageForm.teamAName !==
+        normalizedManageInitialForm.teamAName ||
       normalizedManageForm.teamBName !== normalizedManageInitialForm.teamBName,
     [
       normalizedManageForm.name,
@@ -553,7 +579,7 @@ export default function SessionsPageClient({
       normalizedManageInitialForm.name,
       normalizedManageInitialForm.teamAName,
       normalizedManageInitialForm.teamBName,
-    ]
+    ],
   );
   const shouldPromptManageDiscard = isManageFormDirty || manageWasEdited;
 
@@ -580,22 +606,25 @@ export default function SessionsPageClient({
     setPinPrompt({ mode: "director", session: nextSession });
   }, []);
 
-  const mergeMatchImageUpdateIntoSession = useCallback((sessionId, updatedMatch) => {
-    setSessions((current) =>
-      current.map((session) =>
-        session._id === sessionId
-          ? {
-              ...session,
-              coverImageUrl: updatedMatch?.matchImageUrl || "",
-              matchImageUrl: updatedMatch?.matchImageUrl || "",
-              matchImages: Array.isArray(updatedMatch?.matchImages)
-                ? updatedMatch.matchImages
-                : [],
-            }
-          : session
-      )
-    );
-  }, []);
+  const mergeMatchImageUpdateIntoSession = useCallback(
+    (sessionId, updatedMatch) => {
+      setSessions((current) =>
+        current.map((session) =>
+          session._id === sessionId
+            ? {
+                ...session,
+                coverImageUrl: updatedMatch?.matchImageUrl || "",
+                matchImageUrl: updatedMatch?.matchImageUrl || "",
+                matchImages: Array.isArray(updatedMatch?.matchImages)
+                  ? updatedMatch.matchImages
+                  : [],
+              }
+            : session,
+        ),
+      );
+    },
+    [],
+  );
 
   const mergeSessionUpdateIntoList = useCallback((updatedSession) => {
     if (!updatedSession?._id) {
@@ -609,8 +638,8 @@ export default function SessionsPageClient({
               ...session,
               ...updatedSession,
             }
-          : session
-      )
+          : session,
+      ),
     );
   }, []);
 
@@ -624,13 +653,13 @@ export default function SessionsPageClient({
 
     const removedIdSet = new Set(normalizedIds);
     setSessions((current) =>
-      current.filter((session) => !removedIdSet.has(String(session._id || "")))
+      current.filter((session) => !removedIdSet.has(String(session._id || ""))),
     );
     setTotalCount((current) =>
-      Math.max(0, Number(current || 0) - removedIdSet.size)
+      Math.max(0, Number(current || 0) - removedIdSet.size),
     );
     setUnfilteredTotalCount((current) =>
-      Math.max(0, Number(current || 0) - removedIdSet.size)
+      Math.max(0, Number(current || 0) - removedIdSet.size),
     );
   }, []);
 
@@ -695,7 +724,7 @@ export default function SessionsPageClient({
 
   const shouldBlockCardOpen = useCallback(
     () => selectionMode || Date.now() < suppressCardOpenUntilRef.current,
-    [selectionMode]
+    [selectionMode],
   );
 
   const handleGoHome = useCallback(() => {
@@ -713,7 +742,9 @@ export default function SessionsPageClient({
       sessionsTopRef.current instanceof HTMLElement
         ? Math.max(
             0,
-            window.scrollY + sessionsTopRef.current.getBoundingClientRect().top - 12
+            window.scrollY +
+              sessionsTopRef.current.getBoundingClientRect().top -
+              12,
           )
         : 0;
 
@@ -772,7 +803,12 @@ export default function SessionsPageClient({
         }
       }
     },
-    [applyCountsPayload, applySessionsPayload, fetchSessionCountsPayload, fetchSessionsPayload]
+    [
+      applyCountsPayload,
+      applySessionsPayload,
+      fetchSessionCountsPayload,
+      fetchSessionsPayload,
+    ],
   );
 
   useEffect(() => {
@@ -933,16 +969,16 @@ export default function SessionsPageClient({
       }
       openSessionManager(session, pin);
     },
-    [managePinPrompt, openSessionManager, startSelectionMode]
+    [managePinPrompt, openSessionManager, startSelectionMode],
   );
 
   const closeSessionManager = useCallback(
     (options = {}) => {
       const forceClose = Boolean(
         options &&
-          typeof options === "object" &&
-          "force" in options &&
-          options.force === true
+        typeof options === "object" &&
+        "force" in options &&
+        options.force === true,
       );
 
       if (manageSubmitting) {
@@ -962,7 +998,7 @@ export default function SessionsPageClient({
       setManageSubmitting(false);
       setManageDiscardPromptOpen(false);
     },
-    [manageSubmitting, shouldPromptManageDiscard]
+    [manageSubmitting, shouldPromptManageDiscard],
   );
 
   const handleOpenManagedImageUploader = useCallback(() => {
@@ -1006,7 +1042,9 @@ export default function SessionsPageClient({
 
     try {
       const previousSession =
-        sessions.find((session) => session._id === manageSessionContext.sessionId) || null;
+        sessions.find(
+          (session) => session._id === manageSessionContext.sessionId,
+        ) || null;
       const response = await fetch(
         `/api/sessions/${manageSessionContext.sessionId}`,
         {
@@ -1018,7 +1056,7 @@ export default function SessionsPageClient({
             teamAName: manageForm.teamAName.trim(),
             teamBName: manageForm.teamBName.trim(),
           }),
-        }
+        },
       );
       const payload = await response
         .json()
@@ -1032,17 +1070,17 @@ export default function SessionsPageClient({
         describeSessionFieldChange(
           "Game name",
           previousSession?.name || "",
-          payload.name || manageForm.name.trim()
+          payload.name || manageForm.name.trim(),
         ),
         describeSessionFieldChange(
           "Team A",
           previousSession?.teamAName || "",
-          payload.teamAName || manageForm.teamAName.trim()
+          payload.teamAName || manageForm.teamAName.trim(),
         ),
         describeSessionFieldChange(
           "Team B",
           previousSession?.teamBName || "",
-          payload.teamBName || manageForm.teamBName.trim()
+          payload.teamBName || manageForm.teamBName.trim(),
         ),
       ].filter(Boolean);
 
@@ -1067,7 +1105,17 @@ export default function SessionsPageClient({
     } finally {
       setManageSubmitting(false);
     }
-  }, [closeSessionManager, manageForm.name, manageForm.teamAName, manageForm.teamBName, manageSessionContext, manageSubmitting, mergeSessionUpdateIntoList, reloadSessionsFromServer, sessions]);
+  }, [
+    closeSessionManager,
+    manageForm.name,
+    manageForm.teamAName,
+    manageForm.teamBName,
+    manageSessionContext,
+    manageSubmitting,
+    mergeSessionUpdateIntoList,
+    reloadSessionsFromServer,
+    sessions,
+  ]);
 
   const handleBulkDeleteSessions = useCallback(
     async (pin) => {
@@ -1075,7 +1123,7 @@ export default function SessionsPageClient({
         throw new Error("Select at least 1 session.");
       }
       const selectedSessionSnapshot = sessions.filter((session) =>
-        selectedSessionIds.includes(session._id)
+        selectedSessionIds.includes(session._id),
       );
 
       const response = await fetch("/api/sessions/bulk-delete", {
@@ -1118,7 +1166,13 @@ export default function SessionsPageClient({
       });
       void reloadSessionsFromServer({ forceFresh: true }).catch(() => {});
     },
-    [clearSelectionMode, reloadSessionsFromServer, removeSessionsFromList, selectedSessionIds, sessions]
+    [
+      clearSelectionMode,
+      reloadSessionsFromServer,
+      removeSessionsFromList,
+      selectedSessionIds,
+      sessions,
+    ],
   );
 
   const handleDeleteSessionImage = useCallback(
@@ -1141,7 +1195,7 @@ export default function SessionsPageClient({
             pin,
             imageId: imageDeleteContext.image?.id || "",
           }),
-        }
+        },
       );
       const payload = await response
         .json()
@@ -1158,7 +1212,11 @@ export default function SessionsPageClient({
       mergeMatchImageUpdateIntoSession(imageDeleteContext.sessionId, payload);
       closeImageActionFlows();
     },
-    [closeImageActionFlows, imageDeleteContext, mergeMatchImageUpdateIntoSession]
+    [
+      closeImageActionFlows,
+      imageDeleteContext,
+      mergeMatchImageUpdateIntoSession,
+    ],
   );
 
   const handlePinSubmit = async (pin) => {
@@ -1191,11 +1249,14 @@ export default function SessionsPageClient({
         return;
       }
 
-      const response = await fetch(`/api/matches/${pinPrompt.session.match}/auth`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin }),
-      });
+      const response = await fetch(
+        `/api/matches/${pinPrompt.session.match}/auth`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pin }),
+        },
+      );
 
       if (!response.ok) {
         const payload = await response
@@ -1216,7 +1277,7 @@ export default function SessionsPageClient({
         needsToss
           ? `/toss/${pinPrompt.session.match}`
           : `/match/${pinPrompt.session.match}`,
-        { scroll: true }
+        { scroll: true },
       );
       setPinPrompt(null);
     } catch (error) {
@@ -1227,9 +1288,17 @@ export default function SessionsPageClient({
     }
   };
 
-  if (!sessions.length && !isFilteredView && !isRefreshingList && hasLoadedFirstPage) {
+  if (
+    !sessions.length &&
+    !isFilteredView &&
+    !isRefreshingList &&
+    hasLoadedFirstPage
+  ) {
     return (
-      <main id="top" className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_22%),radial-gradient(circle_at_82%_14%,rgba(14,165,233,0.1),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.08),transparent_20%),linear-gradient(180deg,#16181d_0%,#090a0f_100%)] px-5 py-8 text-zinc-100">
+      <main
+        id="top"
+        className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_22%),radial-gradient(circle_at_82%_14%,rgba(14,165,233,0.1),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.08),transparent_20%),linear-gradient(180deg,#16181d_0%,#090a0f_100%)] px-5 py-8 text-zinc-100"
+      >
         <div className="mx-auto flex min-h-[80vh] max-w-4xl items-center justify-center">
           <EmptyState
             title="No sessions yet"
@@ -1301,12 +1370,16 @@ export default function SessionsPageClient({
                   <FaInfoCircle size={18} />
                 </button>
               </div>
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-zinc-400 sm:text-base">
+                Browse latest games, live cricket scores, completed match
+                results, and saved sessions.
+              </p>
               <p className="mt-3 text-sm text-zinc-400">
                 {showInitialSkeleton
                   ? "Loading the latest sessions..."
                   : isFilteredView
-                  ? `Showing ${showingFrom.toLocaleString()}-${showingTo.toLocaleString()} of ${totalSessionCount.toLocaleString()} matches`
-                  : `Showing ${showingFrom.toLocaleString()}-${showingTo.toLocaleString()} of ${overallSessionCount.toLocaleString()} total`}
+                    ? `Showing ${showingFrom.toLocaleString()}-${showingTo.toLocaleString()} of ${totalSessionCount.toLocaleString()} matches`
+                    : `Showing ${showingFrom.toLocaleString()}-${showingTo.toLocaleString()} of ${overallSessionCount.toLocaleString()} total`}
               </p>
             </div>
           </div>
@@ -1362,7 +1435,6 @@ export default function SessionsPageClient({
               ))}
             </div>
           </div>
-
         </section>
 
         <div className="mt-8">
@@ -1370,13 +1442,17 @@ export default function SessionsPageClient({
             <SessionsGridSkeleton count={8} />
           ) : !sessions.length && !isRefreshingList ? (
             <EmptyState
-              title={searchQuery ? "No matching sessions" : "No sessions in this view"}
+              title={
+                searchQuery
+                  ? "No matching sessions"
+                  : "No sessions in this view"
+              }
               text={
                 searchQuery
                   ? "Try a different session name, team name, or date."
                   : filterBy === "live"
-                  ? "No live sessions right now. Completed matches will still appear in All."
-                  : "There are no completed sessions yet."
+                    ? "No live sessions right now. Completed matches will still appear in All."
+                    : "There are no completed sessions yet."
               }
               href="/session/new"
               label="Create New Match"
@@ -1409,7 +1485,8 @@ export default function SessionsPageClient({
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <p className="text-sm font-medium text-zinc-200">
-                      Showing {showingFrom.toLocaleString()}-{showingTo.toLocaleString()} of{" "}
+                      Showing {showingFrom.toLocaleString()}-
+                      {showingTo.toLocaleString()} of{" "}
                       {totalSessionCount.toLocaleString()} matching{" "}
                       {totalSessionCount === 1 ? "session" : "sessions"}
                     </p>
@@ -1488,7 +1565,9 @@ export default function SessionsPageClient({
                         type="button"
                         onClick={() => {
                           scrollSessionsToTop();
-                          setCurrentPage((current) => Math.min(totalPages, current + 1));
+                          setCurrentPage((current) =>
+                            Math.min(totalPages, current + 1),
+                          );
                         }}
                         disabled={!hasNextPage || isRefreshingList}
                         className="press-feedback rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] disabled:cursor-not-allowed disabled:opacity-40"
@@ -1578,7 +1657,9 @@ export default function SessionsPageClient({
             mode={pinPrompt.mode}
             theme={pinPrompt.mode === "director" ? "emerald" : "sky"}
             title={
-              pinPrompt.mode === "director" ? "Director Mode PIN" : "Umpire Mode PIN"
+              pinPrompt.mode === "director"
+                ? "Director Mode PIN"
+                : "Umpire Mode PIN"
             }
             description={
               pinPrompt.mode === "director"
@@ -1586,7 +1667,9 @@ export default function SessionsPageClient({
                 : "Enter the PIN to access scoring controls."
             }
             submitLabel={
-              pinPrompt.mode === "director" ? "Join Director Mode" : "Enter Umpire Mode"
+              pinPrompt.mode === "director"
+                ? "Join Director Mode"
+                : "Enter Umpire Mode"
             }
             rateLimitScope={
               pinPrompt.mode === "director"
@@ -1612,7 +1695,9 @@ export default function SessionsPageClient({
                 : "Enter the 6-digit manage PIN to unlock session options."
             }
             confirmLabel={
-              managePinPrompt.mode === "select" ? "Unlock Selection" : "Continue"
+              managePinPrompt.mode === "select"
+                ? "Unlock Selection"
+                : "Continue"
             }
             digitCount={6}
             pinLabel="Manage PIN"
@@ -1665,7 +1750,8 @@ export default function SessionsPageClient({
                     onClick={handleOpenManagedImageUploader}
                     className="rounded-2xl border border-cyan-300/18 bg-[linear-gradient(180deg,rgba(10,18,26,0.96),rgba(8,47,73,0.82))] px-4 py-3 text-sm font-semibold text-cyan-50 transition hover:brightness-110"
                   >
-                    {Array.isArray(managedSession?.matchImages) && managedSession.matchImages.length
+                    {Array.isArray(managedSession?.matchImages) &&
+                    managedSession.matchImages.length
                       ? "Manage Match Images"
                       : "Add Match Image"}
                   </button>
@@ -1757,7 +1843,8 @@ export default function SessionsPageClient({
             panelClassName="max-w-sm"
           >
             <p className="text-sm leading-6 text-zinc-300">
-              You have unsaved session changes. Do you want to discard them or keep editing?
+              You have unsaved session changes. Do you want to discard them or
+              keep editing?
             </p>
             <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <button
@@ -1787,13 +1874,21 @@ export default function SessionsPageClient({
           >
             <MatchImageUploader
               matchId={String(imageReplaceContext.matchId)}
-              existingImages={Array.isArray(imageReplaceSession?.matchImages) ? imageReplaceSession.matchImages : []}
+              existingImages={
+                Array.isArray(imageReplaceSession?.matchImages)
+                  ? imageReplaceSession.matchImages
+                  : []
+              }
               existingImageUrl={
                 imageReplaceContext.mode === "replace"
                   ? imageReplaceContext.image?.url || ""
                   : ""
               }
-              existingImageCount={Array.isArray(imageReplaceSession?.matchImages) ? imageReplaceSession.matchImages.length : 0}
+              existingImageCount={
+                Array.isArray(imageReplaceSession?.matchImages)
+                  ? imageReplaceSession.matchImages.length
+                  : 0
+              }
               targetImageId={
                 imageReplaceContext.mode === "replace"
                   ? imageReplaceContext.image?.id || ""
@@ -1803,7 +1898,7 @@ export default function SessionsPageClient({
               onUploaded={(updatedMatch) => {
                 mergeMatchImageUpdateIntoSession(
                   imageReplaceContext.sessionId,
-                  updatedMatch
+                  updatedMatch,
                 );
               }}
               onComplete={() => {
@@ -1838,7 +1933,10 @@ export default function SessionsPageClient({
           />
         ) : null}
         {isInfoModalOpen ? (
-          <InfoModal key="info-modal" onExit={() => setIsInfoModalOpen(false)} />
+          <InfoModal
+            key="info-modal"
+            onExit={() => setIsInfoModalOpen(false)}
+          />
         ) : null}
         {actionSummary ? (
           <ActionSummaryModal
@@ -1852,5 +1950,3 @@ export default function SessionsPageClient({
     </main>
   );
 }
-
-
