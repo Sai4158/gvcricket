@@ -38,6 +38,18 @@ export function buildBallSlotLabels(balls = []) {
   });
 }
 
+function countLegalBallsInOver(balls = []) {
+  return (Array.isArray(balls) ? balls : []).reduce((total, ball) => {
+    return isCountableBall(ball) ? total + 1 : total;
+  }, 0);
+}
+
+function calculateRunsInOver(balls = []) {
+  return (Array.isArray(balls) ? balls : []).reduce((total, ball) => {
+    return total + Number(ball?.runs || 0);
+  }, 0);
+}
+
 export const Ball = memo(function Ball({ ball, ballNumber }) {
   let style =
     "border border-white/10 bg-[linear-gradient(180deg,rgba(55,60,72,0.96),rgba(36,40,50,0.98))] shadow-[0_10px_24px_rgba(0,0,0,0.24)]";
@@ -106,6 +118,26 @@ export const BallTracker = memo(function BallTracker({
     () => buildBallSlotLabels(currentBalls),
     [currentBalls],
   );
+  const legalBallsInOver = useMemo(() => {
+    return countLegalBallsInOver(currentBalls);
+  }, [currentBalls]);
+  const runsThisOver = useMemo(() => {
+    return calculateRunsInOver(currentBalls);
+  }, [currentBalls]);
+  const ballsLeftInOver = useMemo(() => {
+    return Math.max(6 - legalBallsInOver, 0);
+  }, [legalBallsInOver]);
+  const overRateLabel = useMemo(() => {
+    if (legalBallsInOver <= 0) {
+      return "RATE 0.00";
+    }
+
+    return `RATE ${((runsThisOver / legalBallsInOver) * 6).toFixed(2)}`;
+  }, [legalBallsInOver, runsThisOver]);
+  const overStatusLabel =
+    ballsLeftInOver === 0
+      ? "OVER DONE"
+      : `${ballsLeftInOver} LEFT`;
   const currentBallSignature = useMemo(
     () =>
       currentBalls
@@ -144,11 +176,19 @@ export const BallTracker = memo(function BallTracker({
 
   return (
     <div className="mb-6 rounded-2xl bg-zinc-900/50 p-4 ring-1 ring-white/10">
-      <h3
-        className={`${matchControlsFont.className} mb-4 text-center font-bold text-white`}
+      <div
+        className={`${matchControlsFont.className} mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-[0.82rem] font-bold uppercase tracking-[0.12em] text-white sm:text-[0.9rem]`}
       >
-        Over {resolvedOverNumber}
-      </h3>
+        <span className="justify-self-start text-left leading-none">
+          {overRateLabel}
+        </span>
+        <h3 className="text-center text-[1.02rem] leading-none sm:text-lg">
+          OVER {resolvedOverNumber}
+        </h3>
+        <span className="justify-self-end text-right leading-none">
+          {overStatusLabel}
+        </span>
+      </div>
       <div
         ref={trackerRef}
         className="overflow-x-auto overflow-y-hidden pb-3 pr-1 [scrollbar-color:rgba(255,255,255,0.35)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/30 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:h-2"
