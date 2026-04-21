@@ -687,6 +687,18 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     return refreshedMatch;
   }, [refreshMatch]);
 
+  const flushPendingActions = useCallback(async () => {
+    if (!actionQueueRef.current.length && !processingQueueRef.current) {
+      return matchRef.current;
+    }
+
+    clearRetryTimer();
+    await processQueuedActionsRef.current();
+
+    const refreshedMatch = await refreshMatchFromServer();
+    return refreshedMatch || matchRef.current;
+  }, [clearRetryTimer, refreshMatchFromServer]);
+
   const processQueuedActions = useCallback(async () => {
     if (processingQueueRef.current) {
       return;
@@ -766,6 +778,36 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
               ),
             );
             continue;
+          }
+
+          if (response.status === 404 || body.message === "Match not found.") {
+            const refreshedMatch = await refreshMatchFromServer();
+            updateQueuedActions(
+              removeQueuedActionById(
+                actionQueueRef.current,
+                currentEntry.action.actionId,
+              ),
+            );
+            optimisticUndoStackRef.current = [];
+            if (refreshedMatch || matchRef.current) {
+              setError(null);
+              continue;
+            }
+          }
+
+          if (response.status === 409) {
+            const refreshedMatch = await refreshMatchFromServer();
+            updateQueuedActions(
+              removeQueuedActionById(
+                actionQueueRef.current,
+                currentEntry.action.actionId,
+              ),
+            );
+            optimisticUndoStackRef.current = [];
+            if (refreshedMatch || matchRef.current) {
+              setError(null);
+              continue;
+            }
           }
 
           throw new Error(body.message || "Failed to update match.");
@@ -1037,7 +1079,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
   }, [currentInningsHasHistory, match?.undoCount, matchId, router, sendAction, startNavigation, tossPending]);
 
   const handleNextInningsOrEnd = useCallback(async () => {
-    if (!match || !hasAccess) return;
+    if (!hasAccess) return null;
     if (tossPending) {
       setError(null);
       startNavigation("Opening toss...");
@@ -1045,10 +1087,22 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       return null;
     }
 
-    if (match.result && !match.pendingResult && !match.isOngoing) {
+    let currentMatch = matchRef.current;
+    if (!currentMatch) {
+      return null;
+    }
+
+    if (actionQueueRef.current.length || processingQueueRef.current) {
+      currentMatch = await flushPendingActions();
+      if (!currentMatch) {
+        return null;
+      }
+    }
+
+    if (currentMatch.result && !currentMatch.pendingResult && !currentMatch.isOngoing) {
       startNavigation("Opening result...");
       router.push(`/result/${matchId}`);
-      return match;
+      return currentMatch;
     }
 
     const updatedMatch = await sendAction({
@@ -1061,7 +1115,15 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       router.push(`/result/${matchId}`);
     }
     return updatedMatch || null;
-  }, [hasAccess, match, matchId, router, sendAction, startNavigation, tossPending]);
+  }, [
+    flushPendingActions,
+    hasAccess,
+    matchId,
+    router,
+    sendAction,
+    startNavigation,
+    tossPending,
+  ]);
 
   return {
     match,
