@@ -79,6 +79,52 @@ function getActiveInningsKey(match) {
 }
 
 function getCompactOverState(match) {
+  const explicitActiveOverBalls = Array.isArray(match?.activeOverBalls)
+    ? match.activeOverBalls
+    : null;
+  const explicitActiveOverNumber = Number(match?.activeOverNumber);
+  const explicitLegalBallCount = Number(match?.legalBallCount);
+  const explicitFirstInningsLegalBallCount = Number(match?.firstInningsLegalBallCount);
+  const explicitSecondInningsLegalBallCount = Number(match?.secondInningsLegalBallCount);
+
+  if (
+    explicitActiveOverBalls &&
+    Number.isFinite(explicitActiveOverNumber) &&
+    explicitActiveOverNumber > 0 &&
+    Number.isFinite(explicitLegalBallCount) &&
+    explicitLegalBallCount >= 0
+  ) {
+    const firstInningsLegalBallCount = Number.isFinite(
+      explicitFirstInningsLegalBallCount,
+    )
+      ? explicitFirstInningsLegalBallCount
+      : match?.innings === "first"
+        ? explicitLegalBallCount
+        : countLegalBalls(match?.innings1?.history || []);
+    const secondInningsLegalBallCount = Number.isFinite(
+      explicitSecondInningsLegalBallCount,
+    )
+      ? explicitSecondInningsLegalBallCount
+      : match?.innings === "second"
+        ? explicitLegalBallCount
+        : countLegalBalls(match?.innings2?.history || []);
+
+    return {
+      activeHistory: Array.isArray(match?.[getActiveInningsKey(match)]?.history)
+        ? match[getActiveInningsKey(match)].history
+        : [],
+      activeOver: {
+        overNumber: explicitActiveOverNumber,
+        balls: explicitActiveOverBalls,
+      },
+      activeOverBalls: explicitActiveOverBalls,
+      activeOverNumber: explicitActiveOverNumber,
+      legalBallCount: explicitLegalBallCount,
+      firstInningsLegalBallCount,
+      secondInningsLegalBallCount,
+    };
+  }
+
   const activeInningsKey = getActiveInningsKey(match);
   const activeHistory = Array.isArray(match?.[activeInningsKey]?.history)
     ? match[activeInningsKey].history

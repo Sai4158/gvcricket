@@ -502,6 +502,7 @@ export async function seedMatchImages(matchId: string, count = 12) {
 }
 
 export async function uploadTinyImage(baseUrl: string, matchId: string, jar: CookieJar) {
+  readEnvFileIfNeeded();
   const file = new File(
     [Buffer.from(TINY_PNG_BASE64, "base64")],
     `umpire-stress-${Date.now()}.png`,
@@ -509,6 +510,16 @@ export async function uploadTinyImage(baseUrl: string, matchId: string, jar: Coo
   );
   const formData = new FormData();
   formData.append("image", file);
+  const uploadPin =
+    String(
+      process.env.SESSION_MANAGE_PIN ||
+      process.env.MATCH_MEDIA_PIN ||
+      process.env.UMPIRE_ADMIN_PIN ||
+      "",
+    ).trim();
+  if (uploadPin) {
+    formData.append("pin", uploadPin);
+  }
 
   return api(baseUrl, `/api/matches/${matchId}/image`, {
     method: "POST",

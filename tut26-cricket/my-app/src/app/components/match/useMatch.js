@@ -17,7 +17,12 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
-import { applyMatchAction, MatchEngineError } from "../../lib/match-engine";
+import {
+  applyMatchAction,
+  createMatchUndoSnapshot,
+  MatchEngineError,
+  restoreMatchUndoSnapshot,
+} from "../../lib/match-engine";
 import { countLegalBalls } from "../../lib/match-scoring";
 import useEventSource from "../live/useEventSource";
 import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
@@ -34,18 +39,6 @@ function wait(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
-}
-
-function cloneMatchState(match) {
-  if (!match) {
-    return null;
-  }
-
-  if (typeof structuredClone === "function") {
-    return structuredClone(match);
-  }
-
-  return JSON.parse(JSON.stringify(match));
 }
 
 function triggerHapticFeedback() {
@@ -134,6 +127,8 @@ function normalizeOptimisticMatch(nextMatch) {
     ? nextMatch.activeOverBalls
     : [];
   const compactActiveOverNumber = Number(nextMatch?.activeOverNumber || 1);
+  const hasExplicitCompactState = hasCompactActiveOverBalls &&
+    Number.isFinite(Number(nextMatch?.legalBallCount));
   const derivedActiveOverBalls = Array.isArray(activeOver?.balls)
     ? activeOver.balls
     : [];
@@ -144,28 +139,32 @@ function normalizeOptimisticMatch(nextMatch) {
     compactActiveOverNumber > 0
       ? compactActiveOverNumber
       : Number(activeOver?.overNumber || 1);
-  const derivedLegalBallCount = activeHistory.length
-    ? countLegalBalls(activeHistory)
-    : countLegalBallsInBalls(activeOverBalls);
+  const derivedLegalBallCount = hasExplicitCompactState
+    ? Number(nextMatch?.legalBallCount || 0)
+    : activeHistory.length
+      ? countLegalBalls(activeHistory)
+      : countLegalBallsInBalls(activeOverBalls);
   const legalBallCount = Number.isFinite(Number(nextMatch?.legalBallCount))
     ? Math.max(derivedLegalBallCount, Number(nextMatch.legalBallCount || 0))
     : derivedLegalBallCount;
-  const firstInningsLegalBallCount = Array.isArray(nextMatch?.innings1?.history) &&
-    nextMatch.innings1.history.length
+  const firstInningsLegalBallCount = Number.isFinite(
+    Number(nextMatch?.firstInningsLegalBallCount),
+  )
+    ? Number(nextMatch.firstInningsLegalBallCount || 0)
+    : Array.isArray(nextMatch?.innings1?.history) && nextMatch.innings1.history.length
       ? countLegalBalls(nextMatch.innings1.history)
-      : Number.isFinite(Number(nextMatch?.firstInningsLegalBallCount))
-        ? Number(nextMatch.firstInningsLegalBallCount || 0)
-        : nextMatch?.innings === "first"
-          ? legalBallCount
-          : 0;
-  const secondInningsLegalBallCount = Array.isArray(nextMatch?.innings2?.history) &&
-    nextMatch.innings2.history.length
+      : nextMatch?.innings === "first"
+        ? legalBallCount
+        : 0;
+  const secondInningsLegalBallCount = Number.isFinite(
+    Number(nextMatch?.secondInningsLegalBallCount),
+  )
+    ? Number(nextMatch.secondInningsLegalBallCount || 0)
+    : Array.isArray(nextMatch?.innings2?.history) && nextMatch.innings2.history.length
       ? countLegalBalls(nextMatch.innings2.history)
-      : Number.isFinite(Number(nextMatch?.secondInningsLegalBallCount))
-        ? Number(nextMatch.secondInningsLegalBallCount || 0)
-        : nextMatch?.innings === "second"
-          ? legalBallCount
-          : 0;
+      : nextMatch?.innings === "second"
+        ? legalBallCount
+        : 0;
   const historyUndoCount = Array.isArray(nextMatch.actionHistory)
     ? nextMatch.actionHistory.length
     : 0;
@@ -377,10 +376,12 @@ export function replayQueuedMatchActions(baseMatch, queuedEntries = []) {
         throw new MatchEngineError("There is nothing left to undo.", 409);
       }
 
-      return normalizeOptimisticMatch(previousSnapshot);
+      return normalizeOptimisticMatch(
+        restoreMatchUndoSnapshot(nextMatch, previousSnapshot),
+      );
     }
 
-    undoShadowStack.push(cloneMatchState(nextMatch));
+    undoShadowStack.push(createMatchUndoSnapshot(nextMatch));
     return normalizeOptimisticMatch(applyMatchAction(nextMatch, entry.action));
   }, baseMatch);
 }
@@ -843,9 +844,11 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
         if (!previousSnapshot && Number(baseMatch?.undoCount || 0) <= 0) {
           throw new MatchEngineError("There is nothing left to undo.", 409);
         }
-        optimisticMatch = previousSnapshot || baseMatch;
+        optimisticMatch = previousSnapshot
+          ? restoreMatchUndoSnapshot(baseMatch, previousSnapshot)
+          : baseMatch;
       } else {
-        optimisticUndoStackRef.current.push(cloneMatchState(baseMatch));
+        optimisticUndoStackRef.current.push(createMatchUndoSnapshot(baseMatch));
         optimisticMatch = applyMatchAction(baseMatch, action);
       }
 

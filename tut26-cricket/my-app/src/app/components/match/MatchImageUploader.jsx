@@ -136,6 +136,20 @@ function getPlannedGalleryCount({
   return existingCount + nextSelectedCount;
 }
 
+async function prepareUploadFiles(selectedFiles = [], onProgress) {
+  const files = Array.isArray(selectedFiles) ? selectedFiles : [];
+  let preparedCount = 0;
+
+  return Promise.all(
+    files.map(async (selectedFile) => {
+      const compressedFile = await compressMatchImage(selectedFile);
+      preparedCount += 1;
+      onProgress?.(preparedCount, files.length);
+      return compressedFile;
+    }),
+  );
+}
+
 function SelectedImageTile({
   item,
   index,
@@ -729,15 +743,23 @@ export default function MatchImageUploader({
       try {
         let latestPayload = null;
         const totalUploads = selectedFiles.length;
-
-        for (const [index, selectedFile] of selectedFiles.entries()) {
+        const preparedFiles = await (async () => {
           setUploadStatusText(
             totalUploads > 1
-              ? `Preparing ${index + 1}/${totalUploads}...`
+              ? `Preparing 0/${totalUploads}...`
               : "Preparing...",
           );
-          const compressedFile = await compressMatchImage(selectedFile);
 
+          return prepareUploadFiles(selectedFiles, (preparedCount, totalCount) => {
+            setUploadStatusText(
+              totalCount > 1
+                ? `Preparing ${preparedCount}/${totalCount}...`
+                : "Preparing...",
+            );
+          });
+        })();
+
+        for (const [index, compressedFile] of preparedFiles.entries()) {
           setUploadStatusText(
             totalUploads > 1
               ? `Uploading ${index + 1}/${totalUploads}...`

@@ -9,7 +9,7 @@
  * Read next: ./README.md
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   FaBookOpen,
@@ -472,7 +472,7 @@ function ActionIconButton({
   );
 }
 
-export default function MatchActionGrid({
+const MatchActionGrid = memo(function MatchActionGrid({
   isUpdating,
   historyStackLength,
   onEditTeams,
@@ -855,6 +855,8 @@ export default function MatchActionGrid({
       </AnimatePresence>
     </>
   );
-}
+});
+
+export default MatchActionGrid;
 
 

@@ -79,7 +79,7 @@ export const Ball = memo(function Ball({ ball, ballNumber }) {
   );
 });
 
-export function BallTracker({
+export const BallTracker = memo(function BallTracker({
   history = null,
   activeOverBalls = null,
   activeOverNumber = null,
@@ -166,4 +166,4 @@ export function BallTracker({
       </div>
     </div>
   );
-}
+});

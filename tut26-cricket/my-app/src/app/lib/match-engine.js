@@ -78,6 +78,70 @@ function countInningsWickets(history = []) {
   }, 0);
 }
 
+function countLegalBallsInBalls(balls = []) {
+  let total = 0;
+
+  for (const ball of Array.isArray(balls) ? balls : []) {
+    if (ball?.extraType !== "wide" && ball?.extraType !== "noball") {
+      total += 1;
+    }
+  }
+
+  return total;
+}
+
+function cloneBallsArray(balls = []) {
+  return Array.isArray(balls) ? balls.slice() : [];
+}
+
+function cloneInningsShell(innings = null) {
+  return innings
+    ? {
+        ...innings,
+        history: Array.isArray(innings.history) ? innings.history : [],
+      }
+    : {
+        team: "",
+        score: 0,
+        history: [],
+      };
+}
+
+function cloneOver(over = null) {
+  if (!over) {
+    return null;
+  }
+
+  return {
+    ...over,
+    balls: cloneBallsArray(over.balls),
+  };
+}
+
+function rebuildHistoryFromBalls(balls = []) {
+  const history = [];
+  let currentOver = null;
+  let legalBallsInCurrentOver = 0;
+
+  for (const ball of Array.isArray(balls) ? balls : []) {
+    if (!currentOver || legalBallsInCurrentOver >= 6) {
+      currentOver = {
+        overNumber: history.length + 1,
+        balls: [],
+      };
+      history.push(currentOver);
+      legalBallsInCurrentOver = 0;
+    }
+
+    currentOver.balls.push(ball);
+    if (ball?.extraType !== "wide" && ball?.extraType !== "noball") {
+      legalBallsInCurrentOver += 1;
+    }
+  }
+
+  return history;
+}
+
 // Turn a Mongoose document into a plain object we can safely edit.
 function toPlainMatch(matchDocument) {
   if (!matchDocument) return null;
@@ -87,12 +151,116 @@ function toPlainMatch(matchDocument) {
     : cloneValue(matchDocument);
 }
 
+function createMutableHotMatch(match, { cloneBalls = false, cloneActiveHistory = false } = {}) {
+  if (!match) {
+    return null;
+  }
+
+  const nextMatch = {
+    ...match,
+    innings1: cloneInningsShell(match.innings1),
+    innings2: cloneInningsShell(match.innings2),
+  };
+
+  if (cloneBalls) {
+    nextMatch.balls = cloneBallsArray(match.balls);
+  }
+
+  if (cloneActiveHistory) {
+    const activeInningsKey = getActiveInningsKey(match);
+    const sourceHistory = Array.isArray(match?.[activeInningsKey]?.history)
+      ? match[activeInningsKey].history
+      : [];
+    const nextHistory = sourceHistory.slice();
+    const lastIndex = nextHistory.length - 1;
+
+    if (lastIndex >= 0) {
+      nextHistory[lastIndex] = cloneOver(sourceHistory[lastIndex]);
+    }
+
+    nextMatch[activeInningsKey] = {
+      ...nextMatch[activeInningsKey],
+      history: nextHistory,
+    };
+  }
+
+  return nextMatch;
+}
+
+function getKnownInningsLegalBallCount(match, inningsKey) {
+  const compactKey =
+    inningsKey === "second"
+      ? "secondInningsLegalBallCount"
+      : "firstInningsLegalBallCount";
+  const explicitCount = Number(match?.[compactKey]);
+
+  if (Number.isFinite(explicitCount) && explicitCount >= 0) {
+    return explicitCount;
+  }
+
+  const history = Array.isArray(match?.[inningsKey]?.history)
+    ? match[inningsKey].history
+    : [];
+
+  if (history.length) {
+    return countLegalBalls(history);
+  }
+
+  if (getActiveInningsKey(match) === inningsKey) {
+    return countLegalBallsInBalls(match?.balls);
+  }
+
+  return 0;
+}
+
+function assignCompactMatchState(match, overrides = {}) {
+  const activeInningsKey = getActiveInningsKey(match);
+  const activeHistory = Array.isArray(match?.[activeInningsKey]?.history)
+    ? match[activeInningsKey].history
+    : [];
+  const currentOver = activeHistory.at(-1) || null;
+  const activeOverBalls = Array.isArray(overrides.activeOverBalls)
+    ? overrides.activeOverBalls
+    : Array.isArray(currentOver?.balls)
+      ? currentOver.balls
+      : [];
+  const explicitOverNumber = Number(overrides.activeOverNumber);
+  const resolvedLegalBallCount = Number(overrides.legalBallCount);
+  const firstInningsLegalBallCount = Number(overrides.firstInningsLegalBallCount);
+  const secondInningsLegalBallCount = Number(overrides.secondInningsLegalBallCount);
+
+  match.activeOverBalls = cloneBallsArray(activeOverBalls);
+  match.activeOverNumber =
+    Number.isFinite(explicitOverNumber) && explicitOverNumber > 0
+      ? explicitOverNumber
+      : Number(currentOver?.overNumber || 1);
+  match.legalBallCount =
+    Number.isFinite(resolvedLegalBallCount) && resolvedLegalBallCount >= 0
+      ? resolvedLegalBallCount
+      : getKnownInningsLegalBallCount(match, activeInningsKey);
+  match.firstInningsLegalBallCount =
+    Number.isFinite(firstInningsLegalBallCount) && firstInningsLegalBallCount >= 0
+      ? firstInningsLegalBallCount
+      : activeInningsKey === "first"
+        ? match.legalBallCount
+        : getKnownInningsLegalBallCount(match, "first");
+  match.secondInningsLegalBallCount =
+    Number.isFinite(secondInningsLegalBallCount) && secondInningsLegalBallCount >= 0
+      ? secondInningsLegalBallCount
+      : activeInningsKey === "second"
+        ? match.legalBallCount
+        : getKnownInningsLegalBallCount(match, "second");
+
+  return match;
+}
+
 // Save the current match state so undo can go back to it.
 function getSnapshot(match) {
   const activeInningsKey = getActiveInningsKey(match);
+  const currentLegalBallCount = getKnownInningsLegalBallCount(match, activeInningsKey);
 
   return {
-    snapshotVersion: 2,
+    snapshotVersion: 3,
     tossWinner: cloneValue(match?.tossWinner),
     tossDecision: cloneValue(match?.tossDecision),
     score: cloneValue(match?.score),
@@ -117,6 +285,21 @@ function getSnapshot(match) {
       history: [],
     },
     balls: cloneValue(match?.balls || []),
+    activeOverNumber: cloneValue(match?.activeOverNumber || 1),
+    activeOverBalls: cloneValue(match?.activeOverBalls || []),
+    legalBallCount: cloneValue(match?.legalBallCount ?? currentLegalBallCount),
+    firstInningsLegalBallCount: cloneValue(
+      match?.firstInningsLegalBallCount ??
+        (activeInningsKey === "first"
+          ? currentLegalBallCount
+          : getKnownInningsLegalBallCount(match, "first")),
+    ),
+    secondInningsLegalBallCount: cloneValue(
+      match?.secondInningsLegalBallCount ??
+        (activeInningsKey === "second"
+          ? currentLegalBallCount
+          : getKnownInningsLegalBallCount(match, "second")),
+    ),
     lastLiveEvent: cloneValue(match?.lastLiveEvent),
     lastEventType: cloneValue(match?.lastEventType),
     lastEventText: cloneValue(match?.lastEventText),
@@ -147,12 +330,25 @@ function restoreSnapshot(match, snapshot) {
       history: [],
     };
     match.balls = cloneValue(snapshot?.balls || []);
+    match.activeOverNumber = cloneValue(snapshot?.activeOverNumber || 1);
+    match.activeOverBalls = cloneValue(snapshot?.activeOverBalls || []);
+    match.legalBallCount = cloneValue(snapshot?.legalBallCount);
+    match.firstInningsLegalBallCount = cloneValue(snapshot?.firstInningsLegalBallCount);
+    match.secondInningsLegalBallCount = cloneValue(snapshot?.secondInningsLegalBallCount);
     match.lastLiveEvent = cloneValue(snapshot?.lastLiveEvent);
     match.lastEventType = cloneValue(snapshot?.lastEventType);
     match.lastEventText = cloneValue(snapshot?.lastEventText);
-
-    for (const ball of match.balls) {
-      addBallToHistory(match, ball);
+    const rebuiltHistory = rebuildHistoryFromBalls(match.balls);
+    if (match.innings === "second") {
+      match.innings2.history = rebuiltHistory;
+    } else {
+      match.innings1.history = rebuiltHistory;
+    }
+    if (
+      !Number.isFinite(Number(match?.legalBallCount)) ||
+      !Array.isArray(match?.activeOverBalls)
+    ) {
+      assignCompactMatchState(match);
     }
     return;
   }
@@ -168,7 +364,7 @@ export function createMatchUndoSnapshot(matchDocument) {
 
 export function restoreMatchUndoSnapshot(matchDocument, snapshot, options = {}) {
   const shouldClone = options.clone !== false;
-  const nextMatch = shouldClone ? toPlainMatch(matchDocument) : matchDocument;
+  const nextMatch = shouldClone ? createMutableHotMatch(matchDocument) : matchDocument;
   restoreSnapshot(nextMatch, snapshot);
   return nextMatch;
 }
@@ -430,7 +626,7 @@ function setToss(match, action) {
 
   // Save the old state so undo can come back here.
   const snapshot = getSnapshot(match);
-  const nextMatch = toPlainMatch(match);
+  const nextMatch = createMutableHotMatch(match);
   const battingFirst =
     action.tossDecision === "bat"
       ? action.tossWinner
@@ -460,6 +656,13 @@ function setToss(match, action) {
   );
   appendActionHistory(nextMatch, action, snapshot);
   appendProcessedActionId(nextMatch, action.actionId);
+  assignCompactMatchState(nextMatch, {
+    activeOverBalls: [],
+    activeOverNumber: 1,
+    legalBallCount: 0,
+    firstInningsLegalBallCount: 0,
+    secondInningsLegalBallCount: 0,
+  });
 
   return nextMatch;
 }
@@ -496,9 +699,15 @@ function scoreBall(match, action) {
   }
 
   const snapshot = getSnapshot(match);
-  const nextMatch = toPlainMatch(match);
+  const nextMatch = createMutableHotMatch(match, {
+    cloneBalls: true,
+    cloneActiveHistory: true,
+  });
   clearPendingResultFields(nextMatch);
   const activeInningsKey = getActiveInningsKey(nextMatch);
+  const previousLegalBallCount = getKnownInningsLegalBallCount(match, activeInningsKey);
+  const firstInningsLegalBallCount = getKnownInningsLegalBallCount(match, "first");
+  const secondInningsLegalBallCount = getKnownInningsLegalBallCount(match, "second");
   // This ball object is what gets saved in history.
   const ball = {
     runs: Number(action.runs || 0),
@@ -551,6 +760,23 @@ function scoreBall(match, action) {
   }
   appendActionHistory(nextMatch, action, snapshot);
   appendProcessedActionId(nextMatch, action.actionId);
+  const currentOver = nextMatch[activeInningsKey]?.history?.at(-1) || null;
+  const nextLegalBallCount =
+    previousLegalBallCount +
+    (ball.extraType === "wide" || ball.extraType === "noball" ? 0 : 1);
+  assignCompactMatchState(nextMatch, {
+    activeOverBalls: currentOver?.balls || [],
+    activeOverNumber: Number(currentOver?.overNumber || 1),
+    legalBallCount: nextLegalBallCount,
+    firstInningsLegalBallCount:
+      activeInningsKey === "first"
+        ? nextLegalBallCount
+        : firstInningsLegalBallCount,
+    secondInningsLegalBallCount:
+      activeInningsKey === "second"
+        ? nextLegalBallCount
+        : secondInningsLegalBallCount,
+  });
 
   return nextMatch;
 }
@@ -566,7 +792,9 @@ function completeInnings(match, action) {
   }
 
   const snapshot = getSnapshot(match);
-  const nextMatch = toPlainMatch(match);
+  const nextMatch = createMutableHotMatch(match, {
+    cloneBalls: true,
+  });
 
   if (nextMatch.innings === "first") {
     // Reset the live score view for the chase.
@@ -584,6 +812,13 @@ function completeInnings(match, action) {
     );
     appendActionHistory(nextMatch, action, snapshot);
     appendProcessedActionId(nextMatch, action.actionId);
+    assignCompactMatchState(nextMatch, {
+      activeOverBalls: [],
+      activeOverNumber: 1,
+      legalBallCount: getKnownInningsLegalBallCount(nextMatch, "second"),
+      firstInningsLegalBallCount: getKnownInningsLegalBallCount(match, "first"),
+      secondInningsLegalBallCount: getKnownInningsLegalBallCount(nextMatch, "second"),
+    });
 
     return nextMatch;
   }
@@ -592,6 +827,7 @@ function completeInnings(match, action) {
     const finalizedMatch = finalizePendingMatchResult(nextMatch);
     appendActionHistory(finalizedMatch, action, snapshot);
     appendProcessedActionId(finalizedMatch, action.actionId);
+    assignCompactMatchState(finalizedMatch);
     return finalizedMatch;
   }
 
@@ -602,6 +838,7 @@ function completeInnings(match, action) {
   markLiveEvent(nextMatch, createMatchEndLiveEvent(nextMatch, nextMatch.result));
   appendActionHistory(nextMatch, action, snapshot);
   appendProcessedActionId(nextMatch, action.actionId);
+  assignCompactMatchState(nextMatch);
 
   return nextMatch;
 }
@@ -615,7 +852,7 @@ function undoLastAction(match, action) {
     throw new MatchEngineError("There is nothing left to undo.", 409);
   }
 
-  const nextMatch = toPlainMatch(match);
+  const nextMatch = createMutableHotMatch(match);
   restoreSnapshot(nextMatch, previousAction.snapshot);
   nextMatch.actionHistory = history.slice(0, -1);
   appendProcessedActionId(nextMatch, action.actionId);
@@ -642,7 +879,7 @@ export function isProcessedAction(match, actionId) {
 
 // Main entry point for toss, score, innings end, and undo.
 export function applyMatchAction(matchDocument, action) {
-  const match = normalizeLegacyTossState(toPlainMatch(matchDocument));
+  const match = normalizeLegacyTossState(matchDocument);
 
   if (!match?._id) {
     throw new MatchEngineError("Match not found.", 404);

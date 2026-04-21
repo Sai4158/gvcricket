@@ -9,6 +9,7 @@
  * Read next: ./README.md
  */
 
+import { memo } from "react";
 import { motion } from "framer-motion";
 import { FaInfoCircle } from "react-icons/fa";
 import {
@@ -16,7 +17,7 @@ import {
   scoreControlFont,
 } from "./score-control-theme";
 
-function ScoreButton({ onClick, disabled, className, children }) {
+const ScoreButton = memo(function ScoreButton({ onClick, disabled, className, children }) {
   return (
     <motion.button
       whileTap={{ scale: 0.92, y: 2 }}
@@ -31,9 +32,9 @@ function ScoreButton({ onClick, disabled, className, children }) {
       </span>
     </motion.button>
   );
-}
+});
 
-function ButtonWithInfo({
+const ButtonWithInfo = memo(function ButtonWithInfo({
   children,
   info,
   setInfoText,
@@ -73,9 +74,9 @@ function ButtonWithInfo({
       </button>
     </div>
   );
-}
+});
 
-export function Controls({
+export const Controls = memo(function Controls({
   onScore,
   onOut,
   onNoBall,
@@ -141,9 +142,15 @@ export function Controls({
       </ButtonWithInfo>
     </div>
   );
-}
+});
 
-export function ActionButton({ onClick, icon, label, colorClass, disabled }) {
+export const ActionButton = memo(function ActionButton({
+  onClick,
+  icon,
+  label,
+  colorClass,
+  disabled,
+}) {
   return (
     <motion.button
       whileTap={{ scale: 0.92, y: 2 }}
@@ -155,6 +162,6 @@ export function ActionButton({ onClick, icon, label, colorClass, disabled }) {
       <span className="text-sm font-bold uppercase tracking-wider">{label}</span>
     </motion.button>
   );
-}
+});
 
 

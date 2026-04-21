@@ -9,7 +9,7 @@
  * Read next: ./README.md
  */
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Barlow_Condensed } from "next/font/google";
 import { FaPause, FaVolumeUp } from "react-icons/fa";
 import LoadingButton from "../shared/LoadingButton";
@@ -165,7 +165,7 @@ export function AccessGate({
   );
 }
 
-export function MatchHeader({
+export const MatchHeader = memo(function MatchHeader({
   match,
   onAnnounceScore = null,
   announceIsActive = false,
@@ -212,9 +212,9 @@ export function MatchHeader({
       ) : null}
     </header>
   );
-}
+});
 
-export function Scoreboard({ match, legalBallCount = null }) {
+export const Scoreboard = memo(function Scoreboard({ match, legalBallCount = null }) {
   const legalBalls = Number.isFinite(Number(legalBallCount))
     ? Math.max(0, Number(legalBallCount || 0))
     : 0;
@@ -266,6 +266,6 @@ export function Scoreboard({ match, legalBallCount = null }) {
       </div>
     </div>
   );
-}
+});
 
 

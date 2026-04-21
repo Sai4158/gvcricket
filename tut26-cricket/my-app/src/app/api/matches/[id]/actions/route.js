@@ -35,6 +35,7 @@ import { getRequestMeta } from "../../../../lib/request-meta";
 import { parseJsonRequest } from "../../../../lib/request-security";
 import { hydrateLegacyTossState } from "../../../../lib/match-toss";
 import { createUndoLiveEvent } from "../../../../lib/live-announcements";
+import { countLegalBalls } from "../../../../lib/match-scoring";
 import { matchActionSchema } from "../../../../lib/validators";
 import { invalidateSessionsDataCache } from "../../../../lib/server-data-helpers";
 import Match from "../../../../../models/Match";
@@ -68,7 +69,7 @@ const MUTABLE_ACTION_KEYS = [
   "actionHistory",
 ];
 const UNDO_MATCH_FIELDS =
-  "_id sessionId adminAccessVersion teamA teamB teamAName teamBName overs tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageUploadedAt matchImageUploadedBy announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText recentActionIds undoCount undoSequence processedActionIds createdAt updatedAt";
+  "_id sessionId adminAccessVersion teamA teamB teamAName teamBName overs tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText recentActionIds undoCount undoSequence processedActionIds createdAt updatedAt";
 const UNDO_MATCH_PROJECTION = String(UNDO_MATCH_FIELDS)
   .split(/\s+/)
   .filter(Boolean)
@@ -76,6 +77,18 @@ const UNDO_MATCH_PROJECTION = String(UNDO_MATCH_FIELDS)
     projection[field] = 1;
     return projection;
   }, {});
+
+function countLegalBallsInBalls(balls = []) {
+  let total = 0;
+
+  for (const ball of Array.isArray(balls) ? balls : []) {
+    if (ball?.extraType !== "wide" && ball?.extraType !== "noball") {
+      total += 1;
+    }
+  }
+
+  return total;
+}
 
 function buildHotSessionMirrorUpdate(match) {
   const resultText = String(match?.result || "").trim();
@@ -203,14 +216,28 @@ export async function POST(req, { params }) {
     let updatePayload = {};
 
     if (parsedRequest.value.type === "undo_last") {
-      const latestUndoEntry = await MatchUndoEntry.collection.findOne(
+      const deletedUndoEntry = await MatchUndoEntry.collection.findOneAndDelete(
         {
           matchId: finalizedMatch._id,
         },
         {
+          projection: {
+            _id: 1,
+            matchId: 1,
+            sequence: 1,
+            actionId: 1,
+            type: 1,
+            snapshot: 1,
+            createdAt: 1,
+            updatedAt: 1,
+          },
           sort: { sequence: -1, createdAt: -1 },
         },
       );
+      const latestUndoEntry =
+        deletedUndoEntry?.value ??
+        deletedUndoEntry ??
+        null;
 
       if (latestUndoEntry?.snapshot) {
         const restoredMatch = restoreMatchUndoSnapshot(
@@ -219,6 +246,28 @@ export async function POST(req, { params }) {
           { clone: false },
         );
         const undoEvent = createUndoLiveEvent(restoredMatch);
+        const activeInningsKey =
+          restoredMatch?.innings === "second" ? "innings2" : "innings1";
+        const activeHistory = Array.isArray(restoredMatch?.[activeInningsKey]?.history)
+          ? restoredMatch[activeInningsKey].history
+          : [];
+        const activeOver = activeHistory.at(-1) || null;
+        const activeOverBalls = Array.isArray(activeOver?.balls) ? activeOver.balls : [];
+        const activeOverNumber = Number(activeOver?.overNumber || 1);
+        const legalBallCount = countLegalBallsInBalls(restoredMatch?.balls || []);
+        const firstInningsLegalBallCount = restoredMatch?.innings === "first"
+          ? legalBallCount
+          : countLegalBalls(restoredMatch?.innings1?.history || []);
+        const secondInningsLegalBallCount = restoredMatch?.innings === "second"
+          ? legalBallCount
+          : 0;
+        const responseCompactState = {
+          activeOverBalls,
+          activeOverNumber,
+          legalBallCount,
+          firstInningsLegalBallCount,
+          secondInningsLegalBallCount,
+        };
 
         updatePayload = {
           tossWinner: restoredMatch.tossWinner,
@@ -260,16 +309,18 @@ export async function POST(req, { params }) {
           },
         );
         if (!undoUpdateResult?.matchedCount) {
+          await MatchUndoEntry.collection
+            .insertOne(latestUndoEntry)
+            .catch(() => {});
           return jsonError("Match not found.", 404);
         }
 
         const updatedMatch = {
           ...restoredMatch,
           ...updatePayload,
+          ...responseCompactState,
           updatedAt,
         };
-
-        await MatchUndoEntry.collection.deleteOne({ _id: latestUndoEntry._id });
 
         invalidateSessionsDataCache();
         publishMatchUpdate(updatedMatch._id);

@@ -9,7 +9,7 @@
  * Read next: ./README.md
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   isSafeMatchImageUrl,
@@ -22,7 +22,7 @@ export function resolveSafeMatchImage(src) {
   return isSafeMatchImageUrl(src) ? src : GV_MATCH_FALLBACK_IMAGE;
 }
 
-export default function SafeMatchImage({
+const SafeMatchImage = memo(function SafeMatchImage({
   src = "",
   alt = "",
   className = "",
@@ -89,6 +89,8 @@ export default function SafeMatchImage({
       }}
     />
   );
-}
+});
+
+export default SafeMatchImage;
 
 

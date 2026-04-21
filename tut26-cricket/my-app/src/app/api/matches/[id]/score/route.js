@@ -27,6 +27,7 @@ import {
   hasValidMatchAccess,
 } from "../../../../lib/match-access";
 import { serializeLiveMatchPatch } from "../../../../lib/public-data";
+import { countLegalBalls } from "../../../../lib/match-scoring";
 import {
   finalizePendingResultIfExpired,
   isFinalizedMatchComplete,
@@ -40,7 +41,7 @@ import MatchUndoEntry from "../../../../../models/MatchUndoEntry";
 import Session from "../../../../../models/Session";
 
 const SCORE_MATCH_FIELDS =
-  "_id sessionId adminAccessVersion teamA teamB teamAName teamBName overs tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageUploadedAt matchImageUploadedBy announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText recentActionIds undoCount undoSequence processedActionIds createdAt updatedAt";
+  "_id sessionId adminAccessVersion teamA teamB teamAName teamBName overs tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText recentActionIds undoCount undoSequence processedActionIds createdAt updatedAt";
 const SCORE_MATCH_PROJECTION = String(SCORE_MATCH_FIELDS)
   .split(/\s+/)
   .filter(Boolean)
@@ -48,6 +49,18 @@ const SCORE_MATCH_PROJECTION = String(SCORE_MATCH_FIELDS)
     projection[field] = 1;
     return projection;
   }, {});
+
+function countLegalBallsInBalls(balls = []) {
+  let total = 0;
+
+  for (const ball of Array.isArray(balls) ? balls : []) {
+    if (ball?.extraType !== "wide" && ball?.extraType !== "noball") {
+      total += 1;
+    }
+  }
+
+  return total;
+}
 
 function buildHotSessionMirrorUpdate(match) {
   const resultText = String(match?.result || "").trim();
@@ -98,6 +111,18 @@ function buildScoreWriteOperation(nextState, currentMatch, actionId) {
   const undoCount = getMatchUndoCount(currentMatch) + 1;
   const undoSequence = Math.max(0, Number(currentMatch?.undoSequence || 0)) + 1;
   const updatedAt = new Date();
+  const activeOver = nextHistory.at(-1) || null;
+  const activeOverBalls = Array.isArray(activeOver?.balls) ? activeOver.balls : [];
+  const activeOverNumber = Number(activeOver?.overNumber || 1);
+  const currentActiveLegalBallCount = countLegalBallsInBalls(currentMatch?.balls || []);
+  const legalBallCount = currentActiveLegalBallCount +
+    (nextBall?.extraType === "wide" || nextBall?.extraType === "noball" ? 0 : 1);
+  const firstInningsLegalBallCount = activeInningsKey === "innings1"
+    ? legalBallCount
+    : countLegalBalls(currentMatch?.innings1?.history || []);
+  const secondInningsLegalBallCount = activeInningsKey === "innings2"
+    ? legalBallCount
+    : 0;
   const $set = {
     score: nextState?.score ?? 0,
     outs: nextState?.outs ?? 0,
@@ -166,6 +191,11 @@ function buildScoreWriteOperation(nextState, currentMatch, actionId) {
     updatedMatch: {
       ...currentMatch,
       ...nextState,
+      activeOverBalls,
+      activeOverNumber,
+      legalBallCount,
+      firstInningsLegalBallCount,
+      secondInningsLegalBallCount,
       recentActionIds,
       processedActionIds,
       undoCount,

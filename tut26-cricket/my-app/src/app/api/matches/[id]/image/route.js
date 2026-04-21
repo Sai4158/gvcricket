@@ -31,7 +31,11 @@ import {
   getStoredMatchImages,
 } from "../../../../lib/match-image-gallery";
 import { getRequiredImagePinKind, IMAGE_PIN_KIND } from "../../../../lib/image-pin-policy";
-import { moderateMatchImageBuffer } from "../../../../lib/match-image-moderation";
+import {
+  getMatchImageModerationRuntimeStatus,
+  moderateMatchImageBuffer,
+  warmMatchImageModerationRuntime,
+} from "../../../../lib/match-image-moderation";
 import { serializeMatchMediaPatch } from "../../../../lib/public-data";
 import { enforceSmartPinRateLimit } from "../../../../lib/pin-attempt-server";
 import { getRequestMeta } from "../../../../lib/request-meta";
@@ -228,10 +232,20 @@ export async function POST(req, { params }) {
       message: "",
     };
 
+    const moderationMode = getMatchImageModerationMode();
+
     try {
+      if (
+        moderationMode !== "strict" &&
+        getMatchImageModerationRuntimeStatus() !== "ready"
+      ) {
+        warmMatchImageModerationRuntime();
+        throw new Error("Image moderation warming up.");
+      }
+
       moderation = await moderateMatchImageBuffer(buffer);
     } catch (error) {
-      if (getMatchImageModerationMode() === "strict") {
+      if (moderationMode === "strict") {
         throw error;
       }
 

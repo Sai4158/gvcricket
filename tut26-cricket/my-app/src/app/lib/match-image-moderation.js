@@ -17,6 +17,7 @@ const SENSITIVE_CLASS_THRESHOLDS = Object.freeze({
 });
 
 let moderationRuntimePromise = null;
+let moderationRuntimeStatus = "idle";
 const require = createRequire(import.meta.url);
 
 function normalizePredictions(predictions) {
@@ -62,28 +63,44 @@ export function evaluateSensitiveImagePredictions(predictions) {
 
 async function getModerationRuntime() {
   if (!moderationRuntimePromise) {
+    moderationRuntimeStatus = "loading";
     moderationRuntimePromise = (async () => {
-      const [{ load }, tfModule, sharpModule] = await Promise.all([
-        Promise.resolve(require("nsfwjs")),
-        import("@tensorflow/tfjs"),
-        import("sharp"),
-      ]);
+      try {
+        const [{ load }, tfModule, sharpModule] = await Promise.all([
+          Promise.resolve(require("nsfwjs")),
+          import("@tensorflow/tfjs"),
+          import("sharp"),
+        ]);
 
-      const tf = tfModule.default || tfModule;
-      const sharp = sharpModule.default;
+        const tf = tfModule.default || tfModule;
+        const sharp = sharpModule.default;
 
-      tf.enableProdMode();
-      if (!tf.getBackend()) {
-        await tf.setBackend("cpu");
+        tf.enableProdMode();
+        if (!tf.getBackend()) {
+          await tf.setBackend("cpu");
+        }
+        await tf.ready();
+
+        const model = await load("MobileNetV2");
+        moderationRuntimeStatus = "ready";
+        return { model, sharp, tf };
+      } catch (error) {
+        moderationRuntimeStatus = "failed";
+        moderationRuntimePromise = null;
+        throw error;
       }
-      await tf.ready();
-
-      const model = await load("MobileNetV2");
-      return { model, sharp, tf };
     })();
   }
 
   return moderationRuntimePromise;
+}
+
+export function getMatchImageModerationRuntimeStatus() {
+  return moderationRuntimeStatus;
+}
+
+export function warmMatchImageModerationRuntime() {
+  void getModerationRuntime().catch(() => {});
 }
 
 async function createModerationTensor(buffer) {
