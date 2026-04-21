@@ -92,7 +92,7 @@ export const Controls = memo(function Controls({
     <div className="grid grid-cols-4 gap-3">
       <ScoreButton
         onClick={() => onScore(0, false, null, { controlKey: "dot" })}
-        disabled={disabled || Boolean(disabledKeys.dot)}
+        disabled={disabled}
         className={`${baseBtn} ${getScoreControlToneClasses("dot")}`}
       >
         Dot
@@ -107,7 +107,7 @@ export const Controls = memo(function Controls({
         <ScoreButton
           key={key}
           onClick={() => onScore(runs, false, null, { controlKey: key })}
-          disabled={disabled || Boolean(disabledKeys[key])}
+          disabled={disabled}
           className={`${baseBtn} ${getScoreControlToneClasses("neutral")}`}
         >
           {runs}
@@ -117,7 +117,7 @@ export const Controls = memo(function Controls({
         info="A dismissal. Specify runs completed in the next step."
         setInfoText={setInfoText}
         onClick={onOut}
-        disabled={disabled || Boolean(disabledKeys.out)}
+        disabled={disabled}
         className={`${baseBtn} ${getScoreControlToneClasses("out")}`}
       >
         OUT
@@ -126,7 +126,7 @@ export const Controls = memo(function Controls({
         info="A wide adds runs but does not count as a legal ball."
         setInfoText={setInfoText}
         onClick={onWide}
-        disabled={disabled || Boolean(disabledKeys.wide)}
+        disabled={disabled}
         className={`${baseBtn} ${getScoreControlToneClasses("wide")}`}
       >
         WIDE
@@ -135,7 +135,7 @@ export const Controls = memo(function Controls({
         info="A no ball adds runs but does not count as a legal ball."
         setInfoText={setInfoText}
         onClick={onNoBall}
-        disabled={disabled || Boolean(disabledKeys.noball)}
+        disabled={disabled}
         className={`${baseBtn} ${getScoreControlToneClasses("noball")}`}
       >
         NO BALL
