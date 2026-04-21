@@ -30,6 +30,9 @@ import {
 import MatchImageCarousel from "../shared/MatchImageCarousel";
 import { primeUiAudio } from "../../lib/page-audio";
 
+const CARD_MANAGE_HOLD_MS = 2500;
+const CARD_HOLD_MOVE_THRESHOLD_PX = 16;
+
 function buildStatusMeta(session) {
   const isLive = Boolean(session.isLive);
   const hasSavedScore = Boolean(session.match);
@@ -104,6 +107,9 @@ function SessionCard({
   const router = useRouter();
   const { startNavigation } = useRouteFeedback();
   const cardRef = useRef(null);
+  const manageHoldTimerRef = useRef(null);
+  const manageHoldPointerStartRef = useRef(null);
+  const suppressCardClickUntilRef = useRef(0);
   const [shouldLoadGallery, setShouldLoadGallery] = useState(false);
   const [galleryImages, setGalleryImages] = useState([]);
   const isLive = session.isLive;
@@ -180,6 +186,15 @@ function SessionCard({
       : !isLive && session.result
       ? "RESULT"
       : "";
+
+  useEffect(() => {
+    return () => {
+      if (manageHoldTimerRef.current) {
+        window.clearTimeout(manageHoldTimerRef.current);
+        manageHoldTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!hasUploadedCardImage || shouldLoadGallery) {
@@ -265,6 +280,52 @@ function SessionCard({
     router.push(scoreHref, { scroll: true });
   };
 
+  const clearManageHoldTimer = () => {
+    if (manageHoldTimerRef.current) {
+      window.clearTimeout(manageHoldTimerRef.current);
+      manageHoldTimerRef.current = null;
+    }
+  };
+
+  const handleManageHoldStart = (event) => {
+    if (
+      selectionMode ||
+      event.button !== 0 ||
+      (event.target instanceof Element &&
+        event.target.closest("button,a,input,textarea,select,label"))
+    ) {
+      return;
+    }
+
+    clearManageHoldTimer();
+    manageHoldPointerStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+    };
+
+    manageHoldTimerRef.current = window.setTimeout(() => {
+      suppressCardClickUntilRef.current = Date.now() + 700;
+      onImageHold?.(session);
+    }, CARD_MANAGE_HOLD_MS);
+  };
+
+  const handleManageHoldMove = (event) => {
+    if (!manageHoldPointerStartRef.current) {
+      return;
+    }
+
+    const deltaX = Math.abs(event.clientX - manageHoldPointerStartRef.current.x);
+    const deltaY = Math.abs(event.clientY - manageHoldPointerStartRef.current.y);
+    if (deltaX > CARD_HOLD_MOVE_THRESHOLD_PX || deltaY > CARD_HOLD_MOVE_THRESHOLD_PX) {
+      clearManageHoldTimer();
+    }
+  };
+
+  const handleManageHoldEnd = () => {
+    manageHoldPointerStartRef.current = null;
+    clearManageHoldTimer();
+  };
+
   return (
     <div
       ref={cardRef}
@@ -279,6 +340,7 @@ function SessionCard({
       }
       onClick={(event) => {
         if (
+          Date.now() < suppressCardClickUntilRef.current ||
           (!canOpenCard && !selectionMode) ||
           (event.target instanceof Element &&
             event.target.closest("button,a,input,textarea,select,label"))
@@ -304,6 +366,11 @@ function SessionCard({
           handleCardOpen();
         }
       }}
+      onPointerDownCapture={handleManageHoldStart}
+      onPointerMoveCapture={handleManageHoldMove}
+      onPointerUpCapture={handleManageHoldEnd}
+      onPointerLeave={handleManageHoldEnd}
+      onPointerCancelCapture={handleManageHoldEnd}
       className={`group relative overflow-hidden rounded-[24px] border p-6 shadow-[0_22px_70px_rgba(0,0,0,0.28)] transition-all select-none [touch-action:pan-y] hover:-translate-y-1 hover:border-white/18 ${
         isLive
           ? "border-rose-300/18 bg-[radial-gradient(circle_at_top_left,rgba(244,63,94,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(190,24,93,0.08),transparent_34%),linear-gradient(180deg,rgba(24,12,16,0.98),rgba(7,10,12,0.98))]"
@@ -466,11 +533,6 @@ function SessionCard({
                   transitionStyle="slide"
                   imageClassName="object-cover object-center"
                   fallbackClassName="object-cover object-center"
-                  onImageHold={(image, index, event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onImageHold?.(session, image, index);
-                  }}
                 />
               ) : (
                 <div className="relative aspect-[16/8.8] w-full overflow-hidden bg-[linear-gradient(180deg,rgba(22,22,28,0.9),rgba(10,10,14,0.96))]">

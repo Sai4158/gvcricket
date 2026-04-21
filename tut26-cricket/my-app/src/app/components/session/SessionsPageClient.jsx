@@ -85,7 +85,6 @@ const PAGE_SIZE_OPTIONS = [
   { value: "58", label: "Show 58" },
   { value: "68", label: "Show 68" },
 ];
-const SESSION_SELECTION_HOLD_MS = 3000;
 const SESSIONS_PAGE_SIZE = 28;
 const EMPTY_MANAGE_FORM = {
   name: "",
@@ -304,10 +303,8 @@ export default function SessionsPageClient({
   const [manageSubmitting, setManageSubmitting] = useState(false);
   const [manageError, setManageError] = useState("");
   const [manageDiscardPromptOpen, setManageDiscardPromptOpen] = useState(false);
-  const [imageActionContext, setImageActionContext] = useState(null);
   const [imageDeleteContext, setImageDeleteContext] = useState(null);
   const [imageReplaceContext, setImageReplaceContext] = useState(null);
-  const [imageActionError, setImageActionError] = useState("");
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedSessionIds, setSelectedSessionIds] = useState([]);
   const [selectionError, setSelectionError] = useState("");
@@ -320,35 +317,11 @@ export default function SessionsPageClient({
   const [isGoingHome, setIsGoingHome] = useState(false);
   const router = useRouter();
   const { startNavigation } = useRouteFeedback();
-  const secretHoldTimerRef = useRef(null);
   const suppressCardOpenUntilRef = useRef(0);
   const hasMountedFiltersRef = useRef(false);
   const activeRequestIdRef = useRef(0);
   const hasPrimedInitialLoadRef = useRef(false);
   const previousPageSizeRef = useRef(initialPageSize);
-
-  // Turn text selection on or off during hidden hold mode.
-  const setSecretHoldSelectionLock = useCallback((locked) => {
-    if (typeof document === "undefined") {
-      return;
-    }
-
-    [document.body, document.documentElement].forEach((node) => {
-      if (!node) {
-        return;
-      }
-
-      if (locked) {
-        node.style.setProperty("user-select", "none");
-        node.style.setProperty("-webkit-user-select", "none");
-        node.style.setProperty("-webkit-touch-callout", "none");
-      } else {
-        node.style.removeProperty("user-select");
-        node.style.removeProperty("-webkit-user-select");
-        node.style.removeProperty("-webkit-touch-callout");
-      }
-    });
-  }, []);
 
   useEffect(() => {
     setSessions(initialSessions ?? []);
@@ -397,16 +370,6 @@ export default function SessionsPageClient({
     };
   }, [searchInput]);
 
-  useEffect(() => {
-    return () => {
-      if (secretHoldTimerRef.current) {
-        window.clearTimeout(secretHoldTimerRef.current);
-        secretHoldTimerRef.current = null;
-      }
-      setSecretHoldSelectionLock(false);
-    };
-  }, [setSecretHoldSelectionLock]);
-
   const totalSessionCount =
     Number.isFinite(totalCount) && totalCount > 0 ? totalCount : sessions.length;
   const overallSessionCount =
@@ -435,6 +398,13 @@ export default function SessionsPageClient({
     [currentPage, totalPages]
   );
   const showInitialSkeleton = !hasLoadedFirstPage && isRefreshingList;
+  const managedSession = useMemo(
+    () =>
+      manageSessionContext?.sessionId
+        ? sessions.find((session) => session._id === manageSessionContext.sessionId) || null
+        : null,
+    [manageSessionContext?.sessionId, sessions],
+  );
 
   const buildSessionsQuery = useCallback(
     ({ forceFresh = false, pageOverride, limitOverride, includeCounts = true } = {}) => {
@@ -663,57 +633,21 @@ export default function SessionsPageClient({
     );
   }, []);
 
-  const handleOpenImageActions = useCallback((session, image) => {
-    if (!session?.match) {
+  const handleOpenManagePrompt = useCallback((session) => {
+    if (!session?._id) {
       return;
     }
 
-    setImageActionError("");
-    setImageActionContext({
-      sessionId: session._id,
-      matchId: session.match,
-      image,
+    setManagePinPrompt({
+      mode: "manage",
+      session,
     });
-
-    if (Array.isArray(session.matchImages) && session.matchImages.length > 1) {
-      return;
-    }
-
-    void fetch(`/api/sessions/${session._id}/view-media`, {
-      cache: "no-store",
-      headers: {
-        "Cache-Control": "no-store",
-      },
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          return null;
-        }
-        return response.json().catch(() => null);
-      })
-      .then((payload) => {
-        if (!payload) {
-          return;
-        }
-        mergeMatchImageUpdateIntoSession(session._id, payload);
-      })
-      .catch(() => {});
-  }, [mergeMatchImageUpdateIntoSession]);
-
-  const closeImageActionFlows = useCallback(() => {
-    setImageActionContext(null);
-    setImageDeleteContext(null);
-    setImageReplaceContext(null);
-    setImageActionError("");
   }, []);
 
-  const clearSecretHoldTimer = useCallback(() => {
-    if (secretHoldTimerRef.current) {
-      window.clearTimeout(secretHoldTimerRef.current);
-      secretHoldTimerRef.current = null;
-    }
-    setSecretHoldSelectionLock(false);
-  }, [setSecretHoldSelectionLock]);
+  const closeImageActionFlows = useCallback(() => {
+    setImageDeleteContext(null);
+    setImageReplaceContext(null);
+  }, []);
 
   const clearSelectionMode = useCallback(() => {
     setSelectionMode(false);
@@ -757,36 +691,6 @@ export default function SessionsPageClient({
       return [...current, session._id];
     });
   }, []);
-
-  const handleSecretManageHoldStart = useCallback(
-    (session, event) => {
-      if (
-        event.target instanceof Element &&
-        event.target.closest("button,a,input,textarea,select,label")
-      ) {
-        return;
-      }
-
-      clearSecretHoldTimer();
-      if (event.pointerType && event.pointerType !== "mouse") {
-        event.preventDefault();
-        event.currentTarget.setPointerCapture?.(event.pointerId);
-        setSecretHoldSelectionLock(true);
-      }
-      secretHoldTimerRef.current = window.setTimeout(() => {
-        setSecretHoldSelectionLock(false);
-        setManagePinPrompt({
-          mode: "select",
-          session,
-        });
-      }, SESSION_SELECTION_HOLD_MS);
-    },
-    [clearSecretHoldTimer, setSecretHoldSelectionLock]
-  );
-
-  const handleSecretManageHoldEnd = useCallback(() => {
-    clearSecretHoldTimer();
-  }, [clearSecretHoldTimer]);
 
   const shouldBlockCardOpen = useCallback(
     () => selectionMode || Date.now() < suppressCardOpenUntilRef.current,
@@ -1043,6 +947,29 @@ export default function SessionsPageClient({
     },
     [manageSubmitting, shouldPromptManageDiscard]
   );
+
+  const handleOpenManagedImageUploader = useCallback(() => {
+    if (!managedSession?.match || !manageSessionContext?.pin) {
+      return;
+    }
+
+    setImageReplaceContext({
+      sessionId: managedSession._id,
+      matchId: managedSession.match,
+      mode: "gallery",
+      pin: manageSessionContext.pin,
+    });
+    closeSessionManager({ force: true });
+  }, [closeSessionManager, manageSessionContext?.pin, managedSession]);
+
+  const handleStartManagedSelection = useCallback(() => {
+    if (!managedSession) {
+      return;
+    }
+
+    closeSessionManager({ force: true });
+    startSelectionMode(managedSession);
+  }, [closeSessionManager, managedSession, startSelectionMode]);
 
   const handleManageFieldChange = useCallback((field, value) => {
     setManageWasEdited(true);
@@ -1442,12 +1369,6 @@ export default function SessionsPageClient({
                     key={session._id}
                     className="h-full select-none [touch-action:pan-y]"
                     style={{ WebkitTouchCallout: "none" }}
-                    onPointerDown={(event) =>
-                      handleSecretManageHoldStart(session, event)
-                    }
-                    onPointerUp={handleSecretManageHoldEnd}
-                    onPointerLeave={handleSecretManageHoldEnd}
-                    onPointerCancel={handleSecretManageHoldEnd}
                     onContextMenu={(event) => event.preventDefault()}
                   >
                     <SessionCard
@@ -1455,7 +1376,7 @@ export default function SessionsPageClient({
                       onUmpireClick={handleOpenUmpirePin}
                       onDirectorClick={handleOpenDirectorPin}
                       shouldBlockCardOpen={shouldBlockCardOpen}
-                      onImageHold={handleOpenImageActions}
+                      onImageHold={handleOpenManagePrompt}
                       selectionMode={selectionMode}
                       selected={selectedSessionIds.includes(session._id)}
                       onSelectToggle={toggleSessionSelection}
@@ -1668,7 +1589,7 @@ export default function SessionsPageClient({
             subtitle={
               managePinPrompt.mode === "select"
                 ? "Enter the 6-digit manage PIN to unlock session selection."
-                : "Enter the 6-digit manage PIN to edit or delete this session."
+                : "Enter the 6-digit manage PIN to unlock session options."
             }
             confirmLabel={
               managePinPrompt.mode === "select" ? "Unlock Selection" : "Continue"
@@ -1717,6 +1638,26 @@ export default function SessionsPageClient({
             panelClassName="max-w-md"
           >
             <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {managedSession?.match ? (
+                  <button
+                    type="button"
+                    onClick={handleOpenManagedImageUploader}
+                    className="rounded-2xl border border-cyan-300/18 bg-[linear-gradient(180deg,rgba(10,18,26,0.96),rgba(8,47,73,0.82))] px-4 py-3 text-sm font-semibold text-cyan-50 transition hover:brightness-110"
+                  >
+                    {Array.isArray(managedSession?.matchImages) && managedSession.matchImages.length
+                      ? "Manage Match Images"
+                      : "Add Match Image"}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={handleStartManagedSelection}
+                  className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-semibold text-zinc-100 transition hover:bg-white/[0.08]"
+                >
+                  Select Sessions
+                </button>
+              </div>
               <label className="block">
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
                   Game Name
@@ -1816,62 +1757,6 @@ export default function SessionsPageClient({
             </div>
           </ModalBase>
         ) : null}
-        {imageActionContext ? (
-          <ModalBase
-            key="image-action-modal"
-            title="Match Images"
-            onExit={closeImageActionFlows}
-            panelClassName="max-w-sm"
-          >
-            <div className="space-y-3">
-              {imageActionError ? (
-                <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                  {imageActionError}
-                </div>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => {
-                  setImageReplaceContext({
-                    ...imageActionContext,
-                    mode: "add",
-                  });
-                  setImageActionContext(null);
-                }}
-                className="w-full rounded-2xl border border-emerald-300/16 bg-[linear-gradient(180deg,rgba(10,18,18,0.98),rgba(9,32,28,0.96)_56%,rgba(6,95,70,0.74))] px-4 py-3 text-sm font-semibold text-emerald-50 transition hover:brightness-110"
-              >
-                Add Image
-              </button>
-              {imageActionContext.image?.id ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setImageReplaceContext({
-                        ...imageActionContext,
-                        mode: "replace",
-                      });
-                      setImageActionContext(null);
-                    }}
-                    className="w-full rounded-2xl border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(10,16,26,0.96),rgba(8,47,73,0.78))] px-4 py-3 text-sm font-semibold text-cyan-50 transition hover:brightness-110"
-                  >
-                    Replace This Image
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setImageDeleteContext(imageActionContext);
-                      setImageActionContext(null);
-                    }}
-                    className="w-full rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/15"
-                  >
-                    Delete This Image
-                  </button>
-                </>
-              ) : null}
-            </div>
-          </ModalBase>
-        ) : null}
         {imageReplaceContext ? (
           <ModalBase
             key="image-replace-modal"
@@ -1908,7 +1793,8 @@ export default function SessionsPageClient({
               title="Match Gallery"
               description="Manage session images."
               primaryLabel="Save Images"
-              promptForUploadPin
+              promptForUploadPin={!imageReplaceContext?.pin}
+              protectedPin={imageReplaceContext?.pin || ""}
             />
           </ModalBase>
         ) : null}

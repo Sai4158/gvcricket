@@ -422,6 +422,7 @@ export default function MatchImageUploader({
   onComplete,
   onSkip,
   onRequestClose,
+  protectedPin = "",
   promptForUploadPin = false,
   title = "Add Match Image",
   primaryLabel = "Upload Image",
@@ -460,6 +461,8 @@ export default function MatchImageUploader({
   const pinInputRef = useRef(null);
   const browseModeRef = useRef("replace");
   const selectedItemsRef = useRef([]);
+  const providedProtectedPin = String(protectedPin || "").trim();
+  const hasProvidedProtectedPin = providedProtectedPin.length > 0;
 
   const selectedFiles = useMemo(
     () => selectedItems.map((item) => item.file),
@@ -720,16 +723,23 @@ export default function MatchImageUploader({
     closeProtectedActionPrompt();
   }, [closeProtectedActionPrompt, isSubmitting, pin]);
 
+  const isAcceptedPinLength = useCallback((pinValue, digitCount) => {
+    const safeLength = String(pinValue || "").trim().length;
+    return safeLength === digitCount || safeLength === 6;
+  }, []);
+
   const executeUpload = useCallback(
     async (pinOverride = "") => {
       if (!selectedFiles.length || isSubmitting) {
         return;
       }
 
-      const submittedPin = String(pinOverride || pin || "").trim();
+      const submittedPin = String(
+        pinOverride || providedProtectedPin || pin || "",
+      ).trim();
       if (
         (promptForUploadPin || Boolean(submittedPin)) &&
-        submittedPin.length !== uploadPinConfig.digitCount
+        !isAcceptedPinLength(submittedPin, uploadPinConfig.digitCount)
       ) {
         requestProtectedAction({ type: "upload" });
         return;
@@ -737,7 +747,8 @@ export default function MatchImageUploader({
 
       setSubmitMode("upload");
       setShowPinPrompt(
-        (current) => current || Boolean(submittedPin),
+        (current) =>
+          current || (!hasProvidedProtectedPin && Boolean(submittedPin)),
       );
       setError("");
       try {
@@ -813,9 +824,12 @@ export default function MatchImageUploader({
     },
     [
       activeExistingItem?.id,
+      hasProvidedProtectedPin,
+      isAcceptedPinLength,
       isSubmitting,
       matchId,
       pin,
+      providedProtectedPin,
       plannedGalleryCount,
       promptForUploadPin,
       replaceTargetId,
@@ -838,12 +852,15 @@ export default function MatchImageUploader({
       setError("");
 
       try {
+        const submittedPin = String(
+          pinOverride || providedProtectedPin || pin || "",
+        ).trim();
         const response = await fetch(`/api/matches/${matchId}/image`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             imageId: String(imageId || "").trim(),
-            pin: String(pinOverride || pin || "").trim(),
+            pin: submittedPin,
           }),
         });
         const payload = await response.json().catch(() => ({}));
@@ -872,6 +889,7 @@ export default function MatchImageUploader({
       isSubmitting,
       matchId,
       pin,
+      providedProtectedPin,
       requestProtectedAction,
       resetSelectedFiles,
       syncGalleryFromPayload,
@@ -888,12 +906,15 @@ export default function MatchImageUploader({
       setError("");
 
       try {
+        const submittedPin = String(
+          pinOverride || providedProtectedPin || pin || "",
+        ).trim();
         const response = await fetch(`/api/matches/${matchId}/image`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             imageIds: nextImageIds,
-            pin: String(pinOverride || pin || "").trim(),
+            pin: submittedPin,
           }),
         });
         const payload = await response.json().catch(() => ({}));
@@ -920,7 +941,14 @@ export default function MatchImageUploader({
         setSubmitMode("");
       }
     },
-    [isSubmitting, matchId, pin, requestProtectedAction, syncGalleryFromPayload],
+    [
+      isSubmitting,
+      matchId,
+      pin,
+      providedProtectedPin,
+      requestProtectedAction,
+      syncGalleryFromPayload,
+    ],
   );
 
   const protectedPinConfig = getImagePinPromptConfig({
@@ -1000,15 +1028,17 @@ export default function MatchImageUploader({
       return;
     }
 
-    if (promptForUploadPin) {
+    if (promptForUploadPin && !hasProvidedProtectedPin) {
       requestProtectedAction({ type: "upload" });
       return;
     }
 
-    void executeUpload();
+    void executeUpload(providedProtectedPin);
   }, [
     executeUpload,
+    hasProvidedProtectedPin,
     isSubmitting,
+    providedProtectedPin,
     promptForUploadPin,
     requestProtectedAction,
     selectedItems.length,
@@ -1037,8 +1067,19 @@ export default function MatchImageUploader({
 
     const nextImageId = deleteConfirmTarget.id;
     setDeleteConfirmTarget(null);
+    if (hasProvidedProtectedPin) {
+      void executeRemoveImage(nextImageId, providedProtectedPin);
+      return;
+    }
     requestProtectedAction({ type: "remove", imageId: nextImageId });
-  }, [deleteConfirmTarget, isSubmitting, requestProtectedAction]);
+  }, [
+    deleteConfirmTarget,
+    executeRemoveImage,
+    hasProvidedProtectedPin,
+    isSubmitting,
+    providedProtectedPin,
+    requestProtectedAction,
+  ]);
 
   const handleMoveExistingImage = useCallback(
     (imageId, direction) => {
@@ -1057,13 +1098,28 @@ export default function MatchImageUploader({
       const [movedImage] = nextImages.splice(currentIndex, 1);
       nextImages.splice(nextIndex, 0, movedImage);
 
+      if (hasProvidedProtectedPin) {
+        void executeReorderImages(
+          nextImages.map((image) => image.id),
+          imageId,
+          providedProtectedPin,
+        );
+        return;
+      }
+
       requestProtectedAction({
         type: "reorder",
         imageIds: nextImages.map((image) => image.id),
         focusImageId: imageId,
       });
     },
-    [galleryItems, requestProtectedAction],
+    [
+      executeReorderImages,
+      galleryItems,
+      hasProvidedProtectedPin,
+      providedProtectedPin,
+      requestProtectedAction,
+    ],
   );
 
   const showGallerySection = galleryItems.length > 0;
