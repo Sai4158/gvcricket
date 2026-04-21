@@ -170,9 +170,7 @@ function SessionCard({
     : Number.isFinite(Number(session.outs))
     ? Number(session.outs)
     : 0;
-  const scoreValue = winningSummary
-    ? `${displayScore.toLocaleString()}/${displayOuts}`
-    : displayScore.toLocaleString();
+  const hasSplitScore = winningSummary || displayOuts > 0;
   const scoreMetaLabel = isLive ? "Runs" : winningSummary ? "Winner" : "Final";
   const scoreDetailLabel =
     winningSummary?.teamName
@@ -374,8 +372,20 @@ function SessionCard({
             </span>
             {hasScoreCard ? (
               <div className="pointer-events-none absolute right-0 top-[3.1rem] text-right">
-                <p className="text-[2.05rem] font-black leading-none tracking-tight text-amber-300 sm:text-[2.3rem]">
-                  {scoreValue}
+                <p className="inline-flex items-end justify-end gap-0.5 leading-none tracking-tight">
+                  <span className="text-[2.4rem] font-black text-emerald-400 sm:text-[2.7rem]">
+                    {displayScore.toLocaleString()}
+                  </span>
+                  {hasSplitScore ? (
+                    <>
+                      <span className="pb-[0.08em] text-[1.45rem] font-black text-amber-300 sm:text-[1.55rem]">
+                        /
+                      </span>
+                      <span className="text-[2.05rem] font-black text-rose-500 sm:text-[2.3rem]">
+                        {displayOuts}
+                      </span>
+                    </>
+                  ) : null}
                 </p>
                 <p className="mt-1 text-[0.92rem] font-black uppercase leading-none tracking-tight text-amber-300">
                   {scoreMetaLabel}

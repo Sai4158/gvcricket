@@ -191,6 +191,22 @@ function normalizeOptimisticMatch(nextMatch) {
   };
 }
 
+function normalizeIncomingMatch(nextMatch) {
+  if (!nextMatch) {
+    return null;
+  }
+
+  const normalizedMatch = normalizeOptimisticMatch(nextMatch);
+  return {
+    ...normalizedMatch,
+    updatedAt: nextMatch?.updatedAt || normalizedMatch.updatedAt,
+    historyVersion:
+      nextMatch?.historyVersion ||
+      nextMatch?.updatedAt ||
+      normalizedMatch.historyVersion,
+  };
+}
+
 function mergeMatchPatch(baseMatch, matchPatch) {
   if (!matchPatch) {
     return baseMatch;
@@ -416,16 +432,18 @@ function isIncomingUpdateOlder(incomingUpdatedAt, currentUpdatedAt) {
 export default function useMatch(matchId, hasAccess, initialMatch = null) {
   const router = useRouter();
   const { startNavigation } = useRouteFeedback();
-  const [match, setMatch] = useState(initialMatch);
+  const [match, setMatch] = useState(() => normalizeIncomingMatch(initialMatch));
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(
     Boolean(matchId && hasAccess && !initialMatch)
   );
   const [isUpdating, setIsUpdating] = useState(false);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState(initialMatch?.updatedAt || "");
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(
+    initialMatch?.updatedAt || "",
+  );
   const lastStreamUpdateRef = useRef(initialMatch?.updatedAt || "");
   const previousMatchIdRef = useRef(matchId);
-  const matchRef = useRef(initialMatch);
+  const matchRef = useRef(normalizeIncomingMatch(initialMatch));
   const actionQueueRef = useRef([]);
   const processingQueueRef = useRef(false);
   const retryTimerRef = useRef(null);
@@ -449,8 +467,10 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       return null;
     }
 
+    const normalizedBaseMatch = normalizeIncomingMatch(baseMatch);
+
     const syncedQueue = filterQueuedActionsAlreadyApplied(
-      baseMatch,
+      normalizedBaseMatch,
       actionQueueRef.current,
     );
 
@@ -459,12 +479,12 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     }
 
     if (!syncedQueue.length) {
-      return baseMatch;
+      return normalizedBaseMatch;
     }
 
     try {
-      return normalizeOptimisticMatch(
-        replayQueuedMatchActions(baseMatch, syncedQueue),
+      return normalizeIncomingMatch(
+        replayQueuedMatchActions(normalizedBaseMatch, syncedQueue),
       );
     } catch {
       updateQueuedActions([]);
@@ -474,7 +494,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
           "Saved local scoring was cleared because the live match changed.",
         ),
       );
-      return baseMatch;
+      return normalizedBaseMatch;
     }
   }, [updateQueuedActions]);
 
@@ -551,9 +571,10 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
           nextMatch?.updatedAt || incomingUpdatedAt || new Date().toISOString(),
         );
         setError(null);
+        return nextMatch;
       }
 
-      return body;
+      return matchRef.current;
     } catch {
       return null;
     }
@@ -568,8 +589,9 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       processingQueueRef.current = false;
       updateQueuedActions([]);
       lastStreamUpdateRef.current = initialMatch?.updatedAt || "";
-      matchRef.current = initialMatch || null;
-      setMatch(initialMatch || null);
+      const normalizedInitialMatch = normalizeIncomingMatch(initialMatch);
+      matchRef.current = normalizedInitialMatch;
+      setMatch(normalizedInitialMatch);
       setError(null);
       setLastUpdatedAt(initialMatch?.updatedAt || "");
       setIsUpdating(false);
@@ -579,8 +601,9 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     if (!matchId || !hasAccess) {
       clearRetryTimer();
       lastStreamUpdateRef.current = initialMatch?.updatedAt || "";
-      matchRef.current = initialMatch || null;
-      setMatch(initialMatch);
+      const normalizedInitialMatch = normalizeIncomingMatch(initialMatch);
+      matchRef.current = normalizedInitialMatch;
+      setMatch(normalizedInitialMatch);
       setError(null);
       setLastUpdatedAt(initialMatch?.updatedAt || "");
       setIsLoading(false);
@@ -973,11 +996,12 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
       const incomingUpdatedAt = body?.updatedAt || "";
       if (!isIncomingUpdateOlder(incomingUpdatedAt, lastStreamUpdateRef.current)) {
-        matchRef.current = body;
+        const normalizedBody = normalizeIncomingMatch(body);
+        matchRef.current = normalizedBody;
         lastStreamUpdateRef.current =
           incomingUpdatedAt || lastStreamUpdateRef.current;
-        setMatch(body);
-        setLastUpdatedAt(incomingUpdatedAt || new Date().toISOString());
+        setMatch(normalizedBody);
+        setLastUpdatedAt(incomingUpdatedAt || normalizedBody?.updatedAt || new Date().toISOString());
         setError(null);
         if (patchChangesScoringStructure(payload)) {
           optimisticUndoStackRef.current = [];
@@ -1134,7 +1158,9 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     historyStack,
     currentInningsHasHistory,
     replaceMatch: (nextMatch) => {
-      const mergedMatch = mergeMatchPatch(matchRef.current, nextMatch);
+      const mergedMatch = normalizeIncomingMatch(
+        mergeMatchPatch(matchRef.current, nextMatch),
+      );
       matchRef.current = mergedMatch;
       lastStreamUpdateRef.current =
         mergedMatch?.updatedAt || lastStreamUpdateRef.current;
