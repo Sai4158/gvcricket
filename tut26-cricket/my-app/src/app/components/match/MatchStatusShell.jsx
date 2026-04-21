@@ -9,7 +9,8 @@
  * Read next: ./README.md
  */
 
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { Barlow_Condensed } from "next/font/google";
 import { FaPause, FaVolumeUp } from "react-icons/fa";
 import LoadingButton from "../shared/LoadingButton";
@@ -24,6 +25,226 @@ const scoreboardDisplayFont = Barlow_Condensed({
   subsets: ["latin"],
   weight: ["700", "800"],
 });
+const ROLLING_DIGIT_DURATION_S = 0.82;
+const ROLLING_DIGIT_DURATION_MS = Math.round(ROLLING_DIGIT_DURATION_S * 1000);
+
+function countLegalBallsInBalls(balls = []) {
+  return (Array.isArray(balls) ? balls : []).reduce((total, ball) => {
+    if (ball?.extraType === "wide" || ball?.extraType === "noball") {
+      return total;
+    }
+
+    return total + 1;
+  }, 0);
+}
+
+function resolveScoreboardLegalBalls(match, explicitLegalBallCount = null) {
+  const activeOverNumber = Number(match?.activeOverNumber);
+  const activeOverBalls = Array.isArray(match?.activeOverBalls)
+    ? match.activeOverBalls
+    : null;
+
+  if (activeOverBalls && Number.isFinite(activeOverNumber) && activeOverNumber > 0) {
+    const activeOverLegalBalls = countLegalBallsInBalls(activeOverBalls);
+    return Math.max(
+      0,
+      (activeOverNumber - 1) * 6 + Math.min(activeOverLegalBalls, 6),
+    );
+  }
+
+  return Number.isFinite(Number(explicitLegalBallCount))
+    ? Math.max(0, Number(explicitLegalBallCount || 0))
+    : 0;
+}
+
+function isNumericCharacter(character) {
+  return /^[0-9]$/.test(String(character || ""));
+}
+
+function getRollingSlotWidthClass(character, previousCharacter) {
+  if (isNumericCharacter(character) || isNumericCharacter(previousCharacter)) {
+    return "w-[0.46em]";
+  }
+
+  if (character === "." || previousCharacter === ".") {
+    return "w-[0.16em]";
+  }
+
+  return "w-auto";
+}
+
+function getRollingDirection(previousCharacter, nextCharacter, fallbackDirection) {
+  if (
+    isNumericCharacter(previousCharacter) &&
+    isNumericCharacter(nextCharacter)
+  ) {
+    const previousDigit = Number(previousCharacter);
+    const nextDigit = Number(nextCharacter);
+
+    if (nextDigit === previousDigit) {
+      return 0;
+    }
+
+    return nextDigit > previousDigit ? 1 : -1;
+  }
+
+  return fallbackDirection;
+}
+
+function RollingDigitText({
+  text = "",
+  valueNumber = 0,
+  className = "",
+}) {
+  const nextText = String(text || "");
+  const [transitionState, setTransitionState] = useState(() => ({
+    previousText: nextText,
+    previousValue: valueNumber,
+    currentText: nextText,
+    currentValue: valueNumber,
+    animationKey: 0,
+    isTransitioning: false,
+  }));
+  const direction =
+    transitionState.currentValue === transitionState.previousValue
+      ? 1
+      : transitionState.currentValue > transitionState.previousValue
+        ? 1
+        : -1;
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTransitionState((current) => {
+      if (
+        current.currentText === nextText &&
+        current.currentValue === valueNumber
+      ) {
+        return current;
+      }
+
+      return {
+        previousText: current.currentText,
+        previousValue: current.currentValue,
+        currentText: nextText,
+        currentValue: valueNumber,
+        animationKey: current.animationKey + 1,
+        isTransitioning: true,
+      };
+    });
+  }, [nextText, valueNumber]);
+
+  useEffect(() => {
+    if (!transitionState.isTransitioning) {
+      return undefined;
+    }
+
+    const settleTimer = window.setTimeout(() => {
+      setTransitionState((current) => {
+        if (!current.isTransitioning) {
+          return current;
+        }
+
+        return {
+          ...current,
+          previousText: current.currentText,
+          previousValue: current.currentValue,
+          isTransitioning: false,
+        };
+      });
+    }, ROLLING_DIGIT_DURATION_MS);
+
+    return () => {
+      window.clearTimeout(settleTimer);
+    };
+  }, [transitionState.isTransitioning]);
+
+  const currentCharacters = Array.from(transitionState.currentText);
+  const previousCharacters = Array.from(transitionState.previousText);
+
+  return (
+    <span
+      className={`inline-flex items-baseline justify-center leading-none tracking-[-0.03em] ${className}`}
+    >
+      {currentCharacters.map((character, index) => {
+        const previousIndex =
+          previousCharacters.length - (currentCharacters.length - index);
+        const previousCharacter =
+          previousIndex >= 0 ? previousCharacters[previousIndex] : "";
+        const slotWidthClass = getRollingSlotWidthClass(
+          character,
+          previousCharacter,
+        );
+        const slotDirection = getRollingDirection(
+          previousCharacter,
+          character,
+          direction,
+        );
+        const shouldAnimate =
+          transitionState.isTransitioning && previousCharacter !== character;
+        const placeholderCharacter = character || previousCharacter || "0";
+
+        if (!shouldAnimate) {
+          return (
+            <span
+              key={`slot:${index}:${character}`}
+              className={`relative inline-flex h-[1em] items-center justify-center overflow-hidden align-baseline ${slotWidthClass}`}
+            >
+              <span className="pointer-events-none select-none opacity-0">
+                {placeholderCharacter}
+              </span>
+              <span className="absolute inset-0 inline-flex h-[1em] items-center justify-center">
+                {character}
+              </span>
+            </span>
+          );
+        }
+
+        return (
+          <span
+            key={`slot:${transitionState.animationKey}:${index}`}
+            className={`relative inline-flex h-[1em] items-center justify-center overflow-hidden align-baseline ${slotWidthClass}`}
+          >
+            <span className="pointer-events-none select-none opacity-0">
+              {placeholderCharacter}
+            </span>
+            <motion.span
+              key={`previous:${transitionState.animationKey}:${index}`}
+              initial={{ opacity: 1, y: "0%" }}
+              animate={{
+                opacity: 0,
+                y: slotDirection >= 0 ? "-112%" : "112%",
+              }}
+              transition={{
+                duration: ROLLING_DIGIT_DURATION_S,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              className="absolute inset-0 inline-flex h-[1em] items-center justify-center"
+              style={{ willChange: "transform" }}
+            >
+              {previousCharacter}
+            </motion.span>
+            <motion.span
+              key={`current:${transitionState.animationKey}:${index}`}
+              initial={{
+                opacity: 0,
+                y: slotDirection >= 0 ? "112%" : "-112%",
+              }}
+              animate={{ opacity: 1, y: "0%" }}
+              transition={{
+                duration: ROLLING_DIGIT_DURATION_S,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              className="absolute inset-0 inline-flex h-[1em] items-center justify-center"
+              style={{ willChange: "transform" }}
+            >
+              {character}
+            </motion.span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
 
 function getBattingStripClasses(battingTeam) {
   const normalizedName = String(battingTeam?.name || "").trim().toLowerCase();
@@ -215,9 +436,7 @@ export const MatchHeader = memo(function MatchHeader({
 });
 
 export const Scoreboard = memo(function Scoreboard({ match, legalBallCount = null }) {
-  const legalBalls = Number.isFinite(Number(legalBallCount))
-    ? Math.max(0, Number(legalBallCount || 0))
-    : 0;
+  const legalBalls = resolveScoreboardLegalBalls(match, legalBallCount);
   const oversDisplay = `${Math.floor(legalBalls / 6)}.${legalBalls % 6}`;
   const battingTeam = getBattingTeamBundle(match);
   const ballsLeft = Math.max(Number(match?.overs || 0) * 6 - legalBalls, 0);
@@ -235,13 +454,17 @@ export const Scoreboard = memo(function Scoreboard({ match, legalBallCount = nul
           className={`${scoreboardDisplayFont.className} ${statNumberWrapClassName} font-bold tabular-nums [font-variant-numeric:tabular-nums]`}
         >
           <span className="inline-flex items-baseline justify-center">
-            <span className="text-8xl text-emerald-400 sm:text-9xl">
-              {match.score}
-            </span>
+            <RollingDigitText
+              text={String(match.score)}
+              valueNumber={Number(match.score || 0)}
+              className="text-8xl text-emerald-400 sm:text-9xl"
+            />
             <span className="text-4xl text-rose-500 sm:text-5xl">/</span>
-            <span className="text-6xl text-rose-500 sm:text-7xl">
-              {match.outs}
-            </span>
+            <RollingDigitText
+              text={String(match.outs)}
+              valueNumber={Number(match.outs || 0)}
+              className="text-6xl text-rose-500 sm:text-7xl"
+            />
           </span>
         </div>
         <div className="text-zinc-100 text-sm uppercase tracking-wider">
@@ -253,9 +476,10 @@ export const Scoreboard = memo(function Scoreboard({ match, legalBallCount = nul
         <div
           className={`${scoreboardDisplayFont.className} ${statNumberWrapClassName} text-7xl font-bold leading-none text-white tabular-nums [font-variant-numeric:tabular-nums] sm:text-8xl`}
         >
-          <span className="inline-flex items-baseline justify-center">
-            {oversDisplay}
-          </span>
+          <RollingDigitText
+            text={oversDisplay}
+            valueNumber={legalBalls}
+          />
         </div>
         <div className="text-zinc-100 text-sm uppercase tracking-wider">
           <span>
