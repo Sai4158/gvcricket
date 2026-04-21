@@ -96,7 +96,7 @@ import { duckPageMedia, restorePageMedia } from "../../../lib/page-audio";
 import { buildMatchScorePreview } from "./match-score-preview";
 
 const SCORE_CONTROL_COOLDOWN_MS = 1000;
-const UNDO_CONTROL_COOLDOWN_MS = 1000;
+const UNDO_CONTROL_COOLDOWN_MS = 500;
 const UNDO_CONTROL_KEY = "undo";
 
 export default function MatchPageClient({
