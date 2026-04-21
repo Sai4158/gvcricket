@@ -10,8 +10,28 @@
  */
 
 import Image from "next/image";
+import Link from "next/link";
 import BackToTopButton from "../home/BackToTopButton";
 import HomeScrollFade from "../home/HomeScrollFade";
+
+const footerLinks = [
+  {
+    href: "/session",
+    label: "Live Cricket Scores",
+  },
+  {
+    href: "/session/new",
+    label: "Start Cricket Scoring",
+  },
+  {
+    href: "/rules",
+    label: "Cricket Scoring Rules",
+  },
+  {
+    href: "/update",
+    label: "GV Cricket Updates",
+  },
+];
 
 export default function SiteFooter({
   action = null,
@@ -49,6 +69,27 @@ export default function SiteFooter({
           unoptimized
           className="h-auto w-[150px] object-contain drop-shadow-[0_16px_40px_rgba(0,0,0,0.42)] sm:w-[180px]"
         />
+      </HomeScrollFade>
+      <HomeScrollFade
+        delayMs={showBackToTop ? 145 : 95}
+        className="mb-8"
+      >
+        <nav aria-label="Popular pages" className="mx-auto max-w-3xl">
+          <p className="mb-4 text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
+            Popular Pages
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {footerLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-zinc-300 transition-colors duration-200 hover:border-white/20 hover:text-white"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
       </HomeScrollFade>
       <HomeScrollFade delayMs={showBackToTop ? 170 : 120}>
         <p suppressHydrationWarning className="text-zinc-400">

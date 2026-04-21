@@ -90,8 +90,17 @@ const jsonLd = [
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: siteConfig.name,
+    alternateName: siteConfig.shortName,
     url: getSiteUrl(),
     description: siteConfig.description,
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: siteConfig.name,
+    alternateName: siteConfig.shortName,
+    url: getSiteUrl(),
+    logo: absoluteUrl(siteConfig.logoPath),
   },
   {
     "@context": "https://schema.org",

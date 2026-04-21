@@ -22,7 +22,7 @@ const LearnCricketCard = nextDynamic(() => import("./components/home/LearnCricke
 export const metadata = {
   title: "GV Cricket | Free Live Cricket Scoring App, Umpire Mode, Scoreboard",
   description:
-    "Free live cricket scoring app for local matches, leagues, tournaments, school cricket, box cricket, and tennis-ball cricket with umpire mode, spectator scoreboards, and instant results.",
+    "Free live cricket scoring app for local matches, leagues, tournaments, school cricket, box cricket, and tennis-ball cricket with umpire mode, spectator scoreboards, and instant results for cricket communities in India, Pakistan, Bangladesh, Sri Lanka, Nepal, UAE, and more.",
   keywords: siteConfig.keywords,
   alternates: {
     canonical: absoluteUrl("/"),
@@ -30,7 +30,7 @@ export const metadata = {
   openGraph: {
     title: "GV Cricket | Free Live Cricket Scoring App and Match Control",
     description:
-      "Free live cricket scoring with umpire mode, spectator scoreboards, instant results, and mobile-first match control.",
+      "Free live cricket scoring with umpire mode, spectator scoreboards, instant results, and mobile-first match control for local cricket communities.",
     url: absoluteUrl("/"),
     type: "website",
     images: [

@@ -15,7 +15,7 @@ export const siteConfig = {
   shareLogoPath: "/gvLogo.png",
   socialImageVersion: "2026-03-21-gvLogo",
   description:
-    "GV Cricket is a free live cricket scoring app for local matches, leagues, tournaments, school cricket, box cricket, and tennis-ball cricket with umpire mode, spectator scoreboards, match results, and mobile-first control.",
+    "GV Cricket is a free live cricket scoring app for local matches, leagues, tournaments, school cricket, box cricket, and tennis-ball cricket with umpire mode, spectator scoreboards, match results, and mobile-first control for cricket communities in India, Pakistan, Bangladesh, Sri Lanka, Nepal, UAE, and more.",
   defaultTitle:
     "GV Cricket | Free Live Cricket Scoring App, Umpire Mode, Scoreboard",
   ogTitle:
@@ -53,6 +53,17 @@ export const siteConfig = {
     "cricket live score for clubs",
     "cricket live score for community matches",
     "ipl style cricket scoring app",
+    "cricket scoring app india",
+    "cricket scoring app pakistan",
+    "cricket scoring app bangladesh",
+    "cricket scoring app sri lanka",
+    "cricket scoring app nepal",
+    "cricket scoring app uae",
+    "tennis ball cricket scoring app india",
+    "box cricket scoring app india",
+    "local cricket scoring app",
+    "community cricket scoring app",
+    "cricket scoring app alternative",
   ],
   ogImagePath: "/opengraph-image?v=2026-03-21-gvLogo",
   twitterImagePath: "/twitter-image?v=2026-03-21-gvLogo",
