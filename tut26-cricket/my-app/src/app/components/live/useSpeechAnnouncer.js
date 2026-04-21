@@ -681,11 +681,9 @@ export default function useSpeechAnnouncer(settings) {
 
   const ensureSpeechAudioSession = useCallback(() => {
     const previousType =
-      platformRef.current.isIOS && platformRef.current.isSafari
-        ? setPreferredAudioSessionType("transient") || ""
-        : setPlaybackFriendlyAudioSessionType({
-            preferMixing: true,
-          }) || "";
+      setPlaybackFriendlyAudioSessionType({
+        preferMixing: true,
+      }) || "";
     if (!audioSessionTypeRef.current) {
       audioSessionTypeRef.current = previousType;
     }
