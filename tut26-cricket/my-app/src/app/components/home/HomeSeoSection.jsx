@@ -113,6 +113,7 @@ function FaqItem({ item }) {
 export default function HomeSeoSection() {
   return (
     <section
+      id="home-faq"
       aria-label="GV Cricket frequently asked questions"
       className="mx-auto w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[108rem]"
     >

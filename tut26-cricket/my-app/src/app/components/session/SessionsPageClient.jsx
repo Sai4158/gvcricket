@@ -322,6 +322,7 @@ export default function SessionsPageClient({
   const activeRequestIdRef = useRef(0);
   const hasPrimedInitialLoadRef = useRef(false);
   const previousPageSizeRef = useRef(initialPageSize);
+  const sessionsTopRef = useRef(null);
 
   useEffect(() => {
     setSessions(initialSessions ?? []);
@@ -708,10 +709,26 @@ export default function SessionsPageClient({
       return;
     }
 
+    const topTarget =
+      sessionsTopRef.current instanceof HTMLElement
+        ? Math.max(
+            0,
+            window.scrollY + sessionsTopRef.current.getBoundingClientRect().top - 12
+          )
+        : 0;
+
     window.scrollTo({
-      top: 0,
+      top: topTarget,
       left: 0,
       behavior: "auto",
+    });
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({
+        top: topTarget,
+        left: 0,
+        behavior: "auto",
+      });
     });
   }, []);
 
@@ -1261,7 +1278,10 @@ export default function SessionsPageClient({
           </PendingLink>
         </div>
 
-        <section className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.06),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.05),transparent_24%),linear-gradient(180deg,rgba(13,14,20,0.98),rgba(8,8,12,0.99))] px-5 py-6 shadow-[0_28px_80px_rgba(0,0,0,0.34)] sm:px-7">
+        <section
+          ref={sessionsTopRef}
+          className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.06),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.05),transparent_24%),linear-gradient(180deg,rgba(13,14,20,0.98),rgba(8,8,12,0.99))] px-5 py-6 shadow-[0_28px_80px_rgba(0,0,0,0.34)] sm:px-7"
+        >
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-3">

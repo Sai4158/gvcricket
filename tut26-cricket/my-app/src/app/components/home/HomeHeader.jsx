@@ -160,6 +160,17 @@ export default function HomeHeader() {
     }
   };
 
+  const handleFaqClick = (event) => {
+    const element = document.getElementById("home-faq");
+    closeMenu();
+
+    if (element) {
+      event.preventDefault();
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.history.replaceState(null, "", "/#home-faq");
+    }
+  };
+
   const handleUpdatesClick = (event) => {
     const element = document.getElementById("updates");
     closeMenu();
@@ -194,6 +205,12 @@ export default function HomeHeader() {
       href: "/#learn-cricket",
       text: "Learn Cricket",
       onClick: handleLearnCricketClick,
+    },
+    { type: "divider" },
+    {
+      href: "/#home-faq",
+      text: "FAQ",
+      onClick: handleFaqClick,
     },
   ];
 
