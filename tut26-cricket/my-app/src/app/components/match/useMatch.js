@@ -633,6 +633,14 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     enabled: Boolean(matchId && hasAccess),
     disconnectWhenHidden: false,
     onMessage: (payload) => {
+      const streamedMatch = payload?.match;
+      const streamedMatchId = String(streamedMatch?._id || "").trim();
+
+      if (!streamedMatch || (streamedMatchId && streamedMatchId !== String(matchId))) {
+        void refreshMatch();
+        return;
+      }
+
       const incomingUpdatedAt = payload?.updatedAt || payload?.match?.updatedAt || "";
 
       if (isIncomingUpdateOlder(incomingUpdatedAt, lastStreamUpdateRef.current)) {
@@ -641,7 +649,11 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
       lastStreamUpdateRef.current =
         incomingUpdatedAt || lastStreamUpdateRef.current;
-      const nextMatch = applyQueuedFallbackState(payload.match || null);
+      const nextMatch = applyQueuedFallbackState(streamedMatch);
+      if (!nextMatch) {
+        void refreshMatch();
+        return;
+      }
       matchRef.current = nextMatch;
       setMatch(nextMatch);
       setLastUpdatedAt(nextMatch?.updatedAt || incomingUpdatedAt || "");
