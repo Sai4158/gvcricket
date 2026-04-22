@@ -815,7 +815,10 @@ export default function SessionsPageClient({
 
   const handlePaginationChange = useCallback(
     (nextPage, type = "page") => {
-      const resolvedPage = Math.max(1, Math.min(totalPages, Number(nextPage || 1)));
+      const resolvedPage = Math.max(
+        1,
+        Math.min(totalPages, Number(nextPage || 1)),
+      );
       if (resolvedPage === currentPage || isRefreshingList) {
         return;
       }
@@ -1575,7 +1578,9 @@ export default function SessionsPageClient({
                               aria-label={`Go to page ${pageNumber}`}
                               aria-current={isActive ? "page" : undefined}
                             >
-                              {isPendingPage ? "..." : pageNumber.toLocaleString()}
+                              {isPendingPage
+                                ? "..."
+                                : pageNumber.toLocaleString()}
                             </button>
                           );
                         })}

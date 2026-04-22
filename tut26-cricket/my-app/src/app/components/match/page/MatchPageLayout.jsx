@@ -303,7 +303,6 @@ export default function MatchPageLayout({
             />
           ) : null}
           <MatchActionGrid
-            isUpdating={isUpdating}
             historyStackLength={currentInningsHasHistory ? historyStack.length : 0}
             onEditTeams={() => setModal({ type: "editTeams" })}
             onEditOvers={() => setModal({ type: "editOvers" })}
