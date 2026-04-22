@@ -295,6 +295,7 @@ export default function SessionsPageClient({
   const [hasPreviousPage, setHasPreviousPage] = useState(
     Boolean(initialPayload?.hasPreviousPage),
   );
+  const [paginationPendingState, setPaginationPendingState] = useState(null);
   const [isRefreshingList, setIsRefreshingList] = useState(!hasInitialPayload);
   const [hasLoadedFirstPage, setHasLoadedFirstPage] =
     useState(hasInitialPayload);
@@ -800,6 +801,7 @@ export default function SessionsPageClient({
         if (requestId === activeRequestIdRef.current) {
           setHasLoadedFirstPage(true);
           setIsRefreshingList(false);
+          setPaginationPendingState(null);
         }
       }
     },
@@ -809,6 +811,23 @@ export default function SessionsPageClient({
       fetchSessionCountsPayload,
       fetchSessionsPayload,
     ],
+  );
+
+  const handlePaginationChange = useCallback(
+    (nextPage, type = "page") => {
+      const resolvedPage = Math.max(1, Math.min(totalPages, Number(nextPage || 1)));
+      if (resolvedPage === currentPage || isRefreshingList) {
+        return;
+      }
+
+      scrollSessionsToTop();
+      setPaginationPendingState({
+        type,
+        targetPage: resolvedPage,
+      });
+      setCurrentPage(resolvedPage);
+    },
+    [currentPage, isRefreshingList, scrollSessionsToTop, totalPages],
   );
 
   useEffect(() => {
@@ -1522,32 +1541,33 @@ export default function SessionsPageClient({
                     <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          scrollSessionsToTop();
-                          setCurrentPage((current) => Math.max(1, current - 1));
-                        }}
-                        disabled={!hasPreviousPage || isRefreshingList}
-                        className="press-feedback rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] disabled:cursor-not-allowed disabled:opacity-40"
+                        onClick={() =>
+                          handlePaginationChange(currentPage - 1, "previous")
+                        }
+                        disabled={!hasPreviousPage}
+                        className="press-feedback rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] disabled:cursor-not-allowed disabled:text-zinc-500 disabled:opacity-100"
                       >
-                        Previous Page
+                        {isRefreshingList &&
+                        paginationPendingState?.type === "previous"
+                          ? "Loading..."
+                          : "Previous Page"}
                       </button>
                       <div className="flex flex-wrap items-center gap-2">
                         {visiblePageNumbers.map((pageNumber) => {
                           const isActive = pageNumber === currentPage;
+                          const isPendingPage =
+                            isRefreshingList &&
+                            paginationPendingState?.type === "page" &&
+                            paginationPendingState?.targetPage === pageNumber;
 
                           return (
                             <button
                               key={`session-page-${pageNumber}`}
                               type="button"
-                              onClick={() => {
-                                if (pageNumber === currentPage) {
-                                  return;
-                                }
-                                scrollSessionsToTop();
-                                setCurrentPage(pageNumber);
-                              }}
-                              disabled={isRefreshingList}
-                              className={`press-feedback inline-flex h-10 min-w-10 items-center justify-center rounded-full border px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                              onClick={() =>
+                                handlePaginationChange(pageNumber, "page")
+                              }
+                              className={`press-feedback inline-flex h-10 min-w-10 items-center justify-center rounded-full border px-3 text-sm font-semibold transition ${
                                 isActive
                                   ? "border-cyan-200/24 bg-[linear-gradient(135deg,rgba(245,252,255,0.96),rgba(211,238,248,0.9)_60%,rgba(245,158,11,0.26))] text-black shadow-[0_10px_20px_rgba(255,255,255,0.14)]"
                                   : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] text-white hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))]"
@@ -1555,23 +1575,23 @@ export default function SessionsPageClient({
                               aria-label={`Go to page ${pageNumber}`}
                               aria-current={isActive ? "page" : undefined}
                             >
-                              {pageNumber.toLocaleString()}
+                              {isPendingPage ? "..." : pageNumber.toLocaleString()}
                             </button>
                           );
                         })}
                       </div>
                       <button
                         type="button"
-                        onClick={() => {
-                          scrollSessionsToTop();
-                          setCurrentPage((current) =>
-                            Math.min(totalPages, current + 1),
-                          );
-                        }}
-                        disabled={!hasNextPage || isRefreshingList}
-                        className="press-feedback rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] disabled:cursor-not-allowed disabled:opacity-40"
+                        onClick={() =>
+                          handlePaginationChange(currentPage + 1, "next")
+                        }
+                        disabled={!hasNextPage}
+                        className="press-feedback rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] disabled:cursor-not-allowed disabled:text-zinc-500 disabled:opacity-100"
                       >
-                        Next Page
+                        {isRefreshingList &&
+                        paginationPendingState?.type === "next"
+                          ? "Loading..."
+                          : "Next Page"}
                       </button>
                     </div>
                   </div>
