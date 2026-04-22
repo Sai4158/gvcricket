@@ -357,6 +357,7 @@ export function serializePublicMatch(
   const match = normalizeLegacyTossState(rawMatch, fallbackState);
   const includeActionHistory = Boolean(options.includeActionHistory);
   const publicImages = getPublicMatchImagesWithFallback(match, fallbackState);
+  const compactOverState = getCompactOverState(match);
   const announcerScoreSoundEffectMap = normalizeScoreSoundEffectMap(
     match?.announcer?.scoreSoundEffectMap ||
       fallbackState?.announcer?.scoreSoundEffectMap ||
@@ -387,6 +388,11 @@ export function serializePublicMatch(
     innings2: match.innings2 || { team: "", score: 0, history: [] },
     tossReady: hasCompleteTossState(match, fallbackState),
     balls: Array.isArray(match.balls) ? match.balls : [],
+    activeOverBalls: compactOverState.activeOverBalls,
+    activeOverNumber: compactOverState.activeOverNumber,
+    legalBallCount: compactOverState.legalBallCount,
+    firstInningsLegalBallCount: compactOverState.firstInningsLegalBallCount,
+    secondInningsLegalBallCount: compactOverState.secondInningsLegalBallCount,
     matchImageUrl: publicImages[0]?.url || getPublicMatchImagePath(match),
     matchImages: publicImages,
     announcerEnabled: Boolean(match.announcerEnabled),

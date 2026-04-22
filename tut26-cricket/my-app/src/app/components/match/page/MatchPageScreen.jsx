@@ -96,7 +96,7 @@ import { duckPageMedia, restorePageMedia } from "../../../lib/page-audio";
 import { buildMatchScorePreview } from "./match-score-preview";
 
 const SCORE_CONTROL_COOLDOWN_MS = 1000;
-const UNDO_CONTROL_COOLDOWN_MS = 500;
+const UNDO_CONTROL_COOLDOWN_MS = 1000;
 const UNDO_CONTROL_KEY = "undo";
 
 export default function MatchPageClient({
@@ -1254,6 +1254,13 @@ export default function MatchPageClient({
     if (isScoreControlCoolingDown(controlKey)) {
       return false;
     }
+    const scoreActionId = createScoreActionId();
+    const acceptedScoreTap = handleScoreEvent(runs, isOut, extraType, {
+      actionId: scoreActionId,
+    });
+    if (!acceptedScoreTap) {
+      return false;
+    }
 
     armScoreControlCooldown(controlKey);
 
@@ -1273,15 +1280,10 @@ export default function MatchPageClient({
     const shouldBroadcastScoreEffect =
       umpireSettings.broadcastScoreSoundEffects !== false &&
       !shouldSuppressScoreEffectForInningsEnd;
-    const scoreActionId = createScoreActionId();
     const configuredScoreEffectPromise =
       shouldPlayLocalScoreEffect || shouldBroadcastScoreEffect
         ? resolveConfiguredScoreSoundEffect(runs, isOut, extraType)
         : Promise.resolve(null);
-
-    handleScoreEvent(runs, isOut, extraType, {
-      actionId: scoreActionId,
-    });
 
     const configuredScoreEffect = await configuredScoreEffectPromise;
 

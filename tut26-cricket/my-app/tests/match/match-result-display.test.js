@@ -11,6 +11,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { getWinningInningsSummary } from "../../src/app/lib/match-result-display.js";
+import { calculateInningsSummary } from "../../src/app/lib/match-stats.js";
 
 test("[match] result display uses the first innings score when the first batting team wins by runs", () => {
   const summary = getWinningInningsSummary({
@@ -60,4 +61,39 @@ test("[match] result display uses the chasing innings score when the second batt
   assert.equal(summary?.score, 39);
   assert.equal(summary?.wickets, 1);
   assert.equal(summary?.scoreline, "39/1");
+});
+
+test("[match] result display falls back to saved legal-ball counts when winner history is incomplete", () => {
+  const summary = getWinningInningsSummary({
+    result: "Team Red won by 13 runs.",
+    firstInningsLegalBallCount: 36,
+    secondInningsLegalBallCount: 30,
+    innings1: {
+      team: "Team Red",
+      score: 95,
+      history: [],
+    },
+    innings2: {
+      team: "Team Blue",
+      score: 82,
+      history: [{ balls: [{ runs: 1, isOut: false }] }],
+    },
+  });
+
+  assert.equal(summary?.teamName, "Team Red");
+  assert.equal(summary?.score, 95);
+  assert.equal(summary?.overs, "6.0");
+  assert.equal(summary?.scoreline, "95/0");
+});
+
+test("[match] innings summary uses saved legal-ball counts when history is incomplete", () => {
+  const summary = calculateInningsSummary({
+    score: 95,
+    history: [],
+    legalBallCount: 36,
+  });
+
+  assert.equal(summary.overs, "6.0");
+  assert.equal(summary.balls, 36);
+  assert.equal(summary.runRate, "15.83");
 });

@@ -59,6 +59,11 @@ const MUTABLE_ACTION_KEYS = [
   "innings1",
   "innings2",
   "balls",
+  "activeOverBalls",
+  "activeOverNumber",
+  "legalBallCount",
+  "firstInningsLegalBallCount",
+  "secondInningsLegalBallCount",
   "lastLiveEvent",
   "lastEventType",
   "lastEventText",
@@ -69,7 +74,7 @@ const MUTABLE_ACTION_KEYS = [
   "actionHistory",
 ];
 const UNDO_MATCH_FIELDS =
-  "_id sessionId adminAccessVersion teamA teamB teamAName teamBName overs tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText recentActionIds undoCount undoSequence processedActionIds createdAt updatedAt";
+  "_id sessionId adminAccessVersion teamA teamB teamAName teamBName overs tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls activeOverBalls activeOverNumber legalBallCount firstInningsLegalBallCount secondInningsLegalBallCount announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText recentActionIds undoCount undoSequence processedActionIds createdAt updatedAt";
 const UNDO_MATCH_PROJECTION = String(UNDO_MATCH_FIELDS)
   .split(/\s+/)
   .filter(Boolean)
@@ -88,6 +93,11 @@ function countLegalBallsInBalls(balls = []) {
   }
 
   return total;
+}
+
+function getStoredLegalBallCount(value) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) && numericValue >= 0 ? numericValue : null;
 }
 
 function buildHotSessionMirrorUpdate(match) {
@@ -245,6 +255,29 @@ export async function POST(req, { params }) {
           latestUndoEntry.snapshot,
           { clone: false },
         );
+        const finalizedFirstInningsHistory = Array.isArray(finalizedMatch?.innings1?.history)
+          ? finalizedMatch.innings1.history
+          : [];
+        if (
+          restoredMatch?.innings === "second" &&
+          finalizedFirstInningsHistory.length &&
+          !Array.isArray(restoredMatch?.innings1?.history)
+        ) {
+          restoredMatch.innings1 = {
+            ...(restoredMatch.innings1 || {}),
+            history: finalizedFirstInningsHistory,
+          };
+        } else if (
+          restoredMatch?.innings === "second" &&
+          finalizedFirstInningsHistory.length &&
+          Array.isArray(restoredMatch?.innings1?.history) &&
+          restoredMatch.innings1.history.length === 0
+        ) {
+          restoredMatch.innings1 = {
+            ...(restoredMatch.innings1 || {}),
+            history: finalizedFirstInningsHistory,
+          };
+        }
         const undoEvent = createUndoLiveEvent(restoredMatch);
         const activeInningsKey =
           restoredMatch?.innings === "second" ? "innings2" : "innings1";
@@ -255,9 +288,16 @@ export async function POST(req, { params }) {
         const activeOverBalls = Array.isArray(activeOver?.balls) ? activeOver.balls : [];
         const activeOverNumber = Number(activeOver?.overNumber || 1);
         const legalBallCount = countLegalBallsInBalls(restoredMatch?.balls || []);
+        const restoredFirstInningsLegalBallCount = countLegalBalls(
+          restoredMatch?.innings1?.history || []
+        );
         const firstInningsLegalBallCount = restoredMatch?.innings === "first"
           ? legalBallCount
-          : countLegalBalls(restoredMatch?.innings1?.history || []);
+          : restoredFirstInningsLegalBallCount > 0
+            ? restoredFirstInningsLegalBallCount
+            : getStoredLegalBallCount(restoredMatch?.firstInningsLegalBallCount) ??
+              getStoredLegalBallCount(finalizedMatch?.firstInningsLegalBallCount) ??
+              countLegalBalls(finalizedFirstInningsHistory);
         const secondInningsLegalBallCount = restoredMatch?.innings === "second"
           ? legalBallCount
           : 0;
@@ -296,6 +336,7 @@ export async function POST(req, { params }) {
           ),
           undoCount: Math.max(0, getMatchUndoCount(finalizedMatch) - 1),
           undoSequence: Math.max(0, Number(finalizedMatch.undoSequence || 0)),
+          ...responseCompactState,
         };
 
         const updatedAt = new Date();

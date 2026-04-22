@@ -41,7 +41,7 @@ import MatchUndoEntry from "../../../../../models/MatchUndoEntry";
 import Session from "../../../../../models/Session";
 
 const SCORE_MATCH_FIELDS =
-  "_id sessionId adminAccessVersion teamA teamB teamAName teamBName overs tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText recentActionIds undoCount undoSequence processedActionIds createdAt updatedAt";
+  "_id sessionId adminAccessVersion teamA teamB teamAName teamBName overs tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls activeOverBalls activeOverNumber legalBallCount firstInningsLegalBallCount secondInningsLegalBallCount announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText recentActionIds undoCount undoSequence processedActionIds createdAt updatedAt";
 const SCORE_MATCH_PROJECTION = String(SCORE_MATCH_FIELDS)
   .split(/\s+/)
   .filter(Boolean)
@@ -49,6 +49,11 @@ const SCORE_MATCH_PROJECTION = String(SCORE_MATCH_FIELDS)
     projection[field] = 1;
     return projection;
   }, {});
+const MAX_SCORE_WRITE_RETRIES = 24;
+
+function isDuplicateKeyError(error) {
+  return Number(error?.code || 0) === 11000;
+}
 
 function countLegalBallsInBalls(balls = []) {
   let total = 0;
@@ -60,6 +65,11 @@ function countLegalBallsInBalls(balls = []) {
   }
 
   return total;
+}
+
+function getStoredLegalBallCount(value) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) && numericValue >= 0 ? numericValue : null;
 }
 
 function buildHotSessionMirrorUpdate(match) {
@@ -115,14 +125,22 @@ function buildScoreWriteOperation(nextState, currentMatch, actionId) {
   const activeOverBalls = Array.isArray(activeOver?.balls) ? activeOver.balls : [];
   const activeOverNumber = Number(activeOver?.overNumber || 1);
   const currentActiveLegalBallCount = countLegalBallsInBalls(currentMatch?.balls || []);
+  const storedFirstInningsLegalBallCount = getStoredLegalBallCount(
+    currentMatch?.firstInningsLegalBallCount,
+  );
+  const storedSecondInningsLegalBallCount = getStoredLegalBallCount(
+    currentMatch?.secondInningsLegalBallCount,
+  );
   const legalBallCount = currentActiveLegalBallCount +
     (nextBall?.extraType === "wide" || nextBall?.extraType === "noball" ? 0 : 1);
   const firstInningsLegalBallCount = activeInningsKey === "innings1"
     ? legalBallCount
-    : countLegalBalls(currentMatch?.innings1?.history || []);
+    : storedFirstInningsLegalBallCount ??
+      countLegalBalls(currentMatch?.innings1?.history || []);
   const secondInningsLegalBallCount = activeInningsKey === "innings2"
     ? legalBallCount
-    : 0;
+    : storedSecondInningsLegalBallCount ??
+      countLegalBalls(currentMatch?.innings2?.history || []);
   const $set = {
     score: nextState?.score ?? 0,
     outs: nextState?.outs ?? 0,
@@ -139,6 +157,11 @@ function buildScoreWriteOperation(nextState, currentMatch, actionId) {
     [`${activeInningsKey}.score`]: Number(nextState?.[activeInningsKey]?.score || 0),
     [`${inactiveInningsKey}.team`]: nextState?.[inactiveInningsKey]?.team || "",
     [`${inactiveInningsKey}.score`]: Number(nextState?.[inactiveInningsKey]?.score || 0),
+    activeOverBalls,
+    activeOverNumber,
+    legalBallCount,
+    firstInningsLegalBallCount,
+    secondInningsLegalBallCount,
     updatedAt,
   };
   const $push = {
@@ -205,6 +228,18 @@ function buildScoreWriteOperation(nextState, currentMatch, actionId) {
   };
 }
 
+function buildScoreWriteFilter(match) {
+  const filter = {
+    _id: match?._id,
+  };
+
+  if (match?.updatedAt) {
+    filter.updatedAt = match.updatedAt;
+  }
+
+  return filter;
+}
+
 async function hasMatchAccess(matchId, accessVersion) {
   const cookieStore = await cookies();
   const token = cookieStore.get(getMatchAccessCookieName(matchId))?.value;
@@ -232,43 +267,137 @@ export async function POST(req, { params }) {
       return jsonError("Match not found.", 404);
     }
 
-    const match = await Match.collection.findOne(
-      { _id: new Types.ObjectId(id) },
-      { projection: SCORE_MATCH_PROJECTION },
-    );
-    if (!match) {
-      return jsonError("Match not found.", 404);
-    }
-    const finalizedMatch = await finalizePendingResultIfExpired(match);
+    let finalizedMatch = null;
+    let hasAccess = false;
 
-    const hasAccess = await hasMatchAccess(
-      id,
-      Number(finalizedMatch.adminAccessVersion || 1),
-    );
-    if (!hasAccess) {
+    for (let attempt = 0; attempt < MAX_SCORE_WRITE_RETRIES; attempt += 1) {
+      const match = await Match.collection.findOne(
+        { _id: new Types.ObjectId(id) },
+        { projection: SCORE_MATCH_PROJECTION },
+      );
+      if (!match) {
+        return jsonError("Match not found.", 404);
+      }
+
+      finalizedMatch = await finalizePendingResultIfExpired(match);
+
+      if (attempt === 0) {
+        hasAccess = await hasMatchAccess(
+          id,
+          Number(finalizedMatch.adminAccessVersion || 1),
+        );
+      }
+
+      if (!hasAccess) {
+        void writeAuditLog({
+          action: "match_score_denied",
+          targetType: "match",
+          targetId: id,
+          status: "failure",
+          ip: meta.ip,
+          userAgent: meta.userAgent,
+          metadata: { actionId: parsedRequest.value.actionId },
+        });
+        return jsonError("Umpire access required.", 403);
+      }
+
+      if (isMatchCompleted(finalizedMatch)) {
+        return jsonError("This match is complete. Open the result page instead.", 409);
+      }
+
+      if (isProcessedAction(finalizedMatch, parsedRequest.value.actionId)) {
+        return Response.json(
+          {
+            ok: true,
+            actionId: parsedRequest.value.actionId,
+            replayed: true,
+            matchPatch: serializeLiveMatchPatch(finalizedMatch),
+          },
+          {
+            headers: {
+              "Cache-Control": "no-store",
+            },
+          },
+        );
+      }
+
+      const nextState = applyMatchAction(finalizedMatch, {
+        ...parsedRequest.value,
+        type: "score_ball",
+      });
+      const { writeOperation, updatedMatch } = buildScoreWriteOperation(
+        nextState,
+        finalizedMatch,
+        parsedRequest.value.actionId,
+      );
+
+      let createdUndoEntryId = null;
+      try {
+        const createdUndoEntry = await MatchUndoEntry.collection.insertOne({
+          matchId: finalizedMatch._id,
+          sequence: updatedMatch.undoSequence,
+          actionId: parsedRequest.value.actionId,
+          type: "score_ball",
+          snapshot: createMatchUndoSnapshot(finalizedMatch),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        createdUndoEntryId = createdUndoEntry?.insertedId || null;
+      } catch (error) {
+        if (isDuplicateKeyError(error)) {
+          continue;
+        }
+        console.error("Could not create score undo snapshot:", error);
+        return jsonError("Could not update the match.", 500);
+      }
+
+      const scoreUpdateResult = await Match.collection.updateOne(
+        buildScoreWriteFilter(finalizedMatch),
+        writeOperation,
+      );
+      if (!scoreUpdateResult?.matchedCount) {
+        if (createdUndoEntryId) {
+          await MatchUndoEntry.collection
+            .deleteOne({ _id: createdUndoEntryId })
+            .catch(() => {});
+        }
+        continue;
+      }
+
+      invalidateSessionsDataCache();
+      publishMatchUpdate(updatedMatch._id);
+
+      void Session.findByIdAndUpdate(
+        updatedMatch.sessionId,
+        {
+          $set: buildHotSessionMirrorUpdate(updatedMatch),
+        },
+        {
+          timestamps: false,
+        },
+      )
+        .then(() => {
+          publishSessionUpdate(updatedMatch.sessionId);
+        })
+        .catch((error) => {
+          console.error("Could not update session score mirror:", error);
+        });
+
       void writeAuditLog({
-        action: "match_score_denied",
+        action: "match_score_ball",
         targetType: "match",
         targetId: id,
-        status: "failure",
+        status: "success",
         ip: meta.ip,
         userAgent: meta.userAgent,
-        metadata: { actionId: parsedRequest.value.actionId },
+        metadata: { actionId: parsedRequest.value.actionId, retries: attempt },
       });
-      return jsonError("Umpire access required.", 403);
-    }
 
-    if (isMatchCompleted(finalizedMatch)) {
-      return jsonError("This match is complete. Open the result page instead.", 409);
-    }
-
-    if (isProcessedAction(finalizedMatch, parsedRequest.value.actionId)) {
       return Response.json(
         {
           ok: true,
           actionId: parsedRequest.value.actionId,
-          replayed: true,
-          matchPatch: serializeLiveMatchPatch(finalizedMatch),
+          matchPatch: serializeLiveMatchPatch(updatedMatch),
         },
         {
           headers: {
@@ -278,84 +407,7 @@ export async function POST(req, { params }) {
       );
     }
 
-    const nextState = applyMatchAction(finalizedMatch, {
-      ...parsedRequest.value,
-      type: "score_ball",
-    });
-    const { writeOperation, updatedMatch } = buildScoreWriteOperation(
-      nextState,
-      finalizedMatch,
-      parsedRequest.value.actionId,
-    );
-
-    let createdUndoEntryId = null;
-    try {
-      const createdUndoEntry = await MatchUndoEntry.collection.insertOne({
-        matchId: finalizedMatch._id,
-        sequence: updatedMatch.undoSequence,
-        actionId: parsedRequest.value.actionId,
-        type: "score_ball",
-        snapshot: createMatchUndoSnapshot(finalizedMatch),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      createdUndoEntryId = createdUndoEntry?.insertedId || null;
-    } catch (error) {
-      console.error("Could not create score undo snapshot:", error);
-      return jsonError("Could not update the match.", 500);
-    }
-
-    const scoreUpdateResult = await Match.collection.updateOne(
-      { _id: finalizedMatch._id },
-      writeOperation,
-    );
-    if (!scoreUpdateResult?.matchedCount) {
-      if (createdUndoEntryId) {
-        void MatchUndoEntry.collection.deleteOne({ _id: createdUndoEntryId }).catch(() => {});
-      }
-      return jsonError("Match not found.", 404);
-    }
-    invalidateSessionsDataCache();
-    publishMatchUpdate(updatedMatch._id);
-
-    void Session.findByIdAndUpdate(
-      updatedMatch.sessionId,
-      {
-        $set: buildHotSessionMirrorUpdate(updatedMatch),
-      },
-      {
-        timestamps: false,
-      },
-    )
-      .then(() => {
-        publishSessionUpdate(updatedMatch.sessionId);
-      })
-      .catch((error) => {
-        console.error("Could not update session score mirror:", error);
-      });
-
-    void writeAuditLog({
-      action: "match_score_ball",
-      targetType: "match",
-      targetId: id,
-      status: "success",
-      ip: meta.ip,
-      userAgent: meta.userAgent,
-      metadata: { actionId: parsedRequest.value.actionId },
-    });
-
-    return Response.json(
-      {
-        ok: true,
-        actionId: parsedRequest.value.actionId,
-        matchPatch: serializeLiveMatchPatch(updatedMatch),
-      },
-      {
-        headers: {
-          "Cache-Control": "no-store",
-        },
-      },
-    );
+    return jsonError("Could not update the match. Please retry.", 409);
   } catch (error) {
     if (error instanceof MatchEngineError) {
       return jsonError(error.message, error.status);

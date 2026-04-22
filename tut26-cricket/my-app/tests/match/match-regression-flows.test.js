@@ -521,4 +521,34 @@ test("[match] walkie changes stay isolated from score state and do not leak acro
   }
 });
 
+test("[match] public match serialization keeps saved compact over-state for result and refresh recovery", () => {
+  const publicMatch = serializePublicMatch({
+    ...buildBaseMatch(),
+    tossWinner: "Falcons",
+    tossDecision: "bat",
+    innings1: {
+      team: "Falcons",
+      score: 95,
+      history: [],
+    },
+    innings2: {
+      team: "Titans",
+      score: 82,
+      history: [{ balls: [{ runs: 1, isOut: false }] }],
+    },
+    activeOverBalls: [],
+    activeOverNumber: 1,
+    legalBallCount: 30,
+    firstInningsLegalBallCount: 36,
+    secondInningsLegalBallCount: 30,
+    result: "Falcons won by 13 runs.",
+    isOngoing: false,
+  });
+
+  assert.equal(publicMatch.firstInningsLegalBallCount, 36);
+  assert.equal(publicMatch.secondInningsLegalBallCount, 30);
+  assert.equal(publicMatch.legalBallCount, 30);
+  assert.deepEqual(publicMatch.activeOverBalls, []);
+});
+
 

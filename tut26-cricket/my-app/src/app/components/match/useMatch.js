@@ -354,6 +354,12 @@ function updateQueuedActionRetryFlag(
   return changed ? nextEntries : queuedEntries;
 }
 
+function hasQueuedScoreAction(queuedEntries = []) {
+  return (Array.isArray(queuedEntries) ? queuedEntries : []).some(
+    (entry) => entry?.action?.type === "score_ball",
+  );
+}
+
 function readStoredActionQueue(matchId) {
   if (typeof window === "undefined" || !matchId) {
     return [];
@@ -1264,12 +1270,16 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
   }, [clearRetryTimer]);
 
   const handleScoreEvent = useCallback((runs, isOut = false, extraType = null, options = {}) => {
-    if (!match || match.result || match.pendingResult || !hasAccess) return;
+    if (!match || match.result || match.pendingResult || !hasAccess) return false;
     if (tossPending) {
       setError(null);
       startNavigation("Opening toss...");
       router.replace(`/toss/${matchId}`);
-      return;
+      return false;
+    }
+
+    if (hasQueuedScoreAction(actionQueueRef.current)) {
+      return false;
     }
 
     triggerHapticFeedback();
@@ -1281,6 +1291,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       isOut,
       extraType,
     });
+    return true;
   }, [hasAccess, match, matchId, router, sendAction, startNavigation, tossPending]);
 
   const handleUndo = useCallback(async () => {
