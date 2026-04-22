@@ -206,7 +206,6 @@ export default function HomeHeader() {
       text: "Learn Cricket",
       onClick: handleLearnCricketClick,
     },
-    { type: "divider" },
     {
       href: "/#home-faq",
       text: "FAQ",
