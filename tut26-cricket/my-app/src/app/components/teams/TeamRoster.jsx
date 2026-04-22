@@ -20,6 +20,7 @@ import {
   FaTrash,
   FaUserPlus,
 } from "react-icons/fa";
+import RollingDigitText from "../shared/RollingDigitText";
 
 export function createDefaultRoster(teamLabel) {
   return {
@@ -309,8 +310,13 @@ export default function TeamRoster({ color, roster, setRoster }) {
           >
             <span className="text-[1.25rem] font-medium leading-none">−</span>
           </button>
-          <span className="w-8 text-center text-3xl font-black text-white">
-            {roster.players.length}
+          <span className="inline-flex w-8 items-center justify-center text-center text-3xl font-black text-white tabular-nums [font-variant-numeric:tabular-nums]">
+            <RollingDigitText
+              text={String(roster.players.length)}
+              valueNumber={Number(roster.players.length || 0)}
+              trackingClass=""
+              digitWidthClass="w-[0.58em]"
+            />
           </span>
           <button
             onClick={addPlayer}
