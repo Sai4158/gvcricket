@@ -16,20 +16,16 @@ import HomeScrollFade from "../home/HomeScrollFade";
 
 const footerLinks = [
   {
-    href: "/session",
-    label: "Live Cricket Scores",
-  },
-  {
     href: "/session/new",
-    label: "Start Cricket Scoring",
+    label: "Start Match",
   },
   {
-    href: "/rules",
-    label: "Cricket Scoring Rules",
+    href: "/session",
+    label: "View All Games",
   },
   {
     href: "/update",
-    label: "GV Cricket Updates",
+    label: "Updates",
   },
 ];
 
