@@ -355,15 +355,39 @@ function updateQueuedActionRetryFlag(
 }
 
 function readStoredActionQueue(matchId) {
-  if (typeof window !== "undefined" && matchId) {
+  if (typeof window === "undefined" || !matchId) {
+    return [];
+  }
+
+  try {
+    const rawValue = window.sessionStorage.getItem(getActionQueueStorageKey(matchId));
+    if (!rawValue) {
+      return [];
+    }
+
+    const parsedValue = JSON.parse(rawValue);
+    if (!Array.isArray(parsedValue)) {
+      window.sessionStorage.removeItem(getActionQueueStorageKey(matchId));
+      return [];
+    }
+
+    const normalizedEntries = parsedValue
+      .map(normalizeQueuedActionEntry)
+      .filter(Boolean);
+
+    if (normalizedEntries.length !== parsedValue.length) {
+      writeStoredActionQueue(matchId, normalizedEntries);
+    }
+
+    return normalizedEntries;
+  } catch {
     try {
       window.sessionStorage.removeItem(getActionQueueStorageKey(matchId));
     } catch {
       // Ignore storage cleanup failures.
     }
+    return [];
   }
-
-  return [];
 }
 
 function writeStoredActionQueue(matchId, entries) {
@@ -372,10 +396,78 @@ function writeStoredActionQueue(matchId, entries) {
   }
 
   try {
-    window.sessionStorage.removeItem(getActionQueueStorageKey(matchId));
+    const normalizedEntries = (Array.isArray(entries) ? entries : [])
+      .map(normalizeQueuedActionEntry)
+      .filter(Boolean);
+
+    if (!normalizedEntries.length) {
+      window.sessionStorage.removeItem(getActionQueueStorageKey(matchId));
+      return;
+    }
+
+    window.sessionStorage.setItem(
+      getActionQueueStorageKey(matchId),
+      JSON.stringify(normalizedEntries),
+    );
   } catch {
     // Ignore storage cleanup failures and continue with in-memory queueing.
   }
+}
+
+function hasIncompleteInningsHistory(match) {
+  return !Array.isArray(match?.innings1?.history) || !Array.isArray(match?.innings2?.history);
+}
+
+function mergeInningsHistory(baseInnings, incomingInnings) {
+  const nextInnings = {
+    ...(baseInnings || {}),
+    ...(incomingInnings || {}),
+  };
+
+  if (Array.isArray(incomingInnings?.history)) {
+    nextInnings.history = incomingInnings.history;
+    return nextInnings;
+  }
+
+  if (Array.isArray(baseInnings?.history)) {
+    nextInnings.history = baseInnings.history;
+  }
+
+  return nextInnings;
+}
+
+function mergeKnownInningsHistories(baseMatch, incomingMatch) {
+  if (!incomingMatch) {
+    return baseMatch;
+  }
+
+  if (!baseMatch) {
+    return incomingMatch;
+  }
+
+  return {
+    ...baseMatch,
+    ...incomingMatch,
+    innings1: mergeInningsHistory(baseMatch?.innings1, incomingMatch?.innings1),
+    innings2: mergeInningsHistory(baseMatch?.innings2, incomingMatch?.innings2),
+  };
+}
+
+function mergeFetchedUmpireHistory(baseMatch, historyPayload) {
+  if (!baseMatch || !historyPayload) {
+    return baseMatch;
+  }
+
+  return {
+    ...baseMatch,
+    innings1: mergeInningsHistory(baseMatch?.innings1, historyPayload?.innings1),
+    innings2: mergeInningsHistory(baseMatch?.innings2, historyPayload?.innings2),
+    historyVersion:
+      historyPayload?.historyVersion ||
+      baseMatch?.historyVersion ||
+      baseMatch?.updatedAt ||
+      null,
+  };
 }
 
 export function replayQueuedMatchActions(baseMatch, queuedEntries = []) {
@@ -449,6 +541,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
   const retryTimerRef = useRef(null);
   const processQueuedActionsRef = useRef(async () => {});
   const optimisticUndoStackRef = useRef([]);
+  const historyHydrationPromiseRef = useRef(null);
 
   const clearRetryTimer = useCallback(() => {
     if (retryTimerRef.current) {
@@ -540,6 +633,67 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     matchRef.current = match;
   }, [match]);
 
+  const hydrateCompleteMatchHistory = useCallback(async (baseMatch = null) => {
+    const workingMatch = normalizeIncomingMatch(
+      mergeKnownInningsHistories(matchRef.current, baseMatch),
+    );
+
+    if (
+      !matchId ||
+      !hasAccess ||
+      !workingMatch ||
+      !hasIncompleteInningsHistory(workingMatch)
+    ) {
+      return workingMatch;
+    }
+
+    if (historyHydrationPromiseRef.current) {
+      return historyHydrationPromiseRef.current;
+    }
+
+    historyHydrationPromiseRef.current = (async () => {
+      try {
+        const response = await fetchWithNetworkRetry(
+          `/api/matches/${matchId}/umpire-history`,
+          {
+            cache: "no-store",
+          },
+        );
+        const historyPayload = await response
+          .json()
+          .catch(() => null);
+
+        if (!response.ok || !historyPayload) {
+          return workingMatch;
+        }
+
+        const latestMatch = normalizeIncomingMatch(matchRef.current || workingMatch);
+        const hydratedMatch = normalizeIncomingMatch(
+          mergeFetchedUmpireHistory(latestMatch, historyPayload),
+        );
+
+        if (hydratedMatch) {
+          matchRef.current = hydratedMatch;
+          setMatch(hydratedMatch);
+          setLastUpdatedAt(
+            hydratedMatch?.updatedAt ||
+              latestMatch?.updatedAt ||
+              historyPayload?.updatedAt ||
+              new Date().toISOString(),
+          );
+        }
+
+        return hydratedMatch || workingMatch;
+      } catch {
+        return workingMatch;
+      } finally {
+        historyHydrationPromiseRef.current = null;
+      }
+    })();
+
+    return historyHydrationPromiseRef.current;
+  }, [hasAccess, matchId]);
+
   const refreshMatch = useCallback(async () => {
     if (!matchId || !hasAccess) {
       return null;
@@ -562,7 +716,9 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
       const incomingUpdatedAt = body?.updatedAt || "";
       if (!isIncomingUpdateOlder(incomingUpdatedAt, lastStreamUpdateRef.current)) {
-        const nextMatch = applyQueuedFallbackState(body);
+        const nextMatch = applyQueuedFallbackState(
+          mergeKnownInningsHistories(matchRef.current, body),
+        );
         matchRef.current = nextMatch;
         lastStreamUpdateRef.current =
           incomingUpdatedAt || lastStreamUpdateRef.current;
@@ -587,6 +743,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     if (matchChanged) {
       clearRetryTimer();
       processingQueueRef.current = false;
+      historyHydrationPromiseRef.current = null;
       updateQueuedActions([]);
       lastStreamUpdateRef.current = initialMatch?.updatedAt || "";
       const normalizedInitialMatch = normalizeIncomingMatch(initialMatch);
@@ -600,6 +757,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
     if (!matchId || !hasAccess) {
       clearRetryTimer();
+      historyHydrationPromiseRef.current = null;
       lastStreamUpdateRef.current = initialMatch?.updatedAt || "";
       const normalizedInitialMatch = normalizeIncomingMatch(initialMatch);
       matchRef.current = normalizedInitialMatch;
@@ -620,6 +778,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     if (!matchId) {
       clearRetryTimer();
       actionQueueRef.current = [];
+      historyHydrationPromiseRef.current = null;
       return;
     }
 
@@ -650,6 +809,25 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     updateQueuedActions,
   ]);
 
+  useEffect(() => {
+    if (!matchId || !hasAccess) {
+      historyHydrationPromiseRef.current = null;
+      return;
+    }
+
+    if (!hasIncompleteInningsHistory(matchRef.current || initialMatch)) {
+      return;
+    }
+
+    void hydrateCompleteMatchHistory(matchRef.current || initialMatch);
+  }, [
+    hasAccess,
+    hydrateCompleteMatchHistory,
+    initialMatch,
+    match?.historyVersion,
+    matchId,
+  ]);
+
   useEventSource({
     url: matchId && hasAccess ? `/api/live/matches/${matchId}` : null,
     event: "match",
@@ -672,7 +850,9 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
       lastStreamUpdateRef.current =
         incomingUpdatedAt || lastStreamUpdateRef.current;
-      const nextMatch = applyQueuedFallbackState(streamedMatch);
+      const nextMatch = applyQueuedFallbackState(
+        mergeKnownInningsHistories(matchRef.current, streamedMatch),
+      );
       if (!nextMatch) {
         void refreshMatch();
         return;
@@ -734,6 +914,9 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       const currentEntry = actionQueueRef.current[0];
       setIsUpdating(true);
       const isScoreAction = currentEntry.action?.type === "score_ball";
+      if (!isScoreAction && hasIncompleteInningsHistory(matchRef.current)) {
+        await hydrateCompleteMatchHistory(matchRef.current);
+      }
       const targetUrl = isScoreAction
         ? `/api/matches/${matchId}/score`
         : `/api/matches/${matchId}/actions`;
@@ -900,6 +1083,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     scheduleQueuedActionRetry,
     startNavigation,
     updateQueuedActions,
+    hydrateCompleteMatchHistory,
   ]);
 
   processQueuedActionsRef.current = processQueuedActions;
@@ -907,7 +1091,14 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
   const sendAction = useCallback(async (action, allowOneRetry = true) => {
     if (!matchId || !hasAccess) return null;
 
-    const baseMatch = matchRef.current;
+    let baseMatch = matchRef.current;
+    if (action?.type !== "score_ball" && hasIncompleteInningsHistory(baseMatch)) {
+      const hydratedMatch = await hydrateCompleteMatchHistory(baseMatch);
+      if (hydratedMatch) {
+        baseMatch = hydratedMatch;
+      }
+    }
+
     if (!baseMatch) {
       return null;
     }
@@ -964,7 +1155,13 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     void processQueuedActions();
 
     return matchRef.current;
-  }, [hasAccess, matchId, processQueuedActions, updateQueuedActions]);
+  }, [
+    hasAccess,
+    hydrateCompleteMatchHistory,
+    matchId,
+    processQueuedActions,
+    updateQueuedActions,
+  ]);
 
   const patchAndUpdate = useCallback(async (payload) => {
     if (!matchId || !hasAccess || processingQueueRef.current) return null;
