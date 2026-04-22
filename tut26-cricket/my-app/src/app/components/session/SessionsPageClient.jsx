@@ -1371,8 +1371,7 @@ export default function SessionsPageClient({
                 </button>
               </div>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-zinc-400 sm:text-base">
-                Browse latest games, live cricket scores, completed match
-                results, and saved sessions.
+                Browse live scores, match results, and saved sessions.
               </p>
               <p className="mt-3 text-sm text-zinc-400">
                 {showInitialSkeleton
