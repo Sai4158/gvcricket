@@ -11,7 +11,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { FaCheck, FaMinus, FaPen, FaPlus, FaTimes, FaTrash } from "react-icons/fa";
+import {
+  FaCheck,
+  FaMinus,
+  FaPen,
+  FaPlus,
+  FaTimes,
+  FaTrash,
+  FaUserPlus,
+} from "react-icons/fa";
 
 export function createDefaultRoster(teamLabel) {
   return {
@@ -280,7 +288,7 @@ export default function TeamRoster({ color, roster, setRoster }) {
             className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-300 transition-colors hover:bg-white/[0.08]"
             aria-label="Edit roster"
           >
-            <FaPen size={16} />
+            <FaUserPlus size={16} />
           </button>
         )}
       </div>
