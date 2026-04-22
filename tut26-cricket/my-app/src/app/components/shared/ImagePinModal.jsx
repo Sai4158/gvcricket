@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { FaArrowRight, FaImage, FaTimes } from "react-icons/fa";
+import { FaArrowRight, FaEye, FaEyeSlash, FaImage, FaTimes } from "react-icons/fa";
 import LoadingButton from "./LoadingButton";
 import {
   clearClientPinRateLimit,
@@ -42,6 +42,7 @@ export default function ImagePinModal({
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showDigits, setShowDigits] = useState(false);
   const inputRef = useRef(null);
   const pinRateLimit = useClientPinRateLimit(rateLimitScope, isOpen);
   const displayError = pinRateLimit.isBlocked ? pinRateLimit.message : error;
@@ -51,6 +52,7 @@ export default function ImagePinModal({
       setPin("");
       setError("");
       setIsSubmitting(false);
+      setShowDigits(false);
       return;
     }
 
@@ -164,33 +166,47 @@ export default function ImagePinModal({
                     {pinLabel}
                   </label>
                 ) : null}
-                <input
-                  ref={inputRef}
-                  id="image-pin-input"
-                  type={maskDigits ? "password" : "text"}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={digitCount}
-                  value={pin}
-                  disabled={
-                    isSubmitting ||
-                    (pinRateLimit.isBlocked && !allowSubmitDuringRateLimit)
-                  }
-                  onChange={(event) =>
-                    setPin(
-                      event.target.value.replace(/\D/g, "").slice(0, digitCount)
-                    )
-                  }
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      handleSubmit();
+                <div className="relative">
+                  <input
+                    ref={inputRef}
+                    id="image-pin-input"
+                    type={maskDigits && !showDigits ? "password" : "text"}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={digitCount}
+                    value={pin}
+                    disabled={
+                      isSubmitting ||
+                      (pinRateLimit.isBlocked && !allowSubmitDuringRateLimit)
                     }
-                  }}
-                  placeholder={placeholder}
-                  aria-label={pinLabel}
-                  className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-amber-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(251,191,36,0.08)]"
-                />
+                    onChange={(event) =>
+                      setPin(
+                        event.target.value.replace(/\D/g, "").slice(0, digitCount)
+                      )
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleSubmit();
+                      }
+                    }}
+                    placeholder={placeholder}
+                    aria-label={pinLabel}
+                    className={`w-full rounded-2xl border border-white/10 bg-white/[0.05] py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-amber-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(251,191,36,0.08)] ${
+                      maskDigits ? "pl-4 pr-14" : "px-4"
+                    }`}
+                  />
+                  {maskDigits ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowDigits((current) => !current)}
+                      className="absolute right-3 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
+                      aria-label={showDigits ? "Hide PIN digits" : "Show PIN digits"}
+                    >
+                      {showDigits ? <FaEyeSlash /> : <FaEye />}
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               {displayError ? (

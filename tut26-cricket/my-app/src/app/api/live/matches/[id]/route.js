@@ -9,7 +9,8 @@
 
 import { connectDB } from "../../../../lib/db";
 import { ensureLiveUpdates, subscribeToMatch } from "../../../../lib/live-updates";
-import { serializePublicMatch } from "../../../../lib/public-data";
+import { serializePublicMatch, serializeUmpireBootstrap } from "../../../../lib/public-data";
+import { finalizePendingResultIfExpired } from "../../../../lib/pending-match-result";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 
@@ -22,9 +23,9 @@ const STREAM_HEARTBEAT_INTERVAL_MS = 15_000;
 const LIVE_MATCH_SNAPSHOT_CACHE_TTL_MS = 1_000;
 const STREAM_BOOTSTRAP_PAD = "0".repeat(64);
 const LIVE_MATCH_FIELDS =
-  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText createdAt updatedAt actionHistory";
+  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcer announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled walkieTalkieEnabled mediaUpdatedAt lastLiveEvent lastEventType lastEventText recentActionIds undoCount createdAt updatedAt actionHistory processedActionIds";
 const READ_ONLY_LIVE_MATCH_FIELDS =
-  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText createdAt updatedAt";
+  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcer announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled walkieTalkieEnabled mediaUpdatedAt lastLiveEvent lastEventType lastEventText recentActionIds undoCount createdAt updatedAt";
 const FALLBACK_SESSION_FIELDS =
   "tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy updatedAt";
 const globalMatchSnapshotCache =
@@ -62,17 +63,19 @@ function getMatchSnapshotCacheEntry(matchId, includeActionHistory) {
 
 async function readLiveMatchSnapshot(matchId, { includeActionHistory = true } = {}) {
   const match = await Match.findById(matchId)
-    .select(includeActionHistory ? LIVE_MATCH_FIELDS : READ_ONLY_LIVE_MATCH_FIELDS)
-    .lean();
+    .select(includeActionHistory ? LIVE_MATCH_FIELDS : READ_ONLY_LIVE_MATCH_FIELDS);
+  const finalizedMatch = await finalizePendingResultIfExpired(match);
   const fallbackSession =
-    match?.sessionId
-      ? await Session.findById(match.sessionId)
+    finalizedMatch?.sessionId
+      ? await Session.findById(finalizedMatch.sessionId)
           .select(FALLBACK_SESSION_FIELDS)
           .lean()
       : null;
-  const publicMatch = serializePublicMatch(match, fallbackSession, {
-    includeActionHistory,
-  });
+  const publicMatch = includeActionHistory
+    ? serializePublicMatch(finalizedMatch, fallbackSession, {
+        includeActionHistory,
+      })
+    : serializeUmpireBootstrap(finalizedMatch, fallbackSession);
 
   return {
     publicMatch,
@@ -130,7 +133,7 @@ function getMatchIsoTimestamp(match) {
 export async function GET(request, { params }) {
   const { id } = await params;
   const includeActionHistory =
-    request.nextUrl.searchParams.get("history") !== "0";
+    request.nextUrl.searchParams.get("history") === "1";
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({

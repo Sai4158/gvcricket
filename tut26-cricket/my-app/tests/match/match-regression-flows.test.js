@@ -185,7 +185,8 @@ test("[match] mixed scoring, undo, innings switch, and winning-shot undo stay co
     actionId: actionId("winning-shot"),
   });
 
-  assert.equal(winningShot.result, "Titans Prime won by 4 wickets.");
+  assert.equal(winningShot.result, "");
+  assert.equal(winningShot.pendingResult, "Titans Prime won by 4 wickets.");
   assert.equal(winningShot.isOngoing, false);
 
   const rewound = applyMatchAction(winningShot, {
@@ -193,6 +194,7 @@ test("[match] mixed scoring, undo, innings switch, and winning-shot undo stay co
     actionId: actionId("undo-winning-shot"),
   });
   assert.equal(rewound.result, "");
+  assert.equal(rewound.pendingResult, "");
   assert.equal(rewound.isOngoing, true);
   assert.equal(rewound.score, 12);
 
@@ -203,7 +205,8 @@ test("[match] mixed scoring, undo, innings switch, and winning-shot undo stay co
     extraType: "wide",
     actionId: actionId("finish-chase"),
   });
-  assert.equal(finalMatch.result, "Titans Prime won by 4 wickets.");
+  assert.equal(finalMatch.result, "");
+  assert.equal(finalMatch.pendingResult, "Titans Prime won by 4 wickets.");
   assert.equal(finalMatch.isOngoing, false);
   assert.equal(finalMatch.score, 14);
 });

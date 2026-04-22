@@ -56,6 +56,7 @@ export default function TeamInningsDetail({
   statusLabel = "",
   targetSummary = "",
   teamSide = "",
+  loadingHistory = false,
 }) {
   if (!inningsData) return null;
 
@@ -161,6 +162,12 @@ export default function TeamInningsDetail({
               </div>
             </div>
           ))
+        ) : loadingHistory ? (
+          <p
+            className={`relative text-sm font-bold ${isRedSide ? "text-yellow-200" : "text-sky-200"}`}
+          >
+            Loading over history...
+          </p>
         ) : (
           <p
             className={`relative text-sm font-bold ${isRedSide ? "text-yellow-200" : "text-sky-200"}`}

@@ -7,7 +7,7 @@
  * Read next: ../../../../docs/ONBOARDING.md
  */
 
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import ResultPageClient from "../../components/result/ResultPageClient";
 import {
   absoluteUrl,
@@ -46,6 +46,13 @@ export async function generateMetadata({ params }) {
   return {
     title: pageLabel,
     description: `See the final score, winner, over summary, and match stats for ${matchup}.${resultText}`.trim(),
+    keywords: [
+      `${matchup} result`,
+      `${matchup} scorecard`,
+      "cricket result",
+      "cricket final score",
+      "cricket match stats",
+    ],
     alternates: {
       canonical: absoluteUrl(`/result/${id}`),
     },
@@ -68,6 +75,13 @@ export default async function ResultPage({ params }) {
   const initialMatch = await loadPublicMatchDataCached(id);
   if (!initialMatch) {
     notFound();
+  }
+  if (initialMatch.pendingResult && !initialMatch.result) {
+    redirect(
+      initialMatch.sessionId
+        ? `/session/${initialMatch.sessionId}/view`
+        : `/match/${id}`,
+    );
   }
 
   return <ResultPageClient matchId={id} initialMatch={initialMatch} />;

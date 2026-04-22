@@ -11,11 +11,14 @@ import Session from "../../../models/Session.js";
 import { jsonError, jsonRateLimit } from "../../lib/api-response";
 import { writeAuditLog } from "../../lib/audit-log";
 import { connectDB } from "../../lib/db";
-import { loadSessionsIndexPageData } from "../../lib/server-data";
 import { serializePublicSession } from "../../lib/public-data";
 import { getRequestMeta } from "../../lib/request-meta";
 import { enforceRateLimit } from "../../lib/rate-limit";
 import { parseJsonRequest } from "../../lib/request-security";
+import {
+  loadSessionsIndexCounts,
+  loadSessionsIndexPageData,
+} from "../../lib/sessions-index-data";
 import { createDraftToken, createDraftTokenHash } from "../../lib/session-draft";
 import { sessionCreateSchema } from "../../lib/validators";
 
@@ -89,23 +92,73 @@ export async function POST(req) {
 export async function GET(req) {
   try {
     const requestUrl = new URL(req.url);
-    const requestCacheControl = String(
-      req.headers.get("cache-control") || "",
-    ).toLowerCase();
-    const forceFresh =
+    const page = Number(requestUrl.searchParams.get("page") || 1);
+    const limit = Number(requestUrl.searchParams.get("limit") || 28);
+    const search = String(requestUrl.searchParams.get("search") || "").trim();
+    const filter = String(requestUrl.searchParams.get("filter") || "").trim();
+    const sort = String(requestUrl.searchParams.get("sort") || "").trim();
+    const includeCounts = requestUrl.searchParams.get("counts") !== "0";
+    const summary = String(requestUrl.searchParams.get("summary") || "").trim();
+    const bypassCache =
       requestUrl.searchParams.get("fresh") === "1" ||
-      requestCacheControl.includes("no-store") ||
-      requestCacheControl.includes("no-cache");
-    const { sessions, totalCount } = await loadSessionsIndexPageData({
-      forceFresh,
+      requestUrl.searchParams.get("t");
+
+    if (summary === "counts") {
+      const counts = await loadSessionsIndexCounts({
+        page,
+        limit,
+        search,
+        filter,
+        bypassCache,
+      });
+
+      return Response.json(counts, {
+        headers: {
+          "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=45",
+          "X-Total-Count": String(Number(counts.totalCount || 0)),
+        },
+      });
+    }
+
+    const {
+      sessions,
+      page: resolvedPage,
+      limit: resolvedLimit,
+      totalCount,
+      totalPages,
+      unfilteredTotalCount,
+      hasNextPage,
+      hasPreviousPage,
+      countsPending,
+    } = await loadSessionsIndexPageData({
+      page,
+      limit,
+      search,
+      filter,
+      sort,
+      includeCounts,
+      bypassCache,
     });
 
-    return Response.json(sessions, {
+    return Response.json(
+      {
+        sessions,
+        page: resolvedPage,
+        limit: resolvedLimit,
+        totalCount,
+        totalPages,
+        unfilteredTotalCount,
+        hasNextPage,
+        hasPreviousPage,
+        countsPending,
+      },
+      {
       headers: {
         "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=45",
         "X-Total-Count": String(Number(totalCount || 0)),
       },
-    });
+      }
+    );
   } catch {
     return jsonError("Failed to retrieve sessions.", 500);
   }

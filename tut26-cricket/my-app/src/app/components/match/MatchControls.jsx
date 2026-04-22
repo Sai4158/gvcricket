@@ -9,6 +9,7 @@
  * Read next: ./README.md
  */
 
+import { memo } from "react";
 import { motion } from "framer-motion";
 import { FaInfoCircle } from "react-icons/fa";
 import {
@@ -16,7 +17,7 @@ import {
   scoreControlFont,
 } from "./score-control-theme";
 
-function ScoreButton({ onClick, disabled, className, children }) {
+const ScoreButton = memo(function ScoreButton({ onClick, disabled, className, children }) {
   return (
     <motion.button
       whileTap={{ scale: 0.92, y: 2 }}
@@ -31,9 +32,9 @@ function ScoreButton({ onClick, disabled, className, children }) {
       </span>
     </motion.button>
   );
-}
+});
 
-function ButtonWithInfo({
+const ButtonWithInfo = memo(function ButtonWithInfo({
   children,
   info,
   setInfoText,
@@ -73,15 +74,16 @@ function ButtonWithInfo({
       </button>
     </div>
   );
-}
+});
 
-export function Controls({
+export const Controls = memo(function Controls({
   onScore,
   onOut,
   onNoBall,
   onWide,
   setInfoText,
   disabled,
+  disabledKeys = {},
 }) {
   const baseBtn =
     "py-6 rounded-2xl transition-transform active:scale-95 shadow-lg w-full disabled:opacity-50 disabled:cursor-not-allowed";
@@ -89,22 +91,22 @@ export function Controls({
   return (
     <div className="grid grid-cols-4 gap-3">
       <ScoreButton
-        onClick={() => onScore(0)}
+        onClick={() => onScore(0, false, null, { controlKey: "dot" })}
         disabled={disabled}
         className={`${baseBtn} ${getScoreControlToneClasses("dot")}`}
       >
         Dot
       </ScoreButton>
       {[
-        { key: "one", runs: 1 },
-        { key: "two", runs: 2 },
-        { key: "three", runs: 3 },
-        { key: "four", runs: 4 },
-        { key: "six", runs: 6 },
+        { key: "1", runs: 1 },
+        { key: "2", runs: 2 },
+        { key: "3", runs: 3 },
+        { key: "4", runs: 4 },
+        { key: "6", runs: 6 },
       ].map(({ key, runs }) => (
         <ScoreButton
           key={key}
-          onClick={() => onScore(runs)}
+          onClick={() => onScore(runs, false, null, { controlKey: key })}
           disabled={disabled}
           className={`${baseBtn} ${getScoreControlToneClasses("neutral")}`}
         >
@@ -140,9 +142,15 @@ export function Controls({
       </ButtonWithInfo>
     </div>
   );
-}
+});
 
-export function ActionButton({ onClick, icon, label, colorClass, disabled }) {
+export const ActionButton = memo(function ActionButton({
+  onClick,
+  icon,
+  label,
+  colorClass,
+  disabled,
+}) {
   return (
     <motion.button
       whileTap={{ scale: 0.92, y: 2 }}
@@ -154,6 +162,6 @@ export function ActionButton({ onClick, icon, label, colorClass, disabled }) {
       <span className="text-sm font-bold uppercase tracking-wider">{label}</span>
     </motion.button>
   );
-}
+});
 
 

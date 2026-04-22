@@ -10,10 +10,18 @@
 import { getBattingTeamBundle, getTotalDismissalsAllowed } from "./team-utils";
 
 export function countLegalBalls(history = []) {
-  return history
-    .flatMap((over) => over.balls || [])
-    .filter((ball) => ball.extraType !== "wide" && ball.extraType !== "noball")
-    .length;
+  let total = 0;
+
+  for (const over of Array.isArray(history) ? history : []) {
+    const balls = Array.isArray(over?.balls) ? over.balls : [];
+    for (const ball of balls) {
+      if (ball?.extraType !== "wide" && ball?.extraType !== "noball") {
+        total += 1;
+      }
+    }
+  }
+
+  return total;
 }
 
 export function addBallToHistory(match, ball) {
@@ -24,7 +32,15 @@ export function addBallToHistory(match, ball) {
 
   const history = innings.history;
   const lastOver = history.at(-1);
-  const legalBallsInLastOver = countLegalBalls(lastOver ? [lastOver] : []);
+  const legalBallsInLastOver = Array.isArray(lastOver?.balls)
+    ? lastOver.balls.reduce(
+        (total, entry) =>
+          entry?.extraType === "wide" || entry?.extraType === "noball"
+            ? total
+            : total + 1,
+        0,
+      )
+    : 0;
 
   // Once an over already has 6 legal balls, any next scoring event belongs
   // to the next over, including wides and no-balls.

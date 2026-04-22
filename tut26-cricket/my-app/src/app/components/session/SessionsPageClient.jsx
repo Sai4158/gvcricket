@@ -6,18 +6,15 @@
  * Main exports: SessionsPageClient.
  * Major callers: Feature routes and sibling components.
  * Side effects: uses React hooks and browser APIs.
+ * Reading guide:
+ * - top: session list constants and small helpers
+ * - middle: page state, filters, paging, and modal state
+ * - bottom: click handlers, requests, and page UI
  * Read next: ./README.md
  */
 
-
-import {
-  useCallback,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
@@ -32,19 +29,36 @@ import {
   FaTimes,
 } from "react-icons/fa";
 import DarkSelect from "../shared/DarkSelect";
-import InfoModal from "./InfoModal";
-import PinModal from "./PinModal";
 import LoadingButton from "../shared/LoadingButton";
 import PendingLink from "../shared/PendingLink";
-import SiteFooter from "../shared/SiteFooter";
 import SessionCard from "./SessionCard";
-import LiquidSportText from "../home/LiquidSportText";
-import ImagePinModal from "../shared/ImagePinModal";
-import { ModalBase } from "../match/MatchBaseModals";
-import MatchImageUploader from "../match/MatchImageUploader";
 import { verifyImageActionPin } from "../../lib/image-pin-client";
 import { buildPinRequestError } from "../../lib/pin-attempt-client";
 import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
+
+const InfoModal = dynamic(() => import("./InfoModal"), { ssr: false });
+const PinModal = dynamic(() => import("./PinModal"), { ssr: false });
+const SiteFooter = dynamic(() => import("../shared/SiteFooter"));
+const ImagePinModal = dynamic(() => import("../shared/ImagePinModal"), {
+  ssr: false,
+});
+const ModalBase = dynamic(
+  () => import("../match/MatchBaseModals").then((module) => module.ModalBase),
+  { ssr: false },
+);
+const MatchImageUploader = dynamic(
+  () => import("../match/MatchImageUploader"),
+  {
+    ssr: false,
+  },
+);
+const LiquidSportText = dynamic(() => import("../home/LiquidSportText"), {
+  loading: () => (
+    <span className="relative z-10 block text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
+      All Sessions
+    </span>
+  ),
+});
 
 const SORT_OPTIONS = [
   { value: "live-newest", label: "Live first" },
@@ -55,109 +69,58 @@ const SORT_OPTIONS = [
   { value: "z-a", label: "Z to A" },
 ];
 
-const PAGE_SIZE_OPTIONS = [
-  { value: "12", label: "12" },
-  { value: "24", label: "24" },
-  { value: "36", label: "36" },
-  { value: "48", label: "48" },
-];
-
 const FILTER_OPTIONS = [
   { value: "all", label: "All" },
   { value: "live", label: "Live" },
   { value: "completed", label: "Completed" },
 ];
-const SESSION_SELECTION_HOLD_MS = 3000;
+
+const PAGE_SIZE_OPTIONS = [
+  { value: "28", label: "Show 28" },
+  { value: "48", label: "Show 48" },
+  { value: "58", label: "Show 58" },
+  { value: "68", label: "Show 68" },
+];
+const SESSIONS_PAGE_SIZE = 28;
 const EMPTY_MANAGE_FORM = {
   name: "",
   teamAName: "",
   teamBName: "",
 };
 
+// Small helpers for search and sorting.
 function normalizeSearchValue(value) {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
-function getTimestampMs(value) {
-  const timestamp = Date.parse(String(value || ""));
-  return Number.isNaN(timestamp) ? 0 : timestamp;
-}
+function buildVisiblePageNumbers(currentPage, totalPages, maxVisible = 5) {
+  const safeCurrent = Math.max(1, Number(currentPage || 1));
+  const safeTotal = Math.max(1, Number(totalPages || 1));
+  const windowSize = Math.max(1, Math.min(maxVisible, safeTotal));
+  const halfWindow = Math.floor(windowSize / 2);
+  let start = Math.max(1, safeCurrent - halfWindow);
+  let end = start + windowSize - 1;
 
-function getPreferredTimestampMs(...values) {
-  for (const value of values) {
-    const timestamp = getTimestampMs(value);
-    if (timestamp > 0) {
-      return timestamp;
-    }
+  if (end > safeTotal) {
+    end = safeTotal;
+    start = Math.max(1, end - windowSize + 1);
   }
 
-  return 0;
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
 }
 
-function buildSearchText(session) {
-  return [
-    session.name,
-    session.teamAName,
-    session.teamBName,
-    session.date,
-    session.isLive ? "live live now" : "completed ended final score",
-    session.result,
-    session.updatedAt,
-    session.createdAt,
-  ]
-    .map(normalizeSearchValue)
-    .filter(Boolean)
-    .join(" ");
-}
-
-function sortSessions(items, sortValue) {
-  const sessions = [...items];
-  const byCreatedDesc = (left, right) => {
-    const createdDiff = right.__createdAtMs - left.__createdAtMs;
-    if (createdDiff !== 0) {
-      return createdDiff;
-    }
-
-    const updatedDiff = right.__updatedAtMs - left.__updatedAtMs;
-    if (updatedDiff !== 0) {
-      return updatedDiff;
-    }
-
-    return left.__sortName.localeCompare(right.__sortName);
-  };
-
-  switch (sortValue) {
-    case "newest":
-      return sessions.sort(byCreatedDesc);
-    case "oldest":
-      return sessions.sort((left, right) => -byCreatedDesc(left, right));
-    case "recent-ended":
-      return sessions.sort((left, right) => {
-        if (left.isLive !== right.isLive) return left.isLive ? 1 : -1;
-        return byCreatedDesc(left, right);
-      });
-    case "a-z":
-      return sessions.sort((left, right) =>
-        left.__sortName.localeCompare(right.__sortName)
-      );
-    case "z-a":
-      return sessions.sort((left, right) =>
-        right.__sortName.localeCompare(left.__sortName)
-      );
-    case "live-newest":
-    default:
-      return sessions.sort((left, right) => {
-        if (left.isLive !== right.isLive) return left.isLive ? -1 : 1;
-        return byCreatedDesc(left, right);
-      });
-  }
-}
-
+// Card shown when there are no sessions to show.
 function EmptyState({ title, text, href, label }) {
   return (
     <div className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.08),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.08),transparent_28%),linear-gradient(180deg,rgba(18,18,24,0.97),rgba(8,8,12,0.99))] px-6 py-12 text-center shadow-[0_24px_70px_rgba(0,0,0,0.32)]">
-      <h2 className="text-2xl font-semibold tracking-[-0.03em] text-white">{title}</h2>
-      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-zinc-400">{text}</p>
+      <h2 className="text-2xl font-semibold tracking-[-0.03em] text-white">
+        {title}
+      </h2>
+      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-zinc-400">
+        {text}
+      </p>
       {href && label ? (
         <Link
           href={href}
@@ -171,6 +134,34 @@ function EmptyState({ title, text, href, label }) {
   );
 }
 
+function SessionsGridSkeleton({ count = 8 }) {
+  return (
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] gap-5 2xl:gap-6">
+      {Array.from({ length: count }, (_, index) => (
+        <div
+          key={`session-skeleton-${index}`}
+          className="overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.05),transparent_20%),linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,8,12,0.98))] p-6 shadow-[0_20px_44px_rgba(0,0,0,0.24)]"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="h-8 w-40 animate-pulse rounded-2xl bg-white/10" />
+              <div className="mt-4 h-5 w-52 animate-pulse rounded-xl bg-white/8" />
+              <div className="mt-3 h-4 w-32 animate-pulse rounded-xl bg-white/6" />
+            </div>
+            <div className="w-20 shrink-0">
+              <div className="ml-auto h-12 w-20 animate-pulse rounded-2xl bg-amber-300/12" />
+              <div className="mt-2 ml-auto h-4 w-16 animate-pulse rounded-xl bg-white/6" />
+            </div>
+          </div>
+          <div className="mt-10 h-[172px] animate-pulse rounded-[26px] border border-white/6 bg-white/[0.03]" />
+          <div className="mt-5 h-14 animate-pulse rounded-[20px] bg-emerald-400/10" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Small modal that shows what action just finished.
 function ActionSummaryModal({ summary, onClose }) {
   if (!summary) {
     return null;
@@ -197,7 +188,9 @@ function ActionSummaryModal({ summary, onClose }) {
             <FaCheck />
           </span>
           <div className="min-w-0">
-            <p className="text-base font-semibold text-white">{summary.heading}</p>
+            <p className="text-base font-semibold text-white">
+              {summary.heading}
+            </p>
             {summary.description ? (
               <p className="mt-1 text-sm leading-6 text-zinc-300">
                 {summary.description}
@@ -231,6 +224,7 @@ function ActionSummaryModal({ summary, onClose }) {
   );
 }
 
+// Build a simple "old -> new" line for session edits.
 function describeSessionFieldChange(label, previousValue, nextValue) {
   if (previousValue === nextValue) {
     return "";
@@ -243,13 +237,69 @@ function describeSessionFieldChange(label, previousValue, nextValue) {
   return `${label}: ${previousValue} -> ${nextValue}`;
 }
 
+// Main sessions page.
+// Read this component in this order:
+// 1. state declarations
+// 2. derived lists and pagination
+// 3. handlers for pin, manage, delete, and navigation
+// 4. final JSX layout
 export default function SessionsPageClient({
-  initialSessions,
-  initialTotalCount = 0,
+  initialPayload,
   refreshToken = "",
 }) {
+  const hasInitialPayload = Array.isArray(initialPayload?.sessions);
+  const initialSessions = useMemo(
+    () =>
+      Array.isArray(initialPayload?.sessions) ? initialPayload.sessions : [],
+    [initialPayload?.sessions],
+  );
+  const initialTotalCount = useMemo(
+    () => Number(initialPayload?.totalCount || 0),
+    [initialPayload?.totalCount],
+  );
+  const initialUnfilteredTotalCount = useMemo(
+    () =>
+      Number(initialPayload?.unfilteredTotalCount || initialTotalCount || 0),
+    [initialPayload?.unfilteredTotalCount, initialTotalCount],
+  );
+  const initialPage = useMemo(
+    () => Math.max(1, Number(initialPayload?.page || 1)),
+    [initialPayload?.page],
+  );
+  const initialPageSize = useMemo(
+    () =>
+      String(Math.min(68, Math.max(28, Number(initialPayload?.limit || 28)))),
+    [initialPayload?.limit],
+  );
+  const initialTotalPages = useMemo(
+    () => Math.max(1, Number(initialPayload?.totalPages || 1)),
+    [initialPayload?.totalPages],
+  );
+  const initialCountsPending = useMemo(
+    () => Boolean(initialPayload?.countsPending),
+    [initialPayload?.countsPending],
+  );
+
+  // Main page state.
   const [sessions, setSessions] = useState(initialSessions ?? []);
   const [totalCount, setTotalCount] = useState(Number(initialTotalCount || 0));
+  const [unfilteredTotalCount, setUnfilteredTotalCount] = useState(
+    Number(initialUnfilteredTotalCount || 0),
+  );
+  const [currentPage, setCurrentPage] = useState(initialPage);
+  const [totalPages, setTotalPages] = useState(initialTotalPages);
+  const [pageSizeValue, setPageSizeValue] = useState(initialPageSize);
+  const [hasNextPage, setHasNextPage] = useState(
+    Boolean(initialPayload?.hasNextPage),
+  );
+  const [hasPreviousPage, setHasPreviousPage] = useState(
+    Boolean(initialPayload?.hasPreviousPage),
+  );
+  const [paginationPendingState, setPaginationPendingState] = useState(null);
+  const [isRefreshingList, setIsRefreshingList] = useState(!hasInitialPayload);
+  const [hasLoadedFirstPage, setHasLoadedFirstPage] =
+    useState(hasInitialPayload);
+  const [countsPending, setCountsPending] = useState(initialCountsPending);
   const [pinPrompt, setPinPrompt] = useState(null);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [pinError, setPinError] = useState("");
@@ -262,10 +312,8 @@ export default function SessionsPageClient({
   const [manageSubmitting, setManageSubmitting] = useState(false);
   const [manageError, setManageError] = useState("");
   const [manageDiscardPromptOpen, setManageDiscardPromptOpen] = useState(false);
-  const [imageActionContext, setImageActionContext] = useState(null);
   const [imageDeleteContext, setImageDeleteContext] = useState(null);
   const [imageReplaceContext, setImageReplaceContext] = useState(null);
-  const [imageActionError, setImageActionError] = useState("");
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedSessionIds, setSelectedSessionIds] = useState([]);
   const [selectionError, setSelectionError] = useState("");
@@ -275,159 +323,228 @@ export default function SessionsPageClient({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("live-newest");
   const [filterBy, setFilterBy] = useState("all");
-  const [pageSizeValue, setPageSizeValue] = useState("24");
-  const [page, setPage] = useState(1);
   const [isGoingHome, setIsGoingHome] = useState(false);
   const router = useRouter();
   const { startNavigation } = useRouteFeedback();
-  const deferredSearchQuery = useDeferredValue(normalizeSearchValue(searchInput));
-  const secretHoldTimerRef = useRef(null);
   const suppressCardOpenUntilRef = useRef(0);
-  const didInitialFreshReloadRef = useRef(false);
-  const hasHandledInitialPageScrollRef = useRef(false);
-
-  const setSecretHoldSelectionLock = useCallback((locked) => {
-    if (typeof document === "undefined") {
-      return;
-    }
-
-    [document.body, document.documentElement].forEach((node) => {
-      if (!node) {
-        return;
-      }
-
-      if (locked) {
-        node.style.setProperty("user-select", "none");
-        node.style.setProperty("-webkit-user-select", "none");
-        node.style.setProperty("-webkit-touch-callout", "none");
-      } else {
-        node.style.removeProperty("user-select");
-        node.style.removeProperty("-webkit-user-select");
-        node.style.removeProperty("-webkit-touch-callout");
-      }
-    });
-  }, []);
+  const hasMountedFiltersRef = useRef(false);
+  const activeRequestIdRef = useRef(0);
+  const hasPrimedInitialLoadRef = useRef(false);
+  const previousPageSizeRef = useRef(initialPageSize);
+  const sessionsTopRef = useRef(null);
 
   useEffect(() => {
     setSessions(initialSessions ?? []);
-  }, [initialSessions]);
-
-  useEffect(() => {
     setTotalCount(Number(initialTotalCount || 0));
-  }, [initialTotalCount]);
+    setUnfilteredTotalCount(Number(initialUnfilteredTotalCount || 0));
+    setCurrentPage(initialPage);
+    setTotalPages(initialTotalPages);
+    setPageSizeValue(initialPageSize);
+    setHasNextPage(Boolean(initialPayload?.hasNextPage));
+    setHasPreviousPage(Boolean(initialPayload?.hasPreviousPage));
+    setCountsPending(Boolean(initialPayload?.countsPending));
+  }, [
+    initialPage,
+    initialPageSize,
+    initialPayload?.countsPending,
+    initialPayload?.hasNextPage,
+    initialPayload?.hasPreviousPage,
+    initialSessions,
+    initialTotalCount,
+    initialTotalPages,
+    initialUnfilteredTotalCount,
+  ]);
 
   useEffect(() => {
     setSelectedSessionIds((current) =>
       current.filter((sessionId) =>
-        (initialSessions ?? []).some((session) => session._id === sessionId)
-      )
+        sessions.some((session) => session._id === sessionId),
+      ),
     );
-  }, [initialSessions]);
+  }, [sessions]);
 
   useEffect(() => {
-    setSearchQuery(deferredSearchQuery);
-    setPage(1);
-  }, [deferredSearchQuery]);
+    const timerId = window.setTimeout(() => {
+      const nextQuery = normalizeSearchValue(searchInput);
+      setSearchQuery((current) => {
+        if (current === nextQuery) {
+          return current;
+        }
+        setCurrentPage(1);
+        return nextQuery;
+      });
+    }, 300);
 
-  useEffect(() => {
-    setPage(1);
-  }, [filterBy, pageSizeValue, sortBy]);
-
-  useEffect(() => {
     return () => {
-      if (secretHoldTimerRef.current) {
-        window.clearTimeout(secretHoldTimerRef.current);
-        secretHoldTimerRef.current = null;
-      }
-      setSecretHoldSelectionLock(false);
+      window.clearTimeout(timerId);
     };
-  }, [setSecretHoldSelectionLock]);
+  }, [searchInput]);
 
-  const indexedSessions = useMemo(
-    () =>
-      sessions.map((session) => {
-        const createdAtMs = getPreferredTimestampMs(
-          session.date,
-          session.sortCreatedAt ||
-            session.matchCreatedAt ||
-            session.createdAt ||
-            session.updatedAt
-        );
-        const updatedAtMs = getTimestampMs(session.updatedAt || session.createdAt);
-        return {
-          ...session,
-          __searchText: buildSearchText(session),
-          __sortName: normalizeSearchValue(session.name || ""),
-          __createdAtMs: createdAtMs,
-          __updatedAtMs: updatedAtMs,
-        };
-      }),
-    [sessions]
-  );
-
-  const searchTerms = useMemo(
-    () => searchQuery.split(/\s+/).filter(Boolean),
-    [searchQuery]
-  );
-
-  const filteredSessions = useMemo(() => {
-    const searched = searchTerms.length
-      ? indexedSessions.filter((session) =>
-          searchTerms.every((term) => session.__searchText.includes(term))
-        )
-      : indexedSessions;
-
-    const filtered = searched.filter((session) => {
-      if (filterBy === "live") return session.isLive;
-      if (filterBy === "completed") return !session.isLive;
-      return true;
-    });
-
-    return sortSessions(filtered, sortBy);
-  }, [filterBy, indexedSessions, searchTerms, sortBy]);
-
-  const pageSize = Number(pageSizeValue);
-  const totalPages = Math.max(1, Math.ceil(filteredSessions.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const pageStart = filteredSessions.length ? (currentPage - 1) * pageSize : 0;
-  const paginatedSessions = filteredSessions.slice(pageStart, pageStart + pageSize);
-  const showingFrom = filteredSessions.length ? pageStart + 1 : 0;
-  const showingTo = filteredSessions.length
-    ? Math.min(filteredSessions.length, pageStart + pageSize)
-    : 0;
   const totalSessionCount =
-    Number.isFinite(totalCount) && totalCount > 0 ? totalCount : sessions.length;
-  const filteredSessionCount = filteredSessions.length;
+    Number.isFinite(totalCount) && totalCount > 0
+      ? totalCount
+      : sessions.length;
+  const overallSessionCount =
+    Number.isFinite(unfilteredTotalCount) && unfilteredTotalCount > 0
+      ? unfilteredTotalCount
+      : totalSessionCount;
   const totalSessionsLabel = `${totalSessionCount} ${
     totalSessionCount === 1 ? "session" : "sessions"
   }`;
-  const filteredSessionsLabel = `${filteredSessionCount} ${
-    filteredSessionCount === 1 ? "session" : "sessions"
-  }`;
+  const showingFrom = sessions.length
+    ? (currentPage - 1) * Number(pageSizeValue || 30) + 1
+    : 0;
+  const showingTo = sessions.length ? showingFrom + sessions.length - 1 : 0;
   const isFilteredView = filterBy !== "all" || Boolean(searchQuery);
   const imageReplaceSession = imageReplaceContext
-    ? sessions.find((session) => session._id === imageReplaceContext.sessionId) || null
+    ? sessions.find(
+        (session) => session._id === imageReplaceContext.sessionId,
+      ) || null
     : null;
   const selectedSessions = useMemo(
-    () => sessions.filter((session) => selectedSessionIds.includes(session._id)),
-    [selectedSessionIds, sessions]
+    () =>
+      sessions.filter((session) => selectedSessionIds.includes(session._id)),
+    [selectedSessionIds, sessions],
+  );
+  const visiblePageNumbers = useMemo(
+    () => buildVisiblePageNumbers(currentPage, totalPages),
+    [currentPage, totalPages],
+  );
+  const showInitialSkeleton = !hasLoadedFirstPage && isRefreshingList;
+  const managedSession = useMemo(
+    () =>
+      manageSessionContext?.sessionId
+        ? sessions.find(
+            (session) => session._id === manageSessionContext.sessionId,
+          ) || null
+        : null,
+    [manageSessionContext?.sessionId, sessions],
   );
 
-  useEffect(() => {
-    if (!hasHandledInitialPageScrollRef.current) {
-      hasHandledInitialPageScrollRef.current = true;
-      return;
-    }
+  const buildSessionsQuery = useCallback(
+    ({
+      forceFresh = false,
+      pageOverride,
+      limitOverride,
+      includeCounts = true,
+    } = {}) => {
+      const query = new URLSearchParams({
+        page: String(Math.max(1, Number(pageOverride || currentPage || 1))),
+        limit: String(
+          Math.min(
+            68,
+            Math.max(
+              1,
+              Number(limitOverride || pageSizeValue || SESSIONS_PAGE_SIZE),
+            ),
+          ),
+        ),
+        search: searchQuery,
+        filter: filterBy,
+        sort: sortBy,
+      });
 
-    if (typeof window === "undefined") {
-      return;
-    }
+      if (!includeCounts) {
+        query.set("counts", "0");
+      }
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  }, [currentPage]);
+      if (forceFresh) {
+        query.set("fresh", "1");
+        query.set("t", String(Date.now()));
+      }
+
+      return query;
+    },
+    [currentPage, filterBy, pageSizeValue, searchQuery, sortBy],
+  );
+
+  const fetchSessionsPayload = useCallback(
+    async ({
+      forceFresh = false,
+      pageOverride,
+      limitOverride,
+      includeCounts = true,
+    } = {}) => {
+      const response = await fetch(
+        `/api/sessions?${buildSessionsQuery({
+          forceFresh,
+          pageOverride,
+          limitOverride,
+          includeCounts,
+        }).toString()}`,
+        {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Could not refresh sessions.");
+      }
+
+      const payload = await response.json().catch(() => null);
+      if (!payload || !Array.isArray(payload.sessions)) {
+        throw new Error("Could not refresh sessions.");
+      }
+
+      return payload;
+    },
+    [buildSessionsQuery],
+  );
+
+  const fetchSessionCountsPayload = useCallback(
+    async ({ forceFresh = false, pageOverride, limitOverride } = {}) => {
+      const query = buildSessionsQuery({
+        forceFresh,
+        pageOverride,
+        limitOverride,
+        includeCounts: true,
+      });
+      query.set("summary", "counts");
+
+      const response = await fetch(`/api/sessions?${query.toString()}`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Could not load session counts.");
+      }
+
+      const payload = await response.json().catch(() => null);
+      if (!payload || typeof payload.totalCount !== "number") {
+        throw new Error("Could not load session counts.");
+      }
+
+      return payload;
+    },
+    [buildSessionsQuery],
+  );
+
+  const applySessionsPayload = useCallback((payload) => {
+    setSessions(payload.sessions);
+    setCurrentPage(Math.max(1, Number(payload.page || 1)));
+    if (Number.isFinite(Number(payload.totalPages))) {
+      setTotalPages(Math.max(1, Number(payload.totalPages || 1)));
+    }
+    setHasNextPage(Boolean(payload.hasNextPage));
+    setHasPreviousPage(Boolean(payload.hasPreviousPage));
+    setCountsPending(Boolean(payload.countsPending));
+  }, []);
+
+  const applyCountsPayload = useCallback((payload) => {
+    setTotalCount(Number(payload.totalCount || 0));
+    setUnfilteredTotalCount(Number(payload.unfilteredTotalCount || 0));
+    setTotalPages(Math.max(1, Number(payload.totalPages || 1)));
+    setHasNextPage(Boolean(payload.hasNextPage));
+    setHasPreviousPage(Boolean(payload.hasPreviousPage));
+    setCountsPending(Boolean(payload.countsPending));
+  }, []);
+
   const selectedSessionForManage =
     selectedSessions.length === 1 ? selectedSessions[0] : null;
   const normalizedManageForm = useMemo(
@@ -436,7 +553,7 @@ export default function SessionsPageClient({
       teamAName: String(manageForm.teamAName || "").trim(),
       teamBName: String(manageForm.teamBName || "").trim(),
     }),
-    [manageForm.name, manageForm.teamAName, manageForm.teamBName]
+    [manageForm.name, manageForm.teamAName, manageForm.teamBName],
   );
   const normalizedManageInitialForm = useMemo(
     () => ({
@@ -444,12 +561,17 @@ export default function SessionsPageClient({
       teamAName: String(manageInitialForm.teamAName || "").trim(),
       teamBName: String(manageInitialForm.teamBName || "").trim(),
     }),
-    [manageInitialForm.name, manageInitialForm.teamAName, manageInitialForm.teamBName]
+    [
+      manageInitialForm.name,
+      manageInitialForm.teamAName,
+      manageInitialForm.teamBName,
+    ],
   );
   const isManageFormDirty = useMemo(
     () =>
       normalizedManageForm.name !== normalizedManageInitialForm.name ||
-      normalizedManageForm.teamAName !== normalizedManageInitialForm.teamAName ||
+      normalizedManageForm.teamAName !==
+        normalizedManageInitialForm.teamAName ||
       normalizedManageForm.teamBName !== normalizedManageInitialForm.teamBName,
     [
       normalizedManageForm.name,
@@ -458,13 +580,9 @@ export default function SessionsPageClient({
       normalizedManageInitialForm.name,
       normalizedManageInitialForm.teamAName,
       normalizedManageInitialForm.teamBName,
-    ]
+    ],
   );
   const shouldPromptManageDiscard = isManageFormDirty || manageWasEdited;
-
-  useEffect(() => {
-    setPage((current) => Math.min(current, totalPages));
-  }, [totalPages]);
 
   useEffect(() => {
     if (!selectionMode) {
@@ -477,31 +595,37 @@ export default function SessionsPageClient({
     }
   }, [selectedSessionIds.length, selectionMode]);
 
+  // Click handlers and request handlers start here.
   const handleOpenUmpirePin = useCallback((nextSession) => {
     setPinError("");
     setPinPrompt({ mode: "umpire", session: nextSession });
   }, []);
 
+  // Director uses the same PIN modal, just with a different mode.
   const handleOpenDirectorPin = useCallback((nextSession) => {
     setPinError("");
     setPinPrompt({ mode: "director", session: nextSession });
   }, []);
 
-  const mergeMatchImageUpdateIntoSession = useCallback((sessionId, updatedMatch) => {
-    setSessions((current) =>
-      current.map((session) =>
-        session._id === sessionId
-          ? {
-              ...session,
-              matchImageUrl: updatedMatch?.matchImageUrl || "",
-              matchImages: Array.isArray(updatedMatch?.matchImages)
-                ? updatedMatch.matchImages
-                : [],
-            }
-          : session
-      )
-    );
-  }, []);
+  const mergeMatchImageUpdateIntoSession = useCallback(
+    (sessionId, updatedMatch) => {
+      setSessions((current) =>
+        current.map((session) =>
+          session._id === sessionId
+            ? {
+                ...session,
+                coverImageUrl: updatedMatch?.matchImageUrl || "",
+                matchImageUrl: updatedMatch?.matchImageUrl || "",
+                matchImages: Array.isArray(updatedMatch?.matchImages)
+                  ? updatedMatch.matchImages
+                  : [],
+              }
+            : session,
+        ),
+      );
+    },
+    [],
+  );
 
   const mergeSessionUpdateIntoList = useCallback((updatedSession) => {
     if (!updatedSession?._id) {
@@ -515,8 +639,8 @@ export default function SessionsPageClient({
               ...session,
               ...updatedSession,
             }
-          : session
-      )
+          : session,
+      ),
     );
   }, []);
 
@@ -530,40 +654,31 @@ export default function SessionsPageClient({
 
     const removedIdSet = new Set(normalizedIds);
     setSessions((current) =>
-      current.filter((session) => !removedIdSet.has(String(session._id || "")))
+      current.filter((session) => !removedIdSet.has(String(session._id || ""))),
     );
     setTotalCount((current) =>
-      Math.max(0, Number(current || 0) - removedIdSet.size)
+      Math.max(0, Number(current || 0) - removedIdSet.size),
+    );
+    setUnfilteredTotalCount((current) =>
+      Math.max(0, Number(current || 0) - removedIdSet.size),
     );
   }, []);
 
-  const handleOpenImageActions = useCallback((session, image) => {
-    if (!session?.match) {
+  const handleOpenManagePrompt = useCallback((session) => {
+    if (!session?._id) {
       return;
     }
 
-    setImageActionError("");
-    setImageActionContext({
-      sessionId: session._id,
-      matchId: session.match,
-      image,
+    setManagePinPrompt({
+      mode: "manage",
+      session,
     });
   }, []);
 
   const closeImageActionFlows = useCallback(() => {
-    setImageActionContext(null);
     setImageDeleteContext(null);
     setImageReplaceContext(null);
-    setImageActionError("");
   }, []);
-
-  const clearSecretHoldTimer = useCallback(() => {
-    if (secretHoldTimerRef.current) {
-      window.clearTimeout(secretHoldTimerRef.current);
-      secretHoldTimerRef.current = null;
-    }
-    setSecretHoldSelectionLock(false);
-  }, [setSecretHoldSelectionLock]);
 
   const clearSelectionMode = useCallback(() => {
     setSelectionMode(false);
@@ -608,39 +723,9 @@ export default function SessionsPageClient({
     });
   }, []);
 
-  const handleSecretManageHoldStart = useCallback(
-    (session, event) => {
-      if (
-        event.target instanceof Element &&
-        event.target.closest("button,a,input,textarea,select,label")
-      ) {
-        return;
-      }
-
-      clearSecretHoldTimer();
-      if (event.pointerType && event.pointerType !== "mouse") {
-        event.preventDefault();
-        event.currentTarget.setPointerCapture?.(event.pointerId);
-        setSecretHoldSelectionLock(true);
-      }
-      secretHoldTimerRef.current = window.setTimeout(() => {
-        setSecretHoldSelectionLock(false);
-        setManagePinPrompt({
-          mode: "select",
-          session,
-        });
-      }, SESSION_SELECTION_HOLD_MS);
-    },
-    [clearSecretHoldTimer, setSecretHoldSelectionLock]
-  );
-
-  const handleSecretManageHoldEnd = useCallback(() => {
-    clearSecretHoldTimer();
-  }, [clearSecretHoldTimer]);
-
   const shouldBlockCardOpen = useCallback(
     () => selectionMode || Date.now() < suppressCardOpenUntilRef.current,
-    [selectionMode]
+    [selectionMode],
   );
 
   const handleGoHome = useCallback(() => {
@@ -649,54 +734,218 @@ export default function SessionsPageClient({
     router.replace("/");
   }, [router, startNavigation]);
 
-  const reloadSessionsFromServer = useCallback(async ({ forceFresh = false } = {}) => {
-    const requestUrl = forceFresh
-      ? `/api/sessions?fresh=1&t=${Date.now()}`
-      : "/api/sessions";
-    const response = await fetch(requestUrl, {
-      cache: "no-store",
-      headers: {
-        "Cache-Control": "no-store",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error("Could not refresh sessions.");
-    }
-
-    const payload = await response
-      .json()
-      .catch(() => []);
-
-    if (!Array.isArray(payload)) {
-      throw new Error("Could not refresh sessions.");
-    }
-
-    const nextTotalCount = Number(
-      response.headers.get("X-Total-Count") || payload.length || 0
-    );
-
-    setSessions(payload);
-    setTotalCount(Number.isFinite(nextTotalCount) ? nextTotalCount : payload.length);
-    return payload;
-  }, []);
-
-  useEffect(() => {
-    if (didInitialFreshReloadRef.current) {
+  const scrollSessionsToTop = useCallback(() => {
+    if (typeof window === "undefined") {
       return;
     }
 
-    didInitialFreshReloadRef.current = true;
-    void reloadSessionsFromServer({ forceFresh: true }).catch(() => {});
-  }, [reloadSessionsFromServer]);
+    const topTarget =
+      sessionsTopRef.current instanceof HTMLElement
+        ? Math.max(
+            0,
+            window.scrollY +
+              sessionsTopRef.current.getBoundingClientRect().top -
+              12,
+          )
+        : 0;
+
+    window.scrollTo({
+      top: topTarget,
+      left: 0,
+      behavior: "auto",
+    });
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({
+        top: topTarget,
+        left: 0,
+        behavior: "auto",
+      });
+    });
+  }, []);
+
+  const reloadSessionsFromServer = useCallback(
+    async ({ forceFresh = false, pageOverride, limitOverride } = {}) => {
+      const requestId = activeRequestIdRef.current + 1;
+      activeRequestIdRef.current = requestId;
+      setIsRefreshingList(true);
+
+      try {
+        const cardsPayload = await fetchSessionsPayload({
+          forceFresh,
+          pageOverride,
+          limitOverride,
+          includeCounts: false,
+        });
+
+        if (requestId !== activeRequestIdRef.current) {
+          return cardsPayload.sessions;
+        }
+
+        applySessionsPayload(cardsPayload);
+        setHasLoadedFirstPage(true);
+        void fetchSessionCountsPayload({
+          forceFresh,
+          pageOverride: cardsPayload.page,
+          limitOverride: limitOverride || cardsPayload.limit,
+        })
+          .then((countsPayload) => {
+            if (requestId !== activeRequestIdRef.current) {
+              return;
+            }
+            applyCountsPayload(countsPayload);
+          })
+          .catch(() => {});
+        return cardsPayload.sessions;
+      } finally {
+        if (requestId === activeRequestIdRef.current) {
+          setHasLoadedFirstPage(true);
+          setIsRefreshingList(false);
+          setPaginationPendingState(null);
+        }
+      }
+    },
+    [
+      applyCountsPayload,
+      applySessionsPayload,
+      fetchSessionCountsPayload,
+      fetchSessionsPayload,
+    ],
+  );
+
+  const handlePaginationChange = useCallback(
+    (nextPage, type = "page") => {
+      const resolvedPage = Math.max(1, Math.min(totalPages, Number(nextPage || 1)));
+      if (resolvedPage === currentPage || isRefreshingList) {
+        return;
+      }
+
+      scrollSessionsToTop();
+      setPaginationPendingState({
+        type,
+        targetPage: resolvedPage,
+      });
+      setCurrentPage(resolvedPage);
+    },
+    [currentPage, isRefreshingList, scrollSessionsToTop, totalPages],
+  );
 
   useEffect(() => {
     if (!String(refreshToken || "").trim()) {
       return;
     }
 
-    void reloadSessionsFromServer({ forceFresh: true });
+    void reloadSessionsFromServer({ forceFresh: true }).catch(() => {});
   }, [refreshToken, reloadSessionsFromServer]);
+
+  useEffect(() => {
+    if (hasInitialPayload || hasPrimedInitialLoadRef.current) {
+      return;
+    }
+
+    hasPrimedInitialLoadRef.current = true;
+    let cancelled = false;
+
+    const primeSessionsIncrementally = async () => {
+      try {
+        const firstPayload = await fetchSessionsPayload({
+          pageOverride: 1,
+          limitOverride: 1,
+          includeCounts: false,
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        applySessionsPayload(firstPayload);
+        setHasLoadedFirstPage(true);
+
+        const fivePayload = await fetchSessionsPayload({
+          pageOverride: 1,
+          limitOverride: 5,
+          includeCounts: false,
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        applySessionsPayload(fivePayload);
+
+        if (cancelled) {
+          return;
+        }
+
+        const fullCardsPayload = await fetchSessionsPayload({
+          pageOverride: 1,
+          limitOverride: Number(pageSizeValue || SESSIONS_PAGE_SIZE),
+          includeCounts: false,
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        applySessionsPayload(fullCardsPayload);
+        setHasLoadedFirstPage(true);
+
+        void fetchSessionCountsPayload({
+          pageOverride: 1,
+          limitOverride: Number(pageSizeValue || SESSIONS_PAGE_SIZE),
+        })
+          .then((countsPayload) => {
+            if (cancelled) {
+              return;
+            }
+            applyCountsPayload(countsPayload);
+          })
+          .catch(() => {});
+      } catch {
+        if (!cancelled) {
+          void reloadSessionsFromServer({ pageOverride: 1 }).catch(() => {});
+        }
+      }
+    };
+
+    void primeSessionsIncrementally();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    applyCountsPayload,
+    applySessionsPayload,
+    pageSizeValue,
+    fetchSessionCountsPayload,
+    fetchSessionsPayload,
+    hasInitialPayload,
+    reloadSessionsFromServer,
+  ]);
+
+  useEffect(() => {
+    if (!hasMountedFiltersRef.current) {
+      hasMountedFiltersRef.current = true;
+      previousPageSizeRef.current = pageSizeValue;
+      return;
+    }
+
+    const pageSizeChanged = previousPageSizeRef.current !== pageSizeValue;
+    previousPageSizeRef.current = pageSizeValue;
+    if (!pageSizeChanged) {
+      scrollSessionsToTop();
+    }
+    void reloadSessionsFromServer().catch(() => {});
+  }, [
+    currentPage,
+    filterBy,
+    pageSizeValue,
+    hasInitialPayload,
+    reloadSessionsFromServer,
+    scrollSessionsToTop,
+    searchQuery,
+    sortBy,
+  ]);
 
   const openSessionManager = useCallback((session, pin) => {
     setManageSessionContext({ sessionId: session._id, pin });
@@ -739,16 +988,16 @@ export default function SessionsPageClient({
       }
       openSessionManager(session, pin);
     },
-    [managePinPrompt, openSessionManager, startSelectionMode]
+    [managePinPrompt, openSessionManager, startSelectionMode],
   );
 
   const closeSessionManager = useCallback(
     (options = {}) => {
       const forceClose = Boolean(
         options &&
-          typeof options === "object" &&
-          "force" in options &&
-          options.force === true
+        typeof options === "object" &&
+        "force" in options &&
+        options.force === true,
       );
 
       if (manageSubmitting) {
@@ -768,8 +1017,31 @@ export default function SessionsPageClient({
       setManageSubmitting(false);
       setManageDiscardPromptOpen(false);
     },
-    [manageSubmitting, shouldPromptManageDiscard]
+    [manageSubmitting, shouldPromptManageDiscard],
   );
+
+  const handleOpenManagedImageUploader = useCallback(() => {
+    if (!managedSession?.match || !manageSessionContext?.pin) {
+      return;
+    }
+
+    setImageReplaceContext({
+      sessionId: managedSession._id,
+      matchId: managedSession.match,
+      mode: "gallery",
+      pin: manageSessionContext.pin,
+    });
+    closeSessionManager({ force: true });
+  }, [closeSessionManager, manageSessionContext?.pin, managedSession]);
+
+  const handleStartManagedSelection = useCallback(() => {
+    if (!managedSession) {
+      return;
+    }
+
+    closeSessionManager({ force: true });
+    startSelectionMode(managedSession);
+  }, [closeSessionManager, managedSession, startSelectionMode]);
 
   const handleManageFieldChange = useCallback((field, value) => {
     setManageWasEdited(true);
@@ -789,7 +1061,9 @@ export default function SessionsPageClient({
 
     try {
       const previousSession =
-        sessions.find((session) => session._id === manageSessionContext.sessionId) || null;
+        sessions.find(
+          (session) => session._id === manageSessionContext.sessionId,
+        ) || null;
       const response = await fetch(
         `/api/sessions/${manageSessionContext.sessionId}`,
         {
@@ -801,7 +1075,7 @@ export default function SessionsPageClient({
             teamAName: manageForm.teamAName.trim(),
             teamBName: manageForm.teamBName.trim(),
           }),
-        }
+        },
       );
       const payload = await response
         .json()
@@ -815,17 +1089,17 @@ export default function SessionsPageClient({
         describeSessionFieldChange(
           "Game name",
           previousSession?.name || "",
-          payload.name || manageForm.name.trim()
+          payload.name || manageForm.name.trim(),
         ),
         describeSessionFieldChange(
           "Team A",
           previousSession?.teamAName || "",
-          payload.teamAName || manageForm.teamAName.trim()
+          payload.teamAName || manageForm.teamAName.trim(),
         ),
         describeSessionFieldChange(
           "Team B",
           previousSession?.teamBName || "",
-          payload.teamBName || manageForm.teamBName.trim()
+          payload.teamBName || manageForm.teamBName.trim(),
         ),
       ].filter(Boolean);
 
@@ -850,7 +1124,17 @@ export default function SessionsPageClient({
     } finally {
       setManageSubmitting(false);
     }
-  }, [closeSessionManager, manageForm.name, manageForm.teamAName, manageForm.teamBName, manageSessionContext, manageSubmitting, mergeSessionUpdateIntoList, reloadSessionsFromServer, sessions]);
+  }, [
+    closeSessionManager,
+    manageForm.name,
+    manageForm.teamAName,
+    manageForm.teamBName,
+    manageSessionContext,
+    manageSubmitting,
+    mergeSessionUpdateIntoList,
+    reloadSessionsFromServer,
+    sessions,
+  ]);
 
   const handleBulkDeleteSessions = useCallback(
     async (pin) => {
@@ -858,7 +1142,7 @@ export default function SessionsPageClient({
         throw new Error("Select at least 1 session.");
       }
       const selectedSessionSnapshot = sessions.filter((session) =>
-        selectedSessionIds.includes(session._id)
+        selectedSessionIds.includes(session._id),
       );
 
       const response = await fetch("/api/sessions/bulk-delete", {
@@ -887,7 +1171,6 @@ export default function SessionsPageClient({
       const removedIds = deletedIds.length ? deletedIds : selectedSessionIds;
 
       removeSessionsFromList(removedIds);
-      setPage(1);
       clearSelectionMode();
       setBulkDeletePromptOpen(false);
       setActionSummary({
@@ -902,7 +1185,13 @@ export default function SessionsPageClient({
       });
       void reloadSessionsFromServer({ forceFresh: true }).catch(() => {});
     },
-    [clearSelectionMode, reloadSessionsFromServer, removeSessionsFromList, selectedSessionIds, sessions]
+    [
+      clearSelectionMode,
+      reloadSessionsFromServer,
+      removeSessionsFromList,
+      selectedSessionIds,
+      sessions,
+    ],
   );
 
   const handleDeleteSessionImage = useCallback(
@@ -925,7 +1214,7 @@ export default function SessionsPageClient({
             pin,
             imageId: imageDeleteContext.image?.id || "",
           }),
-        }
+        },
       );
       const payload = await response
         .json()
@@ -942,7 +1231,11 @@ export default function SessionsPageClient({
       mergeMatchImageUpdateIntoSession(imageDeleteContext.sessionId, payload);
       closeImageActionFlows();
     },
-    [closeImageActionFlows, imageDeleteContext, mergeMatchImageUpdateIntoSession]
+    [
+      closeImageActionFlows,
+      imageDeleteContext,
+      mergeMatchImageUpdateIntoSession,
+    ],
   );
 
   const handlePinSubmit = async (pin) => {
@@ -968,16 +1261,21 @@ export default function SessionsPageClient({
 
         const directorSessionId = pinPrompt.session._id;
         startNavigation("Opening director mode...");
-        router.push(`/director?session=${directorSessionId}&manage=1`);
+        router.push(`/director?session=${directorSessionId}&manage=1`, {
+          scroll: true,
+        });
         setPinPrompt(null);
         return;
       }
 
-      const response = await fetch(`/api/matches/${pinPrompt.session.match}/auth`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin }),
-      });
+      const response = await fetch(
+        `/api/matches/${pinPrompt.session.match}/auth`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pin }),
+        },
+      );
 
       if (!response.ok) {
         const payload = await response
@@ -985,7 +1283,7 @@ export default function SessionsPageClient({
           .catch(() => ({ message: "Incorrect PIN.", redirectTo: "" }));
         if (payload?.redirectTo) {
           startNavigation("Opening result...");
-          router.push(payload.redirectTo);
+          router.push(payload.redirectTo, { scroll: true });
           setPinPrompt(null);
           return;
         }
@@ -995,7 +1293,10 @@ export default function SessionsPageClient({
       const needsToss = !pinPrompt.session.tossReady;
       startNavigation(needsToss ? "Opening toss..." : "Opening umpire mode...");
       router.push(
-        needsToss ? `/toss/${pinPrompt.session.match}` : `/match/${pinPrompt.session.match}`
+        needsToss
+          ? `/toss/${pinPrompt.session.match}`
+          : `/match/${pinPrompt.session.match}`,
+        { scroll: true },
       );
       setPinPrompt(null);
     } catch (error) {
@@ -1006,9 +1307,17 @@ export default function SessionsPageClient({
     }
   };
 
-  if (!sessions.length) {
+  if (
+    !sessions.length &&
+    !isFilteredView &&
+    !isRefreshingList &&
+    hasLoadedFirstPage
+  ) {
     return (
-      <main id="top" className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_22%),radial-gradient(circle_at_82%_14%,rgba(14,165,233,0.1),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.08),transparent_20%),linear-gradient(180deg,#16181d_0%,#090a0f_100%)] px-5 py-8 text-zinc-100">
+      <main
+        id="top"
+        className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_22%),radial-gradient(circle_at_82%_14%,rgba(14,165,233,0.1),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.08),transparent_20%),linear-gradient(180deg,#16181d_0%,#090a0f_100%)] px-5 py-8 text-zinc-100"
+      >
         <div className="mx-auto flex min-h-[80vh] max-w-4xl items-center justify-center">
           <EmptyState
             title="No sessions yet"
@@ -1022,6 +1331,7 @@ export default function SessionsPageClient({
     );
   }
 
+  // Main page UI starts here.
   return (
     <main
       id="top"
@@ -1056,7 +1366,10 @@ export default function SessionsPageClient({
           </PendingLink>
         </div>
 
-        <section className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.06),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.05),transparent_24%),linear-gradient(180deg,rgba(13,14,20,0.98),rgba(8,8,12,0.99))] px-5 py-6 shadow-[0_28px_80px_rgba(0,0,0,0.34)] sm:px-7">
+        <section
+          ref={sessionsTopRef}
+          className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.06),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.05),transparent_24%),linear-gradient(180deg,rgba(13,14,20,0.98),rgba(8,8,12,0.99))] px-5 py-6 shadow-[0_28px_80px_rgba(0,0,0,0.34)] sm:px-7"
+        >
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-3">
@@ -1076,10 +1389,15 @@ export default function SessionsPageClient({
                   <FaInfoCircle size={18} />
                 </button>
               </div>
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-zinc-400 sm:text-base">
+                Browse live scores, match results, and saved sessions.
+              </p>
               <p className="mt-3 text-sm text-zinc-400">
-                {isFilteredView
-                  ? `${filteredSessionsLabel} visible of ${totalSessionsLabel}`
-                  : `${totalSessionsLabel} total`}
+                {showInitialSkeleton
+                  ? "Loading the latest sessions..."
+                  : isFilteredView
+                    ? `Showing ${showingFrom.toLocaleString()}-${showingTo.toLocaleString()} of ${totalSessionCount.toLocaleString()} matches`
+                    : `Showing ${showingFrom.toLocaleString()}-${showingTo.toLocaleString()} of ${overallSessionCount.toLocaleString()} total`}
               </p>
             </div>
           </div>
@@ -1104,7 +1422,7 @@ export default function SessionsPageClient({
                   value={sortBy}
                   onChange={(value) => {
                     setSortBy(value);
-                    setPage(1);
+                    setCurrentPage(1);
                   }}
                   options={SORT_OPTIONS}
                   ariaLabel="Sort sessions"
@@ -1122,7 +1440,7 @@ export default function SessionsPageClient({
                   type="button"
                   onClick={() => {
                     setFilterBy(pill.value);
-                    setPage(1);
+                    setCurrentPage(1);
                   }}
                   className={`press-feedback rounded-full px-4 py-2 text-sm font-semibold transition ${
                     filterBy === pill.value
@@ -1135,19 +1453,24 @@ export default function SessionsPageClient({
               ))}
             </div>
           </div>
-
         </section>
 
         <div className="mt-8">
-          {!filteredSessions.length ? (
+          {showInitialSkeleton ? (
+            <SessionsGridSkeleton count={8} />
+          ) : !sessions.length && !isRefreshingList ? (
             <EmptyState
-              title={searchQuery ? "No matching sessions" : "No sessions in this view"}
+              title={
+                searchQuery
+                  ? "No matching sessions"
+                  : "No sessions in this view"
+              }
               text={
                 searchQuery
                   ? "Try a different session name, team name, or date."
                   : filterBy === "live"
-                  ? "No live sessions right now. Completed matches will still appear in All."
-                  : "There are no completed sessions yet."
+                    ? "No live sessions right now. Completed matches will still appear in All."
+                    : "There are no completed sessions yet."
               }
               href="/session/new"
               label="Create New Match"
@@ -1155,17 +1478,11 @@ export default function SessionsPageClient({
           ) : (
             <>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] gap-5 2xl:gap-6">
-                {paginatedSessions.map((session) => (
+                {sessions.map((session) => (
                   <div
                     key={session._id}
                     className="h-full select-none [touch-action:pan-y]"
                     style={{ WebkitTouchCallout: "none" }}
-                    onPointerDown={(event) =>
-                      handleSecretManageHoldStart(session, event)
-                    }
-                    onPointerUp={handleSecretManageHoldEnd}
-                    onPointerLeave={handleSecretManageHoldEnd}
-                    onPointerCancel={handleSecretManageHoldEnd}
                     onContextMenu={(event) => event.preventDefault()}
                   >
                     <SessionCard
@@ -1173,7 +1490,7 @@ export default function SessionsPageClient({
                       onUmpireClick={handleOpenUmpirePin}
                       onDirectorClick={handleOpenDirectorPin}
                       shouldBlockCardOpen={shouldBlockCardOpen}
-                      onImageHold={handleOpenImageActions}
+                      onImageHold={handleOpenManagePrompt}
                       selectionMode={selectionMode}
                       selected={selectedSessionIds.includes(session._id)}
                       onSelectToggle={toggleSessionSelection}
@@ -1186,47 +1503,95 @@ export default function SessionsPageClient({
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <p className="text-sm font-medium text-zinc-200">
-                      Showing {showingFrom}-{showingTo} of{" "}
-                      {isFilteredView ? filteredSessionsLabel : totalSessionsLabel}
+                      Showing {showingFrom.toLocaleString()}-
+                      {showingTo.toLocaleString()} of{" "}
+                      {totalSessionCount.toLocaleString()} matching{" "}
+                      {totalSessionCount === 1 ? "session" : "sessions"}
                     </p>
                     {isFilteredView ? (
                       <p className="mt-1 text-sm text-zinc-500">
-                        {totalSessionsLabel} in database
+                        {overallSessionCount.toLocaleString()} total in database
                       </p>
                     ) : null}
                     <p className="mt-1 text-sm text-zinc-500">
-                      Page {currentPage} of {totalPages}
+                      {countsPending
+                        ? "Loading full session count..."
+                        : `Showing page ${currentPage.toLocaleString()} of ${totalPages.toLocaleString()}`}
                     </p>
                   </div>
 
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <div className="min-w-[140px]">
+                    <div className="flex items-center gap-2">
+                      {isRefreshingList ? (
+                        <span className="text-sm text-zinc-400">
+                          Loading sessions...
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="min-w-[148px]">
                       <DarkSelect
                         value={pageSizeValue}
                         onChange={(value) => {
                           setPageSizeValue(value);
-                          setPage(1);
                         }}
                         options={PAGE_SIZE_OPTIONS}
-                        ariaLabel="Sessions per page"
+                        ariaLabel="How many sessions to show"
                       />
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setPage((current) => Math.max(1, current - 1))}
-                        disabled={currentPage <= 1}
-                        className="press-feedback rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] disabled:cursor-not-allowed disabled:opacity-40"
+                        onClick={() =>
+                          handlePaginationChange(currentPage - 1, "previous")
+                        }
+                        disabled={!hasPreviousPage}
+                        className="press-feedback rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] disabled:cursor-not-allowed disabled:text-zinc-500 disabled:opacity-100"
                       >
-                        Previous
+                        {isRefreshingList &&
+                        paginationPendingState?.type === "previous"
+                          ? "Loading..."
+                          : "Previous Page"}
                       </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {visiblePageNumbers.map((pageNumber) => {
+                          const isActive = pageNumber === currentPage;
+                          const isPendingPage =
+                            isRefreshingList &&
+                            paginationPendingState?.type === "page" &&
+                            paginationPendingState?.targetPage === pageNumber;
+
+                          return (
+                            <button
+                              key={`session-page-${pageNumber}`}
+                              type="button"
+                              onClick={() =>
+                                handlePaginationChange(pageNumber, "page")
+                              }
+                              className={`press-feedback inline-flex h-10 min-w-10 items-center justify-center rounded-full border px-3 text-sm font-semibold transition ${
+                                isActive
+                                  ? "border-cyan-200/24 bg-[linear-gradient(135deg,rgba(245,252,255,0.96),rgba(211,238,248,0.9)_60%,rgba(245,158,11,0.26))] text-black shadow-[0_10px_20px_rgba(255,255,255,0.14)]"
+                                  : "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] text-white hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))]"
+                              }`}
+                              aria-label={`Go to page ${pageNumber}`}
+                              aria-current={isActive ? "page" : undefined}
+                            >
+                              {isPendingPage ? "..." : pageNumber.toLocaleString()}
+                            </button>
+                          );
+                        })}
+                      </div>
                       <button
                         type="button"
-                        onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-                        disabled={currentPage >= totalPages}
-                        className="press-feedback rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] disabled:cursor-not-allowed disabled:opacity-40"
+                        onClick={() =>
+                          handlePaginationChange(currentPage + 1, "next")
+                        }
+                        disabled={!hasNextPage}
+                        className="press-feedback rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] disabled:cursor-not-allowed disabled:text-zinc-500 disabled:opacity-100"
                       >
-                        Next
+                        {isRefreshingList &&
+                        paginationPendingState?.type === "next"
+                          ? "Loading..."
+                          : "Next Page"}
                       </button>
                     </div>
                   </div>
@@ -1311,7 +1676,9 @@ export default function SessionsPageClient({
             mode={pinPrompt.mode}
             theme={pinPrompt.mode === "director" ? "emerald" : "sky"}
             title={
-              pinPrompt.mode === "director" ? "Director Mode PIN" : "Umpire Mode PIN"
+              pinPrompt.mode === "director"
+                ? "Director Mode PIN"
+                : "Umpire Mode PIN"
             }
             description={
               pinPrompt.mode === "director"
@@ -1319,7 +1686,9 @@ export default function SessionsPageClient({
                 : "Enter the PIN to access scoring controls."
             }
             submitLabel={
-              pinPrompt.mode === "director" ? "Join Director Mode" : "Enter Umpire Mode"
+              pinPrompt.mode === "director"
+                ? "Join Director Mode"
+                : "Enter Umpire Mode"
             }
             rateLimitScope={
               pinPrompt.mode === "director"
@@ -1342,10 +1711,12 @@ export default function SessionsPageClient({
             subtitle={
               managePinPrompt.mode === "select"
                 ? "Enter the 6-digit manage PIN to unlock session selection."
-                : "Enter the 6-digit manage PIN to edit or delete this session."
+                : "Enter the 6-digit manage PIN to unlock session options."
             }
             confirmLabel={
-              managePinPrompt.mode === "select" ? "Unlock Selection" : "Continue"
+              managePinPrompt.mode === "select"
+                ? "Unlock Selection"
+                : "Continue"
             }
             digitCount={6}
             pinLabel="Manage PIN"
@@ -1391,6 +1762,27 @@ export default function SessionsPageClient({
             panelClassName="max-w-md"
           >
             <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {managedSession?.match ? (
+                  <button
+                    type="button"
+                    onClick={handleOpenManagedImageUploader}
+                    className="rounded-2xl border border-cyan-300/18 bg-[linear-gradient(180deg,rgba(10,18,26,0.96),rgba(8,47,73,0.82))] px-4 py-3 text-sm font-semibold text-cyan-50 transition hover:brightness-110"
+                  >
+                    {Array.isArray(managedSession?.matchImages) &&
+                    managedSession.matchImages.length
+                      ? "Manage Match Images"
+                      : "Add Match Image"}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={handleStartManagedSelection}
+                  className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-semibold text-zinc-100 transition hover:bg-white/[0.08]"
+                >
+                  Select Sessions
+                </button>
+              </div>
               <label className="block">
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
                   Game Name
@@ -1470,7 +1862,8 @@ export default function SessionsPageClient({
             panelClassName="max-w-sm"
           >
             <p className="text-sm leading-6 text-zinc-300">
-              You have unsaved session changes. Do you want to discard them or keep editing?
+              You have unsaved session changes. Do you want to discard them or
+              keep editing?
             </p>
             <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <button
@@ -1490,62 +1883,6 @@ export default function SessionsPageClient({
             </div>
           </ModalBase>
         ) : null}
-        {imageActionContext ? (
-          <ModalBase
-            key="image-action-modal"
-            title="Match Images"
-            onExit={closeImageActionFlows}
-            panelClassName="max-w-sm"
-          >
-            <div className="space-y-3">
-              {imageActionError ? (
-                <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                  {imageActionError}
-                </div>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => {
-                  setImageReplaceContext({
-                    ...imageActionContext,
-                    mode: "add",
-                  });
-                  setImageActionContext(null);
-                }}
-                className="w-full rounded-2xl border border-emerald-300/16 bg-[linear-gradient(180deg,rgba(10,18,18,0.98),rgba(9,32,28,0.96)_56%,rgba(6,95,70,0.74))] px-4 py-3 text-sm font-semibold text-emerald-50 transition hover:brightness-110"
-              >
-                Add Image
-              </button>
-              {imageActionContext.image?.id ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setImageReplaceContext({
-                        ...imageActionContext,
-                        mode: "replace",
-                      });
-                      setImageActionContext(null);
-                    }}
-                    className="w-full rounded-2xl border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(10,16,26,0.96),rgba(8,47,73,0.78))] px-4 py-3 text-sm font-semibold text-cyan-50 transition hover:brightness-110"
-                  >
-                    Replace This Image
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setImageDeleteContext(imageActionContext);
-                      setImageActionContext(null);
-                    }}
-                    className="w-full rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/15"
-                  >
-                    Delete This Image
-                  </button>
-                </>
-              ) : null}
-            </div>
-          </ModalBase>
-        ) : null}
         {imageReplaceContext ? (
           <ModalBase
             key="image-replace-modal"
@@ -1556,13 +1893,21 @@ export default function SessionsPageClient({
           >
             <MatchImageUploader
               matchId={String(imageReplaceContext.matchId)}
-              existingImages={Array.isArray(imageReplaceSession?.matchImages) ? imageReplaceSession.matchImages : []}
+              existingImages={
+                Array.isArray(imageReplaceSession?.matchImages)
+                  ? imageReplaceSession.matchImages
+                  : []
+              }
               existingImageUrl={
                 imageReplaceContext.mode === "replace"
                   ? imageReplaceContext.image?.url || ""
                   : ""
               }
-              existingImageCount={Array.isArray(imageReplaceSession?.matchImages) ? imageReplaceSession.matchImages.length : 0}
+              existingImageCount={
+                Array.isArray(imageReplaceSession?.matchImages)
+                  ? imageReplaceSession.matchImages.length
+                  : 0
+              }
               targetImageId={
                 imageReplaceContext.mode === "replace"
                   ? imageReplaceContext.image?.id || ""
@@ -1572,7 +1917,7 @@ export default function SessionsPageClient({
               onUploaded={(updatedMatch) => {
                 mergeMatchImageUpdateIntoSession(
                   imageReplaceContext.sessionId,
-                  updatedMatch
+                  updatedMatch,
                 );
               }}
               onComplete={() => {
@@ -1582,7 +1927,8 @@ export default function SessionsPageClient({
               title="Match Gallery"
               description="Manage session images."
               primaryLabel="Save Images"
-              promptForUploadPin
+              promptForUploadPin={!imageReplaceContext?.pin}
+              protectedPin={imageReplaceContext?.pin || ""}
             />
           </ModalBase>
         ) : null}
@@ -1606,7 +1952,10 @@ export default function SessionsPageClient({
           />
         ) : null}
         {isInfoModalOpen ? (
-          <InfoModal key="info-modal" onExit={() => setIsInfoModalOpen(false)} />
+          <InfoModal
+            key="info-modal"
+            onExit={() => setIsInfoModalOpen(false)}
+          />
         ) : null}
         {actionSummary ? (
           <ActionSummaryModal
@@ -1620,5 +1969,3 @@ export default function SessionsPageClient({
     </main>
   );
 }
-
-

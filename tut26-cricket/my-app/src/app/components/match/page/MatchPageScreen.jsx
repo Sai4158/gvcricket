@@ -91,10 +91,13 @@ import {
   writeCachedSoundEffectsLibrary,
   writeCachedSoundEffectsOrder,
 } from "../../../lib/sound-effects-client";
-import { applyMatchAction } from "../../../lib/match-engine";
 import { countLegalBalls } from "../../../lib/match-scoring";
 import { duckPageMedia, restorePageMedia } from "../../../lib/page-audio";
 import { buildMatchScorePreview } from "./match-score-preview";
+
+const SCORE_CONTROL_COOLDOWN_MS = 1000;
+const UNDO_CONTROL_COOLDOWN_MS = 500;
+const UNDO_CONTROL_KEY = "undo";
 
 export default function MatchPageClient({
   matchId,
@@ -157,6 +160,7 @@ export default function MatchPageClient({
   const endStageAnnouncementKeyRef = useRef("");
   const stageCardRevealVersionRef = useRef(0);
   const stageCardPlaybackBlockUntilRef = useRef(0);
+  const scoreControlCooldownTimersRef = useRef({});
   const handleHeroMenuScroll = useCallback(() => {
     contentStartRef.current?.scrollIntoView({
       behavior: "smooth",
@@ -175,7 +179,28 @@ export default function MatchPageClient({
   const [entryScoreSoundEffectsEnabled, setEntryScoreSoundEffectsEnabled] =
     useState(false);
   const [stageCardUndoPending, setStageCardUndoPending] = useState(false);
+  const [liveToolsReady, setLiveToolsReady] = useState(false);
+  const [scoreControlCooldowns, setScoreControlCooldowns] = useState({});
   const micMonitor = useLocalMicMonitor();
+  const clearAllScoreControlCooldownTimers = useCallback(() => {
+    Object.values(scoreControlCooldownTimersRef.current || {}).forEach((timerId) => {
+      window.clearTimeout(timerId);
+    });
+    scoreControlCooldownTimersRef.current = {};
+  }, []);
+  const deferredUmpireSettings = useMemo(
+    () => (
+      liveToolsReady
+        ? umpireSettings
+        : {
+            ...umpireSettings,
+            enabled: false,
+            playScoreSoundEffects: false,
+            broadcastScoreSoundEffects: false,
+          }
+    ),
+    [liveToolsReady, umpireSettings],
+  );
   const {
     speak,
     speakSequence,
@@ -185,12 +210,80 @@ export default function MatchPageClient({
     voiceName,
     interruptAndCapture,
   } =
-    useSpeechAnnouncer(umpireSettings);
+    useSpeechAnnouncer(deferredUmpireSettings);
 
   useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => {
+      setLiveToolsReady(true);
+    });
+
     return () => {
+      clearAllScoreControlCooldownTimers();
+      window.cancelAnimationFrame(frameId);
       isMountedRef.current = false;
     };
+  }, [clearAllScoreControlCooldownTimers]);
+
+  const isScoreControlCoolingDown = useCallback((controlKey = "") => {
+    const safeControlKey = String(controlKey || "").trim();
+    if (!safeControlKey) {
+      return false;
+    }
+
+    return Number(scoreControlCooldowns?.[safeControlKey] || 0) > Date.now();
+  }, [scoreControlCooldowns]);
+
+  const armScoreControlCooldown = useCallback((controlKey = "") => {
+    const safeControlKey = String(controlKey || "").trim();
+    if (!safeControlKey) {
+      return;
+    }
+
+    const expiresAt = Date.now() + SCORE_CONTROL_COOLDOWN_MS;
+    const existingTimer = scoreControlCooldownTimersRef.current?.[safeControlKey];
+    if (existingTimer) {
+      window.clearTimeout(existingTimer);
+    }
+
+    scoreControlCooldownTimersRef.current[safeControlKey] = window.setTimeout(() => {
+      setScoreControlCooldowns((current) => {
+        if (!current?.[safeControlKey]) {
+          return current;
+        }
+
+        const nextCooldowns = { ...(current || {}) };
+        delete nextCooldowns[safeControlKey];
+        return nextCooldowns;
+      });
+      delete scoreControlCooldownTimersRef.current[safeControlKey];
+    }, SCORE_CONTROL_COOLDOWN_MS + 40);
+
+    setScoreControlCooldowns((current) => ({
+      ...(current || {}),
+      [safeControlKey]: expiresAt,
+    }));
+  }, []);
+
+  const resolveScoreControlKey = useCallback((runs, isOut = false, extraType = null, options = {}) => {
+    const explicitControlKey = String(options?.controlKey || "").trim();
+    if (explicitControlKey) {
+      return explicitControlKey;
+    }
+
+    if (isOut) {
+      return "out";
+    }
+    if (extraType === "wide") {
+      return "wide";
+    }
+    if (extraType === "noball") {
+      return "noball";
+    }
+    if (Number(runs || 0) === 0) {
+      return "dot";
+    }
+
+    return String(Number(runs || 0));
   }, []);
 
   useEffect(() => {
@@ -724,15 +817,20 @@ export default function MatchPageClient({
   );
   const liveUpdatedLabel = useLiveRelativeTime(lastUpdatedAt);
   const isLiveMatch = Boolean(match?.isOngoing && !match?.result);
+  const liveToolsEnabled = liveToolsReady && isLiveMatch;
   const tossPending = Boolean(match && !match.tossReady);
   const walkie = useWalkieTalkie({
     matchId,
-    enabled: Boolean(authStatus === "granted" && isLiveMatch),
+    enabled: Boolean(authStatus === "granted" && liveToolsEnabled),
     role: "umpire",
     hasUmpireAccess: authStatus === "granted",
     displayName: "Umpire",
-    autoConnectAudio: Boolean(authStatus === "granted" && isLiveMatch),
-    signalingActive: Boolean(authStatus === "granted" && isLiveMatch && match?.walkieTalkieEnabled),
+    autoConnectAudio: Boolean(authStatus === "granted" && liveToolsEnabled),
+    signalingActive: Boolean(
+      authStatus === "granted" &&
+        liveToolsEnabled &&
+        match?.walkieTalkieEnabled,
+    ),
   });
   const hasPendingWalkieRequests = Boolean(isLiveMatch && walkie.pendingRequests?.length);
   const umpireRemoteSpeakerState = getWalkieRemoteSpeakerState({
@@ -775,6 +873,10 @@ export default function MatchPageClient({
   );
 
   useEffect(() => {
+    if (!liveToolsReady) {
+      return;
+    }
+
     const cachedFiles = sortSoundEffectsByOrder(
       readCachedSoundEffectsLibrary(),
       readCachedSoundEffectsOrder(),
@@ -795,7 +897,7 @@ export default function MatchPageClient({
         Object.keys(current).length ? current : cachedDurations,
       );
     }
-  }, []);
+  }, [liveToolsReady]);
 
   useEffect(() => {
     if (authStatus === "granted" && match && tossPending) {
@@ -804,10 +906,10 @@ export default function MatchPageClient({
   }, [authStatus, match, matchId, router, tossPending]);
 
   useEffect(() => {
-    if (!isLiveMatch) {
+    if (!liveToolsEnabled) {
       stop();
     }
-  }, [isLiveMatch, stop]);
+  }, [liveToolsEnabled, stop]);
 
   useEffect(() => {
     const nextMatchId = match?._id || "";
@@ -1141,8 +1243,20 @@ export default function MatchPageClient({
   const handleAnnouncedScoreEvent = async (
     runs,
     isOut = false,
-    extraType = null
+    extraType = null,
+    options = {},
   ) => {
+    if (!match || match.result || match.pendingResult || tossPending) {
+      return false;
+    }
+
+    const controlKey = resolveScoreControlKey(runs, isOut, extraType, options);
+    if (isScoreControlCoolingDown(controlKey)) {
+      return false;
+    }
+
+    armScoreControlCooldown(controlKey);
+
     if (activeBoundarySequenceRef.current || soundEffectPlayingRef.current) {
       cancelBoundarySequence({ stopEffect: true });
     }
@@ -1160,10 +1274,16 @@ export default function MatchPageClient({
       umpireSettings.broadcastScoreSoundEffects !== false &&
       !shouldSuppressScoreEffectForInningsEnd;
     const scoreActionId = createScoreActionId();
-    const configuredScoreEffect =
+    const configuredScoreEffectPromise =
       shouldPlayLocalScoreEffect || shouldBroadcastScoreEffect
-        ? await resolveConfiguredScoreSoundEffect(runs, isOut, extraType)
-        : null;
+        ? resolveConfiguredScoreSoundEffect(runs, isOut, extraType)
+        : Promise.resolve(null);
+
+    handleScoreEvent(runs, isOut, extraType, {
+      actionId: scoreActionId,
+    });
+
+    const configuredScoreEffect = await configuredScoreEffectPromise;
 
     if (configuredScoreEffect) {
       if (shouldPlayLocalScoreEffect) {
@@ -1171,9 +1291,6 @@ export default function MatchPageClient({
       }
 
       if (!shouldPlayLocalScoreEffect && shouldBroadcastScoreEffect) {
-        handleScoreEvent(runs, isOut, extraType, {
-          actionId: scoreActionId,
-        });
         void fetch(`/api/matches/${matchId}/sound-effects`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1226,9 +1343,6 @@ export default function MatchPageClient({
           configuredEffectDurationMs +
           followUpDelayMs;
       }
-      handleScoreEvent(runs, isOut, extraType, {
-        actionId: scoreActionId,
-      });
 
       if (shouldBroadcastScoreEffect) {
         localSoundEffectRequestIdRef.current = clientRequestId;
@@ -1295,9 +1409,7 @@ export default function MatchPageClient({
     }
 
     announceUmpireAction(runs, isOut, extraType);
-    handleScoreEvent(runs, isOut, extraType, {
-      actionId: scoreActionId,
-    });
+    return true;
   };
 
   const handleManualScoreAnnouncement = useCallback(() => {
@@ -1400,7 +1512,7 @@ export default function MatchPageClient({
     failAnnouncementSoundEffectDuck,
     handleManualScoreAnnouncement,
     isAnySoundEffectActive,
-    isLiveMatch,
+    isLiveMatch: liveToolsEnabled,
     isLoading,
     lastHandledSoundEffectEventRef,
     lastPersistedScoreSoundEffectMapRef,
@@ -1443,25 +1555,20 @@ export default function MatchPageClient({
   });
 
   const handleAnnouncedUndo = async () => {
-    if (!match?.undoCount || !currentInningsHasHistory) {
+    if (
+      !match?.undoCount ||
+      !currentInningsHasHistory ||
+      isScoreControlCoolingDown(UNDO_CONTROL_KEY)
+    ) {
       return;
     }
 
+    armScoreControlCooldown(UNDO_CONTROL_KEY);
     cancelBoundarySequence({ stopEffect: true });
-    let previewMatch = match;
-    try {
-      previewMatch = applyMatchAction(match, {
-        actionId: `umpire-preview:${Date.now()}`,
-        type: "undo_last",
-      });
-    } catch {
-      previewMatch = match;
-    }
-
-    const undoEvent = createUndoLiveEvent(previewMatch);
+    const undoEvent = createUndoLiveEvent(match);
     const undoSequence = buildLiveScoreAnnouncementSequence(
       undoEvent,
-      previewMatch,
+      match,
       umpireSettings.mode
     );
     speakImmediateUmpireSequence(undoSequence, "umpire-undo");
@@ -1598,7 +1705,7 @@ export default function MatchPageClient({
   }, [micMonitor]);
 
   useEffect(() => {
-    if (authStatus !== "granted" || !match?._id) {
+    if (!liveToolsReady || authStatus !== "granted" || !match?._id) {
       return;
     }
 
@@ -1655,10 +1762,11 @@ export default function MatchPageClient({
     umpireSettings.enabled,
     umpireSettings.mode,
     umpireSettings.playScoreSoundEffects,
+    liveToolsReady,
   ]);
 
   useEffect(() => {
-    if (authStatus !== "granted" || !match?._id) {
+    if (!liveToolsReady || authStatus !== "granted" || !match?._id) {
       scoreSoundEffectMapSyncReadyRef.current = false;
       scoreSoundEffectMapDirtyRef.current = false;
       scoreSoundEffectMapPersistInFlightRef.current = false;
@@ -1692,6 +1800,7 @@ export default function MatchPageClient({
   }, [
     authStatus,
     hydrateRemoteScoreSoundEffectMap,
+    liveToolsReady,
     match?._id,
     matchId,
     queueScoreSoundEffectMapSave,
@@ -1700,6 +1809,7 @@ export default function MatchPageClient({
   useEffect(() => {
     if (
       authStatus !== "granted" ||
+      !liveToolsReady ||
       !match?._id ||
       !scoreSoundEffectMapSyncReadyRef.current ||
       scoreSoundEffectMapPersistInFlightRef.current
@@ -1755,6 +1865,7 @@ export default function MatchPageClient({
     })();
   }, [
     authStatus,
+    liveToolsReady,
     match?._id,
     matchId,
     scoreSoundEffectMapSignature,
@@ -1763,11 +1874,13 @@ export default function MatchPageClient({
   ]);
 
   const activeInningsKey = match?.innings === "second" ? "innings2" : "innings1";
-  const oversHistory = match?.[activeInningsKey]?.history ?? [];
-  const currentOverNumber = oversHistory.at(-1)?.overNumber ?? 1;
+  const oversHistory = Array.isArray(match?.[activeInningsKey]?.history)
+    ? match[activeInningsKey].history
+    : [];
+  const currentOverNumber = Number(match?.activeOverNumber || oversHistory.at(-1)?.overNumber || 1);
   const firstInningsOversPlayed = Math.max(
     1,
-    Math.ceil(countLegalBalls(match?.innings1?.history ?? []) / 6)
+    Math.ceil(Number(match?.firstInningsLegalBallCount || countLegalBalls(match?.innings1?.history ?? [])) / 6)
   );
   const {
     dismissVisibleStageCard,
@@ -1805,13 +1918,17 @@ export default function MatchPageClient({
   });
 
   const handleStageCardUndo = useCallback(async () => {
-    if (stageCardUndoPending) {
+    if (
+      stageCardUndoPending ||
+      isScoreControlCoolingDown(UNDO_CONTROL_KEY)
+    ) {
       return;
     }
     if (!match?.undoCount || !currentInningsHasHistory) {
       return;
     }
 
+    armScoreControlCooldown(UNDO_CONTROL_KEY);
     setStageCardUndoPending(true);
     dismissVisibleStageCard();
     setStageContinuePrompt(null);
@@ -1825,12 +1942,14 @@ export default function MatchPageClient({
       setStageCardUndoPending(false);
     }
   }, [
+    armScoreControlCooldown,
     cancelBoundarySequence,
     clearAnnouncementDuck,
     clearSpeechEffectPlayerDuck,
     currentInningsHasHistory,
     dismissVisibleStageCard,
     handleUndo,
+    isScoreControlCoolingDown,
     match?.undoCount,
     stageCardUndoPending,
     setStageCardUndoPending,
@@ -1895,14 +2014,14 @@ export default function MatchPageClient({
             <div className="mt-6 grid gap-3">
               <button
                 type="button"
-                onClick={() => router.push("/session/new")}
+                onClick={() => router.push("/session/new", { scroll: true })}
                 className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200"
               >
                 Create New Session
               </button>
               <button
                 type="button"
-                onClick={() => router.push("/session")}
+                onClick={() => router.push("/session", { scroll: true })}
                 className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
               >
                 All Sessions
@@ -1915,7 +2034,7 @@ export default function MatchPageClient({
   }
   if (tossPending) return <Splash>Opening toss...</Splash>;
   const controlsDisabled =
-    isUpdating || showInningsEnd || Boolean(match.result) || tossPending;
+    showInningsEnd || Boolean(match.result) || Boolean(match.pendingResult) || tossPending;
   const showCompactUmpireWalkie = Boolean(
     !hasPendingWalkieRequests &&
       isLiveMatch &&
@@ -1975,8 +2094,11 @@ export default function MatchPageClient({
         infoText,
         isLiveMatch,
         isReadScoreActionActive,
-        isStageCardUndoPending: stageCardUndoPending,
+        isStageCardUndoPending:
+          stageCardUndoPending ||
+          isScoreControlCoolingDown(UNDO_CONTROL_KEY),
         isTestSequenceActionActive,
+        isUndoCoolingDown: isScoreControlCoolingDown(UNDO_CONTROL_KEY),
         isUpdating,
         liveUpdatedLabel,
         loadSoundEffectsLibrary,
@@ -1990,6 +2112,7 @@ export default function MatchPageClient({
         previewingCommentarySoundEffectId,
         prime,
         replaceMatch,
+        scoreControlDisabledKeys: scoreControlCooldowns,
         setEntryScoreAnnouncementsEnabled,
         setEntryScoreSoundEffectsEnabled,
         setInfoText,

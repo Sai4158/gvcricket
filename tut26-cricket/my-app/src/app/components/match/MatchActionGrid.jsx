@@ -9,7 +9,7 @@
  * Read next: ./README.md
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   FaBookOpen,
@@ -472,13 +472,14 @@ function ActionIconButton({
   );
 }
 
-export default function MatchActionGrid({
+const MatchActionGrid = memo(function MatchActionGrid({
   isUpdating,
   historyStackLength,
   onEditTeams,
   onEditOvers,
   editOversLabel = "Edit overs",
   onUndo,
+  undoDisabled = false,
   onHistory,
   onImage,
   onCommentary,
@@ -581,7 +582,7 @@ export default function MatchActionGrid({
             icon={<LuUndo2 />}
             label="Undo"
             colorClass="text-zinc-400"
-            disabled={isUpdating || historyStackLength === 0}
+            disabled={historyStackLength === 0 || undoDisabled}
             compact
           />
           {showLiveControls ? (
@@ -854,6 +855,8 @@ export default function MatchActionGrid({
       </AnimatePresence>
     </>
   );
-}
+});
+
+export default MatchActionGrid;
 
 

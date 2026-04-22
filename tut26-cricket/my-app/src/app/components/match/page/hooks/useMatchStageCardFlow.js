@@ -63,6 +63,7 @@ export default function useMatchStageCardFlow({
     showInningsEnd,
     key: stageCardKey,
   } = getMatchEndStageState(match, matchId);
+  const displayResult = String(match?.pendingResult || match?.result || "").trim();
   const isStageCardDismissed = Boolean(
     showInningsEnd && stageCardKey && dismissedStageCardKey === stageCardKey,
   );
@@ -70,7 +71,7 @@ export default function useMatchStageCardFlow({
     showInningsEnd && !isStageCardDismissed && visibleStageCardKey === stageCardKey,
   );
   const showPendingMatchOverCountdown = Boolean(
-    match?.result &&
+    displayResult &&
       showInningsEnd &&
       !isStageCardDismissed &&
       !showVisibleInningsEndCard,
@@ -104,56 +105,19 @@ export default function useMatchStageCardFlow({
   );
 
   const estimateStageCardRevealDelayMs = useCallback(() => {
-      let estimateMs = Math.max(
-        0,
-        stageCardPlaybackBlockUntilRef.current - Date.now(),
-      );
       const remainingSoundEffectMs = getRemainingActiveSoundEffectMs();
+      const shortRevealDelayMs = displayResult ? 260 : 200;
+      const soundEffectDelayMs =
+        remainingSoundEffectMs > 0
+          ? Math.min(420, Math.max(160, remainingSoundEffectMs))
+          : 0;
 
-      if (pendingUmpireAnnouncementRef.current?.items?.length) {
-        estimateMs = Math.max(
-          estimateMs,
-          estimateSpeechSequenceDelayMs(pendingUmpireAnnouncementRef.current.items),
-        );
-      }
-      if (deferredUmpireAnnouncementRef.current?.items?.length) {
-        estimateMs = Math.max(
-          estimateMs,
-          estimateSpeechSequenceDelayMs(deferredUmpireAnnouncementRef.current.items),
-        );
-      }
-      if (status === "speaking") {
-        estimateMs = Math.max(estimateMs, 2600);
-      }
-      if (umpireAnnouncementTimerRef.current) {
-        estimateMs = Math.max(estimateMs, 1800);
-      }
-      if (activeBoundarySequenceRef.current) {
-        estimateMs = Math.max(estimateMs, 2800);
-      }
-      if (remainingSoundEffectMs > 0) {
-        estimateMs = Math.max(estimateMs, remainingSoundEffectMs);
-      }
-      if (walkieAnnouncementPauseActiveRef.current || soundEffectPlayingRef.current) {
-        estimateMs = Math.max(estimateMs, 3200);
-      }
-
-      return Math.max(
-        1800,
-        Math.min(STAGE_CARD_REVEAL_TIMEOUT_MS, estimateMs || 2200),
+      return Math.min(
+        STAGE_CARD_REVEAL_TIMEOUT_MS,
+        Math.max(shortRevealDelayMs, soundEffectDelayMs),
       );
     },
-    [
-      activeBoundarySequenceRef,
-      deferredUmpireAnnouncementRef,
-      getRemainingActiveSoundEffectMs,
-      pendingUmpireAnnouncementRef,
-      soundEffectPlayingRef,
-      stageCardPlaybackBlockUntilRef,
-      status,
-      umpireAnnouncementTimerRef,
-      walkieAnnouncementPauseActiveRef,
-    ],
+    [displayResult, getRemainingActiveSoundEffectMs],
   );
 
   const pendingStageCardEffectiveDeadlineMs = useMemo(() => {
@@ -320,8 +284,8 @@ export default function useMatchStageCardFlow({
 
     setStageCardRevealDeadlineMs(Date.now() + estimateStageCardRevealDelayMs());
 
-    void (async () => {
-      await waitForUmpirePlaybackToSettle(STAGE_CARD_REVEAL_TIMEOUT_MS);
+    const revealDelayMs = estimateStageCardRevealDelayMs();
+    const timerId = window.setTimeout(() => {
       if (stageCardRevealVersionRef.current !== revealVersion) {
         return;
       }
@@ -329,7 +293,11 @@ export default function useMatchStageCardFlow({
       setStageCardRevealDeadlineMs(null);
       stageCardVisibleAtRef.current = Date.now();
       setVisibleStageCardKey(stageCardKey);
-    })();
+    }, revealDelayMs);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
   }, [
     activeBoundarySequenceRef,
     deferredUmpireAnnouncementRef,
@@ -345,7 +313,6 @@ export default function useMatchStageCardFlow({
     status,
     umpireAnnouncementTimerRef,
     visibleStageCardKey,
-    waitForUmpirePlaybackToSettle,
     walkieAnnouncementPauseActiveRef,
   ]);
 
@@ -383,7 +350,7 @@ export default function useMatchStageCardFlow({
   }, [hasPendingStageContinueSpeech, stageContinuePrompt]);
 
   useEffect(() => {
-    if (!showVisibleInningsEndCard || !match?.result) {
+    if (!showVisibleInningsEndCard || !displayResult) {
       if (!showVisibleInningsEndCard) {
         endStageAnnouncementKeyRef.current = "";
       }
@@ -395,8 +362,8 @@ export default function useMatchStageCardFlow({
       return;
     }
 
-    const nextKey = match.result
-      ? `result:${match._id || matchId}:${match.result}`
+    const nextKey = displayResult
+      ? `result:${match._id || matchId}:${displayResult}`
       : `innings:${match._id || matchId}:${match?.innings1?.score ?? match.score}:${match?.innings1?.outs ?? match.outs}`;
 
     if (endStageAnnouncementKeyRef.current === nextKey) {
@@ -417,6 +384,7 @@ export default function useMatchStageCardFlow({
     queueOrSpeakUmpireSequence(stageSequence, "umpire-match-over-modal");
   }, [
     endStageAnnouncementKeyRef,
+    displayResult,
     match,
     matchId,
     queueOrSpeakUmpireSequence,
@@ -431,7 +399,7 @@ export default function useMatchStageCardFlow({
         cancelBoundarySequence({ stopEffect: true });
       }
 
-      if (match?.result && !match?.isOngoing) {
+      if (match?.result && !match?.pendingResult && !match?.isOngoing) {
         const matchOverText = buildUmpireStageAnnouncement(match);
         const matchOverSequence = {
           items: matchOverText
@@ -530,7 +498,10 @@ export default function useMatchStageCardFlow({
 
     if (hasPendingStageContinueSpeech()) {
       setStageContinuePrompt({
-        mode: match?.result && !match?.isOngoing ? "result" : "innings",
+        mode:
+          (match?.pendingResult || (match?.result && !match?.isOngoing))
+            ? "result"
+            : "innings",
       });
       return null;
     }
@@ -540,9 +511,35 @@ export default function useMatchStageCardFlow({
     handleAnnouncedNextInningsOrEnd,
     hasPendingStageContinueSpeech,
     match?.isOngoing,
+    match?.pendingResult,
     match?.result,
     showVisibleInningsEndCard,
   ]);
+
+  useEffect(() => {
+    if (!matchId || !match?.pendingResult || !match?.resultAutoFinalizeAt) {
+      return undefined;
+    }
+
+    const autoFinalizeAtMs = Date.parse(String(match.resultAutoFinalizeAt || ""));
+    if (!Number.isFinite(autoFinalizeAtMs)) {
+      return undefined;
+    }
+
+    const delayMs = autoFinalizeAtMs - Date.now();
+    if (delayMs <= 0) {
+      router.push(`/result/${matchId}`);
+      return undefined;
+    }
+
+    const timerId = window.setTimeout(() => {
+      router.push(`/result/${matchId}`);
+    }, delayMs);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [match?.pendingResult, match?.resultAutoFinalizeAt, matchId, router]);
 
   const handleForceContinuePastSpeech = useCallback(async () => {
     return handleAnnouncedNextInningsOrEnd({ force: true });

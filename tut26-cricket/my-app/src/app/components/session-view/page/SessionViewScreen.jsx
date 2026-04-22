@@ -12,6 +12,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -81,12 +82,16 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const [copied, setCopied] = useState(false);
   const [isLeavingToSessions, setIsLeavingToSessions] = useState(false);
   const [data, setData] = useState(initialData || null);
+  const [historyDetail, setHistoryDetail] = useState(null);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [liveToolsReady, setLiveToolsReady] = useState(false);
   const [activePanel, setActivePanel] = useState(null);
   const [localWalkieNotice, setLocalWalkieNotice] = useState("");
   const [streamError, setStreamError] = useState("");
   const [spectatorWalkieEnabled, setSpectatorWalkieEnabled] = useState(false);
   const [quickWalkieTalking, setQuickWalkieTalking] = useState(false);
   const [quickSpeakerTalking, setQuickSpeakerTalking] = useState(false);
+  const [shouldLoadHistoryDetail, setShouldLoadHistoryDetail] = useState(false);
   const lastAnnouncedEventRef = useRef("");
   const announcementDuckRef = useRef([]);
   const announcementRestoreTimerRef = useRef(null);
@@ -129,10 +134,23 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const pendingDerivedScoreSoundRef = useRef(null);
   const handledDerivedScoreSoundActionIdsRef = useRef(new Map());
   const pendingResultNavigationRef = useRef("");
+  const requestedHistoryVersionRef = useRef("");
+  const inningsGridRef = useRef(null);
   const router = useRouter();
   const { startNavigation } = useRouteFeedback();
   const sessionData = data?.session;
-  const match = data?.match;
+  const match = useMemo(() => {
+    const baseMatch = data?.match;
+    if (!baseMatch) {
+      return null;
+    }
+
+    return {
+      ...baseMatch,
+      innings1: historyDetail?.innings1 || baseMatch.innings1,
+      innings2: historyDetail?.innings2 || baseMatch.innings2,
+    };
+  }, [data?.match, historyDetail]);
   const { settings, updateSetting } = useAnnouncementSettings(
     "spectator",
     match?._id || sessionId || "",
@@ -156,6 +174,89 @@ export default function SessionViewClient({ sessionId, initialData }) {
       startNavigation,
     });
   }, [router, startNavigation]);
+
+  const loadSessionHistory = useCallback(async () => {
+    if (!sessionId || isHistoryLoading) {
+      return;
+    }
+
+    setIsHistoryLoading(true);
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/view-history`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Could not load innings history.");
+      }
+
+      const payload = await response.json().catch(() => null);
+      if (!payload) {
+        throw new Error("Could not load innings history.");
+      }
+
+      setHistoryDetail(payload);
+    } catch {
+      // Keep the compact shell visible even if deferred history fails.
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  }, [isHistoryLoading, sessionId]);
+
+  useEffect(() => {
+    setHistoryDetail(null);
+    setLiveToolsReady(false);
+    setShouldLoadHistoryDetail(false);
+    requestedHistoryVersionRef.current = "";
+
+    const frameId = window.requestAnimationFrame(() => {
+      setLiveToolsReady(true);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [sessionId]);
+
+  useEffect(() => {
+    const element = inningsGridRef.current;
+    if (!element || shouldLoadHistoryDetail || typeof IntersectionObserver === "undefined") {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldLoadHistoryDetail(true);
+          observer.disconnect();
+        }
+      },
+      {
+        rootMargin: "240px 0px",
+        threshold: 0.05,
+      },
+    );
+
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+    };
+  }, [shouldLoadHistoryDetail, match?._id]);
+
+  useEffect(() => {
+    if (!match?._id || !shouldLoadHistoryDetail) {
+      return;
+    }
+    const nextHistoryVersion = String(match.historyVersion || "");
+    if (!nextHistoryVersion || requestedHistoryVersionRef.current === nextHistoryVersion) {
+      return;
+    }
+
+    requestedHistoryVersionRef.current = nextHistoryVersion;
+    void loadSessionHistory();
+  }, [loadSessionHistory, match?._id, match?.historyVersion, shouldLoadHistoryDetail]);
 
   useEventSource({
     url: sessionId ? `/api/live/sessions/${sessionId}` : null,
@@ -181,14 +282,16 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const currentLiveEventId = match?.lastLiveEvent?.id || "";
   const currentAnnouncementEventId =
     match?.lastLiveEvent?.type === "sound_effect" ? "" : currentLiveEventId;
-  const isLiveMatch = Boolean(match?.isOngoing && !match?.result);
+  const isLiveMatch = Boolean(
+    match?.isOngoing && !match?.result && !match?.pendingResult
+  );
   const walkiePreferenceScope = match?._id || sessionId || "";
   const spectatorWalkieSignalActive = Boolean(
-    isLiveMatch && (spectatorWalkieEnabled || quickWalkieTalking),
+    liveToolsReady && isLiveMatch && (spectatorWalkieEnabled || quickWalkieTalking),
   );
   const walkie = useWalkieTalkie({
     matchId: match?._id || "",
-    enabled: Boolean(match?._id && isLiveMatch),
+    enabled: Boolean(match?._id && isLiveMatch && liveToolsReady),
     role: "spectator",
     displayName: sessionData?.name
       ? `${sessionData.name} Spectator`
@@ -1240,7 +1343,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   });
 
   useEffect(() => {
-    if (!match?._id || !match?.result) {
+    if (!match?._id || !match?.result || match?.pendingResult) {
       pendingResultNavigationRef.current = "";
       return undefined;
     }
@@ -1275,12 +1378,38 @@ export default function SessionViewClient({ sessionId, initialData }) {
   }, [
     hasSpectatorPlaybackInFlight,
     match?._id,
+    match?.pendingResult,
     match?.result,
     router,
     settings.enabled,
     settings.mode,
     waitForSpectatorPlaybackToSettle,
   ]);
+
+  useEffect(() => {
+    if (!match?._id || !match?.pendingResult || !match?.resultAutoFinalizeAt) {
+      return undefined;
+    }
+
+    const autoFinalizeAtMs = Date.parse(String(match.resultAutoFinalizeAt || ""));
+    if (!Number.isFinite(autoFinalizeAtMs)) {
+      return undefined;
+    }
+
+    const delayMs = autoFinalizeAtMs - Date.now();
+    if (delayMs <= 0) {
+      router.push(`/result/${match._id}`);
+      return undefined;
+    }
+
+    const timerId = window.setTimeout(() => {
+      router.push(`/result/${match._id}`);
+    }, delayMs);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [match?._id, match?.pendingResult, match?.resultAutoFinalizeAt, router]);
 
   useEffect(() => {
     if (activePanel !== "mic") {
@@ -1791,7 +1920,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const announcerCardDescription = announceSwitchOn
     ? "Reads each update."
     : "Turn on for scores.";
-  const trackerHistory = buildSessionViewTrackerHistory(match);
+  const trackerHistory = buildSessionViewTrackerHistory(match, historyDetail);
   const launcherCardClass =
     "relative w-full overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.05),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.06),transparent_28%),linear-gradient(180deg,rgba(24,24,28,0.95),rgba(10,10,12,0.95))] text-left shadow-[0_18px_50px_rgba(0,0,0,0.32)] backdrop-blur-sm transition-transform hover:-translate-y-0.5";
   const handleSpectatorAnnouncerToggle = (nextEnabled) => {
@@ -1845,6 +1974,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
     teamA,
     teamB,
     isLiveMatch,
+    historyDetail,
+    historyLoading: isHistoryLoading && !historyDetail,
   });
 
   return (
@@ -1857,6 +1988,8 @@ export default function SessionViewClient({ sessionId, initialData }) {
         sessionName={sessionData.name}
         match={match}
         trackerHistory={trackerHistory}
+        activeOverBalls={match?.activeOverBalls || []}
+        activeOverNumber={match?.activeOverNumber || 1}
       />
 
       <OptionalFeatureBoundary
@@ -1910,7 +2043,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
         </div>
       </OptionalFeatureBoundary>
 
-      <SessionViewInningsGrid inningsCards={inningsCards} teamBName={teamB.name} />
+      <SessionViewInningsGrid
+        inningsCards={inningsCards}
+        teamBName={teamB.name}
+        gridRef={inningsGridRef}
+      />
 
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {

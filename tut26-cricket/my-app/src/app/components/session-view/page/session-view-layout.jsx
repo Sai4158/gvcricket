@@ -23,6 +23,8 @@ export function SessionViewTopShell({
   sessionName,
   match,
   trackerHistory,
+  activeOverBalls,
+  activeOverNumber,
 }) {
   return (
     <>
@@ -76,7 +78,11 @@ export function SessionViewTopShell({
           </div>
           <div className="mt-3 flex justify-center">
             <div className="w-full max-w-xl">
-              <BallTracker history={trackerHistory} />
+              <BallTracker
+                history={trackerHistory}
+                activeOverBalls={activeOverBalls}
+                activeOverNumber={activeOverNumber}
+              />
             </div>
           </div>
         </div>
@@ -85,9 +91,12 @@ export function SessionViewTopShell({
   );
 }
 
-export function SessionViewInningsGrid({ inningsCards, teamBName }) {
+export function SessionViewInningsGrid({ inningsCards, teamBName, gridRef = null }) {
   return (
-    <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
+    <div
+      ref={gridRef}
+      className="w-full max-w-4xl grid grid-cols-1 gap-6 mt-10 md:grid-cols-2"
+    >
       {inningsCards.map((inningsCard) => (
         <TeamInningsDetail
           key={inningsCard.key}
@@ -95,6 +104,7 @@ export function SessionViewInningsGrid({ inningsCards, teamBName }) {
           inningsData={inningsCard.inningsData}
           statusLabel={inningsCard.statusLabel}
           targetSummary={inningsCard.targetSummary}
+          loadingHistory={inningsCard.loadingHistory}
           teamSide={
             inningsCard.title === teamBName || inningsCard.inningsData?.team === teamBName
               ? "red"

@@ -7,6 +7,7 @@
  * Read next: ./README.md
  */
 
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SmoothScroll from "./components/SmoothScroll";
@@ -89,8 +90,17 @@ const jsonLd = [
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: siteConfig.name,
+    alternateName: siteConfig.shortName,
     url: getSiteUrl(),
     description: siteConfig.description,
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: siteConfig.name,
+    alternateName: siteConfig.shortName,
+    url: getSiteUrl(),
+    logo: absoluteUrl(siteConfig.logoPath),
   },
   {
     "@context": "https://schema.org",
@@ -121,6 +131,8 @@ const jsonLd = [
 ];
 
 export default function RootLayout({ children }) {
+  const appShell = <SmoothScroll>{children}</SmoothScroll>;
+
   return (
     <html lang="en">
       <head>
@@ -133,9 +145,9 @@ export default function RootLayout({ children }) {
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}
       >
-        <RouteFeedbackProvider>
-          <SmoothScroll>{children}</SmoothScroll>
-        </RouteFeedbackProvider>
+        <Suspense fallback={appShell}>
+          <RouteFeedbackProvider>{appShell}</RouteFeedbackProvider>
+        </Suspense>
         <Analytics />
       </body>
     </html>

@@ -30,12 +30,24 @@ export function buildBallSlotLabels(balls = []) {
 
   return (Array.isArray(balls) ? balls : []).map((ball) => {
     if (!isCountableBall(ball)) {
-      return "•";
+      return ".";
     }
 
     legalBallCount += 1;
     return String(legalBallCount);
   });
+}
+
+function countLegalBallsInOver(balls = []) {
+  return (Array.isArray(balls) ? balls : []).reduce((total, ball) => {
+    return isCountableBall(ball) ? total + 1 : total;
+  }, 0);
+}
+
+function calculateRunsInOver(balls = []) {
+  return (Array.isArray(balls) ? balls : []).reduce((total, ball) => {
+    return total + Number(ball?.runs || 0);
+  }, 0);
 }
 
 export const Ball = memo(function Ball({ ball, ballNumber }) {
@@ -79,20 +91,53 @@ export const Ball = memo(function Ball({ ball, ballNumber }) {
   );
 });
 
-export function BallTracker({ history }) {
+export const BallTracker = memo(function BallTracker({
+  history = null,
+  activeOverBalls = null,
+  activeOverNumber = null,
+}) {
   const trackerRef = useRef(null);
-  const currentOver = useMemo(
-    () => history.at(-1) ?? { overNumber: 1, balls: [] },
-    [history]
+  const fallbackOver = useMemo(
+    () => (Array.isArray(history) && history.length ? history.at(-1) : null),
+    [history],
   );
+  const resolvedOverNumber = Number.isFinite(Number(activeOverNumber)) &&
+    Number(activeOverNumber) > 0
+      ? Number(activeOverNumber)
+      : Number(fallbackOver?.overNumber || 1);
   const currentBalls = useMemo(
-    () => (Array.isArray(currentOver.balls) ? currentOver.balls : []),
-    [currentOver]
+    () =>
+      Array.isArray(activeOverBalls)
+        ? activeOverBalls
+        : Array.isArray(fallbackOver?.balls)
+          ? fallbackOver.balls
+          : [],
+    [activeOverBalls, fallbackOver],
   );
   const currentBallSlotLabels = useMemo(
     () => buildBallSlotLabels(currentBalls),
-    [currentBalls]
+    [currentBalls],
   );
+  const legalBallsInOver = useMemo(() => {
+    return countLegalBallsInOver(currentBalls);
+  }, [currentBalls]);
+  const runsThisOver = useMemo(() => {
+    return calculateRunsInOver(currentBalls);
+  }, [currentBalls]);
+  const ballsLeftInOver = useMemo(() => {
+    return Math.max(6 - legalBallsInOver, 0);
+  }, [legalBallsInOver]);
+  const overRateLabel = useMemo(() => {
+    if (legalBallsInOver <= 0) {
+      return "RATE 0.00";
+    }
+
+    return `RATE ${((runsThisOver / legalBallsInOver) * 6).toFixed(2)}`;
+  }, [legalBallsInOver, runsThisOver]);
+  const overStatusLabel =
+    ballsLeftInOver === 0
+      ? "OVER DONE"
+      : `${ballsLeftInOver} LEFT`;
   const currentBallSignature = useMemo(
     () =>
       currentBalls
@@ -102,10 +147,10 @@ export function BallTracker({ history }) {
             Number(ball?.runs || 0),
             ball?.isOut ? "out" : "in",
             ball?.extraType || "legal",
-          ].join(":")
+          ].join(":"),
         )
         .join("|"),
-    [currentBalls]
+    [currentBalls],
   );
 
   useLayoutEffect(() => {
@@ -127,25 +172,33 @@ export function BallTracker({ history }) {
     return () => {
       window.cancelAnimationFrame(frameId);
     };
-  }, [currentBallSignature, currentOver.overNumber]);
+  }, [resolvedOverNumber, currentBallSignature]);
 
   return (
     <div className="mb-6 rounded-2xl bg-zinc-900/50 p-4 ring-1 ring-white/10">
-      <h3
-        className={`${matchControlsFont.className} mb-4 text-center font-bold text-white`}
+      <div
+        className={`${matchControlsFont.className} mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-[0.82rem] font-bold uppercase tracking-[0.12em] text-white sm:text-[0.9rem]`}
       >
-        Over {currentOver.overNumber}
-      </h3>
+        <span className="justify-self-start text-left leading-none">
+          {overRateLabel}
+        </span>
+        <h3 className="text-center text-[1.02rem] leading-none sm:text-lg">
+          OVER {resolvedOverNumber}
+        </h3>
+        <span className="justify-self-end text-right leading-none">
+          {overStatusLabel}
+        </span>
+      </div>
       <div
         ref={trackerRef}
         className="overflow-x-auto overflow-y-hidden pb-3 pr-1 [scrollbar-color:rgba(255,255,255,0.35)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/30 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:h-2"
       >
         <div className="ml-auto flex min-h-18 min-w-max items-start gap-4">
           {currentBalls.map((ball, index) => (
-            <div key={getBallKey(index + 1, currentOver.overNumber)}>
+            <div key={getBallKey(index + 1, resolvedOverNumber)}>
               <Ball
                 ball={ball}
-                ballNumber={currentBallSlotLabels[index] || "•"}
+                ballNumber={currentBallSlotLabels[index] || "."}
               />
             </div>
           ))}
@@ -153,6 +206,4 @@ export function BallTracker({ history }) {
       </div>
     </div>
   );
-}
-
-
+});

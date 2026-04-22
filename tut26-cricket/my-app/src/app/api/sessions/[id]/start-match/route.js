@@ -9,6 +9,7 @@
 
 import { NextResponse } from "next/server";
 import Match from "../../../../../models/Match";
+import MatchUndoEntry from "../../../../../models/MatchUndoEntry";
 import Session from "../../../../../models/Session";
 import { connectDB } from "../../../../lib/db";
 import { publishMatchUpdate, publishSessionUpdate } from "../../../../lib/live-updates";
@@ -21,6 +22,7 @@ import {
   rebaseStoredMatchImagesForMatch,
 } from "../../../../lib/match-image-gallery";
 import { serializePublicMatch } from "../../../../lib/public-data";
+import { buildSessionMirrorUpdate } from "../../../../lib/match-engine";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../../lib/request-security";
@@ -115,6 +117,9 @@ export async function POST(req, { params }) {
         existingMatch.isOngoing = true;
         existingMatch.innings = "first";
         existingMatch.result = "";
+        existingMatch.pendingResult = "";
+        existingMatch.pendingResultAt = null;
+        existingMatch.resultAutoFinalizeAt = null;
         existingMatch.balls = [];
         existingMatch.innings1 = {
           team: battingFirst,
@@ -126,6 +131,9 @@ export async function POST(req, { params }) {
           score: 0,
           history: [],
         };
+        existingMatch.recentActionIds = [];
+        existingMatch.undoCount = 0;
+        existingMatch.undoSequence = 0;
         existingMatch.processedActionIds = [];
         existingMatch.actionHistory = [];
         existingMatch.lastLiveEvent = null;
@@ -138,7 +146,15 @@ export async function POST(req, { params }) {
         applyStoredMatchImages(existingMatch, existingMatchImages, {
           matchId: String(existingMatch._id),
         });
+        existingMatch.mediaUpdatedAt =
+          session.mediaUpdatedAt ||
+          existingMatch.matchImageUploadedAt ||
+          existingMatch.mediaUpdatedAt ||
+          null;
         await existingMatch.save({ session: transactionSession });
+        await MatchUndoEntry.deleteMany({
+          matchId: existingMatch._id,
+        }).session(transactionSession);
         finalMatch = existingMatch;
       } else {
         [finalMatch] = await Match.create(
@@ -157,6 +173,12 @@ export async function POST(req, { params }) {
               score: 0,
               outs: 0,
               result: "",
+              pendingResult: "",
+              pendingResultAt: null,
+              resultAutoFinalizeAt: null,
+              recentActionIds: [],
+              undoCount: 0,
+              undoSequence: 0,
               balls: [],
               matchImages: [],
               innings1: { team: battingFirst, score: 0, history: [] },
@@ -175,6 +197,11 @@ export async function POST(req, { params }) {
         applyStoredMatchImages(finalMatch, nextMatchImages, {
           matchId: String(finalMatch._id),
         });
+        finalMatch.mediaUpdatedAt =
+          session.mediaUpdatedAt ||
+          finalMatch.matchImageUploadedAt ||
+          finalMatch.mediaUpdatedAt ||
+          null;
         await finalMatch.save({ session: transactionSession });
       }
 
@@ -189,6 +216,7 @@ export async function POST(req, { params }) {
       session.isLive = true;
       session.isDraft = false;
       session.draftTokenHash = "";
+      Object.assign(session, buildSessionMirrorUpdate(finalMatch));
       await session.save({ session: transactionSession });
     });
 

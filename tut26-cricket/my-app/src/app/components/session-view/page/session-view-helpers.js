@@ -33,10 +33,15 @@ export function getSessionStreamPayloadSignature(payload) {
     liveEvent?.id || "",
     liveEvent?.type || "",
     liveEvent?.createdAt || "",
+    match?.pendingResult || "",
+    match?.historyVersion || "",
+    match?.mediaVersion || "",
+    match?.legalBallCount ?? "",
+    match?.activeOverNumber ?? "",
+    JSON.stringify(match?.activeOverBalls || []),
     match?.announcerBroadcastScoreSoundEffectsEnabled !== false ? "1" : "0",
     match?.announcerScoreSoundEffectsEnabled !== false ? "1" : "0",
     JSON.stringify(match?.announcerScoreSoundEffectMap || {}),
-    Array.isArray(match?.balls) ? match.balls.length : 0,
   ]);
 }
 
@@ -54,7 +59,11 @@ export function countLegalBallsLocal(history = []) {
 
 export function formatOversLeftLocal(match) {
   const totalBalls = Math.max(Number(match?.overs || 0), 0) * 6;
-  const legalBalls = countLegalBallsLocal(match?.innings2?.history || []);
+  const legalBalls = Number.isFinite(Number(match?.secondInningsLegalBallCount))
+    ? Number(match.secondInningsLegalBallCount)
+    : Number.isFinite(Number(match?.legalBallCount)) && match?.innings === "second"
+      ? Number(match.legalBallCount)
+      : countLegalBallsLocal(match?.innings2?.history || []);
   const ballsLeft = Math.max(totalBalls - legalBalls, 0);
   const overs = Math.floor(ballsLeft / 6);
   const balls = ballsLeft % 6;

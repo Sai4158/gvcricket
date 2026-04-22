@@ -1,7 +1,7 @@
 /**
  * File overview:
  * Purpose: Provides shared Validators logic for routes, APIs, and feature code.
- * Main exports: sanitizePlainText, validateSessionCreatePayload, validateSetupMatchPayload, validatePinPayload, validateSessionPatchPayload, validateSessionDraftDeletePayload, validateMatchPatchPayload, validateMatchActionPayload, validateWalkieTogglePayload, validateWalkieClaimPayload, validateWalkieReleasePayload, validateWalkieRequestPayload, validateWalkieSignalPayload, optionalStringSchema, requiredNameSchema, playerNameSchema, playerArraySchema, oversSchema, sessionCreateSchema, setupMatchSchema, createMatchSchema, sessionDraftDeleteSchema, pinPayloadSchema, secretPinPayloadSchema, sessionPatchObjectSchema, sessionPatchSchema, matchPatchObjectSchema, walkieToggleSchema, walkieClaimSchema, walkieReleaseSchema, walkieRequestSchema, walkieRespondSchema, walkieSignalSchema, matchPatchSchema, matchActionSchema.
+ * Main exports: sanitizePlainText, validateSessionCreatePayload, validateSetupMatchPayload, validatePinPayload, validateSessionPatchPayload, validateSessionDraftDeletePayload, validateMatchPatchPayload, validateMatchActionPayload, validateWalkieTogglePayload, validateWalkieClaimPayload, validateWalkieReleasePayload, validateWalkieRequestPayload, validateWalkieSignalPayload, optionalStringSchema, requiredNameSchema, playerNameSchema, playerArraySchema, oversSchema, sessionCreateSchema, setupMatchSchema, createMatchSchema, sessionDraftDeleteSchema, pinPayloadSchema, secretPinPayloadSchema, sessionPatchObjectSchema, sessionPatchSchema, matchPatchObjectSchema, walkieToggleSchema, walkieClaimSchema, walkieReleaseSchema, walkieRequestSchema, walkieRespondSchema, walkieSignalSchema, matchPatchSchema, matchScoreSchema, matchActionSchema.
  * Major callers: Route loaders, API routes, and feature components.
  * Side effects: none.
  * Read next: ./README.md
@@ -286,32 +286,35 @@ const actionBaseSchema = z.object({
     .regex(/^[a-zA-Z0-9._:-]+$/, "actionId is invalid."),
 });
 
-export const matchActionSchema = z.discriminatedUnion("type", [
-  actionBaseSchema
-    .extend({
-      type: z.literal("score_ball"),
-      runs: z.number().int().min(0).max(7),
-      isOut: z.boolean().default(false),
-      extraType: z.enum(["wide", "noball"]).nullable().default(null),
-    })
-    .refine(
-      (value) => {
-        if (value.extraType === "wide") {
-          return value.runs >= 0;
-        }
-
-        if (value.extraType === "noball") {
-          return value.runs >= 0;
-        }
-
-        return value.runs <= 6;
-      },
-      {
-        message: "runs is invalid.",
-        path: ["runs"],
+export const matchScoreSchema = actionBaseSchema
+  .extend({
+    runs: z.number().int().min(0).max(7),
+    isOut: z.boolean().default(false),
+    extraType: z.enum(["wide", "noball"]).nullable().default(null),
+  })
+  .refine(
+    (value) => {
+      if (value.extraType === "wide") {
+        return value.runs >= 0;
       }
-    )
-    .strict(),
+
+      if (value.extraType === "noball") {
+        return value.runs >= 0;
+      }
+
+      return value.runs <= 6;
+    },
+    {
+      message: "runs is invalid.",
+      path: ["runs"],
+    }
+  )
+  .strict();
+
+export const matchActionSchema = z.discriminatedUnion("type", [
+  matchScoreSchema.extend({
+    type: z.literal("score_ball"),
+  }),
   actionBaseSchema
     .extend({
       type: z.literal("undo_last"),

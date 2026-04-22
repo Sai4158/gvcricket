@@ -26,6 +26,7 @@ import TeamRoster, {
 import InlineSpinner from "../../components/shared/InlineSpinner";
 import useSessionStorageState from "../../components/teams/useSessionStorageState";
 import LoadingButton from "../../components/shared/LoadingButton";
+import RollingDigitText from "../../components/shared/RollingDigitText";
 import LiquidSportText from "../../components/home/LiquidSportText";
 import {
   clearPendingSessionImage,
@@ -513,8 +514,13 @@ export default function TeamSelectionPageClient({ sessionId }) {
               >
                 <span className="text-[1.35rem] font-medium leading-none">-</span>
               </button>
-              <span className="w-12 text-center text-4xl font-black text-white">
-                {overs}
+              <span className="inline-flex w-12 items-center justify-center text-center text-4xl font-black text-white tabular-nums [font-variant-numeric:tabular-nums]">
+                <RollingDigitText
+                  text={String(overs)}
+                  valueNumber={Number(overs || 0)}
+                  trackingClass=""
+                  digitWidthClass="w-[0.58em]"
+                />
               </span>
               <button
                 onClick={() => overs < 50 && setOvers(overs + 1)}

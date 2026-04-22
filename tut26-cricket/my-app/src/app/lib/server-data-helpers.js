@@ -15,20 +15,20 @@ export const SERVER_DATA_CACHE_TTL_MS = 15000;
 export const PUBLIC_SESSION_FIELDS =
   "_id name date overs isLive isDraft match tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcer announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastEventType lastEventText createdAt updatedAt";
 export const READ_ONLY_PUBLIC_MATCH_FIELDS =
-  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcer announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastLiveEvent lastEventType lastEventText createdAt updatedAt";
-export const PUBLIC_MATCH_FIELDS = `${READ_ONLY_PUBLIC_MATCH_FIELDS} actionHistory`;
+  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy announcer announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled walkieTalkieEnabled mediaUpdatedAt lastLiveEvent lastEventType lastEventText recentActionIds undoCount undoSequence createdAt updatedAt";
+export const PUBLIC_MATCH_FIELDS = `${READ_ONLY_PUBLIC_MATCH_FIELDS} actionHistory processedActionIds`;
 export const SESSION_MATCH_SUMMARY_FIELDS =
-  "_id teamA teamB teamAName teamBName tossWinner tossDecision score outs innings innings1 innings2 isOngoing result updatedAt sessionId matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy createdAt";
+  "_id teamA teamB teamAName teamBName tossWinner tossDecision score outs innings innings1 innings2 isOngoing result pendingResult pendingResultAt resultAutoFinalizeAt updatedAt sessionId matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy createdAt";
 export const FALLBACK_SESSION_FIELDS =
   "tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy updatedAt";
 export const HOME_LIVE_BANNER_SESSION_FIELDS =
   "_id match teamAName teamBName matchImageUrl createdAt updatedAt";
 export const HOME_LIVE_BANNER_MATCH_FIELDS =
-  "_id sessionId teamAName teamBName score outs isOngoing result matchImageUrl lastEventType lastEventText createdAt updatedAt";
+  "_id sessionId teamAName teamBName score outs isOngoing result pendingResult matchImageUrl lastEventType lastEventText createdAt updatedAt";
 export const SESSIONS_INDEX_SESSION_FIELDS =
-  "_id name date isLive match tossWinner tossDecision teamAName teamBName matchImages matchImageUrl createdAt updatedAt";
+  "_id name date isLive match tossWinner tossDecision teamAName teamBName matchImageUrl createdAt updatedAt";
 export const SESSIONS_INDEX_MATCH_FIELDS =
-  "_id sessionId teamAName teamBName tossWinner tossDecision score outs innings innings1 innings2 isOngoing result matchImages matchImageUrl createdAt updatedAt";
+  "_id sessionId teamAName teamBName tossWinner tossDecision score outs innings isOngoing result pendingResult matchImageUrl createdAt updatedAt";
 export const NON_DRAFT_SESSION_COLLECTION_FILTER = {
   isDraft: { $ne: true },
 };

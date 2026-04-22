@@ -8,9 +8,8 @@
  * Side effects: uses React hooks and browser APIs.
  * Read next: ./README.md
  */
-
-
 import { motion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
 import { FaTimes, FaUndoAlt } from "react-icons/fa";
 import LiquidSportText from "../home/LiquidSportText";
 import LoadingButton from "../shared/LoadingButton";
@@ -219,21 +218,82 @@ function HistorySection({ title, history }) {
 }
 
 export function HistoryModal({ match, onClose }) {
-  const innings1History = match?.innings1?.history ?? [];
-  const innings2History = match?.innings2?.history ?? [];
+  const fallbackHistoryPayload = useMemo(
+    () => ({
+      innings1: match?.innings1 || { team: "", score: 0, history: [] },
+      innings2: match?.innings2 || { team: "", score: 0, history: [] },
+    }),
+    [match?.innings1, match?.innings2],
+  );
+  const [historyPayload, setHistoryPayload] = useState(() => ({
+    innings1: match?.innings1 || { team: "", score: 0, history: [] },
+    innings2: match?.innings2 || { team: "", score: 0, history: [] },
+  }));
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setIsLoadingHistory(true);
+    setHistoryError("");
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/matches/${match?._id}/umpire-history`, {
+          cache: "no-store",
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || !payload || cancelled) {
+          if (!cancelled && !payload?.innings1 && !payload?.innings2) {
+            setHistoryError(payload?.message || "Could not load over history.");
+          }
+          return;
+        }
+
+        if (!cancelled) {
+          setHistoryPayload({
+            innings1: payload.innings1 || { team: "", score: 0, history: [] },
+            innings2: payload.innings2 || { team: "", score: 0, history: [] },
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setHistoryError("Could not load over history.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingHistory(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [match?._id]);
+
+  const resolvedHistoryPayload = historyPayload || fallbackHistoryPayload;
+  const innings1History = resolvedHistoryPayload?.innings1?.history ?? [];
+  const innings2History = resolvedHistoryPayload?.innings2?.history ?? [];
 
   return (
     <ModalBase title="Over History" onExit={onClose}>
       <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-2 text-left">
-        {innings1History.length > 0 || innings2History.length > 0 ? (
+        {isLoadingHistory ? (
+          <p className="text-zinc-500 text-center">Loading over history...</p>
+        ) : historyError ? (
+          <p className="text-center text-rose-300">{historyError}</p>
+        ) : innings1History.length > 0 || innings2History.length > 0 ? (
           <>
-            <HistorySection
-              title={match?.innings1?.team || "Innings 1"}
+              <HistorySection
+              title={resolvedHistoryPayload?.innings1?.team || "Innings 1"}
               history={innings1History}
             />
             {innings2History.length > 0 ? (
               <HistorySection
-                title={match?.innings2?.team || "Innings 2"}
+                title={resolvedHistoryPayload?.innings2?.team || "Innings 2"}
                 history={innings2History}
               />
             ) : null}
@@ -264,19 +324,24 @@ export function InningsEndModal({
   onUndo,
   undoDisabled = false,
 }) {
-  const isFirstInningsBreak = match.innings === "first" && !match.result;
+  const displayResult = String(match?.pendingResult || match?.result || "").trim();
+  const isFirstInningsBreak = match.innings === "first" && !displayResult;
   const firstInningsTeam = match?.innings1?.team || "Innings 1";
   const firstInningsScore = Number(match?.score || 0);
   const firstInningsOuts = Number(match?.outs || 0);
   const target = firstInningsScore + 1;
-  const firstInningsLegalBalls = countLegalBalls(match?.innings1?.history || []);
+  const firstInningsLegalBalls = Number.isFinite(
+    Number(match?.firstInningsLegalBallCount),
+  )
+    ? Number(match.firstInningsLegalBallCount || 0)
+    : countLegalBalls(match?.innings1?.history || []);
   const firstInningsOvers =
     firstInningsLegalBalls > 0
       ? `${Math.floor(firstInningsLegalBalls / 6)}.${firstInningsLegalBalls % 6}`
       : "0.0";
   const inningsOvers = Number(match?.overs || 0);
   const requiredRunRate = formatRequiredRunRateDisplay(target, inningsOvers);
-  const resultText = String(match?.result || "").trim();
+  const resultText = displayResult;
   const winnerName = parseWinnerName(resultText);
   const winnerPrefix = winnerName ? `${winnerName} won by ` : "";
   const resultSummary =
@@ -296,7 +361,7 @@ export function InningsEndModal({
 
   return (
     <ModalBase
-      title={match.result ? "Match Over" : "Innings Over"}
+      title={displayResult ? "Match Over" : "Innings Over"}
       onExit={undefined}
       closeOnBackdrop={false}
       showCloseButton={false}
@@ -323,7 +388,7 @@ export function InningsEndModal({
       <div className="relative overflow-hidden rounded-[28px] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_26%),linear-gradient(180deg,rgba(18,18,24,0.98),rgba(9,10,14,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
         <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/24 to-transparent" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.08),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.08),transparent_28%)]" />
-        {match.result
+        {displayResult
           ? confettiPieces.map((pieceClass, index) => (
               <motion.span
                 key={pieceClass}
@@ -335,7 +400,7 @@ export function InningsEndModal({
           : null}
 
         <div className="relative z-10 text-center">
-          {match.result ? (
+          {displayResult ? (
             <>
               <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-emerald-200/78">
                 Winning Result
@@ -371,7 +436,7 @@ export function InningsEndModal({
 
           <div className="mt-4 rounded-[22px] border border-white/8 bg-black/20 px-4 py-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-              {match.result ? "Final Score" : "Innings 1 Summary"}
+              {displayResult ? "Final Score" : "Innings 1 Summary"}
             </p>
             <p className="mt-2 text-2xl font-semibold text-amber-300">
               {match.score} / {match.outs}
@@ -407,10 +472,10 @@ export function InningsEndModal({
       </div>
       <LoadingButton
         onClick={onNext}
-        pendingLabel={match.innings === "first" && !match.result ? "Opening..." : "Loading result..."}
+        pendingLabel={match.innings === "first" && !displayResult ? "Opening..." : "Loading result..."}
         className="mt-5 w-full rounded-[22px] border border-emerald-300/18 bg-[linear-gradient(180deg,rgba(16,185,129,0.96),rgba(5,150,105,0.96))] py-3.5 text-lg font-bold text-white shadow-[0_18px_32px_rgba(5,150,105,0.18)] transition hover:brightness-105"
       >
-        {match.innings === "first" && !match.result
+        {match.innings === "first" && !displayResult
           ? "Start Second Innings"
           : "View Final Results"}
       </LoadingButton>
@@ -419,6 +484,42 @@ export function InningsEndModal({
 }
 
 export function MatchImageModal({ match, onUploaded, onClose }) {
+  const [mediaMatch, setMediaMatch] = useState(match);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/matches/${match?._id}/umpire-media`, {
+          cache: "no-store",
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload || cancelled) {
+          return;
+        }
+
+        if (!cancelled) {
+          setMediaMatch((current) => ({
+            ...(current || {}),
+            ...payload,
+          }));
+        }
+      } catch {
+        // Keep the initial cover image if media detail fetch fails.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [match?._id]);
+
+  const uploaderMatch = useMemo(
+    () => mediaMatch || match,
+    [match, mediaMatch],
+  );
+
   return (
     <ModalBase
       onExit={undefined}
@@ -427,31 +528,38 @@ export function MatchImageModal({ match, onUploaded, onClose }) {
       bodyClassName="max-h-[calc(100vh-7rem)]"
     >
       <MatchImageUploader
-        matchId={String(match._id)}
-        existingImages={Array.isArray(match?.matchImages) ? match.matchImages : []}
-        existingImageUrl={match?.matchImageUrl || ""}
+        matchId={String(uploaderMatch._id)}
+        existingImages={
+          Array.isArray(uploaderMatch?.matchImages) ? uploaderMatch.matchImages : []
+        }
+        existingImageUrl={uploaderMatch?.matchImageUrl || ""}
         existingImageCount={
-          Array.isArray(match?.matchImages) && match.matchImages.length
-            ? match.matchImages.length
-            : match?.matchImageUrl
+          Array.isArray(uploaderMatch?.matchImages) && uploaderMatch.matchImages.length
+            ? uploaderMatch.matchImages.length
+            : uploaderMatch?.matchImageUrl
               ? 1
               : 0
         }
         appendOnUpload={
-          (Array.isArray(match?.matchImages) && match.matchImages.length > 0) ||
-          Boolean(match?.matchImageUrl)
+          (Array.isArray(uploaderMatch?.matchImages) &&
+            uploaderMatch.matchImages.length > 0) ||
+          Boolean(uploaderMatch?.matchImageUrl)
         }
         onUploaded={(updatedMatch) => {
-          onUploaded(updatedMatch);
+          setMediaMatch((current) => ({
+            ...(current || {}),
+            ...updatedMatch,
+          }));
+          onUploaded?.(updatedMatch);
         }}
         onComplete={() => {
           onClose?.();
         }}
         onRequestClose={onClose}
         promptForUploadPin
-        title={match?.matchImageUrl ? "Replace Match Image" : "Add Match Image"}
+        title={uploaderMatch?.matchImageUrl ? "Replace Match Image" : "Add Match Image"}
         description="Manage match images."
-        primaryLabel={match?.matchImageUrl ? "Save Images" : "Upload Images"}
+        primaryLabel={uploaderMatch?.matchImageUrl ? "Save Images" : "Upload Images"}
       />
     </ModalBase>
   );

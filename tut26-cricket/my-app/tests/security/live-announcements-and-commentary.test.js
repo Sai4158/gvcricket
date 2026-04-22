@@ -136,7 +136,7 @@ test("[security] spectator commentary handles last-ball warnings and over summar
   assert.equal(fullLine, "Umpire has given 1 run.");
 
   const scoreLine = buildSpectatorScoreAnnouncement(event, after);
-  assert.equal(scoreLine, "Score is 5 for 2. One ball to finish the over.");
+  assert.equal(scoreLine, "Score is 5 for 2. One ball left.");
 
   const overLine = buildSpectatorOverCompleteAnnouncement({
     ...after,
@@ -294,12 +294,12 @@ test("[security] spectator commentary gives progress reminders and clean undo li
         ],
       },
     }),
-    "Score is 2 for 0. This is ball 2."
+    "Score is 2 for 0. Ball 2 completed."
   );
 
   assert.equal(
     buildSpectatorScoreAnnouncement(ballFourEvent, match),
-    "Score is 4 for 0. This is ball 4."
+    "Score is 4 for 0. Ball 4 completed."
   );
   assert.equal(
     buildSpectatorAnnouncement(undoEvent, match, "full"),
@@ -389,6 +389,43 @@ test("[security] score correction announcements stay smart for umpire and specta
   assert.equal(
     buildSpectatorScoreAnnouncement(correctionEvent, correctedMatch),
     "Score is 2 for 0. Target is now 7. 5 needed from 5 balls."
+  );
+});
+
+test("[security] spectator progress reminders prefer the event ball number over a newer match state", () => {
+  const staleEvent = {
+    id: "evt-ball-2-stable",
+    type: "score_update",
+    ball: { runs: 1, isOut: false, extraType: null },
+    score: 2,
+    outs: 0,
+    overCompleted: false,
+    ballNumberInOver: 2,
+  };
+
+  const newerMatchState = {
+    ...buildBaseMatch(),
+    score: 3,
+    outs: 0,
+    innings1: {
+      team: "Falcons",
+      score: 3,
+      history: [
+        {
+          overNumber: 1,
+          balls: [
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+          ],
+        },
+      ],
+    },
+  };
+
+  assert.equal(
+    buildSpectatorScoreAnnouncement(staleEvent, newerMatchState),
+    "Score is 2 for 0. Ball 2 completed."
   );
 });
 

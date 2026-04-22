@@ -17,11 +17,23 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
-import { applyMatchAction, MatchEngineError } from "../../lib/match-engine";
+import {
+  applyMatchAction,
+  createMatchUndoSnapshot,
+  MatchEngineError,
+  restoreMatchUndoSnapshot,
+} from "../../lib/match-engine";
+import { countLegalBalls } from "../../lib/match-scoring";
 import useEventSource from "../live/useEventSource";
 import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
 
 const ACTION_QUEUE_RETRY_DELAY_MS = 2500;
+
+function countLegalBallsInBalls(balls = []) {
+  return (Array.isArray(balls) ? balls : []).filter(
+    (ball) => ball?.extraType !== "wide" && ball?.extraType !== "noball",
+  ).length;
+}
 
 function wait(ms) {
   return new Promise((resolve) => {
@@ -105,14 +117,142 @@ function normalizeOptimisticMatch(nextMatch) {
     return null;
   }
 
+  const activeInningsKey = nextMatch?.innings === "second" ? "innings2" : "innings1";
+  const activeHistory = Array.isArray(nextMatch?.[activeInningsKey]?.history)
+    ? nextMatch[activeInningsKey].history
+    : [];
+  const activeOver = activeHistory.at(-1) || null;
+  const hasCompactActiveOverBalls = Array.isArray(nextMatch?.activeOverBalls);
+  const compactActiveOverBalls = hasCompactActiveOverBalls
+    ? nextMatch.activeOverBalls
+    : [];
+  const compactActiveOverNumber = Number(nextMatch?.activeOverNumber || 1);
+  const hasExplicitCompactState = hasCompactActiveOverBalls &&
+    Number.isFinite(Number(nextMatch?.legalBallCount));
+  const derivedActiveOverBalls = Array.isArray(activeOver?.balls)
+    ? activeOver.balls
+    : [];
+  const activeOverBalls = hasCompactActiveOverBalls
+    ? compactActiveOverBalls
+    : derivedActiveOverBalls;
+  const activeOverNumber = Number.isFinite(compactActiveOverNumber) &&
+    compactActiveOverNumber > 0
+      ? compactActiveOverNumber
+      : Number(activeOver?.overNumber || 1);
+  const derivedLegalBallCount = hasExplicitCompactState
+    ? Number(nextMatch?.legalBallCount || 0)
+    : activeHistory.length
+      ? countLegalBalls(activeHistory)
+      : countLegalBallsInBalls(activeOverBalls);
+  const legalBallCount = Number.isFinite(Number(nextMatch?.legalBallCount))
+    ? Math.max(derivedLegalBallCount, Number(nextMatch.legalBallCount || 0))
+    : derivedLegalBallCount;
+  const firstInningsLegalBallCount = Number.isFinite(
+    Number(nextMatch?.firstInningsLegalBallCount),
+  )
+    ? Number(nextMatch.firstInningsLegalBallCount || 0)
+    : Array.isArray(nextMatch?.innings1?.history) && nextMatch.innings1.history.length
+      ? countLegalBalls(nextMatch.innings1.history)
+      : nextMatch?.innings === "first"
+        ? legalBallCount
+        : 0;
+  const secondInningsLegalBallCount = Number.isFinite(
+    Number(nextMatch?.secondInningsLegalBallCount),
+  )
+    ? Number(nextMatch.secondInningsLegalBallCount || 0)
+    : Array.isArray(nextMatch?.innings2?.history) && nextMatch.innings2.history.length
+      ? countLegalBalls(nextMatch.innings2.history)
+      : nextMatch?.innings === "second"
+        ? legalBallCount
+        : 0;
+  const historyUndoCount = Array.isArray(nextMatch.actionHistory)
+    ? nextMatch.actionHistory.length
+    : 0;
+  const numericUndoCount = Number(nextMatch.undoCount || 0);
+
   return {
     ...nextMatch,
     actionHistory: Array.isArray(nextMatch.actionHistory) ? nextMatch.actionHistory : [],
-    undoCount: Array.isArray(nextMatch.actionHistory)
-      ? nextMatch.actionHistory.length
-      : Number(nextMatch.undoCount || 0),
+    recentActionIds: Array.isArray(nextMatch.recentActionIds)
+      ? nextMatch.recentActionIds
+      : [],
+    legalBallCount,
+    activeOverNumber,
+    activeOverBalls,
+    firstInningsLegalBallCount,
+    secondInningsLegalBallCount,
+    historyVersion: nextMatch?.updatedAt || new Date().toISOString(),
+    undoCount: Math.max(
+      0,
+      historyUndoCount,
+      Number.isFinite(numericUndoCount) ? numericUndoCount : 0,
+    ),
     updatedAt: new Date().toISOString(),
   };
+}
+
+function normalizeIncomingMatch(nextMatch) {
+  if (!nextMatch) {
+    return null;
+  }
+
+  const normalizedMatch = normalizeOptimisticMatch(nextMatch);
+  return {
+    ...normalizedMatch,
+    updatedAt: nextMatch?.updatedAt || normalizedMatch.updatedAt,
+    historyVersion:
+      nextMatch?.historyVersion ||
+      nextMatch?.updatedAt ||
+      normalizedMatch.historyVersion,
+  };
+}
+
+function mergeMatchPatch(baseMatch, matchPatch) {
+  if (!matchPatch) {
+    return baseMatch;
+  }
+
+  return {
+    ...(baseMatch || {}),
+    ...matchPatch,
+    innings1: matchPatch.innings1
+      ? {
+          ...(baseMatch?.innings1 || {}),
+          ...matchPatch.innings1,
+        }
+      : baseMatch?.innings1,
+    innings2: matchPatch.innings2
+      ? {
+          ...(baseMatch?.innings2 || {}),
+          ...matchPatch.innings2,
+        }
+      : baseMatch?.innings2,
+  };
+}
+
+function patchChangesScoringStructure(payload) {
+  if (!payload || typeof payload !== "object") {
+    return false;
+  }
+
+  return [
+    "teamA",
+    "teamB",
+    "teamAName",
+    "teamBName",
+    "overs",
+    "innings1Score",
+    "score",
+    "outs",
+    "innings",
+    "innings1",
+    "innings2",
+    "balls",
+    "result",
+    "pendingResult",
+    "pendingResultAt",
+    "resultAutoFinalizeAt",
+  ].some((key) => Object.prototype.hasOwnProperty.call(payload, key));
 }
 
 function getActionQueueStorageKey(matchId) {
@@ -137,6 +277,20 @@ function normalizeQueuedActionEntry(entry) {
 }
 
 function getAppliedActionIds(match) {
+  const recentActionIds = Array.isArray(match?.recentActionIds)
+    ? match.recentActionIds
+    : Array.isArray(match?.processedActionIds)
+      ? match.processedActionIds
+      : [];
+
+  if (recentActionIds.length) {
+    return new Set(
+      recentActionIds
+        .map((actionId) => String(actionId || "").trim())
+        .filter(Boolean),
+    );
+  }
+
   const history = Array.isArray(match?.actionHistory) ? match.actionHistory : [];
 
   return new Set(
@@ -206,22 +360,32 @@ function readStoredActionQueue(matchId) {
   }
 
   try {
-    const rawValue = window.sessionStorage.getItem(
-      getActionQueueStorageKey(matchId)
-    );
+    const rawValue = window.sessionStorage.getItem(getActionQueueStorageKey(matchId));
     if (!rawValue) {
       return [];
     }
 
-    const parsed = JSON.parse(rawValue);
-    if (!Array.isArray(parsed)) {
+    const parsedValue = JSON.parse(rawValue);
+    if (!Array.isArray(parsedValue)) {
+      window.sessionStorage.removeItem(getActionQueueStorageKey(matchId));
       return [];
     }
 
-    return parsed
+    const normalizedEntries = parsedValue
       .map(normalizeQueuedActionEntry)
       .filter(Boolean);
+
+    if (normalizedEntries.length !== parsedValue.length) {
+      writeStoredActionQueue(matchId, normalizedEntries);
+    }
+
+    return normalizedEntries;
   } catch {
+    try {
+      window.sessionStorage.removeItem(getActionQueueStorageKey(matchId));
+    } catch {
+      // Ignore storage cleanup failures.
+    }
     return [];
   }
 }
@@ -232,23 +396,101 @@ function writeStoredActionQueue(matchId, entries) {
   }
 
   try {
-    if (!entries.length) {
+    const normalizedEntries = (Array.isArray(entries) ? entries : [])
+      .map(normalizeQueuedActionEntry)
+      .filter(Boolean);
+
+    if (!normalizedEntries.length) {
       window.sessionStorage.removeItem(getActionQueueStorageKey(matchId));
       return;
     }
 
     window.sessionStorage.setItem(
       getActionQueueStorageKey(matchId),
-      JSON.stringify(entries),
+      JSON.stringify(normalizedEntries),
     );
   } catch {
-    // Ignore storage failures and continue with in-memory queueing.
+    // Ignore storage cleanup failures and continue with in-memory queueing.
   }
 }
 
+function hasIncompleteInningsHistory(match) {
+  return !Array.isArray(match?.innings1?.history) || !Array.isArray(match?.innings2?.history);
+}
+
+function mergeInningsHistory(baseInnings, incomingInnings) {
+  const nextInnings = {
+    ...(baseInnings || {}),
+    ...(incomingInnings || {}),
+  };
+
+  if (Array.isArray(incomingInnings?.history)) {
+    nextInnings.history = incomingInnings.history;
+    return nextInnings;
+  }
+
+  if (Array.isArray(baseInnings?.history)) {
+    nextInnings.history = baseInnings.history;
+  }
+
+  return nextInnings;
+}
+
+function mergeKnownInningsHistories(baseMatch, incomingMatch) {
+  if (!incomingMatch) {
+    return baseMatch;
+  }
+
+  if (!baseMatch) {
+    return incomingMatch;
+  }
+
+  return {
+    ...baseMatch,
+    ...incomingMatch,
+    innings1: mergeInningsHistory(baseMatch?.innings1, incomingMatch?.innings1),
+    innings2: mergeInningsHistory(baseMatch?.innings2, incomingMatch?.innings2),
+  };
+}
+
+function mergeFetchedUmpireHistory(baseMatch, historyPayload) {
+  if (!baseMatch || !historyPayload) {
+    return baseMatch;
+  }
+
+  return {
+    ...baseMatch,
+    innings1: mergeInningsHistory(baseMatch?.innings1, historyPayload?.innings1),
+    innings2: mergeInningsHistory(baseMatch?.innings2, historyPayload?.innings2),
+    historyVersion:
+      historyPayload?.historyVersion ||
+      baseMatch?.historyVersion ||
+      baseMatch?.updatedAt ||
+      null,
+  };
+}
+
 export function replayQueuedMatchActions(baseMatch, queuedEntries = []) {
+  const undoShadowStack = [];
+
   return (queuedEntries || []).reduce((nextMatch, entry) => {
-    return applyMatchAction(nextMatch, entry.action);
+    if (!nextMatch) {
+      return nextMatch;
+    }
+
+    if (entry?.action?.type === "undo_last") {
+      const previousSnapshot = undoShadowStack.pop();
+      if (!previousSnapshot) {
+        throw new MatchEngineError("There is nothing left to undo.", 409);
+      }
+
+      return normalizeOptimisticMatch(
+        restoreMatchUndoSnapshot(nextMatch, previousSnapshot),
+      );
+    }
+
+    undoShadowStack.push(createMatchUndoSnapshot(nextMatch));
+    return normalizeOptimisticMatch(applyMatchAction(nextMatch, entry.action));
   }, baseMatch);
 }
 
@@ -282,20 +524,24 @@ function isIncomingUpdateOlder(incomingUpdatedAt, currentUpdatedAt) {
 export default function useMatch(matchId, hasAccess, initialMatch = null) {
   const router = useRouter();
   const { startNavigation } = useRouteFeedback();
-  const [match, setMatch] = useState(initialMatch);
+  const [match, setMatch] = useState(() => normalizeIncomingMatch(initialMatch));
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(
     Boolean(matchId && hasAccess && !initialMatch)
   );
   const [isUpdating, setIsUpdating] = useState(false);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState(initialMatch?.updatedAt || "");
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(
+    initialMatch?.updatedAt || "",
+  );
   const lastStreamUpdateRef = useRef(initialMatch?.updatedAt || "");
   const previousMatchIdRef = useRef(matchId);
-  const matchRef = useRef(initialMatch);
+  const matchRef = useRef(normalizeIncomingMatch(initialMatch));
   const actionQueueRef = useRef([]);
   const processingQueueRef = useRef(false);
   const retryTimerRef = useRef(null);
   const processQueuedActionsRef = useRef(async () => {});
+  const optimisticUndoStackRef = useRef([]);
+  const historyHydrationPromiseRef = useRef(null);
 
   const clearRetryTimer = useCallback(() => {
     if (retryTimerRef.current) {
@@ -314,8 +560,10 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       return null;
     }
 
+    const normalizedBaseMatch = normalizeIncomingMatch(baseMatch);
+
     const syncedQueue = filterQueuedActionsAlreadyApplied(
-      baseMatch,
+      normalizedBaseMatch,
       actionQueueRef.current,
     );
 
@@ -324,21 +572,22 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     }
 
     if (!syncedQueue.length) {
-      return baseMatch;
+      return normalizedBaseMatch;
     }
 
     try {
-      return normalizeOptimisticMatch(
-        replayQueuedMatchActions(baseMatch, syncedQueue),
+      return normalizeIncomingMatch(
+        replayQueuedMatchActions(normalizedBaseMatch, syncedQueue),
       );
     } catch {
       updateQueuedActions([]);
+      optimisticUndoStackRef.current = [];
       setError(
         new Error(
           "Saved local scoring was cleared because the live match changed.",
         ),
       );
-      return baseMatch;
+      return normalizedBaseMatch;
     }
   }, [updateQueuedActions]);
 
@@ -384,15 +633,79 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     matchRef.current = match;
   }, [match]);
 
+  const hydrateCompleteMatchHistory = useCallback(async (baseMatch = null) => {
+    const workingMatch = normalizeIncomingMatch(
+      mergeKnownInningsHistories(matchRef.current, baseMatch),
+    );
+
+    if (
+      !matchId ||
+      !hasAccess ||
+      !workingMatch ||
+      !hasIncompleteInningsHistory(workingMatch)
+    ) {
+      return workingMatch;
+    }
+
+    if (historyHydrationPromiseRef.current) {
+      return historyHydrationPromiseRef.current;
+    }
+
+    historyHydrationPromiseRef.current = (async () => {
+      try {
+        const response = await fetchWithNetworkRetry(
+          `/api/matches/${matchId}/umpire-history`,
+          {
+            cache: "no-store",
+          },
+        );
+        const historyPayload = await response
+          .json()
+          .catch(() => null);
+
+        if (!response.ok || !historyPayload) {
+          return workingMatch;
+        }
+
+        const latestMatch = normalizeIncomingMatch(matchRef.current || workingMatch);
+        const hydratedMatch = normalizeIncomingMatch(
+          mergeFetchedUmpireHistory(latestMatch, historyPayload),
+        );
+
+        if (hydratedMatch) {
+          matchRef.current = hydratedMatch;
+          setMatch(hydratedMatch);
+          setLastUpdatedAt(
+            hydratedMatch?.updatedAt ||
+              latestMatch?.updatedAt ||
+              historyPayload?.updatedAt ||
+              new Date().toISOString(),
+          );
+        }
+
+        return hydratedMatch || workingMatch;
+      } catch {
+        return workingMatch;
+      } finally {
+        historyHydrationPromiseRef.current = null;
+      }
+    })();
+
+    return historyHydrationPromiseRef.current;
+  }, [hasAccess, matchId]);
+
   const refreshMatch = useCallback(async () => {
     if (!matchId || !hasAccess) {
       return null;
     }
 
     try {
-      const response = await fetchWithNetworkRetry(`/api/matches/${matchId}`, {
+      const response = await fetchWithNetworkRetry(
+        `/api/matches/${matchId}?view=umpire`,
+        {
         cache: "no-store",
-      });
+        },
+      );
       const body = await response
         .json()
         .catch(() => null);
@@ -403,7 +716,9 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
       const incomingUpdatedAt = body?.updatedAt || "";
       if (!isIncomingUpdateOlder(incomingUpdatedAt, lastStreamUpdateRef.current)) {
-        const nextMatch = applyQueuedFallbackState(body);
+        const nextMatch = applyQueuedFallbackState(
+          mergeKnownInningsHistories(matchRef.current, body),
+        );
         matchRef.current = nextMatch;
         lastStreamUpdateRef.current =
           incomingUpdatedAt || lastStreamUpdateRef.current;
@@ -412,9 +727,10 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
           nextMatch?.updatedAt || incomingUpdatedAt || new Date().toISOString(),
         );
         setError(null);
+        return nextMatch;
       }
 
-      return body;
+      return matchRef.current;
     } catch {
       return null;
     }
@@ -427,23 +743,29 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     if (matchChanged) {
       clearRetryTimer();
       processingQueueRef.current = false;
+      historyHydrationPromiseRef.current = null;
       updateQueuedActions([]);
       lastStreamUpdateRef.current = initialMatch?.updatedAt || "";
-      matchRef.current = initialMatch || null;
-      setMatch(initialMatch || null);
+      const normalizedInitialMatch = normalizeIncomingMatch(initialMatch);
+      matchRef.current = normalizedInitialMatch;
+      setMatch(normalizedInitialMatch);
       setError(null);
       setLastUpdatedAt(initialMatch?.updatedAt || "");
       setIsUpdating(false);
+      optimisticUndoStackRef.current = [];
     }
 
     if (!matchId || !hasAccess) {
       clearRetryTimer();
+      historyHydrationPromiseRef.current = null;
       lastStreamUpdateRef.current = initialMatch?.updatedAt || "";
-      matchRef.current = initialMatch || null;
-      setMatch(initialMatch);
+      const normalizedInitialMatch = normalizeIncomingMatch(initialMatch);
+      matchRef.current = normalizedInitialMatch;
+      setMatch(normalizedInitialMatch);
       setError(null);
       setLastUpdatedAt(initialMatch?.updatedAt || "");
       setIsLoading(false);
+      optimisticUndoStackRef.current = [];
       return;
     }
 
@@ -456,6 +778,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     if (!matchId) {
       clearRetryTimer();
       actionQueueRef.current = [];
+      historyHydrationPromiseRef.current = null;
       return;
     }
 
@@ -471,6 +794,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     matchRef.current = replayedMatch;
     setMatch(replayedMatch);
     setLastUpdatedAt(replayedMatch?.updatedAt || initialMatch.updatedAt || "");
+    optimisticUndoStackRef.current = [];
 
     if (hasAccess) {
       scheduleQueuedActionRetry(250);
@@ -485,12 +809,39 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     updateQueuedActions,
   ]);
 
+  useEffect(() => {
+    if (!matchId || !hasAccess) {
+      historyHydrationPromiseRef.current = null;
+      return;
+    }
+
+    if (!hasIncompleteInningsHistory(matchRef.current || initialMatch)) {
+      return;
+    }
+
+    void hydrateCompleteMatchHistory(matchRef.current || initialMatch);
+  }, [
+    hasAccess,
+    hydrateCompleteMatchHistory,
+    initialMatch,
+    match?.historyVersion,
+    matchId,
+  ]);
+
   useEventSource({
     url: matchId && hasAccess ? `/api/live/matches/${matchId}` : null,
     event: "match",
     enabled: Boolean(matchId && hasAccess),
     disconnectWhenHidden: false,
     onMessage: (payload) => {
+      const streamedMatch = payload?.match;
+      const streamedMatchId = String(streamedMatch?._id || "").trim();
+
+      if (!streamedMatch || (streamedMatchId && streamedMatchId !== String(matchId))) {
+        void refreshMatch();
+        return;
+      }
+
       const incomingUpdatedAt = payload?.updatedAt || payload?.match?.updatedAt || "";
 
       if (isIncomingUpdateOlder(incomingUpdatedAt, lastStreamUpdateRef.current)) {
@@ -499,7 +850,13 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
       lastStreamUpdateRef.current =
         incomingUpdatedAt || lastStreamUpdateRef.current;
-      const nextMatch = applyQueuedFallbackState(payload.match || null);
+      const nextMatch = applyQueuedFallbackState(
+        mergeKnownInningsHistories(matchRef.current, streamedMatch),
+      );
+      if (!nextMatch) {
+        void refreshMatch();
+        return;
+      }
       matchRef.current = nextMatch;
       setMatch(nextMatch);
       setLastUpdatedAt(nextMatch?.updatedAt || incomingUpdatedAt || "");
@@ -519,9 +876,10 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     [match?.undoCount]
   );
   const tossPending = Boolean(match && !match.tossReady);
-  const activeInningsKey = match?.innings === "second" ? "innings2" : "innings1";
   const currentInningsHasHistory = Boolean(
-    match?.[activeInningsKey]?.history?.some((over) => Array.isArray(over?.balls) && over.balls.length > 0)
+    Number(match?.legalBallCount || 0) > 0 ||
+      (Array.isArray(match?.activeOverBalls) && match.activeOverBalls.length > 0) ||
+      match?.balls?.length
   );
 
   const refreshMatchFromServer = useCallback(async () => {
@@ -531,6 +889,18 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     }
     return refreshedMatch;
   }, [refreshMatch]);
+
+  const flushPendingActions = useCallback(async () => {
+    if (!actionQueueRef.current.length && !processingQueueRef.current) {
+      return matchRef.current;
+    }
+
+    clearRetryTimer();
+    await processQueuedActionsRef.current();
+
+    const refreshedMatch = await refreshMatchFromServer();
+    return refreshedMatch || matchRef.current;
+  }, [clearRetryTimer, refreshMatchFromServer]);
 
   const processQueuedActions = useCallback(async () => {
     if (processingQueueRef.current) {
@@ -543,12 +913,27 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     while (actionQueueRef.current.length > 0) {
       const currentEntry = actionQueueRef.current[0];
       setIsUpdating(true);
+      const isScoreAction = currentEntry.action?.type === "score_ball";
+      if (!isScoreAction && hasIncompleteInningsHistory(matchRef.current)) {
+        await hydrateCompleteMatchHistory(matchRef.current);
+      }
+      const targetUrl = isScoreAction
+        ? `/api/matches/${matchId}/score`
+        : `/api/matches/${matchId}/actions`;
+      const requestBody = isScoreAction
+        ? {
+            actionId: currentEntry.action.actionId,
+            runs: currentEntry.action.runs,
+            isOut: currentEntry.action.isOut,
+            extraType: currentEntry.action.extraType,
+          }
+        : currentEntry.action;
 
       try {
-        const response = await fetchWithNetworkRetry(`/api/matches/${matchId}/actions`, {
+        const response = await fetchWithNetworkRetry(targetUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(currentEntry.action),
+          body: JSON.stringify(requestBody),
         });
 
         const body = await response
@@ -601,23 +986,59 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
             continue;
           }
 
+          if (response.status === 404 || body.message === "Match not found.") {
+            const refreshedMatch = await refreshMatchFromServer();
+            updateQueuedActions(
+              removeQueuedActionById(
+                actionQueueRef.current,
+                currentEntry.action.actionId,
+              ),
+            );
+            optimisticUndoStackRef.current = [];
+            if (refreshedMatch || matchRef.current) {
+              setError(null);
+              continue;
+            }
+          }
+
+          if (response.status === 409) {
+            const refreshedMatch = await refreshMatchFromServer();
+            updateQueuedActions(
+              removeQueuedActionById(
+                actionQueueRef.current,
+                currentEntry.action.actionId,
+              ),
+            );
+            optimisticUndoStackRef.current = [];
+            if (refreshedMatch || matchRef.current) {
+              setError(null);
+              continue;
+            }
+          }
+
           throw new Error(body.message || "Failed to update match.");
         }
 
-        if (body.match) {
+        const responseMatch = body.match
+          ? body.match
+          : body.matchPatch
+            ? mergeMatchPatch(matchRef.current, body.matchPatch)
+            : null;
+
+        if (responseMatch) {
           const remainingQueue = removeQueuedActionById(
             actionQueueRef.current,
             currentEntry.action.actionId,
           );
           updateQueuedActions(remainingQueue);
-          const incomingUpdatedAt = body?.match?.updatedAt || "";
+          const incomingUpdatedAt = responseMatch?.updatedAt || "";
           if (
             !isIncomingUpdateOlder(
               incomingUpdatedAt,
               lastStreamUpdateRef.current,
             )
           ) {
-            const nextMatch = applyQueuedFallbackState(body.match);
+            const nextMatch = applyQueuedFallbackState(responseMatch);
             matchRef.current = nextMatch;
             lastStreamUpdateRef.current =
               incomingUpdatedAt || lastStreamUpdateRef.current;
@@ -662,6 +1083,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     scheduleQueuedActionRetry,
     startNavigation,
     updateQueuedActions,
+    hydrateCompleteMatchHistory,
   ]);
 
   processQueuedActionsRef.current = processQueuedActions;
@@ -669,19 +1091,51 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
   const sendAction = useCallback(async (action, allowOneRetry = true) => {
     if (!matchId || !hasAccess) return null;
 
-    const baseMatch = matchRef.current;
+    let baseMatch = matchRef.current;
+    if (action?.type !== "score_ball" && hasIncompleteInningsHistory(baseMatch)) {
+      const hydratedMatch = await hydrateCompleteMatchHistory(baseMatch);
+      if (hydratedMatch) {
+        baseMatch = hydratedMatch;
+      }
+    }
+
     if (!baseMatch) {
       return null;
     }
 
     try {
-      const optimisticMatch = applyMatchAction(baseMatch, action);
-      const nextOptimisticMatch = normalizeOptimisticMatch(optimisticMatch);
-      matchRef.current = nextOptimisticMatch;
-      setMatch(nextOptimisticMatch);
-      setLastUpdatedAt(nextOptimisticMatch.updatedAt || new Date().toISOString());
-      setError(null);
+      let optimisticMatch = null;
+      let previousSnapshot = null;
+
+      if (action.type === "undo_last") {
+        previousSnapshot = optimisticUndoStackRef.current.pop();
+        if (!previousSnapshot && Number(baseMatch?.undoCount || 0) <= 0) {
+          throw new MatchEngineError("There is nothing left to undo.", 409);
+        }
+        optimisticMatch = previousSnapshot
+          ? restoreMatchUndoSnapshot(baseMatch, previousSnapshot)
+          : baseMatch;
+      } else {
+        optimisticUndoStackRef.current.push(createMatchUndoSnapshot(baseMatch));
+        optimisticMatch = applyMatchAction(baseMatch, action);
+      }
+
+      if (action.type === "undo_last" && !previousSnapshot) {
+        setError(null);
+      } else {
+        const nextOptimisticMatch = normalizeOptimisticMatch(optimisticMatch);
+        matchRef.current = nextOptimisticMatch;
+        setMatch(nextOptimisticMatch);
+        setLastUpdatedAt(nextOptimisticMatch.updatedAt || new Date().toISOString());
+        setError(null);
+      }
     } catch (caughtError) {
+      if (action.type !== "undo_last") {
+        optimisticUndoStackRef.current = optimisticUndoStackRef.current.slice(
+          0,
+          Math.max(0, optimisticUndoStackRef.current.length - 1),
+        );
+      }
       if (caughtError instanceof MatchEngineError) {
         setError(caughtError);
         return null;
@@ -701,7 +1155,13 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     void processQueuedActions();
 
     return matchRef.current;
-  }, [hasAccess, matchId, processQueuedActions, updateQueuedActions]);
+  }, [
+    hasAccess,
+    hydrateCompleteMatchHistory,
+    matchId,
+    processQueuedActions,
+    updateQueuedActions,
+  ]);
 
   const patchAndUpdate = useCallback(async (payload) => {
     if (!matchId || !hasAccess || processingQueueRef.current) return null;
@@ -733,12 +1193,16 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
 
       const incomingUpdatedAt = body?.updatedAt || "";
       if (!isIncomingUpdateOlder(incomingUpdatedAt, lastStreamUpdateRef.current)) {
-        matchRef.current = body;
+        const normalizedBody = normalizeIncomingMatch(body);
+        matchRef.current = normalizedBody;
         lastStreamUpdateRef.current =
           incomingUpdatedAt || lastStreamUpdateRef.current;
-        setMatch(body);
-        setLastUpdatedAt(incomingUpdatedAt || new Date().toISOString());
+        setMatch(normalizedBody);
+        setLastUpdatedAt(incomingUpdatedAt || normalizedBody?.updatedAt || new Date().toISOString());
         setError(null);
+        if (patchChangesScoringStructure(payload)) {
+          optimisticUndoStackRef.current = [];
+        }
       }
       return body;
     } catch (caughtError) {
@@ -800,7 +1264,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
   }, [clearRetryTimer]);
 
   const handleScoreEvent = useCallback((runs, isOut = false, extraType = null, options = {}) => {
-    if (!match || match.result || !hasAccess) return;
+    if (!match || match.result || match.pendingResult || !hasAccess) return;
     if (tossPending) {
       setError(null);
       startNavigation("Opening toss...");
@@ -836,7 +1300,7 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
   }, [currentInningsHasHistory, match?.undoCount, matchId, router, sendAction, startNavigation, tossPending]);
 
   const handleNextInningsOrEnd = useCallback(async () => {
-    if (!match || !hasAccess) return;
+    if (!hasAccess) return null;
     if (tossPending) {
       setError(null);
       startNavigation("Opening toss...");
@@ -844,10 +1308,22 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       return null;
     }
 
-    if (match.result && !match.isOngoing) {
+    let currentMatch = matchRef.current;
+    if (!currentMatch) {
+      return null;
+    }
+
+    if (actionQueueRef.current.length || processingQueueRef.current) {
+      currentMatch = await flushPendingActions();
+      if (!currentMatch) {
+        return null;
+      }
+    }
+
+    if (currentMatch.result && !currentMatch.pendingResult && !currentMatch.isOngoing) {
       startNavigation("Opening result...");
       router.push(`/result/${matchId}`);
-      return match;
+      return currentMatch;
     }
 
     const updatedMatch = await sendAction({
@@ -855,12 +1331,20 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
       type: "complete_innings",
     });
 
-    if (updatedMatch?.result && !updatedMatch?.isOngoing) {
+    if (updatedMatch?.result && !updatedMatch?.pendingResult && !updatedMatch?.isOngoing) {
       startNavigation("Opening result...");
       router.push(`/result/${matchId}`);
     }
     return updatedMatch || null;
-  }, [hasAccess, match, matchId, router, sendAction, startNavigation, tossPending]);
+  }, [
+    flushPendingActions,
+    hasAccess,
+    matchId,
+    router,
+    sendAction,
+    startNavigation,
+    tossPending,
+  ]);
 
   return {
     match,
@@ -871,11 +1355,14 @@ export default function useMatch(matchId, hasAccess, initialMatch = null) {
     historyStack,
     currentInningsHasHistory,
     replaceMatch: (nextMatch) => {
-      matchRef.current = nextMatch;
+      const mergedMatch = normalizeIncomingMatch(
+        mergeMatchPatch(matchRef.current, nextMatch),
+      );
+      matchRef.current = mergedMatch;
       lastStreamUpdateRef.current =
-        nextMatch?.updatedAt || lastStreamUpdateRef.current;
-      setMatch(nextMatch);
-      setLastUpdatedAt(nextMatch?.updatedAt || new Date().toISOString());
+        mergedMatch?.updatedAt || lastStreamUpdateRef.current;
+      setMatch(mergedMatch);
+      setLastUpdatedAt(mergedMatch?.updatedAt || new Date().toISOString());
     },
     handleScoreEvent,
     handleUndo,

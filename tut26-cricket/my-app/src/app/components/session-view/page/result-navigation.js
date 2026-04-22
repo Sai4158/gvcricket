@@ -10,7 +10,7 @@
 export function navigateToSessions({ router, setIsLeavingToSessions, startNavigation }) {
   setIsLeavingToSessions(true);
   startNavigation("Opening sessions...");
-  router.push("/session");
+  router.push("/session", { scroll: true });
 }
 
 

@@ -21,7 +21,7 @@ import {
   useState,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import InlineSpinner from "./InlineSpinner";
 
 const RouteFeedbackContext = createContext({
@@ -69,7 +69,12 @@ function RouteTransitionLoader({ visible, label }) {
 
 export default function RouteFeedbackProvider({ children }) {
   const pathname = usePathname();
-  const currentUrl = pathname || "";
+  const searchParams = useSearchParams();
+  const currentUrl = useMemo(() => {
+    const path = pathname || "";
+    const query = searchParams?.toString() || "";
+    return query ? `${path}?${query}` : path;
+  }, [pathname, searchParams]);
   const [navigationState, setNavigationState] = useState({
     active: false,
     label: "",
@@ -77,6 +82,25 @@ export default function RouteFeedbackProvider({ children }) {
   });
   const currentUrlRef = useRef(currentUrl);
   const clearTimerRef = useRef(null);
+  const pendingScrollResetRef = useRef(false);
+
+  const forceScrollToTop = useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
+    if (document.documentElement) {
+      document.documentElement.scrollTop = 0;
+    }
+    if (document.body) {
+      document.body.scrollTop = 0;
+    }
+  }, []);
 
   const stopNavigation = useCallback(() => {
     if (clearTimerRef.current) {
@@ -89,6 +113,7 @@ export default function RouteFeedbackProvider({ children }) {
   }, []);
 
   const startNavigation = useCallback((label = "Opening...") => {
+    pendingScrollResetRef.current = true;
     setNavigationState({
       active: true,
       label,
@@ -97,8 +122,27 @@ export default function RouteFeedbackProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined" || !window.history) {
+      return undefined;
+    }
+
+    const previousSetting = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+
+    return () => {
+      window.history.scrollRestoration = previousSetting;
+    };
+  }, []);
+
+  useEffect(() => {
     if (currentUrlRef.current !== currentUrl) {
       currentUrlRef.current = currentUrl;
+      if (pendingScrollResetRef.current) {
+        pendingScrollResetRef.current = false;
+        window.requestAnimationFrame(() => {
+          forceScrollToTop();
+        });
+      }
       const elapsed = Date.now() - navigationState.startedAt;
       const delay = navigationState.active ? Math.max(0, 220 - elapsed) : 0;
       if (clearTimerRef.current) {
@@ -119,7 +163,7 @@ export default function RouteFeedbackProvider({ children }) {
     }, 8000);
 
     return () => window.clearTimeout(staleTimer);
-  }, [currentUrl, navigationState.active, navigationState.startedAt, stopNavigation]);
+  }, [currentUrl, forceScrollToTop, navigationState.active, navigationState.startedAt, stopNavigation]);
 
   useEffect(() => {
     return () => {

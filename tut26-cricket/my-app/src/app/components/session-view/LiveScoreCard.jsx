@@ -20,7 +20,9 @@ export default function LiveScoreCard({ match }) {
     match?.innings === "second"
       ? match?.innings2?.history || []
       : match?.innings1?.history || [];
-  const legalBalls = countLegalBalls(activeHistory);
+  const legalBalls = Number.isFinite(Number(match?.legalBallCount))
+    ? Number(match.legalBallCount)
+    : countLegalBalls(activeHistory);
   const oversDisplay = `${Math.floor(legalBalls / 6)}.${legalBalls % 6}`;
   const targetRuns =
     match?.innings === "second" ? Number(match?.innings1?.score || 0) + 1 : 0;

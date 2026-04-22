@@ -43,8 +43,15 @@ export async function connectDB() {
       socketTimeoutMS: Number(process.env.MONGODB_SOCKET_TIMEOUT_MS || 45_000),
     });
   }
-  cached.conn = await cached.promise;
-  return cached.conn;
+
+  try {
+    cached.conn = await cached.promise;
+    return cached.conn;
+  } catch (error) {
+    cached.promise = null;
+    cached.conn = null;
+    throw error;
+  }
 }
 
 

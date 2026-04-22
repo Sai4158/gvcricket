@@ -4,26 +4,43 @@
  * Main exports: revalidate, metadata.
  * Major callers: Next.js App Router.
  * Side effects: none.
+ * Reading guide:
+ * - top: imports and page settings
+ * - middle: SEO metadata for the session page
+ * - bottom: the page function that loads data and renders the client screen
  * Read next: ../README.md
  */
 
 import SessionsPageClient from "../components/session/SessionsPageClient";
 import { absoluteUrl, siteConfig } from "../lib/site-metadata";
-import { loadSessionsIndexPageData } from "../lib/server-data";
 
+// Refresh this page data every 15 seconds.
 export const revalidate = 15;
 
+// Page title and social-preview data for /session.
 export const metadata = {
-  title: "All Cricket Sessions - Live and Completed Matches",
+  title: "GV Cricket Latest Games, Live Cricket Scores, and Match Results",
   description:
-    "Browse live cricket scores, finished matches, saved results, and match history in GV Cricket.",
+    "Browse GV Cricket latest games, live cricket scores, completed match results, cricket scoreboards, and saved sessions for local matches, tournaments, and community cricket.",
+  keywords: [
+    "gv cricket latest games",
+    "live cricket scores",
+    "latest cricket games",
+    "recent cricket matches",
+    "cricket match results",
+    "cricket scoreboard",
+    "cricket live score sessions",
+    "free cricket score viewer",
+    "cricket scoring",
+    "live cricket scoring",
+  ],
   alternates: {
     canonical: absoluteUrl("/session"),
   },
   openGraph: {
-    title: "All Cricket Sessions | GV Cricket",
+    title: "GV Cricket Latest Games, Live Scores, and Match Results",
     description:
-      "Open live scoreboards, finished results, and saved cricket sessions in one place.",
+      "Open GV Cricket latest games, live cricket scoreboards, finished results, and saved sessions in one fast index.",
     url: absoluteUrl("/session"),
     images: [
       {
@@ -35,23 +52,45 @@ export const metadata = {
     ],
   },
   twitter: {
-    title: "All Cricket Sessions | GV Cricket",
+    title: "GV Cricket Latest Games, Live Scores, and Match Results",
     description:
-      "Open live scoreboards, finished results, and saved cricket sessions in one place.",
+      "Open GV Cricket latest games, live cricket scoreboards, finished results, and saved sessions in one place.",
     images: [absoluteUrl(siteConfig.twitterImagePath)],
   },
 };
 
+const sessionsPageJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  name: "GV Cricket latest games, live cricket scores, and match results",
+  url: absoluteUrl("/session"),
+  description:
+    "Browse GV Cricket latest games, live cricket scores, completed match results, and saved cricket sessions.",
+  isPartOf: {
+    "@type": "WebSite",
+    name: siteConfig.name,
+    url: absoluteUrl("/"),
+  },
+};
+
+// Main session page route.
+// This renders the shell immediately and lets the client fetch
+// the first sessions page after paint, which keeps first load fast.
 export default async function SessionsPage({ searchParams }) {
-  const { sessions, totalCount } = await loadSessionsIndexPageData();
+  // Optional refresh token from the URL, used by the client page when needed.
   const resolvedSearchParams = await searchParams;
   const refreshToken = String(resolvedSearchParams?.refresh || "").trim();
   return (
-    <SessionsPageClient
-      initialSessions={sessions}
-      initialTotalCount={totalCount}
-      refreshToken={refreshToken}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(sessionsPageJsonLd) }}
+      />
+      <SessionsPageClient
+        initialPayload={null}
+        refreshToken={refreshToken}
+      />
+    </>
   );
 }
 

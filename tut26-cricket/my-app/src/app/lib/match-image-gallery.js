@@ -45,7 +45,8 @@ function getImageVersion(entry) {
     entry?.publicId ||
     entry?.uploadedAt?.getTime?.() ||
     entry?.uploadedAt ||
-    Date.now()
+    entry?.id ||
+    ""
   );
 }
 

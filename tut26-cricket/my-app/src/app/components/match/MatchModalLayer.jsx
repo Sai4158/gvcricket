@@ -15,7 +15,6 @@ import AnnouncementControls from "../live/AnnouncementControls";
 import LiveMicModal from "../live/LiveMicModal";
 import WalkiePanel from "../live/WalkiePanel";
 import OptionalFeatureBoundary from "../shared/OptionalFeatureBoundary";
-import { countLegalBalls } from "../../lib/match-scoring";
 import {
   HistoryModal,
   InningsEndModal,
@@ -179,7 +178,7 @@ export default function MatchModalLayer({
           match={match}
           onNext={onNext}
           onUndo={onUndoStageCard}
-          undoDisabled={isUpdating || isStageCardUndoPending}
+          undoDisabled={isStageCardUndoPending}
         />
       )}
       {stageContinuePromptProps ? (
@@ -231,7 +230,7 @@ export default function MatchModalLayer({
           key="out"
           title="OUT"
           onConfirm={(runs) => {
-            onScoreEvent(runs, true);
+            onScoreEvent(runs, true, null, { controlKey: "out" });
             onClose();
           }}
           onClose={onClose}
@@ -242,7 +241,7 @@ export default function MatchModalLayer({
           key="noball"
           title="No Ball"
           onConfirm={(runs) => {
-            onScoreEvent(runs, false, "noball");
+            onScoreEvent(runs, false, "noball", { controlKey: "noball" });
             onClose();
           }}
           onClose={onClose}
@@ -253,7 +252,7 @@ export default function MatchModalLayer({
           key="wide"
           title="Wide"
           onConfirm={(runs) => {
-            onScoreEvent(runs, false, "wide");
+            onScoreEvent(runs, false, "wide", { controlKey: "wide" });
             onClose();
           }}
           onClose={onClose}
@@ -263,10 +262,7 @@ export default function MatchModalLayer({
         <EditOversModal
           key="edit-overs"
           currentOvers={match.overs}
-          currentLegalBalls={countLegalBalls(
-            match[match.innings === "second" ? "innings2" : "innings1"]
-              ?.history || [],
-          )}
+          currentLegalBalls={Number(match?.legalBallCount || 0)}
           currentOverNumber={currentOverNumber}
           innings={match.innings}
           firstInningsOversPlayed={firstInningsOversPlayed}

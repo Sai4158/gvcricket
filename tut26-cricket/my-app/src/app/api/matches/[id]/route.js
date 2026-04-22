@@ -23,7 +23,11 @@ import {
   getMatchAccessCookieName,
   hasValidMatchAccess,
 } from "../../../lib/match-access";
-import { serializePublicMatch } from "../../../lib/public-data";
+import { serializePublicMatch, serializeUmpireBootstrap } from "../../../lib/public-data";
+import {
+  finalizePendingResultIfExpired,
+  isFinalizedMatchComplete,
+} from "../../../lib/pending-match-result";
 import { getRequestMeta } from "../../../lib/request-meta";
 import { enforceRateLimit } from "../../../lib/rate-limit";
 import {
@@ -34,13 +38,14 @@ import { hydrateLegacyTossState } from "../../../lib/match-toss";
 import { matchPatchSchema } from "../../../lib/validators";
 import { invalidateSessionsDataCache } from "../../../lib/server-data";
 import Match from "../../../../models/Match";
+import MatchUndoEntry from "../../../../models/MatchUndoEntry";
 import Session from "../../../../models/Session";
 
 const FALLBACK_SESSION_FIELDS =
   "tossWinner tossDecision teamAName teamBName teamA teamB matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy updatedAt";
 
 function isMatchCompleted(match) {
-  return Boolean(String(match?.result || "").trim()) && !Boolean(match?.isOngoing);
+  return isFinalizedMatchComplete(match);
 }
 
 async function hasMatchAccess(matchId, accessVersion) {
@@ -49,33 +54,35 @@ async function hasMatchAccess(matchId, accessVersion) {
   return hasValidMatchAccess(matchId, token, accessVersion);
 }
 
-export async function GET(_req, { params }) {
+export async function GET(req, { params }) {
   try {
     const { id } = await params;
+    const umpireView = req.nextUrl.searchParams.get("view") === "umpire";
     await connectDB();
     const match = await Match.findById(id);
 
     if (!match) {
       return jsonError("Match not found.", 404);
     }
+    const finalizedMatch = await finalizePendingResultIfExpired(match);
 
     const hasAccess = await hasMatchAccess(
       id,
-      Number(match.adminAccessVersion || 1)
+      Number(finalizedMatch.adminAccessVersion || 1)
     );
 
-    const fallbackSession = match.sessionId
-      ? await Session.findById(match.sessionId).select(
+    const fallbackSession = finalizedMatch.sessionId
+      ? await Session.findById(finalizedMatch.sessionId).select(
           FALLBACK_SESSION_FIELDS
         )
       : null;
 
-    if (hydrateLegacyTossState(match, fallbackSession)) {
-      await match.save();
+    if (hydrateLegacyTossState(finalizedMatch, fallbackSession)) {
+      await finalizedMatch.save();
       await Session.findByIdAndUpdate(
-        match.sessionId,
+        finalizedMatch.sessionId,
         {
-          $set: buildSessionMirrorUpdate(match),
+          $set: buildSessionMirrorUpdate(finalizedMatch),
         },
         {
           timestamps: false,
@@ -84,9 +91,9 @@ export async function GET(_req, { params }) {
     }
 
     return Response.json(
-      serializePublicMatch(match, fallbackSession, {
-        includeActionHistory: hasAccess,
-      }),
+      umpireView
+        ? serializeUmpireBootstrap(finalizedMatch, fallbackSession)
+        : serializePublicMatch(finalizedMatch, fallbackSession),
       {
         headers: {
           "Cache-Control": "no-store",
@@ -138,10 +145,11 @@ export async function PATCH(req, { params }) {
     if (!match) {
       return jsonError("Match not found.", 404);
     }
+    const finalizedMatch = await finalizePendingResultIfExpired(match);
 
     const hasAccess = await hasMatchAccess(
       id,
-      Number(match.adminAccessVersion || 1)
+      Number(finalizedMatch.adminAccessVersion || 1)
     );
     if (!hasAccess) {
       await writeAuditLog({
@@ -156,7 +164,7 @@ export async function PATCH(req, { params }) {
       return jsonError("Umpire access required.", 403);
     }
 
-    if (isMatchCompleted(match)) {
+    if (isMatchCompleted(finalizedMatch)) {
       await writeAuditLog({
         action: "match_patch_completed_denied",
         targetType: "match",
@@ -169,18 +177,18 @@ export async function PATCH(req, { params }) {
       return jsonError("This match is complete. Open the result page instead.", 409);
     }
 
-    const fallbackSession = match.sessionId
-      ? await Session.findById(match.sessionId).select(
+    const fallbackSession = finalizedMatch.sessionId
+      ? await Session.findById(finalizedMatch.sessionId).select(
           FALLBACK_SESSION_FIELDS
         )
       : null;
 
-    if (hydrateLegacyTossState(match, fallbackSession)) {
-      await match.save();
+    if (hydrateLegacyTossState(finalizedMatch, fallbackSession)) {
+      await finalizedMatch.save();
       await Session.findByIdAndUpdate(
-        match.sessionId,
+        finalizedMatch.sessionId,
         {
-          $set: buildSessionMirrorUpdate(match),
+          $set: buildSessionMirrorUpdate(finalizedMatch),
         },
         {
           timestamps: false,
@@ -188,44 +196,47 @@ export async function PATCH(req, { params }) {
       );
     }
 
-    const nextState = applySafeMatchPatch(match, parsedRequest.value);
-    match.teamA = nextState.teamA;
-    match.teamB = nextState.teamB;
-    match.teamAName = nextState.teamAName;
-    match.teamBName = nextState.teamBName;
-    match.overs = nextState.overs;
-    match.score = nextState.score;
-    match.outs = nextState.outs;
-    match.isOngoing = nextState.isOngoing;
-    match.innings = nextState.innings;
-    match.result = nextState.result;
-    match.tossWinner = nextState.tossWinner;
-    match.innings1 = nextState.innings1;
-    match.innings2 = nextState.innings2;
-    match.balls = nextState.balls;
-    match.lastLiveEvent = nextState.lastLiveEvent;
-    match.lastEventType = nextState.lastEventType;
-    match.lastEventText = nextState.lastEventText;
-    match.announcerEnabled = nextState.announcerEnabled;
-    match.announcerMode = nextState.announcerMode;
-    match.announcerScoreSoundEffectsEnabled =
+    const nextState = applySafeMatchPatch(finalizedMatch, parsedRequest.value);
+    finalizedMatch.teamA = nextState.teamA;
+    finalizedMatch.teamB = nextState.teamB;
+    finalizedMatch.teamAName = nextState.teamAName;
+    finalizedMatch.teamBName = nextState.teamBName;
+    finalizedMatch.overs = nextState.overs;
+    finalizedMatch.score = nextState.score;
+    finalizedMatch.outs = nextState.outs;
+    finalizedMatch.isOngoing = nextState.isOngoing;
+    finalizedMatch.innings = nextState.innings;
+    finalizedMatch.result = nextState.result;
+    finalizedMatch.pendingResult = nextState.pendingResult;
+    finalizedMatch.pendingResultAt = nextState.pendingResultAt;
+    finalizedMatch.resultAutoFinalizeAt = nextState.resultAutoFinalizeAt;
+    finalizedMatch.tossWinner = nextState.tossWinner;
+    finalizedMatch.innings1 = nextState.innings1;
+    finalizedMatch.innings2 = nextState.innings2;
+    finalizedMatch.balls = nextState.balls;
+    finalizedMatch.lastLiveEvent = nextState.lastLiveEvent;
+    finalizedMatch.lastEventType = nextState.lastEventType;
+    finalizedMatch.lastEventText = nextState.lastEventText;
+    finalizedMatch.announcerEnabled = nextState.announcerEnabled;
+    finalizedMatch.announcerMode = nextState.announcerMode;
+    finalizedMatch.announcerScoreSoundEffectsEnabled =
       nextState.announcerScoreSoundEffectsEnabled;
-    match.announcerBroadcastScoreSoundEffectsEnabled =
+    finalizedMatch.announcerBroadcastScoreSoundEffectsEnabled =
       nextState.announcerBroadcastScoreSoundEffectsEnabled;
-    await match.save();
+    await finalizedMatch.save();
 
     await Session.findByIdAndUpdate(
-      match.sessionId,
+      finalizedMatch.sessionId,
       {
-        $set: buildSessionMirrorUpdate(match),
+        $set: buildSessionMirrorUpdate(finalizedMatch),
       },
       {
         timestamps: false,
       }
     );
     invalidateSessionsDataCache();
-    publishMatchUpdate(match._id);
-    publishSessionUpdate(match.sessionId);
+    publishMatchUpdate(finalizedMatch._id);
+    publishSessionUpdate(finalizedMatch.sessionId);
 
     await writeAuditLog({
       action: "match_patch",
@@ -237,7 +248,7 @@ export async function PATCH(req, { params }) {
       metadata: { fields: Object.keys(parsedRequest.value) },
     });
 
-    return Response.json(serializePublicMatch(match, fallbackSession, { includeActionHistory: true }), {
+    return Response.json(serializePublicMatch(finalizedMatch, fallbackSession), {
       headers: {
         "Cache-Control": "no-store",
       },
@@ -290,6 +301,7 @@ export async function DELETE(req, { params }) {
         isLive: false,
       },
     });
+    await MatchUndoEntry.deleteMany({ matchId: match._id });
     await Match.findByIdAndDelete(id);
     invalidateSessionsDataCache();
     publishMatchUpdate(id);

@@ -9,10 +9,18 @@
  * Read next: ./README.md
  */
 
-
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { FaCheck, FaMinus, FaPen, FaPlus, FaTrash } from "react-icons/fa";
+import {
+  FaCheck,
+  FaMinus,
+  FaPen,
+  FaPlus,
+  FaTimes,
+  FaTrash,
+  FaUserPlus,
+} from "react-icons/fa";
+import RollingDigitText from "../shared/RollingDigitText";
 
 export function createDefaultRoster(teamLabel) {
   return {
@@ -24,6 +32,12 @@ export function createDefaultRoster(teamLabel) {
 export default function TeamRoster({ color, roster, setRoster }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
+  const [nameSnapshot, setNameSnapshot] = useState("");
+  const [rosterSnapshot, setRosterSnapshot] = useState(null);
+  const nameInputRef = useRef(null);
+  const playerInputRefs = useRef([]);
+  const shouldFocusFirstPlayerRef = useRef(false);
+  const clearedPlayerIndexesRef = useRef(new Set());
   const teamColorClass = color === "blue" ? "text-blue-400" : "text-red-400";
   const teamRingClass =
     color === "blue" ? "focus:ring-blue-500" : "focus:ring-red-500";
@@ -82,6 +96,107 @@ export default function TeamRoster({ color, roster, setRoster }) {
     }));
   };
 
+  useEffect(() => {
+    if (!isEditingName) {
+      return;
+    }
+
+    nameInputRef.current?.focus();
+  }, [isEditingName]);
+
+  useEffect(() => {
+    if (!isEditing || !shouldFocusFirstPlayerRef.current) {
+      return;
+    }
+
+    shouldFocusFirstPlayerRef.current = false;
+    playerInputRefs.current[0]?.focus();
+  }, [isEditing, roster.players.length]);
+
+  const beginEditingName = () => {
+    setNameSnapshot(roster.name);
+    setRoster((current) => ({
+      ...current,
+      name: "",
+    }));
+    setIsEditingName(true);
+  };
+
+  const saveEditingName = () => {
+    setRoster((current) => {
+      const trimmedName = String(current.name || "").trim();
+      return {
+        ...current,
+        name: (trimmedName || nameSnapshot || "TEAM").toUpperCase(),
+      };
+    });
+    setIsEditingName(false);
+    setNameSnapshot("");
+  };
+
+  const cancelEditingName = () => {
+    setRoster((current) => ({
+      ...current,
+      name: nameSnapshot || current.name,
+    }));
+    setIsEditingName(false);
+    setNameSnapshot("");
+  };
+
+  const beginEditingRoster = () => {
+    setRosterSnapshot({
+      name: roster.name,
+      players: [...roster.players],
+    });
+    clearedPlayerIndexesRef.current = new Set([0]);
+    shouldFocusFirstPlayerRef.current = true;
+    setRoster((current) => ({
+      ...current,
+      players: current.players.map((player, index) => (index === 0 ? "" : player)),
+    }));
+    setIsEditing(true);
+  };
+
+  const saveEditingRoster = () => {
+    setRoster((current) => ({
+      ...current,
+      players: current.players.map((player, index) => {
+        const trimmedPlayer = String(player || "").trim();
+        return trimmedPlayer || rosterSnapshot?.players?.[index] || `Player ${index + 1}`;
+      }),
+    }));
+    setIsEditing(false);
+    setRosterSnapshot(null);
+    clearedPlayerIndexesRef.current = new Set();
+  };
+
+  const cancelEditingRoster = () => {
+    if (rosterSnapshot) {
+      setRoster({
+        ...roster,
+        name: rosterSnapshot.name,
+        players: [...rosterSnapshot.players],
+      });
+    }
+    setIsEditing(false);
+    setRosterSnapshot(null);
+    clearedPlayerIndexesRef.current = new Set();
+  };
+
+  const handlePlayerFocus = (index) => {
+    if (!isEditing || clearedPlayerIndexesRef.current.has(index)) {
+      return;
+    }
+
+    clearedPlayerIndexesRef.current.add(index);
+    setRoster((current) => ({
+      ...current,
+      players: current.players.map((player, playerIndex) =>
+        playerIndex === index ? "" : player
+      ),
+    }));
+  };
+
   return (
     <div
       className={`relative overflow-hidden rounded-[30px] border p-5 ring-1 ring-white/5 transition-all duration-300 sm:p-6 ${teamBorderClass} ${teamGlowClass} ${innerGlowClass}`}
@@ -94,6 +209,7 @@ export default function TeamRoster({ color, roster, setRoster }) {
             {isEditingName ? (
               <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
                 <input
+                  ref={nameInputRef}
                   type="text"
                   value={roster.name}
                   onChange={(event) =>
@@ -102,18 +218,28 @@ export default function TeamRoster({ color, roster, setRoster }) {
                       name: event.target.value.toUpperCase(),
                     }))
                   }
-                  onBlur={() => setIsEditingName(false)}
+                  autoFocus
+                  onBlur={saveEditingName}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
-                      setIsEditingName(false);
+                      event.preventDefault();
+                      saveEditingName();
                     }
                   }}
-                  placeholder="Team Name"
+                  placeholder={nameSnapshot || "Team Name"}
                   className={`min-w-0 flex-1 bg-transparent text-[16px] font-extrabold uppercase tracking-[0.08em] text-white outline-none sm:text-[22px] ${teamRingClass}`}
                 />
                 <button
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => setIsEditingName(false)}
+                  onClick={cancelEditingName}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-zinc-300 transition-colors hover:bg-white/8 hover:text-white"
+                  aria-label={`Cancel editing ${nameSnapshot || roster.name} name`}
+                >
+                  <FaTimes size={12} />
+                </button>
+                <button
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={saveEditingName}
                   className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${badgeClass}`}
                   aria-label={`Save ${roster.name} name`}
                 >
@@ -128,7 +254,7 @@ export default function TeamRoster({ color, roster, setRoster }) {
                   {roster.name}
                 </h2>
                 <button
-                  onClick={() => setIsEditingName(true)}
+                  onClick={beginEditingName}
                   className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors hover:scale-105 ${badgeClass}`}
                   aria-label={`Edit ${roster.name} name`}
                 >
@@ -140,15 +266,32 @@ export default function TeamRoster({ color, roster, setRoster }) {
           <p className="mt-2 text-sm text-zinc-500">Set players and names.</p>
         </div>
 
-        <button
-          onClick={() => setIsEditing((current) => !current)}
-          className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] transition-colors hover:bg-white/[0.08] ${
-            isEditing ? "text-emerald-400" : "text-zinc-300"
-          }`}
-          aria-label={isEditing ? "Finish editing roster" : "Edit roster"}
-        >
-          {isEditing ? <FaCheck size={18} /> : <FaPen size={16} />}
-        </button>
+        {isEditing ? (
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              onClick={cancelEditingRoster}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white"
+              aria-label="Cancel editing roster"
+            >
+              <FaTimes size={16} />
+            </button>
+            <button
+              onClick={saveEditingRoster}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-emerald-400 transition-colors hover:bg-white/[0.08]"
+              aria-label="Finish editing roster"
+            >
+              <FaCheck size={18} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={beginEditingRoster}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-300 transition-colors hover:bg-white/[0.08]"
+            aria-label="Edit roster"
+          >
+            <FaUserPlus size={16} />
+          </button>
+        )}
       </div>
 
       <div className="mt-5 flex items-center justify-between rounded-[24px] border border-white/6 bg-white/[0.04] px-4 py-4">
@@ -167,8 +310,13 @@ export default function TeamRoster({ color, roster, setRoster }) {
           >
             <span className="text-[1.25rem] font-medium leading-none">−</span>
           </button>
-          <span className="w-8 text-center text-3xl font-black text-white">
-            {roster.players.length}
+          <span className="inline-flex w-8 items-center justify-center text-center text-3xl font-black text-white tabular-nums [font-variant-numeric:tabular-nums]">
+            <RollingDigitText
+              text={String(roster.players.length)}
+              valueNumber={Number(roster.players.length || 0)}
+              trackingClass=""
+              digitWidthClass="w-[0.58em]"
+            />
           </span>
           <button
             onClick={addPlayer}
@@ -204,10 +352,14 @@ export default function TeamRoster({ color, roster, setRoster }) {
                   className="flex items-center gap-3"
                 >
                   <input
+                    ref={(element) => {
+                      playerInputRefs.current[index] = element;
+                    }}
                     type="text"
                     value={player}
                     onChange={(event) => updatePlayer(index, event.target.value)}
-                    placeholder={`Player ${index + 1}`}
+                    onFocus={() => handlePlayerFocus(index)}
+                    placeholder={rosterSnapshot?.players?.[index] || `Player ${index + 1}`}
                     className={`flex-1 rounded-2xl border border-white/5 bg-white/[0.04] px-4 py-3 text-[16px] text-white outline-none transition focus:ring-2 ${teamRingClass}`}
                   />
                   <button

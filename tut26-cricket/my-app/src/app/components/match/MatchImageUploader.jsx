@@ -14,6 +14,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FaArrowLeft,
   FaArrowRight,
+  FaEye,
+  FaEyeSlash,
   FaImage,
   FaPlus,
   FaShieldAlt,
@@ -132,6 +134,20 @@ function getPlannedGalleryCount({
   }
 
   return existingCount + nextSelectedCount;
+}
+
+async function prepareUploadFiles(selectedFiles = [], onProgress) {
+  const files = Array.isArray(selectedFiles) ? selectedFiles : [];
+  let preparedCount = 0;
+
+  return Promise.all(
+    files.map(async (selectedFile) => {
+      const compressedFile = await compressMatchImage(selectedFile);
+      preparedCount += 1;
+      onProgress?.(preparedCount, files.length);
+      return compressedFile;
+    }),
+  );
 }
 
 function SelectedImageTile({
@@ -406,6 +422,7 @@ export default function MatchImageUploader({
   onComplete,
   onSkip,
   onRequestClose,
+  protectedPin = "",
   promptForUploadPin = false,
   title = "Add Match Image",
   primaryLabel = "Upload Image",
@@ -436,6 +453,7 @@ export default function MatchImageUploader({
   const [pendingProtectedAction, setPendingProtectedAction] = useState(null);
   const [error, setError] = useState("");
   const [showPinPrompt, setShowPinPrompt] = useState(false);
+  const [showProtectedPin, setShowProtectedPin] = useState(false);
   const [showDiscardPrompt, setShowDiscardPrompt] = useState(false);
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState(null);
   const [uploadStatusText, setUploadStatusText] = useState("");
@@ -443,6 +461,8 @@ export default function MatchImageUploader({
   const pinInputRef = useRef(null);
   const browseModeRef = useRef("replace");
   const selectedItemsRef = useRef([]);
+  const providedProtectedPin = String(protectedPin || "").trim();
+  const hasProvidedProtectedPin = providedProtectedPin.length > 0;
 
   const selectedFiles = useMemo(
     () => selectedItems.map((item) => item.file),
@@ -640,6 +660,7 @@ export default function MatchImageUploader({
   const requestProtectedAction = useCallback((action) => {
     setPin("");
     setError("");
+    setShowProtectedPin(false);
     setPendingProtectedAction(action);
     setShowPinPrompt(true);
   }, []);
@@ -650,6 +671,7 @@ export default function MatchImageUploader({
     }
 
     setShowPinPrompt(false);
+    setShowProtectedPin(false);
     setPendingProtectedAction(null);
     setPin("");
     setError("");
@@ -701,16 +723,23 @@ export default function MatchImageUploader({
     closeProtectedActionPrompt();
   }, [closeProtectedActionPrompt, isSubmitting, pin]);
 
+  const isAcceptedPinLength = useCallback((pinValue, digitCount) => {
+    const safeLength = String(pinValue || "").trim().length;
+    return safeLength === digitCount || safeLength === 6;
+  }, []);
+
   const executeUpload = useCallback(
     async (pinOverride = "") => {
       if (!selectedFiles.length || isSubmitting) {
         return;
       }
 
-      const submittedPin = String(pinOverride || pin || "").trim();
+      const submittedPin = String(
+        pinOverride || providedProtectedPin || pin || "",
+      ).trim();
       if (
         (promptForUploadPin || Boolean(submittedPin)) &&
-        submittedPin.length !== uploadPinConfig.digitCount
+        !isAcceptedPinLength(submittedPin, uploadPinConfig.digitCount)
       ) {
         requestProtectedAction({ type: "upload" });
         return;
@@ -718,21 +747,30 @@ export default function MatchImageUploader({
 
       setSubmitMode("upload");
       setShowPinPrompt(
-        (current) => current || Boolean(submittedPin),
+        (current) =>
+          current || (!hasProvidedProtectedPin && Boolean(submittedPin)),
       );
       setError("");
       try {
         let latestPayload = null;
         const totalUploads = selectedFiles.length;
-
-        for (const [index, selectedFile] of selectedFiles.entries()) {
+        const preparedFiles = await (async () => {
           setUploadStatusText(
             totalUploads > 1
-              ? `Preparing ${index + 1}/${totalUploads}...`
+              ? `Preparing 0/${totalUploads}...`
               : "Preparing...",
           );
-          const compressedFile = await compressMatchImage(selectedFile);
 
+          return prepareUploadFiles(selectedFiles, (preparedCount, totalCount) => {
+            setUploadStatusText(
+              totalCount > 1
+                ? `Preparing ${preparedCount}/${totalCount}...`
+                : "Preparing...",
+            );
+          });
+        })();
+
+        for (const [index, compressedFile] of preparedFiles.entries()) {
           setUploadStatusText(
             totalUploads > 1
               ? `Uploading ${index + 1}/${totalUploads}...`
@@ -786,9 +824,12 @@ export default function MatchImageUploader({
     },
     [
       activeExistingItem?.id,
+      hasProvidedProtectedPin,
+      isAcceptedPinLength,
       isSubmitting,
       matchId,
       pin,
+      providedProtectedPin,
       plannedGalleryCount,
       promptForUploadPin,
       replaceTargetId,
@@ -811,12 +852,15 @@ export default function MatchImageUploader({
       setError("");
 
       try {
+        const submittedPin = String(
+          pinOverride || providedProtectedPin || pin || "",
+        ).trim();
         const response = await fetch(`/api/matches/${matchId}/image`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             imageId: String(imageId || "").trim(),
-            pin: String(pinOverride || pin || "").trim(),
+            pin: submittedPin,
           }),
         });
         const payload = await response.json().catch(() => ({}));
@@ -845,6 +889,7 @@ export default function MatchImageUploader({
       isSubmitting,
       matchId,
       pin,
+      providedProtectedPin,
       requestProtectedAction,
       resetSelectedFiles,
       syncGalleryFromPayload,
@@ -861,12 +906,15 @@ export default function MatchImageUploader({
       setError("");
 
       try {
+        const submittedPin = String(
+          pinOverride || providedProtectedPin || pin || "",
+        ).trim();
         const response = await fetch(`/api/matches/${matchId}/image`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             imageIds: nextImageIds,
-            pin: String(pinOverride || pin || "").trim(),
+            pin: submittedPin,
           }),
         });
         const payload = await response.json().catch(() => ({}));
@@ -893,7 +941,14 @@ export default function MatchImageUploader({
         setSubmitMode("");
       }
     },
-    [isSubmitting, matchId, pin, requestProtectedAction, syncGalleryFromPayload],
+    [
+      isSubmitting,
+      matchId,
+      pin,
+      providedProtectedPin,
+      requestProtectedAction,
+      syncGalleryFromPayload,
+    ],
   );
 
   const protectedPinConfig = getImagePinPromptConfig({
@@ -973,15 +1028,17 @@ export default function MatchImageUploader({
       return;
     }
 
-    if (promptForUploadPin) {
+    if (promptForUploadPin && !hasProvidedProtectedPin) {
       requestProtectedAction({ type: "upload" });
       return;
     }
 
-    void executeUpload();
+    void executeUpload(providedProtectedPin);
   }, [
     executeUpload,
+    hasProvidedProtectedPin,
     isSubmitting,
+    providedProtectedPin,
     promptForUploadPin,
     requestProtectedAction,
     selectedItems.length,
@@ -1010,8 +1067,19 @@ export default function MatchImageUploader({
 
     const nextImageId = deleteConfirmTarget.id;
     setDeleteConfirmTarget(null);
+    if (hasProvidedProtectedPin) {
+      void executeRemoveImage(nextImageId, providedProtectedPin);
+      return;
+    }
     requestProtectedAction({ type: "remove", imageId: nextImageId });
-  }, [deleteConfirmTarget, isSubmitting, requestProtectedAction]);
+  }, [
+    deleteConfirmTarget,
+    executeRemoveImage,
+    hasProvidedProtectedPin,
+    isSubmitting,
+    providedProtectedPin,
+    requestProtectedAction,
+  ]);
 
   const handleMoveExistingImage = useCallback(
     (imageId, direction) => {
@@ -1030,13 +1098,28 @@ export default function MatchImageUploader({
       const [movedImage] = nextImages.splice(currentIndex, 1);
       nextImages.splice(nextIndex, 0, movedImage);
 
+      if (hasProvidedProtectedPin) {
+        void executeReorderImages(
+          nextImages.map((image) => image.id),
+          imageId,
+          providedProtectedPin,
+        );
+        return;
+      }
+
       requestProtectedAction({
         type: "reorder",
         imageIds: nextImages.map((image) => image.id),
         focusImageId: imageId,
       });
     },
-    [galleryItems, requestProtectedAction],
+    [
+      executeReorderImages,
+      galleryItems,
+      hasProvidedProtectedPin,
+      providedProtectedPin,
+      requestProtectedAction,
+    ],
   );
 
   const showGallerySection = galleryItems.length > 0;
@@ -1280,35 +1363,61 @@ export default function MatchImageUploader({
                   >
                     {protectedPinConfig.label}
                   </label>
-                  <input
-                    ref={pinInputRef}
-                    id={`match-image-pin-${matchId}`}
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={protectedPinConfig.digitCount}
-                    value={pin}
-                    disabled={isSubmitting || imagePinRateLimit.isBlocked}
-                    onChange={(event) => {
-                      setPin(
-                        event.target.value
-                          .replace(/\D/g, "")
-                          .slice(0, protectedPinConfig.digitCount),
-                      );
-                      if (error) {
-                        setError("");
+                  <div className="relative">
+                    <input
+                      ref={pinInputRef}
+                      id={`match-image-pin-${matchId}`}
+                      type={
+                        protectedPinConfig.digitCount === 6 &&
+                        protectedPinConfig.usesManagePin &&
+                        !showProtectedPin
+                          ? "password"
+                          : "text"
                       }
-                    }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      handleProtectedSubmit();
-                    }
-                  }}
-                  placeholder={protectedPinConfig.placeholder}
-                  className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-amber-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(251,191,36,0.08)]"
-                />
-              </div>
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={protectedPinConfig.digitCount}
+                      value={pin}
+                      disabled={isSubmitting || imagePinRateLimit.isBlocked}
+                      onChange={(event) => {
+                        setPin(
+                          event.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, protectedPinConfig.digitCount),
+                        );
+                        if (error) {
+                          setError("");
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          handleProtectedSubmit();
+                        }
+                      }}
+                      placeholder={protectedPinConfig.placeholder}
+                      className={`w-full rounded-2xl border border-white/10 bg-white/[0.05] py-4 text-center text-2xl font-semibold tracking-[0.55em] text-white outline-none transition placeholder:tracking-[0.35em] placeholder:text-zinc-500 focus:border-amber-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(251,191,36,0.08)] ${
+                        protectedPinConfig.digitCount === 6 &&
+                        protectedPinConfig.usesManagePin
+                          ? "pl-4 pr-14"
+                          : "px-4"
+                      }`}
+                    />
+                    {protectedPinConfig.digitCount === 6 &&
+                    protectedPinConfig.usesManagePin ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowProtectedPin((current) => !current)}
+                        className="absolute right-3 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
+                        aria-label={
+                          showProtectedPin ? "Hide PIN digits" : "Show PIN digits"
+                        }
+                      >
+                        {showProtectedPin ? <FaEyeSlash /> : <FaEye />}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
 
                 {pinPromptError ? (
                   <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">

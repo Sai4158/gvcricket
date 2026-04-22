@@ -9,7 +9,7 @@
  * Read next: ./README.md
  */
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   FaArrowRight,
@@ -29,7 +29,9 @@ import {
 } from "../shared/SafeMatchImage";
 import MatchImageCarousel from "../shared/MatchImageCarousel";
 import { primeUiAudio } from "../../lib/page-audio";
-import { getWinningInningsSummary } from "../../lib/match-result-display";
+
+const CARD_MANAGE_HOLD_MS = 2500;
+const CARD_HOLD_MOVE_THRESHOLD_PX = 16;
 
 function buildStatusMeta(session) {
   const isLive = Boolean(session.isLive);
@@ -105,11 +107,36 @@ function SessionCard({
   const router = useRouter();
   const { startNavigation } = useRouteFeedback();
   const cardRef = useRef(null);
+  const manageHoldTimerRef = useRef(null);
+  const manageHoldPointerStartRef = useRef(null);
+  const suppressCardClickUntilRef = useRef(0);
   const [shouldLoadGallery, setShouldLoadGallery] = useState(false);
+  const [galleryImages, setGalleryImages] = useState([]);
   const isLive = session.isLive;
   const statusMeta = buildStatusMeta(session);
-  const matchImages = Array.isArray(session.matchImages) ? session.matchImages : [];
-  const cardImage = matchImages[0]?.url || session.matchImageUrl || "";
+  const matchImages = useMemo(
+    () => (Array.isArray(session.matchImages) ? session.matchImages : []),
+    [session.matchImages]
+  );
+  const cardImage =
+    session.coverImageUrl || matchImages[0]?.url || session.matchImageUrl || "";
+  const baseGalleryImages = useMemo(
+    () =>
+      matchImages.length
+        ? matchImages
+        : cardImage
+          ? [{ id: "cover", url: cardImage }]
+          : [],
+    [cardImage, matchImages]
+  );
+  const imageCount = Math.max(
+    0,
+    Number(session.imageCount || matchImages.length || (cardImage ? 1 : 0))
+  );
+  const shouldRenderGallery = shouldLoadGallery || baseGalleryImages.length > 1;
+  const resolvedGalleryImages = galleryImages.length
+    ? galleryImages
+    : baseGalleryImages;
   const hasUploadedCardImage =
     resolveSafeMatchImage(cardImage) !== GV_MATCH_FALLBACK_IMAGE;
   const scoreHref =
@@ -124,8 +151,14 @@ function SessionCard({
       : "";
   const dateLabel = formatSessionDateLabel(session);
   const canOpenCard = Boolean(scoreHref);
-  const winningInningsSummary =
-    !isLive && session.result ? getWinningInningsSummary(session) : null;
+  const winningSummary =
+    !isLive && session.result
+      ? {
+          teamName: session.winningTeamName || "",
+          score: Number(session.winningScore || 0),
+          wickets: Number(session.winningWickets || 0),
+        }
+      : null;
   const hasScoreCard = Boolean(
     session.match &&
       (isLive ||
@@ -133,28 +166,35 @@ function SessionCard({
         Number(session.outs || 0) > 0 ||
         session.result)
   );
-  const displayScore = winningInningsSummary
-    ? winningInningsSummary.score
+  const displayScore = winningSummary
+    ? winningSummary.score
     : Number.isFinite(Number(session.score))
     ? Number(session.score)
     : 0;
-  const displayOuts = winningInningsSummary
-    ? winningInningsSummary.wickets
+  const displayOuts = winningSummary
+    ? winningSummary.wickets
     : Number.isFinite(Number(session.outs))
     ? Number(session.outs)
     : 0;
-  const scoreValue = winningInningsSummary
-    ? `${displayScore.toLocaleString()}/${displayOuts}`
-    : displayScore.toLocaleString();
-  const scoreMetaLabel = isLive ? "Runs" : winningInningsSummary ? "Winner" : "Final";
+  const hasSplitScore = winningSummary || displayOuts > 0;
+  const scoreMetaLabel = isLive ? "Runs" : winningSummary ? "Winner" : "Final";
   const scoreDetailLabel =
-    winningInningsSummary?.teamName
-      ? winningInningsSummary.teamName
+    winningSummary?.teamName
+      ? winningSummary.teamName
       : displayOuts > 0
       ? `${displayOuts} ${displayOuts === 1 ? "WKT" : "WKTS"}`
       : !isLive && session.result
       ? "RESULT"
       : "";
+
+  useEffect(() => {
+    return () => {
+      if (manageHoldTimerRef.current) {
+        window.clearTimeout(manageHoldTimerRef.current);
+        manageHoldTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!hasUploadedCardImage || shouldLoadGallery) {
@@ -190,6 +230,46 @@ function SessionCard({
     };
   }, [hasUploadedCardImage, shouldLoadGallery]);
 
+  useEffect(() => {
+    if (
+      !shouldLoadGallery ||
+      !session?._id ||
+      imageCount <= 1 ||
+      galleryImages.length > 1
+    ) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+
+    void fetch(`/api/sessions/${session._id}/view-media`, {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-store",
+      },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          return null;
+        }
+
+        return response.json().catch(() => null);
+      })
+      .then((payload) => {
+        if (!payload || !Array.isArray(payload.matchImages) || !payload.matchImages.length) {
+          return;
+        }
+
+        setGalleryImages(payload.matchImages);
+      })
+      .catch(() => {});
+
+    return () => {
+      controller.abort();
+    };
+  }, [galleryImages.length, imageCount, session?._id, shouldLoadGallery]);
+
   const handleCardOpen = () => {
     if (!scoreHref || shouldBlockCardOpen?.()) {
       return;
@@ -197,7 +277,53 @@ function SessionCard({
 
     void primeUiAudio().catch(() => {});
     startNavigation(isLive ? "Opening live score..." : "Opening final score...");
-    router.push(scoreHref);
+    router.push(scoreHref, { scroll: true });
+  };
+
+  const clearManageHoldTimer = () => {
+    if (manageHoldTimerRef.current) {
+      window.clearTimeout(manageHoldTimerRef.current);
+      manageHoldTimerRef.current = null;
+    }
+  };
+
+  const handleManageHoldStart = (event) => {
+    if (
+      selectionMode ||
+      event.button !== 0 ||
+      (event.target instanceof Element &&
+        event.target.closest("button,a,input,textarea,select,label"))
+    ) {
+      return;
+    }
+
+    clearManageHoldTimer();
+    manageHoldPointerStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+    };
+
+    manageHoldTimerRef.current = window.setTimeout(() => {
+      suppressCardClickUntilRef.current = Date.now() + 700;
+      onImageHold?.(session);
+    }, CARD_MANAGE_HOLD_MS);
+  };
+
+  const handleManageHoldMove = (event) => {
+    if (!manageHoldPointerStartRef.current) {
+      return;
+    }
+
+    const deltaX = Math.abs(event.clientX - manageHoldPointerStartRef.current.x);
+    const deltaY = Math.abs(event.clientY - manageHoldPointerStartRef.current.y);
+    if (deltaX > CARD_HOLD_MOVE_THRESHOLD_PX || deltaY > CARD_HOLD_MOVE_THRESHOLD_PX) {
+      clearManageHoldTimer();
+    }
+  };
+
+  const handleManageHoldEnd = () => {
+    manageHoldPointerStartRef.current = null;
+    clearManageHoldTimer();
   };
 
   return (
@@ -214,6 +340,7 @@ function SessionCard({
       }
       onClick={(event) => {
         if (
+          Date.now() < suppressCardClickUntilRef.current ||
           (!canOpenCard && !selectionMode) ||
           (event.target instanceof Element &&
             event.target.closest("button,a,input,textarea,select,label"))
@@ -239,6 +366,11 @@ function SessionCard({
           handleCardOpen();
         }
       }}
+      onPointerDownCapture={handleManageHoldStart}
+      onPointerMoveCapture={handleManageHoldMove}
+      onPointerUpCapture={handleManageHoldEnd}
+      onPointerLeave={handleManageHoldEnd}
+      onPointerCancelCapture={handleManageHoldEnd}
       className={`group relative overflow-hidden rounded-[24px] border p-6 shadow-[0_22px_70px_rgba(0,0,0,0.28)] transition-all select-none [touch-action:pan-y] hover:-translate-y-1 hover:border-white/18 ${
         isLive
           ? "border-rose-300/18 bg-[radial-gradient(circle_at_top_left,rgba(244,63,94,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(190,24,93,0.08),transparent_34%),linear-gradient(180deg,rgba(24,12,16,0.98),rgba(7,10,12,0.98))]"
@@ -307,8 +439,20 @@ function SessionCard({
             </span>
             {hasScoreCard ? (
               <div className="pointer-events-none absolute right-0 top-[3.1rem] text-right">
-                <p className="text-[2.05rem] font-black leading-none tracking-tight text-amber-300 sm:text-[2.3rem]">
-                  {scoreValue}
+                <p className="inline-flex items-end justify-end gap-0.5 leading-none tracking-tight">
+                  <span className="text-[2.4rem] font-black text-emerald-400 sm:text-[2.7rem]">
+                    {displayScore.toLocaleString()}
+                  </span>
+                  {hasSplitScore ? (
+                    <>
+                      <span className="pb-[0.08em] text-[1.45rem] font-black text-amber-300 sm:text-[1.55rem]">
+                        /
+                      </span>
+                      <span className="text-[2.05rem] font-black text-rose-500 sm:text-[2.3rem]">
+                        {displayOuts}
+                      </span>
+                    </>
+                  ) : null}
                 </p>
                 <p className="mt-1 text-[0.92rem] font-black uppercase leading-none tracking-tight text-amber-300">
                   {scoreMetaLabel}
@@ -316,11 +460,11 @@ function SessionCard({
                 {scoreDetailLabel ? (
                   <p
                     className={`mt-1 text-[10px] font-semibold text-zinc-400 ${
-                      winningInningsSummary?.teamName
+                      winningSummary?.teamName
                         ? "normal-case tracking-[0.04em] text-zinc-300"
                         : "uppercase tracking-[0.2em]"
                     }`}
-                    title={winningInningsSummary?.teamName || undefined}
+                    title={winningSummary?.teamName || undefined}
                   >
                     {scoreDetailLabel}
                   </p>
@@ -368,7 +512,7 @@ function SessionCard({
           <div className="relative mt-6 overflow-hidden rounded-[20px] border border-white/8 bg-black/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-[linear-gradient(180deg,rgba(0,0,0,0.72),rgba(0,0,0,0))] px-4 py-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-zinc-300/85">
-                {matchImages.length > 1 ? "Match images" : "Match image"}
+                {imageCount > 1 ? "Match images" : "Match image"}
               </p>
             </div>
             <div
@@ -377,22 +521,18 @@ function SessionCard({
               onPointerLeave={(event) => event.stopPropagation()}
               onPointerCancel={(event) => event.stopPropagation()}
             >
-              {shouldLoadGallery ? (
+              {shouldRenderGallery ? (
                 <MatchImageCarousel
-                  images={matchImages.length ? matchImages : [{ id: "cover", url: cardImage }]}
+                  images={resolvedGalleryImages}
                   alt={`${session.name || "Session"} match image`}
                   compact
                   className="relative"
-                  autoPlayDelayMs={1000}
-                  autoPlayInitialDelayMs={1000}
+                  autoPlay={resolvedGalleryImages.length > 1}
+                  autoPlayDelayMs={1700}
+                  autoPlayInitialDelayMs={850}
                   transitionStyle="slide"
                   imageClassName="object-cover object-center"
                   fallbackClassName="object-cover object-center"
-                  onImageHold={(image, index, event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onImageHold?.(session, image, index);
-                  }}
                 />
               ) : (
                 <div className="relative aspect-[16/8.8] w-full overflow-hidden bg-[linear-gradient(180deg,rgba(22,22,28,0.9),rgba(10,10,14,0.96))]">

@@ -95,18 +95,21 @@ export function normalizeLegacyTossState(match, fallbackState = null) {
     return match;
   }
 
-  const tossWinner = getResolvedTossWinner(match, fallbackState);
-  const tossDecision = getResolvedTossDecision(match, fallbackState);
+  const sourceMatch =
+    typeof match?.toObject === "function" ? match.toObject() : match;
+
+  const tossWinner = getResolvedTossWinner(sourceMatch, fallbackState);
+  const tossDecision = getResolvedTossDecision(sourceMatch, fallbackState);
   const battingFirst = getBattingFirstTeamName(
-    { ...match, tossWinner, tossDecision },
+    { ...sourceMatch, tossWinner, tossDecision },
     fallbackState
   );
   const bowlingFirst = getBowlingFirstTeamName(
-    { ...match, tossWinner, tossDecision },
+    { ...sourceMatch, tossWinner, tossDecision },
     fallbackState
   );
-  const innings1 = buildEmptyInnings(match.innings1);
-  const innings2 = buildEmptyInnings(match.innings2);
+  const innings1 = buildEmptyInnings(sourceMatch.innings1);
+  const innings2 = buildEmptyInnings(sourceMatch.innings2);
 
   if (!innings1.team && battingFirst) {
     innings1.team = battingFirst;
@@ -117,7 +120,7 @@ export function normalizeLegacyTossState(match, fallbackState = null) {
   }
 
   return {
-    ...match,
+    ...sourceMatch,
     tossWinner,
     tossDecision,
     innings1,
