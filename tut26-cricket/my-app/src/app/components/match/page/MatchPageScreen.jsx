@@ -114,6 +114,7 @@ export default function MatchPageClient({
   const [activeCommentaryAction, setActiveCommentaryAction] = useState("");
   const [activeCommentaryPreviewId, setActiveCommentaryPreviewId] =
     useState("");
+  const [scoreTapIndicatorKey, setScoreTapIndicatorKey] = useState("score");
   const localAnnouncementIdRef = useRef(0);
   const lastWalkieRequestSignatureRef = useRef("");
   const umpireAnnouncementTimerRef = useRef(null);
@@ -1342,6 +1343,7 @@ export default function MatchPageClient({
       return false;
     }
 
+    setScoreTapIndicatorKey(controlKey);
     armScoreTapCooldown(controlKey);
 
     if (activeBoundarySequenceRef.current || soundEffectPlayingRef.current) {
@@ -1656,6 +1658,7 @@ export default function MatchPageClient({
       return;
     }
 
+    setScoreTapIndicatorKey(UNDO_CONTROL_KEY);
     armScoreControlCooldown(UNDO_CONTROL_KEY);
     cancelBoundarySequence({ stopEffect: true });
     const undoEvent = createUndoLiveEvent(match);
@@ -2043,6 +2046,7 @@ export default function MatchPageClient({
       return;
     }
 
+    setScoreTapIndicatorKey(UNDO_CONTROL_KEY);
     armScoreControlCooldown(UNDO_CONTROL_KEY);
     setStageCardUndoPending(true);
     dismissVisibleStageCard();
@@ -2230,6 +2234,7 @@ export default function MatchPageClient({
         prime,
         replaceMatch,
         scoreControlDisabledKeys: scoreControlCooldowns,
+        scoreTapIndicatorKey,
         setEntryScoreAnnouncementsEnabled,
         setEntryScoreSoundEffectsEnabled,
         setInfoText,

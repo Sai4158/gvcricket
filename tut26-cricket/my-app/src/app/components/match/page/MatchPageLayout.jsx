@@ -85,6 +85,7 @@ export default function MatchPageLayout({
   setInfoText,
   setModal,
   scoreControlDisabledKeys,
+  scoreTapIndicatorKey,
   setSoundEffectsOpen,
   setStageContinuePrompt,
   showCompactUmpireWalkie,
@@ -258,6 +259,7 @@ export default function MatchPageLayout({
             activeOverBalls={match?.activeOverBalls}
             activeOverNumber={match?.activeOverNumber || currentOverNumber}
             disabledKeys={scoreControlDisabledKeys}
+            tapIndicatorKey={scoreTapIndicatorKey}
           />
           <Controls
             onScore={handleAnnouncedScoreEvent}
