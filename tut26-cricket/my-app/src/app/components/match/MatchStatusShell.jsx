@@ -182,11 +182,22 @@ function RollingDigitText({
         const shouldAnimate =
           transitionState.isTransitioning && previousCharacter !== character;
         const placeholderCharacter = character || previousCharacter || "0";
+        const stableCharacter = character || "_";
+        const stablePreviousCharacter = previousCharacter || "_";
+        const slotKeyBase = [
+          transitionState.animationKey,
+          transitionState.previousText,
+          transitionState.currentText,
+          previousIndex,
+          index,
+          stablePreviousCharacter,
+          stableCharacter,
+        ].join(":");
 
         if (!shouldAnimate) {
           return (
             <span
-              key={`slot:${index}:${character}`}
+              key={`slot:static:${slotKeyBase}`}
               className={`relative inline-flex h-[1em] items-center justify-center overflow-hidden align-baseline ${slotWidthClass}`}
             >
               <span className="pointer-events-none select-none opacity-0">
@@ -201,14 +212,14 @@ function RollingDigitText({
 
         return (
           <span
-            key={`slot:${transitionState.animationKey}:${index}`}
+            key={`slot:animated:${slotKeyBase}`}
             className={`relative inline-flex h-[1em] items-center justify-center overflow-hidden align-baseline ${slotWidthClass}`}
           >
             <span className="pointer-events-none select-none opacity-0">
               {placeholderCharacter}
             </span>
             <motion.span
-              key={`previous:${transitionState.animationKey}:${index}`}
+              key={`previous:${slotKeyBase}`}
               initial={{ opacity: 1, y: "0%" }}
               animate={{
                 opacity: 0,
@@ -224,7 +235,7 @@ function RollingDigitText({
               {previousCharacter}
             </motion.span>
             <motion.span
-              key={`current:${transitionState.animationKey}:${index}`}
+              key={`current:${slotKeyBase}`}
               initial={{
                 opacity: 0,
                 y: slotDirection >= 0 ? "112%" : "-112%",

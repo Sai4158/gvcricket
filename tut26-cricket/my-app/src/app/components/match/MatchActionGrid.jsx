@@ -473,7 +473,6 @@ function ActionIconButton({
 }
 
 const MatchActionGrid = memo(function MatchActionGrid({
-  isUpdating,
   historyStackLength,
   onEditTeams,
   onEditOvers,
@@ -635,7 +634,6 @@ const MatchActionGrid = memo(function MatchActionGrid({
             icon={<FaUserEdit />}
             label="Edit teams"
             colorClass="text-sky-400"
-            disabled={isUpdating}
             compact
           />
           <ActionIconButton
@@ -644,7 +642,6 @@ const MatchActionGrid = memo(function MatchActionGrid({
             icon={<FaRegClock />}
             label={editOversLabel}
             colorClass="text-amber-400"
-            disabled={isUpdating}
             compact
           />
           <ActionIconButton

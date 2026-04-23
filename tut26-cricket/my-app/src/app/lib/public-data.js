@@ -167,6 +167,154 @@ function getCompactOverStateFromBalls(match) {
   };
 }
 
+function cloneHistory(history = []) {
+  return (Array.isArray(history) ? history : []).map((over) => ({
+    ...over,
+    balls: Array.isArray(over?.balls)
+      ? over.balls.map((ball) => ({ ...ball }))
+      : [],
+  }));
+}
+
+function rebuildHistoryFromBalls(balls = []) {
+  if (!Array.isArray(balls) || !balls.length) {
+    return [];
+  }
+
+  const reconstructedMatch = {
+    innings: "first",
+    innings1: { history: [] },
+    innings2: { history: [] },
+  };
+
+  for (const ball of balls) {
+    addBallToHistory(reconstructedMatch, { ...ball });
+  }
+
+  return cloneHistory(reconstructedMatch?.innings1?.history || []);
+}
+
+function hasMeaningfulHistory(innings) {
+  return Array.isArray(innings?.history) && innings.history.length > 0;
+}
+
+function getStoredInningsLegalBallCount(match, inningsKey) {
+  const fieldName =
+    inningsKey === "innings2"
+      ? "secondInningsLegalBallCount"
+      : "firstInningsLegalBallCount";
+  const legalBallCount = Number(match?.[fieldName]);
+
+  return Number.isFinite(legalBallCount) && legalBallCount >= 0
+    ? legalBallCount
+    : 0;
+}
+
+function recoverHistoryFromSnapshot(snapshot, inningsKey) {
+  if (!snapshot || typeof snapshot !== "object") {
+    return [];
+  }
+
+  const directHistory = cloneHistory(snapshot?.[inningsKey]?.history || []);
+  if (directHistory.length) {
+    return directHistory;
+  }
+
+  const snapshotInningsKey =
+    snapshot?.innings === "second" ? "innings2" : "innings1";
+  if (snapshotInningsKey !== inningsKey) {
+    return [];
+  }
+
+  return rebuildHistoryFromBalls(snapshot?.balls || []);
+}
+
+function recoverHistoryFromActionHistory(match, inningsKey) {
+  const actionHistory = Array.isArray(match?.actionHistory)
+    ? [...match.actionHistory].reverse()
+    : [];
+
+  for (const entry of actionHistory) {
+    const recoveredHistory = recoverHistoryFromSnapshot(entry?.snapshot, inningsKey);
+    if (recoveredHistory.length) {
+      return recoveredHistory;
+    }
+  }
+
+  return [];
+}
+
+export function recoverMatchInningsHistory(matchDocument) {
+  if (!matchDocument) {
+    return { match: null, changed: false };
+  }
+
+  const baseMatch =
+    typeof matchDocument.toObject === "function"
+      ? matchDocument.toObject()
+      : matchDocument;
+  let nextMatch = baseMatch;
+  let changed = false;
+  const activeInningsKey = getActiveInningsKey(baseMatch);
+
+  for (const inningsKey of ["innings1", "innings2"]) {
+    const innings = baseMatch?.[inningsKey] || {};
+    const needsRecovery =
+      !hasMeaningfulHistory(innings) &&
+      (
+        Number(innings?.score || 0) > 0 ||
+        getStoredInningsLegalBallCount(baseMatch, inningsKey) > 0
+      );
+
+    if (!needsRecovery) {
+      continue;
+    }
+
+    let recoveredHistory = [];
+
+    if (
+      inningsKey === activeInningsKey &&
+      Array.isArray(baseMatch?.balls) &&
+      baseMatch.balls.length
+    ) {
+      recoveredHistory = rebuildHistoryFromBalls(baseMatch.balls);
+    }
+
+    if (!recoveredHistory.length) {
+      recoveredHistory = recoverHistoryFromActionHistory(baseMatch, inningsKey);
+    }
+
+    if (!recoveredHistory.length) {
+      continue;
+    }
+
+    if (!changed) {
+      nextMatch = {
+        ...baseMatch,
+        innings1: {
+          ...(baseMatch?.innings1 || {}),
+          history: cloneHistory(baseMatch?.innings1?.history || []),
+        },
+        innings2: {
+          ...(baseMatch?.innings2 || {}),
+          history: cloneHistory(baseMatch?.innings2?.history || []),
+        },
+      };
+      changed = true;
+    }
+
+    nextMatch[inningsKey] = {
+      ...(nextMatch?.[inningsKey] || {}),
+      history: recoveredHistory,
+    };
+  }
+
+  return {
+    match: changed ? nextMatch : baseMatch,
+    changed,
+  };
+}
+
 function buildUmpireInnings(match, inningsKey, includeHistory) {
   const source = match?.[inningsKey] || {};
   const innings = {
@@ -237,10 +385,7 @@ export function serializeUmpireHistory(matchDocument) {
     return null;
   }
 
-  const match =
-    typeof matchDocument.toObject === "function"
-      ? matchDocument.toObject()
-      : matchDocument;
+  const { match } = recoverMatchInningsHistory(matchDocument);
 
   return {
     innings1: buildUmpireInnings(match, "innings1", true),
@@ -278,10 +423,8 @@ export function serializeUmpireBootstrap(matchDocument, fallbackState = null) {
     return null;
   }
 
-  const rawMatch =
-    typeof matchDocument.toObject === "function"
-      ? matchDocument.toObject()
-      : matchDocument;
+  const { match: recoveredMatch } = recoverMatchInningsHistory(matchDocument);
+  const rawMatch = recoveredMatch;
   const match = normalizeLegacyTossState(rawMatch, fallbackState);
   const compactOverState = getCompactOverState(match);
   const activeInningsKey = getActiveInningsKey(match);
@@ -350,13 +493,12 @@ export function serializePublicMatch(
 ) {
   if (!matchDocument) return null;
 
-  const rawMatch =
-    typeof matchDocument.toObject === "function"
-      ? matchDocument.toObject()
-      : matchDocument;
+  const { match: recoveredMatch } = recoverMatchInningsHistory(matchDocument);
+  const rawMatch = recoveredMatch;
   const match = normalizeLegacyTossState(rawMatch, fallbackState);
   const includeActionHistory = Boolean(options.includeActionHistory);
   const publicImages = getPublicMatchImagesWithFallback(match, fallbackState);
+  const compactOverState = getCompactOverState(match);
   const announcerScoreSoundEffectMap = normalizeScoreSoundEffectMap(
     match?.announcer?.scoreSoundEffectMap ||
       fallbackState?.announcer?.scoreSoundEffectMap ||
@@ -387,6 +529,11 @@ export function serializePublicMatch(
     innings2: match.innings2 || { team: "", score: 0, history: [] },
     tossReady: hasCompleteTossState(match, fallbackState),
     balls: Array.isArray(match.balls) ? match.balls : [],
+    activeOverBalls: compactOverState.activeOverBalls,
+    activeOverNumber: compactOverState.activeOverNumber,
+    legalBallCount: compactOverState.legalBallCount,
+    firstInningsLegalBallCount: compactOverState.firstInningsLegalBallCount,
+    secondInningsLegalBallCount: compactOverState.secondInningsLegalBallCount,
     matchImageUrl: publicImages[0]?.url || getPublicMatchImagePath(match),
     matchImages: publicImages,
     announcerEnabled: Boolean(match.announcerEnabled),

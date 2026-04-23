@@ -42,14 +42,17 @@ export function getWinningInningsSummary(match = null) {
   const normalizedInnings2Team = normalizeTeamName(innings2?.team);
 
   let winningInnings = null;
+  let winningLegalBallCount = null;
 
   if (normalizedWinnerName && normalizedWinnerName === normalizedInnings1Team) {
     winningInnings = innings1;
+    winningLegalBallCount = Number(match?.firstInningsLegalBallCount);
   } else if (
     normalizedWinnerName &&
     normalizedWinnerName === normalizedInnings2Team
   ) {
     winningInnings = innings2;
+    winningLegalBallCount = Number(match?.secondInningsLegalBallCount);
   } else {
     const innings1Score = Number(innings1?.score || 0);
     const innings2Score = Number(innings2?.score || 0);
@@ -62,12 +65,22 @@ export function getWinningInningsSummary(match = null) {
       return null;
     }
 
-    winningInnings = innings2Score > innings1Score ? innings2 : innings1;
+    if (innings2Score > innings1Score) {
+      winningInnings = innings2;
+      winningLegalBallCount = Number(match?.secondInningsLegalBallCount);
+    } else {
+      winningInnings = innings1;
+      winningLegalBallCount = Number(match?.firstInningsLegalBallCount);
+    }
   }
 
   const score = Number(winningInnings?.score || 0);
   const wickets = countInningsWickets(winningInnings?.history || []);
-  const overs = calculateInningsSummary(winningInnings).overs || "0.0";
+  const overs =
+    calculateInningsSummary({
+      ...winningInnings,
+      legalBallCount: winningLegalBallCount,
+    }).overs || "0.0";
 
   return {
     teamName: winningInnings?.team || winnerName || "",

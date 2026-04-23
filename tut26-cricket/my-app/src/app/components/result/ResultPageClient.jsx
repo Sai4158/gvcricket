@@ -125,8 +125,14 @@ export default function ResultPageClient({ matchId, initialMatch }) {
     );
   }
 
-  const innings1Summary = calculateInningsSummary(match.innings1);
-  const innings2Summary = calculateInningsSummary(match.innings2);
+  const innings1Summary = calculateInningsSummary({
+    ...(match.innings1 || {}),
+    legalBallCount: Number(match?.firstInningsLegalBallCount),
+  });
+  const innings2Summary = calculateInningsSummary({
+    ...(match.innings2 || {}),
+    legalBallCount: Number(match?.secondInningsLegalBallCount),
+  });
   const winningInningsSummary = getWinningInningsSummary(match);
 
   const updateZoomedImageScale = (updater) => {

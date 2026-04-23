@@ -9,13 +9,14 @@
  * Read next: ./README.md
  */
 
-import { memo, useLayoutEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { Rajdhani } from "next/font/google";
 
 const matchControlsFont = Rajdhani({
   subsets: ["latin"],
   weight: ["600", "700"],
 });
+const TAP_PROGRESS_FADE_MS = 180;
 
 function getBallKey(ballNumber, overNumber) {
   return ["over", overNumber, "slot", ballNumber].join(":");
@@ -48,6 +49,48 @@ function calculateRunsInOver(balls = []) {
   return (Array.isArray(balls) ? balls : []).reduce((total, ball) => {
     return total + Number(ball?.runs || 0);
   }, 0);
+}
+
+function getProgressLineTheme(actionKey = "") {
+  const safeActionKey = String(actionKey || "").trim().toLowerCase();
+
+  if (safeActionKey === "dot") {
+    return {
+      base: "bg-sky-400/20",
+      active:
+        "bg-[linear-gradient(90deg,rgba(56,189,248,0.96),rgba(37,99,235,0.92))] shadow-[0_0_12px_rgba(37,99,235,0.4)]",
+    };
+  }
+
+  if (safeActionKey === "out") {
+    return {
+      base: "bg-rose-400/20",
+      active:
+        "bg-[linear-gradient(90deg,rgba(244,63,94,0.96),rgba(225,29,72,0.92))] shadow-[0_0_12px_rgba(225,29,72,0.42)]",
+    };
+  }
+
+  if (safeActionKey === "noball") {
+    return {
+      base: "bg-orange-400/20",
+      active:
+        "bg-[linear-gradient(90deg,rgba(249,115,22,0.96),rgba(234,88,12,0.92))] shadow-[0_0_12px_rgba(249,115,22,0.4)]",
+    };
+  }
+
+  if (safeActionKey === "undo") {
+    return {
+      base: "bg-zinc-200/18",
+      active:
+        "bg-[linear-gradient(90deg,rgba(228,228,231,0.92),rgba(161,161,170,0.9))] shadow-[0_0_10px_rgba(244,244,245,0.24)]",
+    };
+  }
+
+  return {
+    base: "bg-emerald-400/20",
+    active:
+      "bg-[linear-gradient(90deg,rgba(34,197,94,0.96),rgba(74,222,128,0.9))] shadow-[0_0_12px_rgba(34,197,94,0.42)]",
+  };
 }
 
 export const Ball = memo(function Ball({ ball, ballNumber }) {
@@ -95,8 +138,14 @@ export const BallTracker = memo(function BallTracker({
   history = null,
   activeOverBalls = null,
   activeOverNumber = null,
+  disabledKeys = null,
+  tapIndicatorKey = "",
 }) {
   const trackerRef = useRef(null);
+  const progressBarRef = useRef(null);
+  const progressResetTimerRef = useRef(null);
+  const progressAnimationRef = useRef(null);
+  const progressFadeAnimationRef = useRef(null);
   const fallbackOver = useMemo(
     () => (Array.isArray(history) && history.length ? history.at(-1) : null),
     [history],
@@ -152,6 +201,24 @@ export const BallTracker = memo(function BallTracker({
         .join("|"),
     [currentBalls],
   );
+  const scoreTapCooldownExpiresAt = Number(disabledKeys?.__score__ || 0);
+  const undoCooldownExpiresAt = Number(disabledKeys?.undo || 0);
+  const progressState = useMemo(() => {
+    const activeCooldownExpiresAt = Math.max(
+      scoreTapCooldownExpiresAt,
+      undoCooldownExpiresAt,
+    );
+    const isUndoAnimation = undoCooldownExpiresAt > scoreTapCooldownExpiresAt;
+    const theme = getProgressLineTheme(
+      isUndoAnimation ? "undo" : tapIndicatorKey,
+    );
+
+    return {
+      activeCooldownExpiresAt,
+      isUndoAnimation,
+      theme,
+    };
+  }, [scoreTapCooldownExpiresAt, tapIndicatorKey, undoCooldownExpiresAt]);
 
   useLayoutEffect(() => {
     const tracker = trackerRef.current;
@@ -174,8 +241,108 @@ export const BallTracker = memo(function BallTracker({
     };
   }, [resolvedOverNumber, currentBallSignature]);
 
+  useEffect(() => {
+    const progressBar = progressBarRef.current;
+    if (progressResetTimerRef.current) {
+      window.clearTimeout(progressResetTimerRef.current);
+      progressResetTimerRef.current = null;
+    }
+    if (progressAnimationRef.current) {
+      progressAnimationRef.current.cancel();
+      progressAnimationRef.current = null;
+    }
+    if (progressFadeAnimationRef.current) {
+      progressFadeAnimationRef.current.cancel();
+      progressFadeAnimationRef.current = null;
+    }
+    if (!progressBar) {
+      return undefined;
+    }
+
+    const remainingMs = Math.max(
+      progressState.activeCooldownExpiresAt - Date.now(),
+      0,
+    );
+    progressBar.style.opacity = "0";
+    progressBar.style.transform = "scaleX(0)";
+    progressBar.style.transformOrigin = progressState.isUndoAnimation
+      ? "right center"
+      : "left center";
+
+    if (remainingMs <= 0) {
+      return undefined;
+    }
+
+    progressBar.style.opacity = "1";
+    progressAnimationRef.current = progressBar.animate(
+      [
+        { transform: "scaleX(0)", opacity: 1 },
+        { transform: "scaleX(1)", opacity: 1 },
+      ],
+      {
+        duration: remainingMs,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        fill: "forwards",
+      },
+    );
+
+    progressResetTimerRef.current = window.setTimeout(() => {
+      if (progressAnimationRef.current) {
+        progressAnimationRef.current.cancel();
+        progressAnimationRef.current = null;
+      }
+      progressFadeAnimationRef.current = progressBar.animate(
+        [
+          { opacity: 1, transform: "scaleX(1)" },
+          { opacity: 0, transform: "scaleX(1)" },
+        ],
+        {
+          duration: TAP_PROGRESS_FADE_MS,
+          easing: "ease-out",
+          fill: "forwards",
+        },
+      );
+      progressFadeAnimationRef.current.onfinish = () => {
+        progressBar.style.opacity = "0";
+        progressBar.style.transform = "scaleX(0)";
+        progressFadeAnimationRef.current = null;
+      };
+      progressResetTimerRef.current = null;
+    }, remainingMs + 20);
+
+    return () => {
+      if (progressResetTimerRef.current) {
+        window.clearTimeout(progressResetTimerRef.current);
+        progressResetTimerRef.current = null;
+      }
+      if (progressAnimationRef.current) {
+        progressAnimationRef.current.cancel();
+        progressAnimationRef.current = null;
+      }
+      if (progressFadeAnimationRef.current) {
+        progressFadeAnimationRef.current.cancel();
+        progressFadeAnimationRef.current = null;
+      }
+      progressBar.style.opacity = "0";
+      progressBar.style.transform = "scaleX(0)";
+    };
+  }, [progressState]);
+
   return (
-    <div className="mb-6 rounded-2xl bg-zinc-900/50 p-4 ring-1 ring-white/10">
+    <div className="relative mb-6 overflow-hidden rounded-2xl bg-zinc-900/50 p-4 ring-1 ring-white/10">
+      <span
+        className={`pointer-events-none absolute inset-x-0 top-0 h-px ${progressState.theme.base}`}
+      />
+      <span
+        ref={progressBarRef}
+        className={`pointer-events-none absolute left-0 top-0 h-[2px] rounded-r-full ${progressState.theme.active}`}
+        style={{
+          opacity: 0,
+          transform: "scaleX(0)",
+          transformOrigin: "left center",
+          width: "100%",
+        }}
+      />
       <div
         className={`${matchControlsFont.className} mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-[0.82rem] font-bold uppercase tracking-[0.12em] text-white sm:text-[0.9rem]`}
       >

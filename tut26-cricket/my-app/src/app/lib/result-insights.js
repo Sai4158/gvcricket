@@ -54,11 +54,18 @@ function getResultMomentLabel(ball) {
   return `${ball.runs} run${toNumber(ball.runs) === 1 ? "" : "s"}`;
 }
 
-export function buildInningsInsights(innings) {
+export function buildInningsInsights(innings, options = {}) {
   const history = innings?.history || [];
   const allBalls = history.flatMap((over) => over?.balls || []);
   const wickets = allBalls.filter((ball) => ball?.isOut).length;
-  const legalBalls = countLegalBalls(history);
+  const explicitLegalBallCount = Number(
+    options?.legalBallCount ?? innings?.legalBallCount,
+  );
+  const countedLegalBalls = countLegalBalls(history);
+  const legalBalls =
+    Number.isFinite(explicitLegalBallCount) && explicitLegalBallCount >= 0
+      ? Math.max(explicitLegalBallCount, countedLegalBalls)
+      : countedLegalBalls;
   const fours = allBalls.filter((ball) => toNumber(ball?.runs) === 4).length;
   const sixes = allBalls.filter((ball) => toNumber(ball?.runs) === 6).length;
   const wideRuns = allBalls
@@ -169,8 +176,12 @@ function getBestValue(items, scorer) {
 export function buildResultInsights(match) {
   const teamA = getTeamBundle(match, "teamA");
   const teamB = getTeamBundle(match, "teamB");
-  const innings1 = buildInningsInsights(match?.innings1);
-  const innings2 = buildInningsInsights(match?.innings2);
+  const innings1 = buildInningsInsights(match?.innings1, {
+    legalBallCount: match?.firstInningsLegalBallCount,
+  });
+  const innings2 = buildInningsInsights(match?.innings2, {
+    legalBallCount: match?.secondInningsLegalBallCount,
+  });
   const tracked = buildTrackedCollections(match);
 
   const battingStats = [

@@ -121,6 +121,11 @@ export async function POST(req, { params }) {
         existingMatch.pendingResultAt = null;
         existingMatch.resultAutoFinalizeAt = null;
         existingMatch.balls = [];
+        existingMatch.activeOverBalls = [];
+        existingMatch.activeOverNumber = 1;
+        existingMatch.legalBallCount = 0;
+        existingMatch.firstInningsLegalBallCount = 0;
+        existingMatch.secondInningsLegalBallCount = 0;
         existingMatch.innings1 = {
           team: battingFirst,
           score: 0,
@@ -180,6 +185,11 @@ export async function POST(req, { params }) {
               undoCount: 0,
               undoSequence: 0,
               balls: [],
+              activeOverBalls: [],
+              activeOverNumber: 1,
+              legalBallCount: 0,
+              firstInningsLegalBallCount: 0,
+              secondInningsLegalBallCount: 0,
               matchImages: [],
               innings1: { team: battingFirst, score: 0, history: [] },
               innings2: { team: bowlingFirst, score: 0, history: [] },

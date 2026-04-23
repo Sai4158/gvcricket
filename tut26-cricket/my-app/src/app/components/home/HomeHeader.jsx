@@ -245,9 +245,9 @@ export default function HomeHeader() {
         };
 
   const linkStyles =
-    "press-feedback flex w-full items-center justify-between gap-4 rounded-2xl px-3 py-3 text-[1.6rem] leading-tight font-light text-zinc-300 transition-all duration-200 hover:bg-white/6 hover:text-white active:bg-white/10 active:text-white sm:text-2xl";
+    "press-feedback flex w-full items-center justify-between gap-4 rounded-2xl px-3 py-3 text-[1.34rem] leading-tight font-light text-zinc-300 transition-all duration-200 hover:bg-white/6 hover:text-white active:bg-white/10 active:text-white sm:text-2xl";
   const featuredLinkStyles =
-    "press-feedback flex w-full items-center justify-between gap-4 overflow-hidden rounded-[24px] border border-white/18 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.2),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(239,68,68,0.14),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.03))] px-4 py-4 text-left text-rose-50 shadow-[0_18px_36px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-xl transition-all duration-200 hover:border-white/24 hover:bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.24),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(239,68,68,0.18),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.15),rgba(255,255,255,0.05))] active:scale-[0.99] sm:text-[1.05rem]";
+    "press-feedback flex w-full items-center justify-between gap-4 overflow-hidden rounded-[24px] border border-white/18 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.2),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(239,68,68,0.14),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.03))] px-4 py-4 text-left text-[1.12rem] text-rose-50 shadow-[0_18px_36px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-xl transition-all duration-200 hover:border-white/24 hover:bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.24),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(239,68,68,0.18),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.15),rgba(255,255,255,0.05))] active:scale-[0.99] sm:text-[1.05rem]";
 
   const handleNavClick = (event, onClick) => {
     closeMenu();
@@ -369,7 +369,7 @@ export default function HomeHeader() {
                               <span>
                                 <span className="block">{link.text}</span>
                                 {link.subtext && (
-                                  <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-100/78">
+                                  <span className="mt-1 block text-[10px] font-semibold uppercase tracking-[0.24em] text-amber-100/78 sm:text-[11px] sm:tracking-[0.28em]">
                                     {link.subtext}
                                   </span>
                                 )}
@@ -395,7 +395,7 @@ export default function HomeHeader() {
                               <span className="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">
                                 <span className="block">{link.text}</span>
                                 {link.subtext && (
-                                  <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.28em] text-rose-200/82">
+                                  <span className="mt-1 block text-[10px] font-semibold uppercase tracking-[0.24em] text-rose-200/82 sm:text-[11px] sm:tracking-[0.28em]">
                                     {link.subtext}
                                   </span>
                                 )}
@@ -418,7 +418,7 @@ export default function HomeHeader() {
                             <span className="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">
                               <span className="block">{link.text}</span>
                               {link.subtext && (
-                                <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.28em] text-rose-200/82">
+                                <span className="mt-1 block text-[10px] font-semibold uppercase tracking-[0.24em] text-rose-200/82 sm:text-[11px] sm:tracking-[0.28em]">
                                   {link.subtext}
                                 </span>
                               )}

@@ -85,6 +85,7 @@ export default function MatchPageLayout({
   setInfoText,
   setModal,
   scoreControlDisabledKeys,
+  scoreTapIndicatorKey,
   setSoundEffectsOpen,
   setStageContinuePrompt,
   showCompactUmpireWalkie,
@@ -257,6 +258,8 @@ export default function MatchPageLayout({
           <BallTracker
             activeOverBalls={match?.activeOverBalls}
             activeOverNumber={match?.activeOverNumber || currentOverNumber}
+            disabledKeys={scoreControlDisabledKeys}
+            tapIndicatorKey={scoreTapIndicatorKey}
           />
           <Controls
             onScore={handleAnnouncedScoreEvent}
@@ -303,7 +306,6 @@ export default function MatchPageLayout({
             />
           ) : null}
           <MatchActionGrid
-            isUpdating={isUpdating}
             historyStackLength={currentInningsHasHistory ? historyStack.length : 0}
             onEditTeams={() => setModal({ type: "editTeams" })}
             onEditOvers={() => setModal({ type: "editOvers" })}
