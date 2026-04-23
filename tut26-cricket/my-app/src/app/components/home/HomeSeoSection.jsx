@@ -129,7 +129,8 @@ export default function HomeSeoSection() {
           >
             <div className="min-w-0">
               <h2 className="text-3xl font-semibold leading-[1.02] tracking-tight text-white md:hidden">
-                Questions about live cricket scoring? Start here.
+                Questions about live cricket scoring?
+                <span className="mt-1 block">Start here.</span>
               </h2>
               <LiquidSportText
                 as="h2"

@@ -9,9 +9,6 @@
  * Read next: ./README.md
  */
 
-
-
-
 import SiteFooter from "../../shared/SiteFooter";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -97,6 +94,7 @@ import { buildMatchScorePreview } from "./match-score-preview";
 
 const SCORE_CONTROL_COOLDOWN_MS = 1000;
 const UNDO_CONTROL_COOLDOWN_MS = 1000;
+const SCORE_CONTROL_GLOBAL_KEY = "__score__";
 const UNDO_CONTROL_KEY = "undo";
 
 export default function MatchPageClient({
@@ -109,11 +107,13 @@ export default function MatchPageClient({
   const [infoText, setInfoText] = useState(null);
   const [soundEffectsOpen, setSoundEffectsOpen] = useState(false);
   const [soundEffectFiles, setSoundEffectFiles] = useState([]);
-  const [soundEffectLibraryStatus, setSoundEffectLibraryStatus] = useState("idle");
+  const [soundEffectLibraryStatus, setSoundEffectLibraryStatus] =
+    useState("idle");
   const [soundEffectError, setSoundEffectError] = useState("");
   const [soundEffectDurations, setSoundEffectDurations] = useState({});
   const [activeCommentaryAction, setActiveCommentaryAction] = useState("");
-  const [activeCommentaryPreviewId, setActiveCommentaryPreviewId] = useState("");
+  const [activeCommentaryPreviewId, setActiveCommentaryPreviewId] =
+    useState("");
   const localAnnouncementIdRef = useRef(0);
   const lastWalkieRequestSignatureRef = useRef("");
   const umpireAnnouncementTimerRef = useRef(null);
@@ -170,7 +170,7 @@ export default function MatchPageClient({
 
   const { authStatus, authError, authSubmitting, submitPin } = useMatchAccess(
     matchId,
-    initialAuthStatus
+    initialAuthStatus,
   );
   const { settings: umpireSettings, updateSetting: updateUmpireSetting } =
     useAnnouncementSettings("umpire", matchId);
@@ -183,13 +183,15 @@ export default function MatchPageClient({
   const [scoreControlCooldowns, setScoreControlCooldowns] = useState({});
   const micMonitor = useLocalMicMonitor();
   const clearAllScoreControlCooldownTimers = useCallback(() => {
-    Object.values(scoreControlCooldownTimersRef.current || {}).forEach((timerId) => {
-      window.clearTimeout(timerId);
-    });
+    Object.values(scoreControlCooldownTimersRef.current || {}).forEach(
+      (timerId) => {
+        window.clearTimeout(timerId);
+      },
+    );
     scoreControlCooldownTimersRef.current = {};
   }, []);
   const deferredUmpireSettings = useMemo(
-    () => (
+    () =>
       liveToolsReady
         ? umpireSettings
         : {
@@ -197,8 +199,7 @@ export default function MatchPageClient({
             enabled: false,
             playScoreSoundEffects: false,
             broadcastScoreSoundEffects: false,
-          }
-    ),
+          },
     [liveToolsReady, umpireSettings],
   );
   const {
@@ -209,8 +210,7 @@ export default function MatchPageClient({
     status,
     voiceName,
     interruptAndCapture,
-  } =
-    useSpeechAnnouncer(deferredUmpireSettings);
+  } = useSpeechAnnouncer(deferredUmpireSettings);
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => {
@@ -224,14 +224,17 @@ export default function MatchPageClient({
     };
   }, [clearAllScoreControlCooldownTimers]);
 
-  const isScoreControlCoolingDown = useCallback((controlKey = "") => {
-    const safeControlKey = String(controlKey || "").trim();
-    if (!safeControlKey) {
-      return false;
-    }
+  const isScoreControlCoolingDown = useCallback(
+    (controlKey = "") => {
+      const safeControlKey = String(controlKey || "").trim();
+      if (!safeControlKey) {
+        return false;
+      }
 
-    return Number(scoreControlCooldowns?.[safeControlKey] || 0) > Date.now();
-  }, [scoreControlCooldowns]);
+      return Number(scoreControlCooldowns?.[safeControlKey] || 0) > Date.now();
+    },
+    [scoreControlCooldowns],
+  );
 
   const armScoreControlCooldown = useCallback((controlKey = "") => {
     const safeControlKey = String(controlKey || "").trim();
@@ -240,23 +243,27 @@ export default function MatchPageClient({
     }
 
     const expiresAt = Date.now() + SCORE_CONTROL_COOLDOWN_MS;
-    const existingTimer = scoreControlCooldownTimersRef.current?.[safeControlKey];
+    const existingTimer =
+      scoreControlCooldownTimersRef.current?.[safeControlKey];
     if (existingTimer) {
       window.clearTimeout(existingTimer);
     }
 
-    scoreControlCooldownTimersRef.current[safeControlKey] = window.setTimeout(() => {
-      setScoreControlCooldowns((current) => {
-        if (!current?.[safeControlKey]) {
-          return current;
-        }
+    scoreControlCooldownTimersRef.current[safeControlKey] = window.setTimeout(
+      () => {
+        setScoreControlCooldowns((current) => {
+          if (!current?.[safeControlKey]) {
+            return current;
+          }
 
-        const nextCooldowns = { ...(current || {}) };
-        delete nextCooldowns[safeControlKey];
-        return nextCooldowns;
-      });
-      delete scoreControlCooldownTimersRef.current[safeControlKey];
-    }, SCORE_CONTROL_COOLDOWN_MS + 40);
+          const nextCooldowns = { ...(current || {}) };
+          delete nextCooldowns[safeControlKey];
+          return nextCooldowns;
+        });
+        delete scoreControlCooldownTimersRef.current[safeControlKey];
+      },
+      SCORE_CONTROL_COOLDOWN_MS + 40,
+    );
 
     setScoreControlCooldowns((current) => ({
       ...(current || {}),
@@ -264,27 +271,49 @@ export default function MatchPageClient({
     }));
   }, []);
 
-  const resolveScoreControlKey = useCallback((runs, isOut = false, extraType = null, options = {}) => {
-    const explicitControlKey = String(options?.controlKey || "").trim();
-    if (explicitControlKey) {
-      return explicitControlKey;
-    }
+  const isAnyScoreTapCoolingDown = useCallback(
+    (controlKey = "") =>
+      isScoreControlCoolingDown(SCORE_CONTROL_GLOBAL_KEY) ||
+      isScoreControlCoolingDown(controlKey),
+    [isScoreControlCoolingDown],
+  );
 
-    if (isOut) {
-      return "out";
-    }
-    if (extraType === "wide") {
-      return "wide";
-    }
-    if (extraType === "noball") {
-      return "noball";
-    }
-    if (Number(runs || 0) === 0) {
-      return "dot";
-    }
+  const armScoreTapCooldown = useCallback(
+    (controlKey = "") => {
+      armScoreControlCooldown(SCORE_CONTROL_GLOBAL_KEY);
 
-    return String(Number(runs || 0));
-  }, []);
+      const safeControlKey = String(controlKey || "").trim();
+      if (safeControlKey && safeControlKey !== SCORE_CONTROL_GLOBAL_KEY) {
+        armScoreControlCooldown(safeControlKey);
+      }
+    },
+    [armScoreControlCooldown],
+  );
+
+  const resolveScoreControlKey = useCallback(
+    (runs, isOut = false, extraType = null, options = {}) => {
+      const explicitControlKey = String(options?.controlKey || "").trim();
+      if (explicitControlKey) {
+        return explicitControlKey;
+      }
+
+      if (isOut) {
+        return "out";
+      }
+      if (extraType === "wide") {
+        return "wide";
+      }
+      if (extraType === "noball") {
+        return "noball";
+      }
+      if (Number(runs || 0) === 0) {
+        return "dot";
+      }
+
+      return String(Number(runs || 0));
+    },
+    [],
+  );
 
   useEffect(() => {
     micMonitorDuckingRef.current = Boolean(
@@ -321,17 +350,20 @@ export default function MatchPageClient({
         announcementRestoreTimerRef.current = null;
       }
 
-      announcementRestoreTimerRef.current = window.setTimeout(() => {
-        announcementRestoreTimerRef.current = null;
-        if (
-          micMonitorDuckingRef.current ||
-          speechPlaybackActiveRef.current ||
-          soundEffectPlaybackActiveRef.current
-        ) {
-          return;
-        }
-        clearAnnouncementDuck();
-      }, Math.max(0, delayMs));
+      announcementRestoreTimerRef.current = window.setTimeout(
+        () => {
+          announcementRestoreTimerRef.current = null;
+          if (
+            micMonitorDuckingRef.current ||
+            speechPlaybackActiveRef.current ||
+            soundEffectPlaybackActiveRef.current
+          ) {
+            return;
+          }
+          clearAnnouncementDuck();
+        },
+        Math.max(0, delayMs),
+      );
     },
     [clearAnnouncementDuck],
   );
@@ -343,13 +375,16 @@ export default function MatchPageClient({
         speechEffectPlayerRestoreTimerRef.current = null;
       }
 
-      speechEffectPlayerRestoreTimerRef.current = window.setTimeout(() => {
-        speechEffectPlayerRestoreTimerRef.current = null;
-        if (micMonitorDuckingRef.current || speechPlaybackActiveRef.current) {
-          return;
-        }
-        clearSpeechEffectPlayerDuck();
-      }, Math.max(0, delayMs));
+      speechEffectPlayerRestoreTimerRef.current = window.setTimeout(
+        () => {
+          speechEffectPlayerRestoreTimerRef.current = null;
+          if (micMonitorDuckingRef.current || speechPlaybackActiveRef.current) {
+            return;
+          }
+          clearSpeechEffectPlayerDuck();
+        },
+        Math.max(0, delayMs),
+      );
     },
     [clearSpeechEffectPlayerDuck],
   );
@@ -404,9 +439,9 @@ export default function MatchPageClient({
 
     const targetSet = new Set(targetElements);
     return duckPageMedia(speechEffectPlayerDuckRef, 0.12, {
-      excludedElements: Array.from(document.querySelectorAll("audio, video")).filter(
-        (element) => !targetSet.has(element),
-      ),
+      excludedElements: Array.from(
+        document.querySelectorAll("audio, video"),
+      ).filter((element) => !targetSet.has(element)),
     });
   }, []);
 
@@ -589,7 +624,7 @@ export default function MatchPageClient({
         interrupt: true,
         minGapMs: 0,
         userGesture: true,
-      }
+      },
     );
   }, [
     speakSequenceWithAnnouncementDuck,
@@ -648,7 +683,8 @@ export default function MatchPageClient({
     },
   });
   const isAnySoundEffectActive =
-    activeSoundEffectStatus === "loading" || activeSoundEffectStatus === "playing";
+    activeSoundEffectStatus === "loading" ||
+    activeSoundEffectStatus === "playing";
 
   const flushDeferredUmpireAnnouncement = useCallback(() => {
     if (
@@ -757,10 +793,11 @@ export default function MatchPageClient({
       umpireSettings.enabled,
       umpireSettings.mode,
       umpireSettings.playScoreSoundEffects,
-    ]
+    ],
   );
   const normalizedScoreSoundEffectMap = useMemo(
-    () => normalizeScoreSoundEffectMap(umpireSettings.scoreSoundEffectMap || {}),
+    () =>
+      normalizeScoreSoundEffectMap(umpireSettings.scoreSoundEffectMap || {}),
     [umpireSettings.scoreSoundEffectMap],
   );
   const scoreSoundEffectMapSignature = useMemo(
@@ -774,7 +811,8 @@ export default function MatchPageClient({
 
   useEffect(() => {
     currentScoreSoundEffectMapRef.current = normalizedScoreSoundEffectMap;
-    currentScoreSoundEffectMapSignatureRef.current = scoreSoundEffectMapSignature;
+    currentScoreSoundEffectMapSignatureRef.current =
+      scoreSoundEffectMapSignature;
   }, [normalizedScoreSoundEffectMap, scoreSoundEffectMapSignature]);
   useEffect(() => {
     if (modal.type === ENTRY_SCORE_SOUND_EFFECTS_MODAL) {
@@ -828,11 +866,13 @@ export default function MatchPageClient({
     autoConnectAudio: Boolean(authStatus === "granted" && liveToolsEnabled),
     signalingActive: Boolean(
       authStatus === "granted" &&
-        liveToolsEnabled &&
-        match?.walkieTalkieEnabled,
+      liveToolsEnabled &&
+      match?.walkieTalkieEnabled,
     ),
   });
-  const hasPendingWalkieRequests = Boolean(isLiveMatch && walkie.pendingRequests?.length);
+  const hasPendingWalkieRequests = Boolean(
+    isLiveMatch && walkie.pendingRequests?.length,
+  );
   const umpireRemoteSpeakerState = getWalkieRemoteSpeakerState({
     snapshot: walkie.snapshot,
     participantId: walkie.participantId,
@@ -840,18 +880,17 @@ export default function MatchPageClient({
   });
   const isLocalWalkieInteractionActive = Boolean(
     walkie.updatingEnabled ||
-      walkie.isSelfTalking ||
-      walkie.isFinishing ||
-      (!walkie.talkPathPrimed &&
-        (walkie.claiming || walkie.preparingToTalk))
+    walkie.isSelfTalking ||
+    walkie.isFinishing ||
+    (!walkie.talkPathPrimed && (walkie.claiming || walkie.preparingToTalk)),
   );
   const hasWalkieAudience = Boolean(
     Number(walkie.snapshot?.spectatorCount || 0) +
       Number(walkie.snapshot?.directorCount || 0) >
-      0
+    0,
   );
   const isWalkieConversationActive = Boolean(
-    isLocalWalkieInteractionActive || umpireRemoteSpeakerState.isRemoteTalking
+    isLocalWalkieInteractionActive || umpireRemoteSpeakerState.isRemoteTalking,
   );
 
   useEffect(() => {
@@ -976,7 +1015,7 @@ export default function MatchPageClient({
         stopActiveSoundEffect();
       }
     },
-    [stop, stopActiveSoundEffect]
+    [stop, stopActiveSoundEffect],
   );
 
   useEffect(() => {
@@ -1014,7 +1053,10 @@ export default function MatchPageClient({
     if (!next) return;
 
     pendingUmpireAnnouncementRef.current = null;
-    if (soundEffectPlayingRef.current || walkieAnnouncementPauseActiveRef.current) {
+    if (
+      soundEffectPlayingRef.current ||
+      walkieAnnouncementPauseActiveRef.current
+    ) {
       queueDeferredUmpireAnnouncement(next);
       return;
     }
@@ -1031,71 +1073,88 @@ export default function MatchPageClient({
     });
   };
 
-  const speakImmediateUmpireSequence = useCallback((sequence, keyPrefix) => {
-    if (!sequence?.items?.length || !umpireSettings.enabled || umpireSettings.mode === "silent") {
-      return;
-    }
+  const speakImmediateUmpireSequence = useCallback(
+    (sequence, keyPrefix) => {
+      if (
+        !sequence?.items?.length ||
+        !umpireSettings.enabled ||
+        umpireSettings.mode === "silent"
+      ) {
+        return;
+      }
 
-    if (soundEffectPlayingRef.current || walkieAnnouncementPauseActiveRef.current) {
-      queueDeferredUmpireAnnouncement({
-        items: sequence.items,
-        options: {
-          key: keyPrefix,
-          priority: sequence.priority || 2,
-        },
+      if (
+        soundEffectPlayingRef.current ||
+        walkieAnnouncementPauseActiveRef.current
+      ) {
+        queueDeferredUmpireAnnouncement({
+          items: sequence.items,
+          options: {
+            key: keyPrefix,
+            priority: sequence.priority || 2,
+          },
+        });
+        return;
+      }
+
+      localAnnouncementIdRef.current += 1;
+      speakSequenceWithAnnouncementDuck(sequence.items, {
+        key: `${keyPrefix}-${localAnnouncementIdRef.current}`,
+        priority: sequence.priority || 2,
+        minGapMs: 0,
+        userGesture: true,
+        interrupt: true,
       });
-      return;
-    }
+    },
+    [
+      queueDeferredUmpireAnnouncement,
+      speakSequenceWithAnnouncementDuck,
+      umpireSettings.enabled,
+      umpireSettings.mode,
+    ],
+  );
 
-    localAnnouncementIdRef.current += 1;
-    speakSequenceWithAnnouncementDuck(sequence.items, {
-      key: `${keyPrefix}-${localAnnouncementIdRef.current}`,
-      priority: sequence.priority || 2,
-      minGapMs: 0,
-      userGesture: true,
-      interrupt: true,
-    });
-  }, [
-    queueDeferredUmpireAnnouncement,
-    speakSequenceWithAnnouncementDuck,
-    umpireSettings.enabled,
-    umpireSettings.mode,
-  ]);
+  const queueOrSpeakUmpireSequence = useCallback(
+    (sequence, keyPrefix) => {
+      if (
+        !sequence?.items?.length ||
+        !umpireSettings.enabled ||
+        umpireSettings.mode === "silent"
+      ) {
+        return false;
+      }
 
-  const queueOrSpeakUmpireSequence = useCallback((sequence, keyPrefix) => {
-    if (!sequence?.items?.length || !umpireSettings.enabled || umpireSettings.mode === "silent") {
-      return false;
-    }
+      if (
+        walkieAnnouncementPauseActiveRef.current ||
+        soundEffectPlayingRef.current ||
+        activeBoundarySequenceRef.current ||
+        umpireAnnouncementTimerRef.current ||
+        pendingUmpireAnnouncementRef.current?.items?.length ||
+        status === "speaking" ||
+        isAnySoundEffectActive
+      ) {
+        queueDeferredUmpireAnnouncement({
+          items: sequence.items,
+          options: {
+            key: keyPrefix,
+            priority: sequence.priority || 2,
+          },
+        });
+        return false;
+      }
 
-    if (
-      walkieAnnouncementPauseActiveRef.current ||
-      soundEffectPlayingRef.current ||
-      activeBoundarySequenceRef.current ||
-      umpireAnnouncementTimerRef.current ||
-      pendingUmpireAnnouncementRef.current?.items?.length ||
-      status === "speaking" ||
-      isAnySoundEffectActive
-    ) {
-      queueDeferredUmpireAnnouncement({
-        items: sequence.items,
-        options: {
-          key: keyPrefix,
-          priority: sequence.priority || 2,
-        },
-      });
-      return false;
-    }
-
-    speakImmediateUmpireSequence(sequence, keyPrefix);
-    return true;
-  }, [
-    isAnySoundEffectActive,
-    queueDeferredUmpireAnnouncement,
-    speakImmediateUmpireSequence,
-    status,
-    umpireSettings.enabled,
-    umpireSettings.mode,
-  ]);
+      speakImmediateUmpireSequence(sequence, keyPrefix);
+      return true;
+    },
+    [
+      isAnySoundEffectActive,
+      queueDeferredUmpireAnnouncement,
+      speakImmediateUmpireSequence,
+      status,
+      umpireSettings.enabled,
+      umpireSettings.mode,
+    ],
+  );
 
   const buildUmpireScorePreview = useCallback(
     (runs, isOut = false, extraType = null) =>
@@ -1115,7 +1174,8 @@ export default function MatchPageClient({
       : readCachedSoundEffectsLibrary();
 
     return availableEffects.filter(
-      (effect) => effect?.id && effect?.src && effect.id !== RANDOM_SCORE_EFFECT_ID,
+      (effect) =>
+        effect?.id && effect?.src && effect.id !== RANDOM_SCORE_EFFECT_ID,
     );
   }, [soundEffectFiles]);
 
@@ -1127,79 +1187,99 @@ export default function MatchPageClient({
     return randomPool[Math.floor(Math.random() * randomPool.length)] || null;
   }, [getAvailableScoreSoundEffectPool]);
 
-  const findConfiguredScoreSoundEffectFromMap = useCallback((
-    configuredMap,
-    runs,
-    isOut = false,
-    extraType = null,
-  ) => {
-    const effectKey = getScoreSoundEffectEventKey(runs, isOut, extraType);
-    if (!effectKey) {
-      return null;
-    }
+  const findConfiguredScoreSoundEffectFromMap = useCallback(
+    (configuredMap, runs, isOut = false, extraType = null) => {
+      const effectKey = getScoreSoundEffectEventKey(runs, isOut, extraType);
+      if (!effectKey) {
+        return null;
+      }
 
-    const configuredEffectId =
-      typeof configuredMap?.[effectKey] === "string" ? configuredMap[effectKey] : "";
-    const effectId = String(configuredEffectId || "").trim();
-    if (!effectId) {
-      return null;
-    }
+      const configuredEffectId =
+        typeof configuredMap?.[effectKey] === "string"
+          ? configuredMap[effectKey]
+          : "";
+      const effectId = String(configuredEffectId || "").trim();
+      if (!effectId) {
+        return null;
+      }
 
-    if (effectId === RANDOM_SCORE_EFFECT_ID) {
-      return pickRandomScoreSoundEffect();
-    }
+      if (effectId === RANDOM_SCORE_EFFECT_ID) {
+        return pickRandomScoreSoundEffect();
+      }
 
-    const availableEffects = soundEffectFiles.length
-      ? soundEffectFiles
-      : readCachedSoundEffectsLibrary();
-    return (
-      availableEffects.find((effect) => effect?.id === effectId) ||
-      (effectId === IPL_HORN_EFFECT.id
-        ? IPL_HORN_EFFECT
-        : buildFallbackSoundEffectFromId(effectId))
-    );
-  }, [pickRandomScoreSoundEffect, soundEffectFiles]);
+      const availableEffects = soundEffectFiles.length
+        ? soundEffectFiles
+        : readCachedSoundEffectsLibrary();
+      return (
+        availableEffects.find((effect) => effect?.id === effectId) ||
+        (effectId === IPL_HORN_EFFECT.id
+          ? IPL_HORN_EFFECT
+          : buildFallbackSoundEffectFromId(effectId))
+      );
+    },
+    [pickRandomScoreSoundEffect, soundEffectFiles],
+  );
 
-  const findConfiguredScoreSoundEffect = useCallback((runs, isOut = false, extraType = null) => (
-    findConfiguredScoreSoundEffectFromMap(
-      umpireSettings.scoreSoundEffectMap || {},
-      runs,
-      isOut,
-      extraType,
-    )
-  ), [findConfiguredScoreSoundEffectFromMap, umpireSettings.scoreSoundEffectMap]);
+  const findConfiguredScoreSoundEffect = useCallback(
+    (runs, isOut = false, extraType = null) =>
+      findConfiguredScoreSoundEffectFromMap(
+        umpireSettings.scoreSoundEffectMap || {},
+        runs,
+        isOut,
+        extraType,
+      ),
+    [findConfiguredScoreSoundEffectFromMap, umpireSettings.scoreSoundEffectMap],
+  );
 
-  const announceConfiguredScoreFollowUp = useCallback((followUpItems = []) => {
-    if (!umpireSettings.enabled || umpireSettings.mode === "silent" || !followUpItems.length) {
-      return;
-    }
+  const announceConfiguredScoreFollowUp = useCallback(
+    (followUpItems = []) => {
+      if (
+        !umpireSettings.enabled ||
+        umpireSettings.mode === "silent" ||
+        !followUpItems.length
+      ) {
+        return;
+      }
 
-    speakImmediateUmpireSequence(
-      {
+      speakImmediateUmpireSequence(
+        {
+          items: followUpItems,
+          priority: 2,
+        },
+        "umpire-boundary-score",
+      );
+    },
+    [speakImmediateUmpireSequence, umpireSettings.enabled, umpireSettings.mode],
+  );
+
+  const queueConfiguredScoreFollowUp = useCallback(
+    (followUpItems = []) => {
+      if (
+        !umpireSettings.enabled ||
+        umpireSettings.mode === "silent" ||
+        !followUpItems.length
+      ) {
+        deferredUmpireAnnouncementRef.current = null;
+        return;
+      }
+
+      deferredUmpireAnnouncementRef.current = {
         items: followUpItems,
-        priority: 2,
-      },
-      "umpire-boundary-score"
-    );
-  }, [speakImmediateUmpireSequence, umpireSettings.enabled, umpireSettings.mode]);
-
-  const queueConfiguredScoreFollowUp = useCallback((followUpItems = []) => {
-    if (!umpireSettings.enabled || umpireSettings.mode === "silent" || !followUpItems.length) {
-      deferredUmpireAnnouncementRef.current = null;
-      return;
-    }
-
-    deferredUmpireAnnouncementRef.current = {
-      items: followUpItems,
-      options: {
-        key: "umpire-boundary-score",
-        priority: 2,
-      },
-    };
-  }, [umpireSettings.enabled, umpireSettings.mode]);
+        options: {
+          key: "umpire-boundary-score",
+          priority: 2,
+        },
+      };
+    },
+    [umpireSettings.enabled, umpireSettings.mode],
+  );
 
   const announceUmpireAction = (runs, isOut = false, extraType = null) => {
-    if (!umpireSettings.enabled || umpireSettings.mode === "silent" || !isLiveMatch) {
+    if (
+      !umpireSettings.enabled ||
+      umpireSettings.mode === "silent" ||
+      !isLiveMatch
+    ) {
       return;
     }
 
@@ -1251,7 +1331,7 @@ export default function MatchPageClient({
     }
 
     const controlKey = resolveScoreControlKey(runs, isOut, extraType, options);
-    if (isScoreControlCoolingDown(controlKey)) {
+    if (isAnyScoreTapCoolingDown(controlKey)) {
       return false;
     }
     const scoreActionId = createScoreActionId();
@@ -1262,7 +1342,7 @@ export default function MatchPageClient({
       return false;
     }
 
-    armScoreControlCooldown(controlKey);
+    armScoreTapCooldown(controlKey);
 
     if (activeBoundarySequenceRef.current || soundEffectPlayingRef.current) {
       cancelBoundarySequence({ stopEffect: true });
@@ -1303,7 +1383,9 @@ export default function MatchPageClient({
             sourceActionId: scoreActionId,
             resumeAnnouncements: false,
             trigger: "score_boundary",
-            preAnnouncementText: String(scorePreview.leadItem?.text || "").trim(),
+            preAnnouncementText: String(
+              scorePreview.leadItem?.text || "",
+            ).trim(),
             preAnnouncementDelayMs: getConfiguredScoreEffectDelayMs(
               runs,
               isOut,
@@ -1321,7 +1403,9 @@ export default function MatchPageClient({
 
       const boundarySequenceVersion = boundarySequenceVersionRef.current + 1;
       const leadText = String(scorePreview.leadItem?.text || "").trim();
-      const leadRate = Number(scorePreview.leadItem?.rate || SCORE_PRE_EFFECT_RATE);
+      const leadRate = Number(
+        scorePreview.leadItem?.rate || SCORE_PRE_EFFECT_RATE,
+      );
       const leadDelayMs = getConfiguredScoreEffectDelayMs(
         runs,
         isOut,
@@ -1366,7 +1450,11 @@ export default function MatchPageClient({
         });
       }
 
-      if (leadText && umpireSettings.enabled && umpireSettings.mode !== "silent") {
+      if (
+        leadText &&
+        umpireSettings.enabled &&
+        umpireSettings.mode !== "silent"
+      ) {
         speakWithAnnouncementDuck(leadText, {
           key: `umpire-score-pre-${configuredScoreEffect.id}`,
           rate: leadRate,
@@ -1390,9 +1478,12 @@ export default function MatchPageClient({
         setSoundEffectError("");
         shouldResumeAfterSoundEffectRef.current = false;
         queueConfiguredScoreFollowUp(scorePreview.followUpItems);
-        const playedLocally = await playLocalSoundEffect(configuredScoreEffect, {
-          userGesture: true,
-        });
+        const playedLocally = await playLocalSoundEffect(
+          configuredScoreEffect,
+          {
+            userGesture: true,
+          },
+        );
         if (!playedLocally) {
           resumeUmpireAnnouncementsAfterSoundEffect();
           return;
@@ -1571,7 +1662,7 @@ export default function MatchPageClient({
     const undoSequence = buildLiveScoreAnnouncementSequence(
       undoEvent,
       match,
-      umpireSettings.mode
+      umpireSettings.mode,
     );
     speakImmediateUmpireSequence(undoSequence, "umpire-undo");
 
@@ -1579,12 +1670,18 @@ export default function MatchPageClient({
   };
 
   const handleAnnouncedPatchUpdate = async (payload) => {
-    const currentTeamALength = Array.isArray(match?.teamA) ? match.teamA.length : 0;
-    const currentTeamBLength = Array.isArray(match?.teamB) ? match.teamB.length : 0;
+    const currentTeamALength = Array.isArray(match?.teamA)
+      ? match.teamA.length
+      : 0;
+    const currentTeamBLength = Array.isArray(match?.teamB)
+      ? match.teamB.length
+      : 0;
     const teamASizeChanged =
-      Array.isArray(payload?.teamA) && payload.teamA.length !== currentTeamALength;
+      Array.isArray(payload?.teamA) &&
+      payload.teamA.length !== currentTeamALength;
     const teamBSizeChanged =
-      Array.isArray(payload?.teamB) && payload.teamB.length !== currentTeamBLength;
+      Array.isArray(payload?.teamB) &&
+      payload.teamB.length !== currentTeamBLength;
     const nextMatch = await patchAndUpdate(payload);
     if (!nextMatch) {
       return null;
@@ -1602,7 +1699,7 @@ export default function MatchPageClient({
     const correctionSequence = buildLiveScoreAnnouncementSequence(
       nextMatch.lastLiveEvent,
       nextMatch,
-      umpireSettings.mode
+      umpireSettings.mode,
     );
     speakImmediateUmpireSequence(correctionSequence, "umpire-correction");
     return nextMatch;
@@ -1623,14 +1720,18 @@ export default function MatchPageClient({
     triggerMatchHapticFeedback();
     const link = buildShareUrl(
       `/session/${match.sessionId}/view`,
-      window.location.origin
+      window.location.origin,
     );
     const shareTitle = `${match.innings1.team} vs ${match.innings2.team}`;
     const shareText = `Follow the live score for ${shareTitle}. Current score: ${match.score}/${match.outs}.`;
 
     if (navigator.share) {
       try {
-        await navigator.share({ title: shareTitle, text: shareText, url: link });
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: link,
+        });
         return;
       } catch (error) {
         if (error?.name === "AbortError") {
@@ -1723,7 +1824,9 @@ export default function MatchPageClient({
       return;
     }
 
-    if (lastPersistedAnnouncerSettingsRef.current === announcerSettingsSignature) {
+    if (
+      lastPersistedAnnouncerSettingsRef.current === announcerSettingsSignature
+    ) {
       return;
     }
 
@@ -1832,15 +1935,18 @@ export default function MatchPageClient({
 
     void (async () => {
       try {
-        const response = await fetch(`/api/matches/${matchId}/announcer-settings`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
+        const response = await fetch(
+          `/api/matches/${matchId}/announcer-settings`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              scoreSoundEffectMap: mapToPersist,
+            }),
           },
-          body: JSON.stringify({
-            scoreSoundEffectMap: mapToPersist,
-          }),
-        });
+        );
 
         if (!response.ok) {
           lastPersistedScoreSoundEffectMapRef.current = "";
@@ -1848,7 +1954,9 @@ export default function MatchPageClient({
         }
 
         lastPersistedScoreSoundEffectMapRef.current = requestSignature;
-        if (currentScoreSoundEffectMapSignatureRef.current === requestSignature) {
+        if (
+          currentScoreSoundEffectMapSignatureRef.current === requestSignature
+        ) {
           scoreSoundEffectMapDirtyRef.current = false;
         }
         didPersistLatestKnownValue = true;
@@ -1875,14 +1983,22 @@ export default function MatchPageClient({
     queueScoreSoundEffectMapSave,
   ]);
 
-  const activeInningsKey = match?.innings === "second" ? "innings2" : "innings1";
+  const activeInningsKey =
+    match?.innings === "second" ? "innings2" : "innings1";
   const oversHistory = Array.isArray(match?.[activeInningsKey]?.history)
     ? match[activeInningsKey].history
     : [];
-  const currentOverNumber = Number(match?.activeOverNumber || oversHistory.at(-1)?.overNumber || 1);
+  const currentOverNumber = Number(
+    match?.activeOverNumber || oversHistory.at(-1)?.overNumber || 1,
+  );
   const firstInningsOversPlayed = Math.max(
     1,
-    Math.ceil(Number(match?.firstInningsLegalBallCount || countLegalBalls(match?.innings1?.history ?? [])) / 6)
+    Math.ceil(
+      Number(
+        match?.firstInningsLegalBallCount ||
+          countLegalBalls(match?.innings1?.history ?? []),
+      ) / 6,
+    ),
   );
   const {
     dismissVisibleStageCard,
@@ -1920,10 +2036,7 @@ export default function MatchPageClient({
   });
 
   const handleStageCardUndo = useCallback(async () => {
-    if (
-      stageCardUndoPending ||
-      isScoreControlCoolingDown(UNDO_CONTROL_KEY)
-    ) {
+    if (stageCardUndoPending || isScoreControlCoolingDown(UNDO_CONTROL_KEY)) {
       return;
     }
     if (!match?.undoCount || !currentInningsHasHistory) {
@@ -1989,7 +2102,8 @@ export default function MatchPageClient({
   }, [flushDeferredUmpireAnnouncement]);
 
   if (authStatus !== "granted") {
-    if (authStatus === "checking") return <Splash>Checking umpire access...</Splash>;
+    if (authStatus === "checking")
+      return <Splash>Checking umpire access...</Splash>;
     return (
       <AccessGate
         onSubmit={submitPin}
@@ -2001,7 +2115,8 @@ export default function MatchPageClient({
   }
 
   if (isLoading) return <Splash>Loading match...</Splash>;
-  if (error && !match) return <Splash>Error: Could not load the match data.</Splash>;
+  if (error && !match)
+    return <Splash>Error: Could not load the match data.</Splash>;
   if (!match) {
     return (
       <main className="min-h-screen bg-zinc-950 px-4 py-8 text-white">
@@ -2036,22 +2151,23 @@ export default function MatchPageClient({
   }
   if (tossPending) return <Splash>Opening toss...</Splash>;
   const controlsDisabled =
-    showInningsEnd || Boolean(match.result) || Boolean(match.pendingResult) || tossPending;
+    showInningsEnd ||
+    Boolean(match.result) ||
+    Boolean(match.pendingResult) ||
+    tossPending;
   const showCompactUmpireWalkie = Boolean(
     !hasPendingWalkieRequests &&
-      isLiveMatch &&
-      (
-        walkie.snapshot?.enabled ||
-        isLocalWalkieInteractionActive ||
-        umpireRemoteSpeakerState.isRemoteTalking ||
-        walkie.recoveringAudio ||
-        walkie.recoveringSignaling
-      )
+    isLiveMatch &&
+    (walkie.snapshot?.enabled ||
+      isLocalWalkieInteractionActive ||
+      umpireRemoteSpeakerState.isRemoteTalking ||
+      walkie.recoveringAudio ||
+      walkie.recoveringSignaling),
   );
   const canGridHoldWalkie = Boolean(
     isLiveMatch &&
-      walkie.snapshot?.enabled &&
-      !umpireRemoteSpeakerState.isRemoteTalking
+    walkie.snapshot?.enabled &&
+    !umpireRemoteSpeakerState.isRemoteTalking,
   );
   const canGridHoldMic = Boolean(isLiveMatch);
 
@@ -2097,8 +2213,7 @@ export default function MatchPageClient({
         isLiveMatch,
         isReadScoreActionActive,
         isStageCardUndoPending:
-          stageCardUndoPending ||
-          isScoreControlCoolingDown(UNDO_CONTROL_KEY),
+          stageCardUndoPending || isScoreControlCoolingDown(UNDO_CONTROL_KEY),
         isTestSequenceActionActive,
         isUndoCoolingDown: isScoreControlCoolingDown(UNDO_CONTROL_KEY),
         isUpdating,
@@ -2147,4 +2262,3 @@ export default function MatchPageClient({
     />
   );
 }
-

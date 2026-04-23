@@ -83,7 +83,6 @@ export const Controls = memo(function Controls({
   onWide,
   setInfoText,
   disabled,
-  disabledKeys = {},
 }) {
   const baseBtn =
     "py-6 rounded-2xl transition-transform active:scale-95 shadow-lg w-full disabled:opacity-50 disabled:cursor-not-allowed";
