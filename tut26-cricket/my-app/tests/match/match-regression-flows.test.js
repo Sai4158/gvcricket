@@ -19,6 +19,7 @@ import {
   createStoredMatchImageEntry,
   rebaseStoredMatchImagesForMatch,
 } from "../../src/app/lib/match-image-gallery.js";
+import { buildResultInsights } from "../../src/app/lib/result-insights.js";
 import { buildSignedMatchImageUrl } from "../../src/app/lib/match-image-secure.js";
 import { serializePublicMatch, serializePublicSession } from "../../src/app/lib/public-data.js";
 import {
@@ -549,6 +550,114 @@ test("[match] public match serialization keeps saved compact over-state for resu
   assert.equal(publicMatch.secondInningsLegalBallCount, 30);
   assert.equal(publicMatch.legalBallCount, 30);
   assert.deepEqual(publicMatch.activeOverBalls, []);
+});
+
+test("[match] public result serialization repairs missing innings histories from preserved snapshots", () => {
+  let match = setToss({
+    ...buildBaseMatch(),
+    overs: 1,
+  });
+
+  for (const runs of [4, 6, 2, 1, 0, 3]) {
+    match = applyMatchAction(match, {
+      type: "score_ball",
+      runs,
+      isOut: false,
+      extraType: null,
+      actionId: actionId(`repair-first-${runs}`),
+    });
+  }
+
+  match = applyMatchAction(match, {
+    type: "complete_innings",
+    actionId: actionId("repair-complete-first"),
+  });
+
+  for (const runs of [6, 1, 4, 6]) {
+    match = applyMatchAction(match, {
+      type: "score_ball",
+      runs,
+      isOut: false,
+      extraType: null,
+      actionId: actionId(`repair-second-${runs}`),
+    });
+  }
+
+  match = applyMatchAction(match, {
+    type: "complete_innings",
+    actionId: actionId("repair-complete-second"),
+  });
+
+  const corruptedMatch = {
+    ...match,
+    innings1: {
+      ...match.innings1,
+      history: [],
+    },
+    innings2: {
+      ...match.innings2,
+      history: [],
+    },
+  };
+
+  const publicMatch = serializePublicMatch(corruptedMatch, null, {
+    includeActionHistory: true,
+  });
+  const insights = buildResultInsights(publicMatch);
+
+  assert.equal(publicMatch.innings1.history.length, 1);
+  assert.equal(publicMatch.innings2.history.length, 1);
+  assert.deepEqual(
+    publicMatch.innings1.history[0].balls.map((ball) => Number(ball.runs || 0)),
+    [4, 6, 2, 1, 0, 3],
+  );
+  assert.deepEqual(
+    publicMatch.innings2.history[0].balls.map((ball) => Number(ball.runs || 0)),
+    [6, 1, 4, 6],
+  );
+  assert.equal(insights.innings1.boundaries, 2);
+  assert.equal(insights.innings2.boundaries, 3);
+  assert.equal(insights.innings1.runRate, "16.00");
+  assert.equal(insights.innings2.runRate, "25.50");
+});
+
+test("[match] result insights keep saved run-rate data when an innings history is incomplete", () => {
+  const insights = buildResultInsights({
+    teamA: ["A1", "A2", "A3"],
+    teamB: ["B1", "B2", "B3"],
+    teamAName: "Falcons",
+    teamBName: "Titans",
+    innings1: {
+      team: "Falcons",
+      score: 92,
+      history: [],
+    },
+    innings2: {
+      team: "Titans",
+      score: 94,
+      history: [
+        {
+          overNumber: 1,
+          balls: [
+            { runs: 6, isOut: false, extraType: null },
+            { runs: 4, isOut: false, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+            { runs: 6, isOut: false, extraType: null },
+            { runs: 1, isOut: false, extraType: null },
+          ],
+        },
+      ],
+    },
+    firstInningsLegalBallCount: 30,
+    secondInningsLegalBallCount: 5,
+    result: "Titans won by 6 wickets.",
+  });
+
+  assert.equal(insights.innings1.runRate, "18.40");
+  assert.equal(insights.innings1.legalBalls, 30);
+  assert.equal(insights.innings1.score, 92);
+  assert.equal(insights.innings1.boundaries, 0);
+  assert.equal(insights.innings2.runRate, "112.80");
 });
 
 

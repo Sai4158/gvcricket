@@ -18,6 +18,7 @@ import {
 } from "./director-access";
 import { getMatchAccessCookieName, hasValidMatchAccess } from "./match-access";
 import {
+  recoverMatchInningsHistory,
   serializePublicMatch,
   serializePublicSession,
   serializeSessionCard,
@@ -48,6 +49,7 @@ import {
   invalidateSessionsDataCache,
   loadFallbackSession,
   NON_DRAFT_SESSION_COLLECTION_FILTER,
+  PUBLIC_MATCH_FIELDS,
   PUBLIC_SESSION_FIELDS,
   PUBLIC_SESSION_PROJECTION,
   READ_ONLY_PUBLIC_MATCH_FIELDS,
@@ -682,13 +684,46 @@ export async function loadPublicMatchData(matchId) {
   }
 
   await connectDB();
-  const match = await Match.findById(matchId).select(READ_ONLY_PUBLIC_MATCH_FIELDS);
+  const match = await Match.findById(matchId).select(PUBLIC_MATCH_FIELDS);
   if (!match) {
     return null;
   }
   const finalizedMatch = await finalizePendingResultIfExpired(match);
-  const fallbackSession = await loadFallbackSession(finalizedMatch.sessionId);
-  return serializePublicMatch(finalizedMatch, fallbackSession);
+  const { match: repairedMatch, changed } =
+    recoverMatchInningsHistory(finalizedMatch);
+
+  if (changed && repairedMatch?._id) {
+    await Match.findByIdAndUpdate(
+      repairedMatch._id,
+      {
+        $set: {
+          innings1: repairedMatch.innings1,
+          innings2: repairedMatch.innings2,
+        },
+      },
+      {
+        timestamps: false,
+      },
+    );
+
+    if (repairedMatch.sessionId) {
+      await Session.findByIdAndUpdate(
+        repairedMatch.sessionId,
+        {
+          $set: buildSessionMirrorUpdate(repairedMatch),
+        },
+        {
+          timestamps: false,
+        },
+      );
+      invalidateSessionsDataCache();
+    }
+  }
+
+  const fallbackSession = await loadFallbackSession(
+    repairedMatch?.sessionId || finalizedMatch.sessionId,
+  );
+  return serializePublicMatch(repairedMatch, fallbackSession);
 }
 
 export async function loadTossPageData(matchId) {

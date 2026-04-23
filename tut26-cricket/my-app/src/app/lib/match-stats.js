@@ -23,10 +23,11 @@ export function calculateInningsSummary(innings) {
   const history = innings?.history || [];
   const allBalls = history.flatMap((over) => over.balls || []);
   const explicitLegalBallCount = Number(innings?.legalBallCount);
+  const countedLegalBalls = countLegalBalls(history);
   const legalBalls =
     Number.isFinite(explicitLegalBallCount) && explicitLegalBallCount >= 0
-      ? explicitLegalBallCount
-      : countLegalBalls(history);
+      ? Math.max(explicitLegalBallCount, countedLegalBalls)
+      : countedLegalBalls;
   const oversDisplay = `${Math.floor(legalBalls / 6)}.${legalBalls % 6}`;
   const runRate =
     legalBalls > 0 ? ((innings?.score || 0) / (legalBalls / 6)).toFixed(2) : "0.00";
