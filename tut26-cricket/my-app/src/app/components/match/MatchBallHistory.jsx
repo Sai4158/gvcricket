@@ -9,7 +9,7 @@
  * Read next: ./README.md
  */
 
-import { memo, useLayoutEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { Rajdhani } from "next/font/google";
 
 const matchControlsFont = Rajdhani({
@@ -95,8 +95,12 @@ export const BallTracker = memo(function BallTracker({
   history = null,
   activeOverBalls = null,
   activeOverNumber = null,
+  disabledKeys = null,
 }) {
   const trackerRef = useRef(null);
+  const progressBarRef = useRef(null);
+  const progressResetTimerRef = useRef(null);
+  const progressAnimationRef = useRef(null);
   const fallbackOver = useMemo(
     () => (Array.isArray(history) && history.length ? history.at(-1) : null),
     [history],
@@ -152,6 +156,7 @@ export const BallTracker = memo(function BallTracker({
         .join("|"),
     [currentBalls],
   );
+  const scoreTapCooldownExpiresAt = Number(disabledKeys?.__score__ || 0);
 
   useLayoutEffect(() => {
     const tracker = trackerRef.current;
@@ -174,8 +179,78 @@ export const BallTracker = memo(function BallTracker({
     };
   }, [resolvedOverNumber, currentBallSignature]);
 
+  useEffect(() => {
+    const progressBar = progressBarRef.current;
+    if (progressResetTimerRef.current) {
+      window.clearTimeout(progressResetTimerRef.current);
+      progressResetTimerRef.current = null;
+    }
+    if (progressAnimationRef.current) {
+      progressAnimationRef.current.cancel();
+      progressAnimationRef.current = null;
+    }
+    if (!progressBar) {
+      return undefined;
+    }
+
+    const remainingMs = Math.max(scoreTapCooldownExpiresAt - Date.now(), 0);
+    progressBar.style.opacity = "0";
+    progressBar.style.transform = "scaleX(0)";
+
+    if (remainingMs <= 0) {
+      return undefined;
+    }
+
+    progressBar.style.opacity = "1";
+    progressAnimationRef.current = progressBar.animate(
+      [
+        { transform: "scaleX(0)", opacity: 1 },
+        { transform: "scaleX(1)", opacity: 1 },
+      ],
+      {
+        duration: remainingMs,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        fill: "forwards",
+      },
+    );
+
+    progressResetTimerRef.current = window.setTimeout(() => {
+      if (progressAnimationRef.current) {
+        progressAnimationRef.current.cancel();
+        progressAnimationRef.current = null;
+      }
+      progressBar.style.opacity = "0";
+      progressBar.style.transform = "scaleX(0)";
+      progressResetTimerRef.current = null;
+    }, remainingMs + 30);
+
+    return () => {
+      if (progressResetTimerRef.current) {
+        window.clearTimeout(progressResetTimerRef.current);
+        progressResetTimerRef.current = null;
+      }
+      if (progressAnimationRef.current) {
+        progressAnimationRef.current.cancel();
+        progressAnimationRef.current = null;
+      }
+      progressBar.style.opacity = "0";
+      progressBar.style.transform = "scaleX(0)";
+    };
+  }, [scoreTapCooldownExpiresAt]);
+
   return (
-    <div className="mb-6 rounded-2xl bg-zinc-900/50 p-4 ring-1 ring-white/10">
+    <div className="relative mb-6 overflow-hidden rounded-2xl bg-zinc-900/50 p-4 ring-1 ring-white/10">
+      <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
+      <span
+        ref={progressBarRef}
+        className="pointer-events-none absolute left-0 top-0 h-[2px] rounded-r-full bg-[linear-gradient(90deg,rgba(34,197,94,0.95),rgba(74,222,128,0.88))] shadow-[0_0_10px_rgba(34,197,94,0.42)]"
+        style={{
+          opacity: 0,
+          transform: "scaleX(0)",
+          transformOrigin: "left center",
+          width: "100%",
+        }}
+      />
       <div
         className={`${matchControlsFont.className} mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-[0.82rem] font-bold uppercase tracking-[0.12em] text-white sm:text-[0.9rem]`}
       >

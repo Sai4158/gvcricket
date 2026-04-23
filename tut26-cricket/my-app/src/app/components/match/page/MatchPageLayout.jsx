@@ -257,6 +257,7 @@ export default function MatchPageLayout({
           <BallTracker
             activeOverBalls={match?.activeOverBalls}
             activeOverNumber={match?.activeOverNumber || currentOverNumber}
+            disabledKeys={scoreControlDisabledKeys}
           />
           <Controls
             onScore={handleAnnouncedScoreEvent}
