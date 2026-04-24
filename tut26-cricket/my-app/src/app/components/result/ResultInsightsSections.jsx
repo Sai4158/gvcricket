@@ -175,6 +175,9 @@ export default function ResultInsightsSections({ match }) {
   const insights = useMemo(() => buildResultInsights(match), [match]);
   const statsFallback =
     "Detailed player stats were not recorded for this match.";
+  const shareCardImageUrl = String(
+    match?.matchImages?.[0]?.url || match?.matchImageUrl || "",
+  ).trim();
 
   const handleCopyLink = async () => {
     const shareUrl = buildShareUrl(
@@ -493,41 +496,56 @@ export default function ResultInsightsSections({ match }) {
 
       <SectionShell
         id="result-share-actions"
-        title="Share / Export Actions"
+        title="Share Results"
         icon={<FaShareAlt />}
       >
         <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,8,12,0.98))] p-5">
-            <div className="flex justify-center">
-              <Image
-                src="/gvLogo.png"
-                alt="GV Cricket logo"
-                width={168}
-                height={168}
-                unoptimized
-                className="h-auto w-28 object-contain sm:w-36"
-              />
-            </div>
-            <p className="text-[11px] uppercase tracking-[0.28em] text-amber-300/85">
-              Share Card
-            </p>
-            <h3 className="mt-3 text-3xl font-black text-white">
-              {insights.teamA.name} vs {insights.teamB.name}
-            </h3>
-            <p className="mt-2 text-lg text-zinc-300">
-              {match?.result || "Match complete"}
-            </p>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <StatMiniCard
-                label="Final score"
-                value={`${match?.score || 0}/${match?.outs || 0}`}
-                tone="text-white"
-              />
-              <StatMiniCard
-                label="Player of the match"
-                value={insights.awards.playerOfMatch}
-                tone="text-amber-300"
-              />
+          <div className="relative overflow-hidden rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,8,12,0.98))]">
+            {shareCardImageUrl ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={shareCardImageUrl}
+                  alt={`${insights.teamA.name} vs ${insights.teamB.name}`}
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,8,12,0.28),rgba(6,8,12,0.62)_38%,rgba(6,8,12,0.9)_100%)]" />
+              </>
+            ) : null}
+            <div className="relative p-5">
+              {!shareCardImageUrl ? (
+                <div className="flex justify-center">
+                  <Image
+                    src="/gvLogo.png"
+                    alt="GV Cricket logo"
+                    width={168}
+                    height={168}
+                    unoptimized
+                    className="h-auto w-28 object-contain sm:w-36"
+                  />
+                </div>
+              ) : null}
+              <p className="text-[11px] uppercase tracking-[0.28em] text-white/88">
+                Share Card
+              </p>
+              <h3 className="mt-3 text-3xl font-black text-white">
+                {insights.teamA.name} vs {insights.teamB.name}
+              </h3>
+              <p className="mt-2 text-lg font-semibold text-white">
+                {match?.result || "Match complete"}
+              </p>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <StatMiniCard
+                  label="Final score"
+                  value={`${match?.score || 0}/${match?.outs || 0}`}
+                  tone="text-white"
+                />
+                <StatMiniCard
+                  label="Player of the match"
+                  value={insights.awards.playerOfMatch}
+                  tone="text-amber-300"
+                />
+              </div>
             </div>
           </div>
 
@@ -539,22 +557,6 @@ export default function ResultInsightsSections({ match }) {
             >
               <FaShareAlt />
               <span>Share result</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className="inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-white/[0.05] px-4 py-3.5 font-semibold text-white transition hover:bg-white/[0.08]"
-            >
-              <FaClipboard />
-              <span>Copy match link</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleCopyResultSectionLink}
-              className="inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-[linear-gradient(90deg,#facc15_0%,#f59e0b_54%,#fb7185_100%)] px-4 py-3.5 font-semibold text-black shadow-[0_16px_36px_rgba(245,158,11,0.18)] transition hover:brightness-105"
-            >
-              <FaClipboard />
-              <span>Copy result section link</span>
             </button>
             {shareStatus ? (
               <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-zinc-300">
