@@ -88,6 +88,32 @@ function TeamCompareColumn({ teamName, stats, accentClass }) {
   );
 }
 
+function TeamFeedColumn({
+  teamName,
+  accentClass,
+  items,
+  emptyText,
+  renderItem,
+}) {
+  return (
+    <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h3 className={`text-xl font-bold ${accentClass}`}>{teamName}</h3>
+        <span className="rounded-full bg-white/[0.05] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-300">
+          {items.length}
+        </span>
+      </div>
+      <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+        {items.length ? (
+          items.map(renderItem)
+        ) : (
+          <p className="text-sm text-zinc-400">{emptyText}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ResultInsightsSections({ match }) {
   const [shareStatus, setShareStatus] = useState("");
   const insights = useMemo(() => buildResultInsights(match), [match]);
@@ -136,38 +162,6 @@ export default function ResultInsightsSections({ match }) {
     }
   };
 
-  const allTimeline = [
-    ...insights.innings1.ballTimeline.map((ball) => ({
-      ...ball,
-      inningsLabel: insights.innings1.team || "Innings 1",
-    })),
-    ...insights.innings2.ballTimeline.map((ball) => ({
-      ...ball,
-      inningsLabel: insights.innings2.team || "Innings 2",
-    })),
-  ];
-
-  const allOverSummaries = [
-    ...insights.innings1.overSummaries.map((over) => ({
-      ...over,
-      inningsLabel: insights.innings1.team || "Innings 1",
-    })),
-    ...insights.innings2.overSummaries.map((over) => ({
-      ...over,
-      inningsLabel: insights.innings2.team || "Innings 2",
-    })),
-  ];
-
-  const allWickets = [
-    ...insights.innings1.wicketTimeline.map((wicket) => ({
-      ...wicket,
-      inningsLabel: insights.innings1.team || "Innings 1",
-    })),
-    ...insights.innings2.wicketTimeline.map((wicket) => ({
-      ...wicket,
-      inningsLabel: insights.innings2.team || "Innings 2",
-    })),
-  ];
   const topPerformerCards = [
     insights.topPerformers.topScorer
       ? {
@@ -281,49 +275,77 @@ export default function ResultInsightsSections({ match }) {
       </SectionShell>
 
       <SectionShell title="Over Summary" icon={<FaChartBar />}>
-        <div className="grid max-h-[420px] gap-3 overflow-y-auto pr-1 md:grid-cols-2">
-          {allOverSummaries.length ? (
-            allOverSummaries.map((over, index) => (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <TeamFeedColumn
+            teamName={insights.innings1.team || "Innings 1"}
+            accentClass="text-sky-300"
+            items={insights.innings1.overSummaries}
+            emptyText="No over summary available."
+            renderItem={(over, index) => (
               <div
-                key={`${over.inningsLabel}-${over.over}-${index}`}
+                key={`innings1-over-${over.over}-${index}`}
                 className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-bold text-white">
-                    {over.label}
-                  </p>
-                  <span className="rounded-full bg-white/[0.05] px-3 py-1 text-xs text-zinc-300">
-                    {over.inningsLabel}
-                  </span>
-                </div>
+                <p className="text-sm font-bold text-white">{over.label}</p>
                 <p className="mt-2 text-sm text-zinc-300">{over.summary}</p>
               </div>
-            ))
-          ) : (
-            <p className="text-zinc-400">No over summary available.</p>
-          )}
+            )}
+          />
+          <TeamFeedColumn
+            teamName={insights.innings2.team || "Innings 2"}
+            accentClass="text-rose-300"
+            items={insights.innings2.overSummaries}
+            emptyText="No over summary available."
+            renderItem={(over, index) => (
+              <div
+                key={`innings2-over-${over.over}-${index}`}
+                className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
+              >
+                <p className="text-sm font-bold text-white">{over.label}</p>
+                <p className="mt-2 text-sm text-zinc-300">{over.summary}</p>
+              </div>
+            )}
+          />
         </div>
       </SectionShell>
 
-      {allWickets.length ? (
+      {insights.innings1.wicketTimeline.length || insights.innings2.wicketTimeline.length ? (
         <SectionShell title="Wicket Timeline" icon={<FaBolt />}>
-          <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
-            {allWickets.map((wicket, index) => (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <TeamFeedColumn
+              teamName={insights.innings1.team || "Innings 1"}
+              accentClass="text-sky-300"
+              items={insights.innings1.wicketTimeline}
+              emptyText="No wickets fell."
+              renderItem={(wicket, index) => (
+                <div
+                  key={`innings1-wicket-${wicket.overBall}-${index}`}
+                  className="flex items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
+                >
+                  <p className="text-sm font-semibold text-white">{wicket.detail}</p>
+                  <span className="rounded-full bg-sky-500/12 px-3 py-1 text-sm font-semibold text-sky-200">
+                    {wicket.overBall}
+                  </span>
+                </div>
+              )}
+            />
+            <TeamFeedColumn
+              teamName={insights.innings2.team || "Innings 2"}
+              accentClass="text-rose-300"
+              items={insights.innings2.wicketTimeline}
+              emptyText="No wickets fell."
+              renderItem={(wicket, index) => (
               <div
-                key={`${wicket.inningsLabel}-${wicket.overBall}-${index}`}
+                  key={`innings2-wicket-${wicket.overBall}-${index}`}
                 className="flex items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
               >
-                <div>
                   <p className="text-sm font-semibold text-white">{wicket.detail}</p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.22em] text-zinc-500">
-                    {wicket.inningsLabel}
-                  </p>
-                </div>
                 <span className="rounded-full bg-rose-500/12 px-3 py-1 text-sm font-semibold text-rose-200">
                   {wicket.overBall}
                 </span>
               </div>
-            ))}
+              )}
+            />
           </div>
         </SectionShell>
       ) : null}
