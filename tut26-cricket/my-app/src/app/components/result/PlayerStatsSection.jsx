@@ -34,15 +34,7 @@ export default function PlayerStatsSection({ match }) {
     hasTrackedPlayerStats(match.innings1) || hasTrackedPlayerStats(match.innings2);
 
   if (!hasTracking) {
-    return (
-      <section className="bg-zinc-900/50 rounded-2xl shadow-lg p-6 ring-1 ring-white/10 text-center">
-        <h2 className="text-2xl font-bold text-white mb-3">Player Stats</h2>
-        <p className="text-zinc-300">
-          This scorecard was recorded in quick scoring mode, so player-by-player
-          batting and bowling stats are not available.
-        </p>
-      </section>
-    );
+    return null;
   }
 
   const innings = [

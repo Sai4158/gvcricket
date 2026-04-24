@@ -39,6 +39,9 @@ import {
 const RunsPerOverChart = dynamic(() => import("./RunsPerOverChart"), {
   ssr: false,
 });
+const ResultMomentumChart = dynamic(() => import("./ResultMomentumChart"), {
+  ssr: false,
+});
 const ScoringBreakdownCharts = dynamic(
   () => import("./ScoringBreakdownCharts"),
   {
@@ -154,6 +157,17 @@ export default function ResultPageClient({ matchId, initialMatch }) {
     legalBallCount: Number(match?.secondInningsLegalBallCount),
   });
   const winningInningsSummary = getWinningInningsSummary(match);
+  const winningScore = winningInningsSummary
+    ? winningInningsSummary.score
+    : match.score;
+  const winningWickets = winningInningsSummary
+    ? winningInningsSummary.wickets
+    : match.outs;
+  const winningOvers =
+    winningInningsSummary?.overs ||
+    innings2Summary.overs ||
+    innings1Summary.overs ||
+    "0.0";
 
   const updateZoomedImageScale = (updater) => {
     setZoomedImageScale((current) => {
@@ -179,6 +193,11 @@ export default function ResultPageClient({ matchId, initialMatch }) {
     setIsLeavingToSessions(true);
     startNavigation("Opening sessions...");
     router.push(`/session?refresh=${Date.now()}`);
+  };
+
+  const handleOpenImageManager = (preferredImageId = "") => {
+    setActiveGalleryImageId(preferredImageId || matchImages[0]?.id || "");
+    setIsImageManagerOpen(true);
   };
 
   const gallerySection = (
@@ -207,8 +226,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           onImageHold={(image, _index, event) => {
             event.preventDefault();
             event.stopPropagation();
-            setActiveGalleryImageId(image?.url ? image.id || "" : "");
-            setIsImageManagerOpen(true);
+            handleOpenImageManager(image?.url ? image.id || "" : "");
           }}
         />
       </div>
@@ -220,7 +238,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
         </p>
         <button
           type="button"
-          onClick={() => setIsImageManagerOpen(true)}
+          onClick={() => handleOpenImageManager()}
           className="rounded-full border border-cyan-300/16 bg-[linear-gradient(180deg,rgba(10,16,26,0.96),rgba(8,47,73,0.78))] px-4 py-2 text-sm font-semibold text-cyan-50 transition hover:brightness-110"
         >
           Manage Images
@@ -234,7 +252,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
       id="top"
       className="min-h-screen bg-zinc-950 p-4 sm:p-8 text-zinc-300 font-sans"
     >
-      <div className="max-w-5xl mx-auto space-y-12 py-10">
+      <div className="mx-auto max-w-[88rem] space-y-12 py-10">
         <div className="flex justify-start">
           <LoadingButton
             onClick={handleOpenSessions}
@@ -284,53 +302,37 @@ export default function ResultPageClient({ matchId, initialMatch }) {
               </div>
             </header>
 
-            <div className="mt-8 grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+            <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] xl:items-center">
               {match.result && <CongratulationsCard result={match.result} />}
               <div className="rounded-[28px] border border-white/10 bg-black/35 p-5 backdrop-blur-md shadow-[0_18px_50px_rgba(0,0,0,0.32)]">
                 <div className="grid grid-cols-2 gap-3 text-center">
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
+                  <div className="flex min-h-[150px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-5">
                     <p className="text-xs uppercase tracking-[0.28em] text-zinc-400">
                       Winning score
                     </p>
-                    <p className="mt-2 text-3xl font-black text-white">
-                      {winningInningsSummary
-                        ? winningInningsSummary.score
-                        : match.score}
-                      <span className="text-zinc-400">
-                        /
-                        {winningInningsSummary
-                          ? winningInningsSummary.wickets
-                          : match.outs}
-                      </span>
+                    <p className="mt-3 text-center text-5xl font-black uppercase leading-none sm:text-6xl">
+                      <span className="text-emerald-400">{winningScore}</span>
+                      <span className="text-white">/</span>
+                      <span className="text-rose-400">{winningWickets}</span>
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
+                  <div className="flex min-h-[150px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-5">
                     <p className="text-xs uppercase tracking-[0.28em] text-zinc-400">
                       Overs
                     </p>
-                    <p className="mt-2 text-3xl font-black text-white">
-                      {winningInningsSummary?.overs ||
-                        innings2Summary.overs ||
-                        innings1Summary.overs ||
-                        "0.0"}
+                    <p className="mt-3 text-center text-5xl font-black uppercase leading-none text-cyan-300 sm:text-6xl">
+                      {winningOvers}
                     </p>
                   </div>
                 </div>
-                <div className="mt-4 space-y-1 text-center">
-                  {winningInningsSummary?.teamName ? (
-                    <p className="text-sm text-zinc-300">
-                      Winning team{" "}
-                      <span className="font-semibold text-white">
-                        {winningInningsSummary.teamName}
-                      </span>
-                    </p>
-                  ) : null}
+                <div className="mt-4 space-y-2 text-center">
                   {match.tossWinner ? (
                     <p className="text-sm text-zinc-400">
-                      Toss won by{" "}
+                      Toss:{" "}
                       <span className="font-semibold text-white">
                         {match.tossWinner}
-                      </span>
+                      </span>{" "}
+                      won the toss.
                     </p>
                   ) : null}
                 </div>
@@ -355,15 +357,21 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           <h2 className="text-3xl font-bold text-white text-center pt-8 border-t border-white/10">
             Graphical Analysis
           </h2>
-          <RunsPerOverChart
-            innings1Summary={innings1Summary}
-            innings2Summary={innings2Summary}
-            team1Name={match.innings1.team}
-            team2Name={match.innings2.team}
-          />
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.95fr)]">
+            <RunsPerOverChart
+              innings1Summary={innings1Summary}
+              innings2Summary={innings2Summary}
+              team1Name={match.innings1.team}
+              team2Name={match.innings2.team}
+            />
+            <ResultMomentumChart match={match} />
+          </div>
         </section>
 
-        <ResultInsightsSections match={match} />
+        <ResultInsightsSections
+          match={match}
+          onSectionImageHold={() => handleOpenImageManager()}
+        />
 
         <PlayerStatsSection match={match} />
 
@@ -438,7 +446,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
             <div
               className="relative overflow-hidden rounded-[24px]"
               onContextMenu={(event) => event.preventDefault()}
-            >
+            >i w
               <button
                 type="button"
                 onClick={() => {

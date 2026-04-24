@@ -14,49 +14,165 @@ import { useMemo, useRef, useState } from "react";
 import {
   FaBolt,
   FaChartBar,
-  FaClipboard,
   FaExchangeAlt,
   FaMedal,
   FaShareAlt,
   FaStar,
   FaTrophy,
 } from "react-icons/fa";
+import { getWinningInningsSummary } from "../../lib/match-result-display";
 import { buildResultInsights } from "../../lib/result-insights";
 import { buildShareUrl } from "../../lib/site-metadata";
 
-function SectionShell({ id, title, icon, children }) {
+function SectionBackgroundCollage({ images = [] }) {
+  const collageImages = images.slice(0, 4).filter((image) => image?.url);
+  if (!collageImages.length) {
+    return null;
+  }
+
+  if (collageImages.length === 1) {
+    return (
+      <div className="absolute inset-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={collageImages[0].url}
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  }
+
+  if (collageImages.length === 2) {
+    return (
+      <div className="absolute inset-0 grid grid-cols-2">
+        {collageImages.map((image) => (
+          <div key={image.id || image.url} className="overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={image.url} alt="" className="h-full w-full object-cover" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (collageImages.length === 3) {
+    return (
+      <div className="absolute inset-0 grid grid-cols-2 grid-rows-2">
+        <div className="row-span-2 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={collageImages[0].url}
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        </div>
+        {collageImages.slice(1).map((image) => (
+          <div key={image.id || image.url} className="overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={image.url} alt="" className="h-full w-full object-cover" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="absolute inset-0 grid grid-cols-2 grid-rows-2">
+      {collageImages.map((image) => (
+        <div key={image.id || image.url} className="overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={image.url} alt="" className="h-full w-full object-cover" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SectionShell({
+  id,
+  title,
+  icon,
+  children,
+  backgroundImages = [],
+  onHold,
+}) {
+  const holdTimerRef = useRef(null);
+  const hasBackgroundImages = backgroundImages.length > 0;
+
+  const clearHoldTimer = () => {
+    if (holdTimerRef.current) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+  };
+
+  const handlePointerDown = (event) => {
+    if (!onHold || !hasBackgroundImages || event.button > 0) {
+      return;
+    }
+
+    clearHoldTimer();
+    holdTimerRef.current = window.setTimeout(() => {
+      holdTimerRef.current = null;
+      onHold();
+    }, 420);
+  };
+
   return (
     <section
       id={id}
-      className="scroll-mt-24 rounded-[28px] border border-white/10 bg-zinc-900/50 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.32)] ring-1 ring-white/6 sm:p-6"
+      className="relative scroll-mt-24 overflow-hidden rounded-[28px] border border-white/10 bg-zinc-900/50 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.32)] ring-1 ring-white/6 sm:p-6"
+      onPointerDown={handlePointerDown}
+      onPointerUp={clearHoldTimer}
+      onPointerLeave={clearHoldTimer}
+      onPointerCancel={clearHoldTimer}
+      onContextMenu={
+        onHold && hasBackgroundImages
+          ? (event) => {
+              event.preventDefault();
+              clearHoldTimer();
+              onHold();
+            }
+          : undefined
+      }
     >
-      <div className="mb-5 flex items-center gap-3">
-        <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.05] text-lg text-amber-300">
-          {icon}
-        </span>
-        <h2 className="text-2xl font-bold tracking-tight text-white">
-          {title}
-        </h2>
+      {hasBackgroundImages ? (
+        <>
+          <SectionBackgroundCollage images={backgroundImages} />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(7,7,10,0.38),rgba(7,7,10,0.62)_38%,rgba(7,7,10,0.76)_100%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.2),transparent_40%)]" />
+        </>
+      ) : null}
+      <div className="relative mb-5 flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.05] text-lg text-amber-300">
+            {icon}
+          </span>
+          <h2 className="text-2xl font-bold tracking-tight text-white">
+            {title}
+          </h2>
+        </div>
       </div>
-      {children}
+      <div className="relative">{children}</div>
     </section>
   );
 }
 
 function StatMiniCard({ label, value, tone = "text-white" }) {
   return (
-    <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4">
-      <p className="text-[11px] uppercase tracking-[0.24em] text-zinc-500">
+    <div className="rounded-[22px] border border-white/8 bg-black/20 px-4 py-4 text-center backdrop-blur-sm lg:px-5 lg:py-5">
+      <p className="text-[11px] uppercase tracking-[0.24em] text-zinc-400">
         {label}
       </p>
-      <p className={`mt-2 text-xl font-black ${tone}`}>{value}</p>
+      <p className={`mt-3 text-2xl font-black lg:text-3xl ${tone}`}>{value}</p>
     </div>
   );
 }
 
 function PerformerCard({ label, primary, secondary, accent = "text-white" }) {
   return (
-    <div className="flex min-h-[220px] w-full max-w-[320px] flex-col items-center justify-center rounded-[24px] border border-white/8 bg-white/[0.03] p-5 text-center">
+    <div className="flex min-h-[220px] w-full basis-[280px] flex-1 flex-col items-center justify-center rounded-[24px] border border-white/8 bg-[rgba(8,8,12,0.52)] p-5 text-center backdrop-blur-sm lg:min-h-[240px] lg:max-w-[360px]">
       <p className="text-[11px] uppercase tracking-[0.24em] text-zinc-500">
         {label}
       </p>
@@ -172,14 +288,131 @@ function SplitTeamFeed({
   );
 }
 
-export default function ResultInsightsSections({ match }) {
+function getResultDetailText(resultText) {
+  const safeResult = String(resultText || "").trim();
+  const resultSuffix = safeResult.replace(/^(.*?)\s+won by\s+/i, "").trim();
+  return resultSuffix ? `Won by ${resultSuffix}` : safeResult || "Match complete.";
+}
+
+function buildAwardCards(insights) {
+  const cards = [
+    {
+      label: "Player of the match",
+      primary: insights.topPerformers.playerOfMatch,
+      secondary: "Unlocked by the strongest all-round match impact.",
+      accent: "text-amber-300",
+    },
+  ];
+
+  if (insights.topPerformers.topScorer) {
+    cards.push({
+      label: "Best batter",
+      primary: insights.topPerformers.topScorer.name,
+      secondary: `Unlocked with ${insights.topPerformers.topScorer.runs} runs.`,
+      accent: "text-sky-300",
+    });
+  }
+
+  if (insights.topPerformers.bestBowler) {
+    cards.push({
+      label: "Best bowler",
+      primary: insights.topPerformers.bestBowler.name,
+      secondary: `Unlocked with ${insights.topPerformers.bestBowler.wickets} wickets at econ ${insights.topPerformers.bestBowler.economy}.`,
+      accent: "text-emerald-300",
+    });
+  }
+
+  if (insights.topPerformers.bestStrikeRate) {
+    cards.push({
+      label: "Fastest scorer",
+      primary: insights.topPerformers.bestStrikeRate.name,
+      secondary: `Unlocked with a strike rate of ${insights.topPerformers.bestStrikeRate.strikeRate}.`,
+      accent: "text-rose-300",
+    });
+  }
+
+  if (insights.topPerformers.bestEconomy) {
+    cards.push({
+      label: "Most economical",
+      primary: insights.topPerformers.bestEconomy.name,
+      secondary: `Unlocked with economy ${insights.topPerformers.bestEconomy.economy}.`,
+      accent: "text-violet-300",
+    });
+  }
+
+  const boundaryLeader =
+    insights.innings1.boundaries >= insights.innings2.boundaries
+      ? insights.innings1
+      : insights.innings2;
+  cards.push({
+    label: "Boundary pressure",
+    primary: boundaryLeader.team || "Innings leader",
+    secondary: `Unlocked with ${boundaryLeader.boundaries} boundaries.`,
+    accent: "text-fuchsia-300",
+  });
+
+  const dotBallLeader =
+    insights.innings1.dotBalls >= insights.innings2.dotBalls
+      ? insights.innings1
+      : insights.innings2;
+  cards.push({
+    label: "Dot-ball squeeze",
+    primary: dotBallLeader.team || "Innings leader",
+    secondary: `Unlocked with ${dotBallLeader.dotBalls} dot balls.`,
+    accent: "text-cyan-300",
+  });
+
+  return cards;
+}
+
+function getSectionBackgroundImages(match) {
+  const galleryImages = Array.isArray(match?.matchImages)
+    ? match.matchImages.filter((image) => image?.url)
+    : [];
+
+  if (galleryImages.length) {
+    return galleryImages;
+  }
+
+  const fallbackUrl = String(match?.matchImageUrl || "").trim();
+  return fallbackUrl ? [{ id: "cover", url: fallbackUrl }] : [];
+}
+
+function getTeamColorClasses(teamName, insights) {
+  if (teamName === insights?.teamA?.name) {
+    return {
+      text: "text-sky-300",
+      badge: "bg-sky-500/12 text-sky-200",
+    };
+  }
+
+  if (teamName === insights?.teamB?.name) {
+    return {
+      text: "text-rose-300",
+      badge: "bg-rose-500/12 text-rose-200",
+    };
+  }
+
+  return {
+    text: "text-zinc-200",
+    badge: "bg-white/[0.08] text-zinc-200",
+  };
+}
+
+export default function ResultInsightsSections({ match, onSectionImageHold }) {
   const [shareStatus, setShareStatus] = useState("");
   const insights = useMemo(() => buildResultInsights(match), [match]);
-  const statsFallback =
-    "Detailed player stats were not recorded for this match.";
+  const sectionBackgroundImages = useMemo(
+    () => getSectionBackgroundImages(match),
+    [match],
+  );
   const shareCardImageUrl = String(
     match?.matchImages?.[0]?.url || match?.matchImageUrl || "",
   ).trim();
+  const winningSummary = useMemo(() => getWinningInningsSummary(match), [match]);
+  const resultDetailText = getResultDetailText(match?.result);
+  const innings1Colors = getTeamColorClasses(insights.innings1.team, insights);
+  const innings2Colors = getTeamColorClasses(insights.innings2.team, insights);
 
   const handleCopyLink = async () => {
     const shareUrl = buildShareUrl(
@@ -216,23 +449,12 @@ export default function ResultInsightsSections({ match }) {
     await handleCopyLink();
   };
 
-  const handleCopyResultSectionLink = async () => {
-    try {
-      const url = new URL(window.location.href);
-      url.hash = "result-share-actions";
-      await navigator.clipboard.writeText(url.toString());
-      setShareStatus("Result section link copied.");
-    } catch {
-      setShareStatus("Could not copy the result section link.");
-    }
-  };
-
   const topPerformerCards = [
     insights.topPerformers.topScorer
       ? {
           label: "Top scorer",
           primary: insights.topPerformers.topScorer.name,
-          secondary: `${insights.topPerformers.topScorer.runs} runs`,
+          secondary: `${insights.topPerformers.topScorer.runs} runs scored in the match.`,
           accent: "text-amber-300",
         }
       : null,
@@ -240,7 +462,7 @@ export default function ResultInsightsSections({ match }) {
       ? {
           label: "Best bowler",
           primary: insights.topPerformers.bestBowler.name,
-          secondary: `${insights.topPerformers.bestBowler.wickets} wickets`,
+          secondary: `${insights.topPerformers.bestBowler.wickets} wickets with controlled bowling.`,
           accent: "text-sky-300",
         }
       : null,
@@ -248,7 +470,7 @@ export default function ResultInsightsSections({ match }) {
       ? {
           label: "Best strike rate",
           primary: insights.topPerformers.bestStrikeRate.name,
-          secondary: `SR ${insights.topPerformers.bestStrikeRate.strikeRate}`,
+          secondary: `Strike rate ${insights.topPerformers.bestStrikeRate.strikeRate}.`,
           accent: "text-emerald-300",
         }
       : null,
@@ -256,7 +478,7 @@ export default function ResultInsightsSections({ match }) {
       ? {
           label: "Best economy",
           primary: insights.topPerformers.bestEconomy.name,
-          secondary: `Econ ${insights.topPerformers.bestEconomy.economy}`,
+          secondary: `Economy ${insights.topPerformers.bestEconomy.economy}.`,
           accent: "text-violet-300",
         }
       : null,
@@ -264,49 +486,22 @@ export default function ResultInsightsSections({ match }) {
       label: "Player of the match",
       primary: insights.topPerformers.playerOfMatch,
       secondary:
-        match?.result
-          ? `${match.result} Final result standout.`
-          : 
-        (insights.tracked
-          ? "Key impact across the match."
-          : "Picked from the final result."),
+        insights.tracked
+          ? "Strongest impact across batting and bowling."
+          : "Chosen from the final score and match result.",
       accent: "text-rose-300",
     },
   ].filter(Boolean);
-  const matchAwardCards = [
-    {
-      label: "Player of the match",
-      primary: insights.awards.playerOfMatch,
-      secondary: match?.result || "",
-      accent: "text-amber-300",
-    },
-    insights.topPerformers.topScorer
-      ? {
-          label: "Best batter",
-          primary: insights.awards.bestBatter,
-          secondary: `${insights.topPerformers.topScorer.runs} runs`,
-          accent: "text-sky-300",
-        }
-      : null,
-    insights.topPerformers.bestBowler
-      ? {
-          label: "Best bowler",
-          primary: insights.awards.bestBowler,
-          secondary: `${insights.topPerformers.bestBowler.wickets} wickets`,
-          accent: "text-emerald-300",
-        }
-      : null,
-    {
-      label: "Best moment",
-      primary: insights.awards.bestMoment,
-      secondary: "Match-defining highlight",
-      accent: "text-rose-300",
-    },
-  ].filter(Boolean);
+  const matchAwardCards = useMemo(() => buildAwardCards(insights), [insights]);
 
   return (
     <div className="space-y-8">
-      <SectionShell title="Top Performers" icon={<FaStar />}>
+      <SectionShell
+        title="Top Performers"
+        icon={<FaStar />}
+        backgroundImages={sectionBackgroundImages}
+        onHold={onSectionImageHold}
+      >
         <div className="flex flex-wrap justify-center gap-4">
           {topPerformerCards.map((card) => (
             <PerformerCard
@@ -346,7 +541,7 @@ export default function ResultInsightsSections({ match }) {
       <SectionShell title="Over Summary" icon={<FaChartBar />}>
         <SplitTeamFeed
           leftTeamName={insights.innings1.team || "Innings 1"}
-          leftAccentClass="text-sky-300"
+          leftAccentClass={innings1Colors.text}
           leftItems={insights.innings1.overSummaries}
           leftEmptyText="No over summary available."
           renderLeftItem={(over, index) => (
@@ -359,7 +554,7 @@ export default function ResultInsightsSections({ match }) {
             </div>
           )}
           rightTeamName={insights.innings2.team || "Innings 2"}
-          rightAccentClass="text-rose-300"
+          rightAccentClass={innings2Colors.text}
           rightItems={insights.innings2.overSummaries}
           rightEmptyText="No over summary available."
           renderRightItem={(over, index) => (
@@ -379,7 +574,7 @@ export default function ResultInsightsSections({ match }) {
         <SectionShell title="Wicket Timeline" icon={<FaBolt />}>
           <SplitTeamFeed
             leftTeamName={insights.innings1.team || "Innings 1"}
-            leftAccentClass="text-sky-300"
+            leftAccentClass={innings1Colors.text}
             leftItems={insights.innings1.wicketTimeline}
             leftEmptyText="No wickets fell."
             renderLeftItem={(wicket, index) => (
@@ -390,13 +585,13 @@ export default function ResultInsightsSections({ match }) {
                 <p className="text-sm font-semibold leading-5 text-white">
                   {wicket.detail}
                 </p>
-                <span className="rounded-full bg-sky-500/12 px-3 py-1 text-sm font-semibold text-sky-200">
+                <span className={`rounded-full px-3 py-1 text-sm font-semibold ${innings1Colors.badge}`}>
                   {wicket.overBall}
                 </span>
               </div>
             )}
             rightTeamName={insights.innings2.team || "Innings 2"}
-            rightAccentClass="text-rose-300"
+            rightAccentClass={innings2Colors.text}
             rightItems={insights.innings2.wicketTimeline}
             rightEmptyText="No wickets fell."
             renderRightItem={(wicket, index) => (
@@ -407,7 +602,7 @@ export default function ResultInsightsSections({ match }) {
                 <p className="text-sm font-semibold leading-5 text-white">
                   {wicket.detail}
                 </p>
-                <span className="rounded-full bg-rose-500/12 px-3 py-1 text-sm font-semibold text-rose-200">
+                <span className={`rounded-full px-3 py-1 text-sm font-semibold ${innings2Colors.badge}`}>
                   {wicket.overBall}
                 </span>
               </div>
@@ -422,10 +617,10 @@ export default function ResultInsightsSections({ match }) {
             <span className="text-[11px] uppercase tracking-[0.24em] text-white">
               Type
             </span>
-            <span className="text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">
+            <span className={`text-center text-[11px] font-semibold uppercase tracking-[0.18em] ${innings1Colors.text}`}>
               {insights.innings1.team || "Innings 1"}
             </span>
-            <span className="text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-300">
+            <span className={`text-center text-[11px] font-semibold uppercase tracking-[0.18em] ${innings2Colors.text}`}>
               {insights.innings2.team || "Innings 2"}
             </span>
           </div>
@@ -434,15 +629,15 @@ export default function ResultInsightsSections({ match }) {
               label="Fours"
               leftValue={insights.innings1.fours}
               rightValue={insights.innings2.fours}
-              leftTone="text-sky-300"
-              rightTone="text-rose-300"
+              leftTone={innings1Colors.text}
+              rightTone={innings2Colors.text}
             />
             <SplitStatRow
               label="Sixes"
               leftValue={insights.innings1.sixes}
               rightValue={insights.innings2.sixes}
-              leftTone="text-sky-300"
-              rightTone="text-rose-300"
+              leftTone={innings1Colors.text}
+              rightTone={innings2Colors.text}
             />
             <SplitStatRow
               label="Wides"
@@ -476,8 +671,13 @@ export default function ResultInsightsSections({ match }) {
         </div>
       </SectionShell>
 
-      <SectionShell title="Match Awards" icon={<FaMedal />}>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <SectionShell
+        title="Match Awards"
+        icon={<FaMedal />}
+        backgroundImages={sectionBackgroundImages}
+        onHold={onSectionImageHold}
+      >
+        <div className="flex flex-wrap justify-center gap-4">
           {matchAwardCards.map((card) => (
             <PerformerCard
               key={card.label}
@@ -491,8 +691,8 @@ export default function ResultInsightsSections({ match }) {
       </SectionShell>
 
       <SectionShell title="Winning Moment / Turning Point" icon={<FaTrophy />}>
-        <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(135deg,rgba(250,204,21,0.08),rgba(255,255,255,0.02))] p-5">
-          <p className="text-xl font-bold text-white">
+        <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(135deg,rgba(250,204,21,0.08),rgba(255,255,255,0.02))] p-5 text-center">
+          <p className="mx-auto max-w-[48rem] text-xl font-bold leading-8 text-white">
             {insights.turningPoint}
           </p>
         </div>
@@ -503,8 +703,8 @@ export default function ResultInsightsSections({ match }) {
         title="Share Results"
         icon={<FaShareAlt />}
       >
-        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="relative overflow-hidden rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,8,12,0.98))]">
+        <div className="mx-auto max-w-[56rem] space-y-4">
+          <div className="relative min-h-[280px] overflow-hidden rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,8,12,0.98))] lg:min-h-[360px]">
             {shareCardImageUrl ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -516,7 +716,7 @@ export default function ResultInsightsSections({ match }) {
                 <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,8,12,0.28),rgba(6,8,12,0.62)_38%,rgba(6,8,12,0.9)_100%)]" />
               </>
             ) : null}
-            <div className="relative p-5">
+            <div className="relative flex min-h-[280px] flex-col justify-between p-5 lg:min-h-[360px] lg:p-7">
               {!shareCardImageUrl ? (
                 <div className="flex justify-center">
                   <Image
@@ -532,16 +732,16 @@ export default function ResultInsightsSections({ match }) {
               <p className="text-[11px] uppercase tracking-[0.28em] text-white/88">
                 Share Card
               </p>
-              <h3 className="mt-3 text-3xl font-black text-white">
+              <h3 className="mt-3 text-4xl font-black text-white lg:text-5xl">
                 {insights.teamA.name} vs {insights.teamB.name}
               </h3>
-              <p className="mt-2 text-lg font-semibold text-white">
-                {match?.result || "Match complete"}
+              <p className="mt-3 max-w-[34rem] text-xl font-semibold leading-8 text-white lg:text-2xl">
+                {resultDetailText}
               </p>
-              <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="mt-6 grid grid-cols-2 gap-3 lg:gap-4">
                 <StatMiniCard
-                  label="Final score"
-                  value={`${match?.score || 0}/${match?.outs || 0}`}
+                  label="Winning score"
+                  value={winningSummary?.scoreline || `${match?.score || 0}/${match?.outs || 0}`}
                   tone="text-white"
                 />
                 <StatMiniCard
@@ -553,17 +753,17 @@ export default function ResultInsightsSections({ match }) {
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="mx-auto flex w-full max-w-md flex-col items-center space-y-3">
             <button
               type="button"
               onClick={handleShare}
-              className="inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-white/[0.05] px-4 py-3.5 font-semibold text-white transition hover:bg-white/[0.08]"
+              className="inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-white/[0.05] px-4 py-4 text-lg font-semibold text-white transition hover:bg-white/[0.08]"
             >
               <FaShareAlt />
               <span>Share result</span>
             </button>
             {shareStatus ? (
-              <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-zinc-300">
+              <div className="w-full rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-center text-sm text-zinc-300">
                 {shareStatus}
               </div>
             ) : null}

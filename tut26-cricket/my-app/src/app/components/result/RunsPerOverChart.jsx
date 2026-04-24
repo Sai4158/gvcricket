@@ -39,31 +39,34 @@ export default function RunsPerOverChart({
   }));
 
   return (
-    <div className="bg-zinc-900/50 rounded-2xl shadow-lg p-6 ring-1 ring-white/10">
-      <h2 className="text-2xl font-bold text-white text-center flex items-center justify-center gap-2 mb-6">
+    <div className="h-full rounded-[28px] border border-white/10 bg-zinc-900/50 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.32)] ring-1 ring-white/6">
+      <h2 className="mb-2 text-center text-2xl font-bold text-white lg:text-3xl">
         Runs Per Over
       </h2>
-      <div ref={containerRef} className="w-full h-80 min-w-0">
+      <p className="mx-auto mb-6 max-w-[34rem] text-center text-sm leading-6 text-zinc-400 lg:text-base">
+        Over-by-over scoring shows where pressure shifted and where the match opened up.
+      </p>
+      <div ref={containerRef} className="h-[360px] w-full min-w-0 lg:h-[420px]">
         {width > 0 ? (
           <LineChart
             width={width}
-            height={320}
+            height={width >= 1024 ? 420 : 360}
             data={chartData}
-            margin={{ top: 5, right: 20, left: 0, bottom: 20 }}
+            margin={{ top: 12, right: 18, left: 0, bottom: 16 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#404040" />
             <XAxis
               dataKey="name"
               stroke="#a1a1aa"
-              fontSize={14}
+              fontSize={13}
               tick={{ dy: 10 }}
             />
-            <YAxis stroke="#a1a1aa" fontSize={14} />
+            <YAxis stroke="#a1a1aa" fontSize={13} />
             <Tooltip
               content={<CustomTooltip />}
               cursor={{ fill: "rgba(113, 113, 122, 0.2)" }}
             />
-            <Legend wrapperStyle={{ fontSize: "16px", paddingTop: "30px" }} />
+            <Legend wrapperStyle={{ fontSize: "15px", paddingTop: "22px" }} />
             <Line
               type="monotone"
               dataKey={team1Name}
