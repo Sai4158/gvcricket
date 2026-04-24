@@ -361,19 +361,30 @@ export function WalkieTalkButton({
   const buttonRef = useRef(null);
   const holdingRef = useRef(false);
   const pointerIdRef = useRef(null);
+  const startAttemptRef = useRef(0);
 
   const startHold = useCallback(async () => {
     if (disabled || holdingRef.current) return;
     holdingRef.current = true;
     setStarting(true);
+    const attemptId = startAttemptRef.current + 1;
+    startAttemptRef.current = attemptId;
     try {
       const prepared = await onPrepare?.();
-      if (!holdingRef.current || prepared === false) {
+      if (
+        !holdingRef.current ||
+        startAttemptRef.current !== attemptId ||
+        prepared === false
+      ) {
         holdingRef.current = false;
         return;
       }
       const started = (await onStart?.()) !== false;
-      if (!holdingRef.current || !started) {
+      if (
+        !holdingRef.current ||
+        startAttemptRef.current !== attemptId ||
+        !started
+      ) {
         if (!holdingRef.current && started) {
           await onStop?.();
         }

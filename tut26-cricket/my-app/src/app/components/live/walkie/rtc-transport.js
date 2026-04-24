@@ -22,6 +22,7 @@ import { shouldPlayWalkieRemoteAudio } from "./walkie-talkie-gates";
 
 export const WALKIE_REMOTE_PLAYBACK_VOLUME = 100;
 export const WALKIE_MIC_SEND_VOLUME = 220;
+const REMOTE_SUBSCRIBE_RETRY_MS = 1200;
 
 export function createWalkieRtcTransportApi({
   audioRetryTimerRef,
@@ -56,6 +57,8 @@ export function createWalkieRtcTransportApi({
   trackPromiseRef,
   updateNotice,
 } = {}) {
+  const remoteSubscribeRetryUntil = new Map();
+
   const stopRemoteAudioPlayback = (uid = "") => {
     const safeUid = String(uid || "");
     if (!safeUid) {
@@ -136,6 +139,11 @@ export function createWalkieRtcTransportApi({
       return false;
     }
 
+    const retryUntil = Number(remoteSubscribeRetryUntil.get(uid) || 0);
+    if (retryUntil > Date.now()) {
+      return false;
+    }
+
     try {
       if (!user.audioTrack) {
         await client.subscribe(user, "audio");
@@ -143,6 +151,7 @@ export function createWalkieRtcTransportApi({
 
       const track = user.audioTrack;
       if (track) {
+        remoteSubscribeRetryUntil.delete(uid);
         try {
           track.setVolume?.(WALKIE_REMOTE_PLAYBACK_VOLUME);
         } catch {
@@ -154,12 +163,21 @@ export function createWalkieRtcTransportApi({
       syncRemoteAudioPlayback();
       return true;
     } catch (subscribeError) {
+      const message = messageFor(subscribeError, "Remote subscribe failed.");
+      remoteAudioTracksRef.current.delete(uid);
+      remoteAudioPlayingRef.current.delete(uid);
+      remoteSubscribeRetryUntil.set(
+        uid,
+        Date.now() + REMOTE_SUBSCRIBE_RETRY_MS,
+      );
       setNeedsAudioUnlock(isSafari);
-      updateNotice("Enable Audio if Safari blocks walkie playback.");
-      walkieConsole("error", "RTC remote subscribe failed", {
+      if (!/no such stream id|can not find remote track/i.test(message)) {
+        updateNotice("Enable Audio if Safari blocks walkie playback.");
+      }
+      walkieConsole("warn", "RTC remote subscribe delayed", {
         stage: "rtc-subscribe",
         uid,
-        message: messageFor(subscribeError, "Remote subscribe failed."),
+        message,
       });
       return false;
     }
@@ -201,12 +219,14 @@ export function createWalkieRtcTransportApi({
         const uid = String(user.uid || "");
         stopRemoteAudioPlayback(uid);
         remoteAudioTracksRef.current.delete(uid);
+        remoteSubscribeRetryUntil.delete(uid);
       }
     });
     client.on("user-left", (user) => {
       const uid = String(user?.uid || "");
       stopRemoteAudioPlayback(uid);
       remoteAudioTracksRef.current.delete(uid);
+      remoteSubscribeRetryUntil.delete(uid);
     });
     client.on("connection-state-change", (state) => {
       if (rtcClientRef.current !== client) {
@@ -460,6 +480,7 @@ export function createWalkieRtcTransportApi({
     clearTimer(cooldownTimerRef, window.clearInterval);
     stopAllRemoteAudioPlayback();
     remoteAudioTracksRef.current.clear();
+    remoteSubscribeRetryUntil.clear();
     await cleanupLocalTrack();
     const client = rtcClientRef.current;
     rtcClientRef.current = null;
