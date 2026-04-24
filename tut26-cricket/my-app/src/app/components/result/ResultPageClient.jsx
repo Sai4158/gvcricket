@@ -9,7 +9,6 @@
  * Read next: ./README.md
  */
 
-
 import dynamic from "next/dynamic";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -40,9 +39,12 @@ import {
 const RunsPerOverChart = dynamic(() => import("./RunsPerOverChart"), {
   ssr: false,
 });
-const ScoringBreakdownCharts = dynamic(() => import("./ScoringBreakdownCharts"), {
-  ssr: false,
-});
+const ScoringBreakdownCharts = dynamic(
+  () => import("./ScoringBreakdownCharts"),
+  {
+    ssr: false,
+  },
+);
 
 const IMAGE_ZOOM_MIN = 1;
 const IMAGE_ZOOM_MAX = 3;
@@ -73,10 +75,11 @@ export default function ResultPageClient({ matchId, initialMatch }) {
         delay: `${(index % 8) * 0.18}s`,
         duration: `${4 + (index % 5) * 0.45}s`,
         rotate: `${(index % 2 === 0 ? 1 : -1) * (10 + index * 3)}deg`,
-        color:
-          ["#f6b400", "#fde68a", "#ffffff", "#ffdd57", "#f59e0b"][index % 5],
+        color: ["#f6b400", "#fde68a", "#ffffff", "#ffdd57", "#f59e0b"][
+          index % 5
+        ],
       })),
-    []
+    [],
   );
 
   useEffect(() => {
@@ -89,7 +92,10 @@ export default function ResultPageClient({ matchId, initialMatch }) {
     event: "match",
     enabled: Boolean(matchId) && Boolean(!match || match.isOngoing),
     onMessage: (payload) => {
-      if (payload.updatedAt && payload.updatedAt === lastStreamUpdateRef.current) {
+      if (
+        payload.updatedAt &&
+        payload.updatedAt === lastStreamUpdateRef.current
+      ) {
         return;
       }
 
@@ -108,7 +114,9 @@ export default function ResultPageClient({ matchId, initialMatch }) {
     },
   });
 
-  const matchImages = Array.isArray(match?.matchImages) ? match.matchImages : [];
+  const matchImages = Array.isArray(match?.matchImages)
+    ? match.matchImages
+    : [];
   const hasGalleryImages = matchImages.length > 0;
   const activeGalleryImage =
     matchImages.find((image) => image.id === activeGalleryImageId) ||
@@ -117,7 +125,10 @@ export default function ResultPageClient({ matchId, initialMatch }) {
 
   if (streamError) {
     return (
-      <main id="top" className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <main
+        id="top"
+        className="min-h-screen bg-zinc-950 flex items-center justify-center"
+      >
         <div className="text-center text-red-400">{streamError}</div>
       </main>
     );
@@ -125,7 +136,10 @@ export default function ResultPageClient({ matchId, initialMatch }) {
 
   if (!match) {
     return (
-      <main id="top" className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <main
+        id="top"
+        className="min-h-screen bg-zinc-950 flex items-center justify-center"
+      >
         <div className="text-lg font-medium">Loading Match Results...</div>
       </main>
     );
@@ -155,8 +169,9 @@ export default function ResultPageClient({ matchId, initialMatch }) {
     }
 
     event.preventDefault();
-    updateZoomedImageScale((current) =>
-      current + (event.deltaY < 0 ? IMAGE_ZOOM_STEP : -IMAGE_ZOOM_STEP)
+    updateZoomedImageScale(
+      (current) =>
+        current + (event.deltaY < 0 ? IMAGE_ZOOM_STEP : -IMAGE_ZOOM_STEP),
     );
   };
 
@@ -174,7 +189,9 @@ export default function ResultPageClient({ matchId, initialMatch }) {
         style={{ WebkitUserSelect: "none", userSelect: "none" }}
       >
         <MatchImageCarousel
-          images={matchImages.length ? matchImages : [{ id: "fallback", url: "" }]}
+          images={
+            matchImages.length ? matchImages : [{ id: "fallback", url: "" }]
+          }
           alt={match.name || "Match cover"}
           showFallback
           imageClassName="object-contain object-center bg-[linear-gradient(180deg,rgba(20,20,24,0.98),rgba(10,10,14,0.98))]"
@@ -213,7 +230,10 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   );
 
   return (
-    <main id="top" className="min-h-screen bg-zinc-950 p-4 sm:p-8 text-zinc-300 font-sans">
+    <main
+      id="top"
+      className="min-h-screen bg-zinc-950 p-4 sm:p-8 text-zinc-300 font-sans"
+    >
       <div className="max-w-5xl mx-auto space-y-12 py-10">
         <div className="flex justify-start">
           <LoadingButton
@@ -269,7 +289,9 @@ export default function ResultPageClient({ matchId, initialMatch }) {
               <div className="rounded-[28px] border border-white/10 bg-black/35 p-5 backdrop-blur-md shadow-[0_18px_50px_rgba(0,0,0,0.32)]">
                 <div className="grid grid-cols-2 gap-3 text-center">
                   <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
-                    <p className="text-xs uppercase tracking-[0.28em] text-zinc-400">Winning score</p>
+                    <p className="text-xs uppercase tracking-[0.28em] text-zinc-400">
+                      Winning score
+                    </p>
                     <p className="mt-2 text-3xl font-black text-white">
                       {winningInningsSummary
                         ? winningInningsSummary.score
@@ -283,7 +305,9 @@ export default function ResultPageClient({ matchId, initialMatch }) {
                     </p>
                   </div>
                   <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4">
-                    <p className="text-xs uppercase tracking-[0.28em] text-zinc-400">Overs</p>
+                    <p className="text-xs uppercase tracking-[0.28em] text-zinc-400">
+                      Overs
+                    </p>
                     <p className="mt-2 text-3xl font-black text-white">
                       {winningInningsSummary?.overs ||
                         innings2Summary.overs ||
@@ -358,7 +382,6 @@ export default function ResultPageClient({ matchId, initialMatch }) {
             team2Name={match.innings2.team}
           />
         </section>
-
       </div>
       <SiteFooter />
       <AnimatePresence>
@@ -372,10 +395,16 @@ export default function ResultPageClient({ matchId, initialMatch }) {
             <MatchImageUploader
               matchId={String(match._id)}
               existingImages={matchImages}
-              existingImageUrl={activeGalleryImage?.url || match?.matchImageUrl || ""}
-              existingImageCount={matchImages.length || (match?.matchImageUrl ? 1 : 0)}
+              existingImageUrl={
+                activeGalleryImage?.url || match?.matchImageUrl || ""
+              }
+              existingImageCount={
+                matchImages.length || (match?.matchImageUrl ? 1 : 0)
+              }
               targetImageId={activeGalleryImage?.id || ""}
-              appendOnUpload={matchImages.length > 0 || Boolean(match?.matchImageUrl)}
+              appendOnUpload={
+                matchImages.length > 0 || Boolean(match?.matchImageUrl)
+              }
               onUploaded={(updatedMatch) => {
                 startTransition(() => {
                   setMatch((current) =>
@@ -398,71 +427,54 @@ export default function ResultPageClient({ matchId, initialMatch }) {
       <AnimatePresence>
         {zoomedImage?.url ? (
           <ModalBase
-            title=""
             onExit={() => {
               setZoomedImageScale(1);
               setZoomedImage(null);
             }}
-            panelClassName="max-w-5xl bg-black/95"
-            bodyClassName="max-h-[calc(100vh-4rem)] p-0"
+            hideHeader
+            panelClassName="max-w-5xl border-0 bg-transparent shadow-none"
+            bodyClassName="max-h-[calc(100vh-6rem)] p-0"
           >
             <div
-              className="overflow-hidden rounded-[24px] bg-black"
+              className="relative overflow-hidden rounded-[24px]"
               onContextMenu={(event) => event.preventDefault()}
             >
-              <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
-                <span>Image preview</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      updateZoomedImageScale((current) => current - IMAGE_ZOOM_STEP)
-                    }
-                    disabled={zoomedImageScale <= IMAGE_ZOOM_MIN}
-                    className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    -
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateZoomedImageScale(1)}
-                    disabled={zoomedImageScale === 1}
-                    className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {Math.round(zoomedImageScale * 100)}%
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      updateZoomedImageScale((current) => current + IMAGE_ZOOM_STEP)
-                    }
-                    disabled={zoomedImageScale >= IMAGE_ZOOM_MAX}
-                    className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setZoomedImageScale(1);
+                  setZoomedImage(null);
+                }}
+                className="absolute right-3 top-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-xl font-bold text-white backdrop-blur-sm transition hover:bg-black/75"
+                aria-label="Close image preview"
+              >
+                ×
+              </button>
               <div
-                className="max-h-[82vh] overflow-auto overscroll-contain"
+                className="max-h-[70vh] overflow-auto overscroll-contain"
                 onWheel={handleZoomedImageWheel}
                 style={{ touchAction: "pan-x pan-y pinch-zoom" }}
               >
-                <div className="flex min-h-[82vh] min-w-full items-center justify-center p-4 sm:p-6">
+                <div className="flex min-h-[70vh] min-w-full items-center justify-center p-2 sm:p-4">
                   <SafeMatchImage
                     src={zoomedImage.url}
                     alt={match.name || "Match image"}
                     width={2000}
                     height={1400}
-                    className="mx-auto h-auto max-h-[82vh] w-auto max-w-full rounded-[18px] object-contain select-none"
-                    fallbackClassName="mx-auto h-auto max-h-[82vh] w-auto max-w-full rounded-[18px] object-contain bg-black p-10 select-none"
+                    className="mx-auto h-auto max-h-[70vh] w-auto max-w-full rounded-[18px] object-contain select-none"
+                    fallbackClassName="mx-auto h-auto max-h-[70vh] w-auto max-w-full rounded-[18px] object-contain bg-black p-10 select-none"
                     sizes="100vw"
                     draggable={false}
                     onDoubleClick={() => {
-                      updateZoomedImageScale((current) => (current > 1 ? 1 : 2));
+                      updateZoomedImageScale((current) =>
+                        current > 1 ? 1 : 2,
+                      );
                     }}
                     style={{
-                      width: zoomedImageScale > 1 ? `${zoomedImageScale * 100}%` : undefined,
+                      width:
+                        zoomedImageScale > 1
+                          ? `${zoomedImageScale * 100}%`
+                          : undefined,
                       maxWidth: zoomedImageScale > 1 ? "none" : undefined,
                       maxHeight: zoomedImageScale > 1 ? "none" : undefined,
                       cursor: zoomedImageScale > 1 ? "zoom-out" : "zoom-in",
@@ -477,5 +489,3 @@ export default function ResultPageClient({ matchId, initialMatch }) {
     </main>
   );
 }
-
-
