@@ -1,0 +1,473 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - alert [ref=e11]
+  - main [ref=e12]:
+    - generic [ref=e13]:
+      - button "Back to Sessions" [ref=e15]:
+        - img [ref=e16]
+        - text: Back to Sessions
+      - generic [ref=e18]:
+        - img "Match cover" [ref=e20]
+        - generic [ref=e25]:
+          - generic [ref=e27]:
+            - paragraph [ref=e28]: Match Complete
+            - heading "MATCH RESULT" [level=1] [ref=e29]:
+              - generic [ref=e30]:
+                - generic [ref=e31]: MATCH RESULT
+                - generic: MATCH RESULT
+            - paragraph [ref=e32]: HARRY vs SHIV
+          - generic [ref=e33]:
+            - generic [ref=e35]:
+              - img [ref=e36]
+              - heading "Congratulations" [level=2] [ref=e38]
+              - paragraph [ref=e39]: HARRY
+              - paragraph [ref=e40]: Won by 5 wickets.
+            - generic [ref=e41]:
+              - generic [ref=e42]:
+                - generic [ref=e43]:
+                  - paragraph [ref=e44]: Winning score
+                  - paragraph [ref=e45]: 76/1
+                - generic [ref=e46]:
+                  - paragraph [ref=e47]: Overs
+                  - paragraph [ref=e48]: "10.0"
+              - paragraph [ref=e50]: "Toss: HARRY won the toss."
+      - generic [ref=e51]:
+        - generic [ref=e54]:
+          - img "Match cover" [ref=e56]
+          - button "Previous image" [ref=e57]:
+            - img [ref=e58]
+          - button "Next image" [ref=e60]:
+            - img [ref=e61]
+        - generic [ref=e63]:
+          - paragraph [ref=e64]: 2 images in gallery
+          - button "Manage Images" [ref=e65]
+      - generic [ref=e67]:
+        - heading "Match Summary" [level=2] [ref=e68]:
+          - img [ref=e69]
+          - text: Match Summary
+        - generic [ref=e71]:
+          - generic [ref=e72]:
+            - generic [ref=e74]:
+              - heading "HARRY" [level=3] [ref=e75]
+              - generic [ref=e76]:
+                - img [ref=e77]
+                - text: Winner
+            - paragraph [ref=e79]: 76/1
+            - generic [ref=e80]:
+              - generic [ref=e81]:
+                - generic [ref=e82]: "Overs:"
+                - generic [ref=e83]: "10.0"
+              - generic [ref=e84]:
+                - generic [ref=e85]: "Total Players:"
+                - generic [ref=e86]: "7"
+              - generic [ref=e87]:
+                - generic [ref=e88]: "Run Rate:"
+                - generic [ref=e89]: "7.60"
+          - generic [ref=e90]:
+            - heading "SHIV" [level=3] [ref=e93]
+            - paragraph [ref=e94]: 77/2
+            - generic [ref=e95]:
+              - generic [ref=e96]:
+                - generic [ref=e97]: "Overs:"
+                - generic [ref=e98]: "9.2"
+              - generic [ref=e99]:
+                - generic [ref=e100]: "Total Players:"
+                - generic [ref=e101]: "7"
+              - generic [ref=e102]:
+                - generic [ref=e103]: "Run Rate:"
+                - generic [ref=e104]: "8.25"
+        - paragraph [ref=e105]: Toss won by HARRY.
+      - generic [ref=e106]:
+        - heading "Graphical Analysis" [level=2] [ref=e107]
+        - generic [ref=e108]:
+          - generic [ref=e109]:
+            - heading "Runs Per Over" [level=2] [ref=e110]
+            - paragraph [ref=e111]: Over-by-over scoring shows where pressure shifted and where the match opened up.
+            - generic [ref=e113]:
+              - list [ref=e115]:
+                - listitem [ref=e116]:
+                  - img "HARRY legend icon" [ref=e117]
+                  - text: HARRY
+                - listitem [ref=e119]:
+                  - img "SHIV legend icon" [ref=e120]
+                  - text: SHIV
+              - application [ref=e122]:
+                - generic [ref=e164]:
+                  - generic [ref=e165]:
+                    - generic [ref=e167]: Over 1
+                    - generic [ref=e169]: Over 2
+                    - generic [ref=e171]: Over 3
+                    - generic [ref=e173]: Over 4
+                    - generic [ref=e175]: Over 5
+                    - generic [ref=e177]: Over 6
+                    - generic [ref=e179]: Over 7
+                    - generic [ref=e181]: Over 8
+                    - generic [ref=e183]: Over 9
+                    - generic [ref=e185]: Over 10
+                  - generic [ref=e186]:
+                    - generic [ref=e188]: "0"
+                    - generic [ref=e190]: "4"
+                    - generic [ref=e192]: "8"
+                    - generic [ref=e194]: "12"
+                    - generic [ref=e196]: "16"
+          - generic [ref=e197]:
+            - generic [ref=e198]:
+              - heading "Match Snapshot" [level=2] [ref=e199]
+              - paragraph [ref=e200]: This chart compares runs, run rate, boundaries, extras, and dot balls for both teams.
+            - generic [ref=e202]:
+              - list [ref=e204]:
+                - listitem [ref=e205]:
+                  - img "HARRY legend icon" [ref=e206]
+                  - text: HARRY
+                - listitem [ref=e208]:
+                  - img "SHIV legend icon" [ref=e209]
+                  - text: SHIV
+              - application [ref=e211]:
+                - generic [ref=e223]:
+                  - generic [ref=e224]:
+                    - generic [ref=e226]: Runs
+                    - generic [ref=e228]: Run rate
+                    - generic [ref=e230]: Boundaries
+                    - generic [ref=e232]: Extras
+                    - generic [ref=e234]: Dot balls
+                  - generic [ref=e235]:
+                    - generic [ref=e237]: "0"
+                    - generic [ref=e239]: "20"
+                    - generic [ref=e241]: "40"
+                    - generic [ref=e243]: "60"
+                    - generic [ref=e245]: "80"
+      - generic [ref=e246]:
+        - generic [ref=e247]:
+          - generic [ref=e252]:
+            - img [ref=e254]
+            - heading "Top Performers" [level=2] [ref=e256]
+          - generic [ref=e259]:
+            - paragraph [ref=e260]: Player of the match
+            - paragraph [ref=e261]: HARRY
+            - paragraph [ref=e262]: Chosen from the final score and match result.
+        - generic [ref=e263]:
+          - generic [ref=e265]:
+            - img [ref=e267]
+            - heading "Team Comparison" [level=2] [ref=e269]
+          - generic [ref=e271]:
+            - generic [ref=e272]:
+              - heading "HARRY" [level=3] [ref=e273]
+              - generic [ref=e274]:
+                - generic [ref=e275]:
+                  - generic [ref=e276]: Total runs
+                  - generic [ref=e277]: "76"
+                - generic [ref=e278]:
+                  - generic [ref=e279]: Wickets lost
+                  - generic [ref=e280]: "1"
+                - generic [ref=e281]:
+                  - generic [ref=e282]: Run rate
+                  - generic [ref=e283]: "7.60"
+                - generic [ref=e284]:
+                  - generic [ref=e285]: Boundaries
+                  - generic [ref=e286]: "8"
+                - generic [ref=e287]:
+                  - generic [ref=e288]: Extras
+                  - generic [ref=e289]: "10"
+                - generic [ref=e290]:
+                  - generic [ref=e291]: Dot balls
+                  - generic [ref=e292]: "23"
+            - generic [ref=e293]:
+              - heading "SHIV" [level=3] [ref=e294]
+              - generic [ref=e295]:
+                - generic [ref=e296]:
+                  - generic [ref=e297]: Total runs
+                  - generic [ref=e298]: "77"
+                - generic [ref=e299]:
+                  - generic [ref=e300]: Wickets lost
+                  - generic [ref=e301]: "2"
+                - generic [ref=e302]:
+                  - generic [ref=e303]: Run rate
+                  - generic [ref=e304]: "8.25"
+                - generic [ref=e305]:
+                  - generic [ref=e306]: Boundaries
+                  - generic [ref=e307]: "11"
+                - generic [ref=e308]:
+                  - generic [ref=e309]: Extras
+                  - generic [ref=e310]: "3"
+                - generic [ref=e311]:
+                  - generic [ref=e312]: Dot balls
+                  - generic [ref=e313]: "21"
+        - generic [ref=e314]:
+          - generic [ref=e316]:
+            - img [ref=e318]
+            - heading "Over Summary" [level=2] [ref=e320]
+          - generic [ref=e323]:
+            - generic [ref=e324]:
+              - generic [ref=e325]:
+                - heading "HARRY" [level=3] [ref=e326]
+                - generic [ref=e327]: "10"
+              - generic [ref=e328]:
+                - generic [ref=e329]:
+                  - paragraph [ref=e330]: Over 1
+                  - paragraph [ref=e331]: 8 runs
+                - generic [ref=e332]:
+                  - paragraph [ref=e333]: Over 2
+                  - paragraph [ref=e334]: 10 runs
+                - generic [ref=e335]:
+                  - paragraph [ref=e336]: Over 3
+                  - paragraph [ref=e337]: 10 runs
+                - generic [ref=e338]:
+                  - paragraph [ref=e339]: Over 4
+                  - paragraph [ref=e340]: 5 runs, 1 wicket
+                - generic [ref=e341]:
+                  - paragraph [ref=e342]: Over 5
+                  - paragraph [ref=e343]: 8 runs
+                - generic [ref=e344]:
+                  - paragraph [ref=e345]: Over 6
+                  - paragraph [ref=e346]: 13 runs
+                - generic [ref=e347]:
+                  - paragraph [ref=e348]: Over 7
+                  - paragraph [ref=e349]: 10 runs
+                - generic [ref=e350]:
+                  - paragraph [ref=e351]: Over 8
+                  - paragraph [ref=e352]: 4 runs
+                - generic [ref=e353]:
+                  - paragraph [ref=e354]: Over 9
+                  - paragraph [ref=e355]: 4 runs
+                - generic [ref=e356]:
+                  - paragraph [ref=e357]: Over 10
+                  - paragraph [ref=e358]: 4 runs
+            - generic [ref=e359]:
+              - generic [ref=e360]:
+                - heading "SHIV" [level=3] [ref=e361]
+                - generic [ref=e362]: "10"
+              - generic [ref=e363]:
+                - generic [ref=e364]:
+                  - paragraph [ref=e365]: Over 1
+                  - paragraph [ref=e366]: 7 runs
+                - generic [ref=e367]:
+                  - paragraph [ref=e368]: Over 2
+                  - paragraph [ref=e369]: 6 runs
+                - generic [ref=e370]:
+                  - paragraph [ref=e371]: Over 3
+                  - paragraph [ref=e372]: 10 runs
+                - generic [ref=e373]:
+                  - paragraph [ref=e374]: Over 4
+                  - paragraph [ref=e375]: 6 runs
+                - generic [ref=e376]:
+                  - paragraph [ref=e377]: Over 5
+                  - paragraph [ref=e378]: 8 runs
+                - generic [ref=e379]:
+                  - paragraph [ref=e380]: Over 6
+                  - paragraph [ref=e381]: 9 runs
+                - generic [ref=e382]:
+                  - paragraph [ref=e383]: Over 7
+                  - paragraph [ref=e384]: 6 runs, 1 wicket
+                - generic [ref=e385]:
+                  - paragraph [ref=e386]: Over 8
+                  - paragraph [ref=e387]: 9 runs, 1 wicket
+                - generic [ref=e388]:
+                  - paragraph [ref=e389]: Over 9
+                  - paragraph [ref=e390]: 10 runs
+                - generic [ref=e391]:
+                  - paragraph [ref=e392]: Over 10
+                  - paragraph [ref=e393]: 6 runs
+        - generic [ref=e394]:
+          - generic [ref=e396]:
+            - img [ref=e398]
+            - heading "Wicket Timeline" [level=2] [ref=e400]
+          - generic [ref=e403]:
+            - generic [ref=e404]:
+              - generic [ref=e405]:
+                - heading "HARRY" [level=3] [ref=e406]
+                - generic [ref=e407]: "1"
+              - generic [ref=e409]:
+                - paragraph [ref=e410]: Wicket fell
+                - generic [ref=e411]: "4.4"
+            - generic [ref=e412]:
+              - generic [ref=e413]:
+                - heading "SHIV" [level=3] [ref=e414]
+                - generic [ref=e415]: "2"
+              - generic [ref=e416]:
+                - generic [ref=e417]:
+                  - paragraph [ref=e418]: Wicket fell
+                  - generic [ref=e419]: "7.4"
+                - generic [ref=e420]:
+                  - paragraph [ref=e421]: Wicket fell
+                  - generic [ref=e422]: "8.5"
+        - generic [ref=e423]:
+          - generic [ref=e425]:
+            - img [ref=e427]
+            - heading "Boundary and Extras Breakdown" [level=2] [ref=e429]
+          - generic [ref=e431]:
+            - generic [ref=e432]:
+              - generic [ref=e433]: Type
+              - generic [ref=e434]: HARRY
+              - generic [ref=e435]: SHIV
+            - generic [ref=e436]:
+              - generic [ref=e437]:
+                - paragraph [ref=e438]: Fours
+                - paragraph [ref=e439]: "5"
+                - paragraph [ref=e440]: "11"
+              - generic [ref=e441]:
+                - paragraph [ref=e442]: Sixes
+                - paragraph [ref=e443]: "3"
+                - paragraph [ref=e444]: "0"
+              - generic [ref=e445]:
+                - paragraph [ref=e446]: Wides
+                - paragraph [ref=e447]: "1"
+                - paragraph [ref=e448]: "2"
+              - generic [ref=e449]:
+                - paragraph [ref=e450]: No Balls
+                - paragraph [ref=e451]: "9"
+                - paragraph [ref=e452]: "1"
+              - generic [ref=e453]:
+                - paragraph [ref=e454]: Other Extras
+                - paragraph [ref=e455]: "0"
+                - paragraph [ref=e456]: "0"
+              - generic [ref=e457]:
+                - paragraph [ref=e458]: Dot Balls
+                - paragraph [ref=e459]: "23"
+                - paragraph [ref=e460]: "21"
+        - generic [ref=e461]:
+          - generic [ref=e466]:
+            - img [ref=e468]
+            - heading "Match Awards" [level=2] [ref=e470]
+          - generic [ref=e472]:
+            - generic [ref=e473]:
+              - paragraph [ref=e474]: Player of the match
+              - paragraph [ref=e475]: HARRY
+              - paragraph [ref=e476]: Unlocked by the strongest all-round match impact.
+            - generic [ref=e477]:
+              - paragraph [ref=e478]: Boundary pressure
+              - paragraph [ref=e479]: SHIV
+              - paragraph [ref=e480]: Unlocked with 11 boundaries.
+            - generic [ref=e481]:
+              - paragraph [ref=e482]: Dot-ball squeeze
+              - paragraph [ref=e483]: HARRY
+              - paragraph [ref=e484]: Unlocked with 23 dot balls.
+        - generic [ref=e485]:
+          - generic [ref=e487]:
+            - img [ref=e489]
+            - heading "Winning Moment / Turning Point" [level=2] [ref=e491]
+          - paragraph [ref=e494]: Winning runs came at 10.2. SHIV completed the chase there.
+        - generic [ref=e495]:
+          - generic [ref=e497]:
+            - img [ref=e499]
+            - heading "Share Results" [level=2] [ref=e501]
+          - generic [ref=e503]:
+            - generic [ref=e504]:
+              - img "HARRY vs SHIV" [ref=e505]
+              - generic [ref=e507]:
+                - paragraph [ref=e508]: Share Card
+                - heading "HARRY vs SHIV" [level=3] [ref=e509]
+                - paragraph [ref=e510]: Won by 5 wickets.
+                - generic [ref=e511]:
+                  - generic [ref=e512]:
+                    - paragraph [ref=e513]: Winning score
+                    - paragraph [ref=e514]: 76/1
+                  - generic [ref=e515]:
+                    - paragraph [ref=e516]: Player of the match
+                    - paragraph [ref=e517]: HARRY
+            - button "Share result" [ref=e519]:
+              - img [ref=e520]
+              - generic [ref=e522]: Share result
+      - generic [ref=e524]:
+        - heading "Final Teams" [level=2] [ref=e525]:
+          - img [ref=e526]
+          - text: Final Teams
+        - generic [ref=e528]:
+          - generic [ref=e529]:
+            - heading "HARRY" [level=3] [ref=e531]
+            - paragraph [ref=e532]: 7 players
+            - list [ref=e533]:
+              - listitem [ref=e534]: Player 1
+              - listitem [ref=e535]: Player 2
+              - listitem [ref=e536]: Player 3
+              - listitem [ref=e537]: Player 4
+              - listitem [ref=e538]: Player 5
+              - listitem [ref=e539]: Player 6
+              - listitem [ref=e540]: Player 7
+          - generic [ref=e541]:
+            - heading "SHIV" [level=3] [ref=e543]
+            - paragraph [ref=e544]: 7 players
+            - list [ref=e545]:
+              - listitem [ref=e546]: Player 1
+              - listitem [ref=e547]: Player 2
+              - listitem [ref=e548]: Player 3
+              - listitem [ref=e549]: Player 4
+              - listitem [ref=e550]: Player 5
+              - listitem [ref=e551]: Player 6
+              - listitem [ref=e552]: Player 7
+      - generic [ref=e553]:
+        - heading "Run Source Breakdown" [level=2] [ref=e554]
+        - generic [ref=e555]:
+          - heading "Run Source Breakdown" [level=2] [ref=e556]:
+            - img [ref=e557]
+            - text: Run Source Breakdown
+          - paragraph [ref=e559]: This split shows how each innings was built through boundaries and runs taken between the wickets.
+          - generic [ref=e560]:
+            - generic [ref=e561]:
+              - heading "HARRY" [level=3] [ref=e563]
+              - generic [ref=e564]:
+                - generic [ref=e565]:
+                  - list [ref=e567]:
+                    - listitem [ref=e568]:
+                      - img "Fours legend icon" [ref=e569]
+                      - text: Fours
+                    - listitem [ref=e571]:
+                      - img "Running legend icon" [ref=e572]
+                      - text: Running
+                    - listitem [ref=e574]:
+                      - img "Sixes legend icon" [ref=e575]
+                      - text: Sixes
+                  - application [ref=e577]
+                - generic: 26%
+                - generic: 24%
+                - generic: 50%
+              - generic [ref=e579]:
+                - generic [ref=e580]:
+                  - generic [ref=e583]: Fours
+                  - generic [ref=e584]: "20"
+                - generic [ref=e585]:
+                  - generic [ref=e588]: Sixes
+                  - generic [ref=e589]: "18"
+                - generic [ref=e590]:
+                  - generic [ref=e593]: Running
+                  - generic [ref=e594]: "38"
+            - generic [ref=e595]:
+              - heading "SHIV" [level=3] [ref=e597]
+              - generic [ref=e598]:
+                - generic [ref=e599]:
+                  - list [ref=e601]:
+                    - listitem [ref=e602]:
+                      - img "Fours legend icon" [ref=e603]
+                      - text: Fours
+                    - listitem [ref=e605]:
+                      - img "Running legend icon" [ref=e606]
+                      - text: Running
+                  - application [ref=e608]
+                - generic: 57%
+                - generic: 43%
+              - generic [ref=e610]:
+                - generic [ref=e611]:
+                  - generic [ref=e614]: Fours
+                  - generic [ref=e615]: "44"
+                - generic [ref=e616]:
+                  - generic [ref=e619]: Running
+                  - generic [ref=e620]: "33"
+    - generic [ref=e621]:
+      - button "Back to top" [ref=e623]:
+        - img [ref=e624]
+      - generic [ref=e627]: Footer divider
+      - img "GV Cricket logo" [ref=e629]
+      - navigation "Popular pages" [ref=e631]:
+        - paragraph [ref=e632]: Popular Pages
+        - generic [ref=e633]:
+          - link "Start Match" [ref=e634] [cursor=pointer]:
+            - /url: /session/new
+          - link "View All Games" [ref=e635] [cursor=pointer]:
+            - /url: /session
+          - link "Updates" [ref=e636] [cursor=pointer]:
+            - /url: /update
+      - paragraph [ref=e638]: © 2026 GV Cricket. All rights reserved.
+      - paragraph [ref=e640]: GV Cricket brings live score, umpire mode, spectator view, director controls, walkie-talkie, and results into one fast mobile flow.
+      - link "gvcricket.com" [ref=e642] [cursor=pointer]:
+        - /url: https://gvcricket.com
+  - generic [ref=e643]: "20"

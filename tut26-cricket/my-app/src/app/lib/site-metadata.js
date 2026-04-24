@@ -129,8 +129,8 @@ export function absoluteUrl(path = "/") {
 export function buildShareUrl(path = "/", currentOrigin = "") {
   const normalizedCurrentOrigin = normalizeSiteUrl(currentOrigin);
   const baseUrl = isLocalOrigin(normalizedCurrentOrigin)
-    ? normalizedCurrentOrigin
-    : getPublicSiteUrl() || normalizedCurrentOrigin || getSiteUrl();
+    ? getPublicSiteUrl() || getSiteUrl()
+    : normalizedCurrentOrigin || getPublicSiteUrl() || getSiteUrl();
   return new URL(path, baseUrl).toString();
 }
 

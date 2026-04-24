@@ -29,6 +29,60 @@ function buildEmptyInnings(existing) {
   };
 }
 
+function getOpposingTeamName(teamName, teamAName, teamBName) {
+  if (teamName === teamAName) {
+    return teamBName;
+  }
+
+  if (teamName === teamBName) {
+    return teamAName;
+  }
+
+  return "";
+}
+
+function reconcileInningsTeamNames({
+  innings1,
+  innings2,
+  teamAName,
+  teamBName,
+  battingFirst,
+  bowlingFirst,
+}) {
+  if (!teamAName || !teamBName || teamAName === teamBName) {
+    return { innings1, innings2 };
+  }
+
+  const validTeams = new Set([teamAName, teamBName]);
+  const innings1Team = sanitizeName(innings1?.team);
+  const innings2Team = sanitizeName(innings2?.team);
+  const innings1Valid = validTeams.has(innings1Team);
+  const innings2Valid = validTeams.has(innings2Team);
+
+  if (!innings1Valid && !innings2Valid && battingFirst && bowlingFirst) {
+    innings1.team = battingFirst;
+    innings2.team = bowlingFirst;
+    return { innings1, innings2 };
+  }
+
+  if (innings1Valid && innings2Valid && innings1Team === innings2Team) {
+    innings2.team = getOpposingTeamName(innings1Team, teamAName, teamBName);
+    return { innings1, innings2 };
+  }
+
+  if (innings1Valid && !innings2Valid) {
+    innings2.team = getOpposingTeamName(innings1Team, teamAName, teamBName);
+    return { innings1, innings2 };
+  }
+
+  if (!innings1Valid && innings2Valid) {
+    innings1.team = getOpposingTeamName(innings2Team, teamAName, teamBName);
+    return { innings1, innings2 };
+  }
+
+  return { innings1, innings2 };
+}
+
 export function getMatchTeamNames(match, fallbackState = null) {
   const fallbackMatch = fallbackState
     ? {
@@ -97,6 +151,7 @@ export function normalizeLegacyTossState(match, fallbackState = null) {
 
   const sourceMatch =
     typeof match?.toObject === "function" ? match.toObject() : match;
+  const { teamAName, teamBName } = getMatchTeamNames(sourceMatch, fallbackState);
 
   const tossWinner = getResolvedTossWinner(sourceMatch, fallbackState);
   const tossDecision = getResolvedTossDecision(sourceMatch, fallbackState);
@@ -118,6 +173,15 @@ export function normalizeLegacyTossState(match, fallbackState = null) {
   if (!innings2.team && bowlingFirst) {
     innings2.team = bowlingFirst;
   }
+
+  reconcileInningsTeamNames({
+    innings1,
+    innings2,
+    teamAName,
+    teamBName,
+    battingFirst,
+    bowlingFirst,
+  });
 
   return {
     ...sourceMatch,
