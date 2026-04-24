@@ -394,6 +394,50 @@ test("[walkie] walkie snapshot stays live through transient signaling reconnect 
   assert.equal(result.spectatorCount, 3);
 });
 
+test("[walkie] empty runtime metadata does not turn off an authoritative live channel", () => {
+  const result = mergeWalkieSnapshots({
+    authoritativeSnapshot: {
+      enabled: true,
+      spectatorCount: 0,
+      directorCount: 0,
+      umpireCount: 1,
+      pendingRequests: [
+        {
+          requestId: "req-1",
+          participantId: "spectator-1",
+          role: "spectator",
+          name: "Spectator",
+          requestedAt: "2099-04-01T12:00:00.000Z",
+          expiresAt: "2099-04-01T12:00:30.000Z",
+        },
+      ],
+      updatedAt: "2026-04-01T12:00:00.000Z",
+      version: 2,
+    },
+    runtimeSnapshot: {
+      enabled: false,
+      spectatorCount: 0,
+      directorCount: 0,
+      umpireCount: 1,
+      busy: false,
+      activeSpeakerRole: "",
+      activeSpeakerId: "",
+      activeSpeakerName: "",
+      lockStartedAt: "",
+      expiresAt: "",
+      transmissionId: "",
+      pendingRequests: [],
+      updatedAt: "",
+      version: 0,
+    },
+    runtimeSubscribed: true,
+    runtimePresenceAvailable: true,
+  });
+
+  assert.equal(result.enabled, true);
+  assert.equal(result.pendingRequests.length, 1);
+});
+
 test("[walkie] non-umpire walkie UI state keeps the local-off notice persistent while shared walkie stays live", () => {
   assert.deepEqual(
     getNonUmpireWalkieUiState({

@@ -89,13 +89,15 @@ export function mergeWalkieSnapshots({
   const useRuntimeMetadata = Boolean(runtimeSubscribed);
   const useRuntimePresence = Boolean(runtimeSubscribed && runtimePresenceAvailable);
   const useRuntimeSpeaker = Boolean(runtimeSubscribed && activeSpeakerSource === "runtime");
+  const mergedPendingRequests = filterAgoraWalkieRequests([
+    ...(authoritative.pendingRequests || []),
+    ...(useRuntimeMetadata ? runtime.pendingRequests || [] : []),
+  ]);
 
   return {
     ...authoritative,
-    enabled: useRuntimeMetadata ? Boolean(runtime.enabled) : authoritative.enabled,
-    pendingRequests: useRuntimeMetadata
-      ? filterAgoraWalkieRequests(runtime.pendingRequests)
-      : authoritative.pendingRequests,
+    enabled: Boolean(authoritative.enabled || (useRuntimeMetadata && runtime.enabled)),
+    pendingRequests: mergedPendingRequests,
     spectatorCount: useRuntimePresence
       ? Math.max(0, Number(runtime.spectatorCount || 0))
       : authoritative.spectatorCount,
