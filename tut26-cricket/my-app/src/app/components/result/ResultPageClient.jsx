@@ -360,19 +360,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
         </section>
 
       </div>
-      <SiteFooter
-        action={
-          <LoadingButton
-            onClick={handleOpenSessions}
-            loading={isLeavingToSessions}
-            pendingLabel="Opening..."
-            className="inline-flex items-center gap-2 bg-blue-600 text-white px-8 py-3 rounded-lg shadow-lg hover:bg-blue-500 transition-colors font-semibold"
-          >
-            <FaArrowLeft />
-            Back to All Sessions
-          </LoadingButton>
-        }
-      />
+      <SiteFooter />
       <AnimatePresence>
         {isImageManagerOpen ? (
           <ModalBase
