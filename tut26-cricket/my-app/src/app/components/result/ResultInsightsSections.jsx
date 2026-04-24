@@ -34,7 +34,9 @@ function SectionShell({ id, title, icon, children }) {
         <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.05] text-lg text-amber-300">
           {icon}
         </span>
-        <h2 className="text-2xl font-bold tracking-tight text-white">{title}</h2>
+        <h2 className="text-2xl font-bold tracking-tight text-white">
+          {title}
+        </h2>
       </div>
       {children}
     </section>
@@ -44,7 +46,9 @@ function SectionShell({ id, title, icon, children }) {
 function StatMiniCard({ label, value, tone = "text-white" }) {
   return (
     <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4">
-      <p className="text-[11px] uppercase tracking-[0.24em] text-zinc-500">{label}</p>
+      <p className="text-[11px] uppercase tracking-[0.24em] text-zinc-500">
+        {label}
+      </p>
       <p className={`mt-2 text-xl font-black ${tone}`}>{value}</p>
     </div>
   );
@@ -53,9 +57,29 @@ function StatMiniCard({ label, value, tone = "text-white" }) {
 function PerformerCard({ label, primary, secondary, accent = "text-white" }) {
   return (
     <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4">
-      <p className="text-[11px] uppercase tracking-[0.24em] text-zinc-500">{label}</p>
+      <p className="text-[11px] uppercase tracking-[0.24em] text-zinc-500">
+        {label}
+      </p>
       <p className={`mt-3 text-xl font-bold ${accent}`}>{primary}</p>
-      {secondary ? <p className="mt-2 text-sm text-zinc-400">{secondary}</p> : null}
+      {secondary ? (
+        <p className="mt-2 text-sm text-zinc-400">{secondary}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function SplitStatRow({ label, leftValue, rightValue, leftTone, rightTone }) {
+  return (
+    <div className="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
+      <p className="text-[11px] uppercase tracking-[0.2em] text-white">
+        {label}
+      </p>
+      <p className={`text-center text-lg font-black sm:text-xl ${leftTone}`}>
+        {leftValue}
+      </p>
+      <p className={`text-center text-lg font-black sm:text-xl ${rightTone}`}>
+        {rightValue}
+      </p>
     </div>
   );
 }
@@ -105,7 +129,9 @@ function SplitTeamFeed({
       <div className="grid grid-cols-2 gap-0">
         <div className="p-3 border-r border-white/8 sm:p-4">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className={`text-sm font-bold uppercase tracking-[0.08em] sm:text-xl sm:normal-case ${leftAccentClass}`}>
+            <h3
+              className={`text-sm font-bold uppercase tracking-[0.08em] sm:text-xl sm:normal-case ${leftAccentClass}`}
+            >
               {leftTeamName}
             </h3>
             <span className="rounded-full bg-white/[0.05] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-300 sm:px-3 sm:text-xs">
@@ -122,7 +148,9 @@ function SplitTeamFeed({
         </div>
         <div className="p-3 sm:p-4">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className={`text-sm font-bold uppercase tracking-[0.08em] sm:text-xl sm:normal-case ${rightAccentClass}`}>
+            <h3
+              className={`text-sm font-bold uppercase tracking-[0.08em] sm:text-xl sm:normal-case ${rightAccentClass}`}
+            >
               {rightTeamName}
             </h3>
             <span className="rounded-full bg-white/[0.05] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-300 sm:px-3 sm:text-xs">
@@ -145,12 +173,13 @@ function SplitTeamFeed({
 export default function ResultInsightsSections({ match }) {
   const [shareStatus, setShareStatus] = useState("");
   const insights = useMemo(() => buildResultInsights(match), [match]);
-  const statsFallback = "Detailed player stats were not recorded for this match.";
+  const statsFallback =
+    "Detailed player stats were not recorded for this match.";
 
   const handleCopyLink = async () => {
     const shareUrl = buildShareUrl(
       `/result/${match?._id || ""}`,
-      window.location.origin
+      window.location.origin,
     );
 
     try {
@@ -167,7 +196,10 @@ export default function ResultInsightsSections({ match }) {
         await navigator.share({
           title: `${insights.teamA.name} vs ${insights.teamB.name}`,
           text: match?.result || "GV Cricket result",
-          url: buildShareUrl(`/result/${match?._id || ""}`, window.location.origin),
+          url: buildShareUrl(
+            `/result/${match?._id || ""}`,
+            window.location.origin,
+          ),
         });
         setShareStatus("");
         return;
@@ -228,7 +260,9 @@ export default function ResultInsightsSections({ match }) {
       primary: insights.topPerformers.playerOfMatch,
       secondary:
         match?.result ||
-        (insights.tracked ? "Key impact across the match." : "Picked from the final result."),
+        (insights.tracked
+          ? "Key impact across the match."
+          : "Picked from the final result."),
       accent: "text-rose-300",
     },
   ].filter(Boolean);
@@ -333,7 +367,8 @@ export default function ResultInsightsSections({ match }) {
         />
       </SectionShell>
 
-      {insights.innings1.wicketTimeline.length || insights.innings2.wicketTimeline.length ? (
+      {insights.innings1.wicketTimeline.length ||
+      insights.innings2.wicketTimeline.length ? (
         <SectionShell title="Wicket Timeline" icon={<FaBolt />}>
           <SplitTeamFeed
             leftTeamName={insights.innings1.team || "Innings 1"}
@@ -345,7 +380,9 @@ export default function ResultInsightsSections({ match }) {
                 key={`innings1-wicket-${wicket.overBall}-${index}`}
                 className="flex items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
               >
-                <p className="text-sm font-semibold text-white">{wicket.detail}</p>
+                <p className="text-sm font-semibold text-white">
+                  {wicket.detail}
+                </p>
                 <span className="rounded-full bg-sky-500/12 px-3 py-1 text-sm font-semibold text-sky-200">
                   {wicket.overBall}
                 </span>
@@ -360,7 +397,9 @@ export default function ResultInsightsSections({ match }) {
                 key={`innings2-wicket-${wicket.overBall}-${index}`}
                 className="flex items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
               >
-                <p className="text-sm font-semibold text-white">{wicket.detail}</p>
+                <p className="text-sm font-semibold text-white">
+                  {wicket.detail}
+                </p>
                 <span className="rounded-full bg-rose-500/12 px-3 py-1 text-sm font-semibold text-rose-200">
                   {wicket.overBall}
                 </span>
@@ -371,27 +410,62 @@ export default function ResultInsightsSections({ match }) {
       ) : null}
 
       <SectionShell title="Boundary and Extras Breakdown" icon={<FaBolt />}>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatMiniCard
-            label={`${insights.innings1.team} 4s / 6s`}
-            value={`${insights.innings1.fours} / ${insights.innings1.sixes}`}
-            tone="text-sky-300"
-          />
-          <StatMiniCard
-            label={`${insights.innings2.team} 4s / 6s`}
-            value={`${insights.innings2.fours} / ${insights.innings2.sixes}`}
-            tone="text-rose-300"
-          />
-          <StatMiniCard
-            label="Wides / No-balls"
-            value={`${insights.innings1.wideRuns + insights.innings2.wideRuns} / ${insights.innings1.noBallRuns + insights.innings2.noBallRuns}`}
-            tone="text-amber-300"
-          />
-          <StatMiniCard
-            label="Other extras / dots"
-            value={`${insights.innings1.otherExtras + insights.innings2.otherExtras} / ${insights.innings1.dotBalls + insights.innings2.dotBalls}`}
-            tone="text-emerald-300"
-          />
+        <div className="overflow-hidden rounded-[24px] border border-white/8 bg-white/[0.03]">
+          <div className="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 border-b border-white/8 px-4 py-3">
+            <span className="text-[11px] uppercase tracking-[0.24em] text-white">
+              Type
+            </span>
+            <span className="text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">
+              {insights.innings1.team || "Innings 1"}
+            </span>
+            <span className="text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-300">
+              {insights.innings2.team || "Innings 2"}
+            </span>
+          </div>
+          <div className="space-y-3 p-4">
+            <SplitStatRow
+              label="Fours"
+              leftValue={insights.innings1.fours}
+              rightValue={insights.innings2.fours}
+              leftTone="text-sky-300"
+              rightTone="text-rose-300"
+            />
+            <SplitStatRow
+              label="Sixes"
+              leftValue={insights.innings1.sixes}
+              rightValue={insights.innings2.sixes}
+              leftTone="text-sky-300"
+              rightTone="text-rose-300"
+            />
+            <SplitStatRow
+              label="Wides"
+              leftValue={insights.innings1.wideRuns}
+              rightValue={insights.innings2.wideRuns}
+              leftTone="text-amber-300"
+              rightTone="text-amber-300"
+            />
+            <SplitStatRow
+              label="No Balls"
+              leftValue={insights.innings1.noBallRuns}
+              rightValue={insights.innings2.noBallRuns}
+              leftTone="text-amber-300"
+              rightTone="text-amber-300"
+            />
+            <SplitStatRow
+              label="Other Extras"
+              leftValue={insights.innings1.otherExtras}
+              rightValue={insights.innings2.otherExtras}
+              leftTone="text-emerald-300"
+              rightTone="text-emerald-300"
+            />
+            <SplitStatRow
+              label="Dot Balls"
+              leftValue={insights.innings1.dotBalls}
+              rightValue={insights.innings2.dotBalls}
+              leftTone="text-emerald-300"
+              rightTone="text-emerald-300"
+            />
+          </div>
         </div>
       </SectionShell>
 
@@ -411,7 +485,9 @@ export default function ResultInsightsSections({ match }) {
 
       <SectionShell title="Winning Moment / Turning Point" icon={<FaTrophy />}>
         <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(135deg,rgba(250,204,21,0.08),rgba(255,255,255,0.02))] p-5">
-          <p className="text-xl font-bold text-white">{insights.turningPoint}</p>
+          <p className="text-xl font-bold text-white">
+            {insights.turningPoint}
+          </p>
         </div>
       </SectionShell>
 
@@ -438,7 +514,9 @@ export default function ResultInsightsSections({ match }) {
             <h3 className="mt-3 text-3xl font-black text-white">
               {insights.teamA.name} vs {insights.teamB.name}
             </h3>
-            <p className="mt-2 text-lg text-zinc-300">{match?.result || "Match complete"}</p>
+            <p className="mt-2 text-lg text-zinc-300">
+              {match?.result || "Match complete"}
+            </p>
             <div className="mt-5 grid grid-cols-2 gap-3">
               <StatMiniCard
                 label="Final score"
@@ -489,5 +567,3 @@ export default function ResultInsightsSections({ match }) {
     </div>
   );
 }
-
-
