@@ -15,6 +15,7 @@ import {
   siteConfig,
   versionedSocialImagePath,
 } from "../../lib/site-metadata";
+import { getWinningInningsSummary } from "../../lib/match-result-display";
 import { loadPublicMatchData } from "../../lib/server-data";
 import { cache } from "react";
 
@@ -39,13 +40,35 @@ export async function generateMetadata({ params }) {
     teamAName: match?.teamAName,
     teamBName: match?.teamBName,
   });
+  const winningSummary = getWinningInningsSummary(match);
+  const galleryImageCount = Array.isArray(match?.matchImages)
+    ? match.matchImages.filter((image) => image?.url).length
+    : 0;
   const pageLabel =
     matchup === "Cricket match" ? "Match Result and Stats" : `${matchup} Result and Stats`;
-  const resultText = match?.result ? ` ${match.result}` : "";
+  const descriptionParts = [];
+
+  if (match?.result) {
+    descriptionParts.push(match.result);
+  }
+
+  if (winningSummary?.teamName) {
+    descriptionParts.push(
+      `${winningSummary.teamName} finished on ${winningSummary.scoreline} in ${winningSummary.overs} overs.`,
+    );
+  }
+
+  if (galleryImageCount >= 2) {
+    descriptionParts.push(`Includes ${galleryImageCount} match photos in the shared card.`);
+  }
+
+  const descriptionText =
+    descriptionParts.join(" ") ||
+    `See the final score, winner, over summary, and match stats for ${matchup}.`;
 
   return {
     title: pageLabel,
-    description: `See the final score, winner, over summary, and match stats for ${matchup}.${resultText}`.trim(),
+    description: descriptionText,
     keywords: [
       `${matchup} result`,
       `${matchup} scorecard`,
@@ -58,13 +81,13 @@ export async function generateMetadata({ params }) {
     },
     openGraph: {
       title: `${pageLabel} | GV Cricket`,
-      description: `Final score, winner, over summary, and match stats for ${matchup}.`,
+      description: descriptionText,
       url: absoluteUrl(`/result/${id}`),
       images: [absoluteUrl(versionedSocialImagePath(`/result/${id}/opengraph-image`))],
     },
     twitter: {
       title: `${pageLabel} | GV Cricket`,
-      description: `Final score and match stats for ${matchup}.`,
+      description: descriptionText,
       images: [absoluteUrl(versionedSocialImagePath(`/result/${id}/twitter-image`))],
     },
   };

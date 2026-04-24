@@ -9,16 +9,24 @@
 
 import {
   createLogoOnlySocialImage,
+  createResultSocialImage,
   SOCIAL_IMAGE_SIZE,
 } from "../../lib/social-image-card";
+import { loadPublicMatchData } from "../../lib/server-data";
 
 export const runtime = "nodejs";
 export const size = SOCIAL_IMAGE_SIZE;
 export const contentType = "image/png";
 
 export default async function OpenGraphImage({ params }) {
-  void params;
-  return createLogoOnlySocialImage();
+  const { id } = await params;
+  const match = await loadPublicMatchData(id);
+
+  if (!match) {
+    return createLogoOnlySocialImage();
+  }
+
+  return createResultSocialImage(match);
 }
 
 
