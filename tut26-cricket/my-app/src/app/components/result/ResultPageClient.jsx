@@ -32,6 +32,10 @@ import PlayerLists from "./PlayerLists";
 import ResultInsightsSections from "./ResultInsightsSections";
 import PlayerStatsSection from "./PlayerStatsSection";
 import SiteFooter from "../shared/SiteFooter";
+import {
+  mergeResultMatchUpdate,
+  normalizeResultMatch,
+} from "./result-page-data";
 
 const RunsPerOverChart = dynamic(() => import("./RunsPerOverChart"), {
   ssr: false,
@@ -51,7 +55,7 @@ function clampImageZoom(value) {
 export default function ResultPageClient({ matchId, initialMatch }) {
   const router = useRouter();
   const { startNavigation } = useRouteFeedback();
-  const [match, setMatch] = useState(initialMatch);
+  const [match, setMatch] = useState(() => normalizeResultMatch(initialMatch));
   const [streamError, setStreamError] = useState("");
   const [isImageManagerOpen, setIsImageManagerOpen] = useState(false);
   const [isLeavingToSessions, setIsLeavingToSessions] = useState(false);
@@ -91,7 +95,9 @@ export default function ResultPageClient({ matchId, initialMatch }) {
 
       lastStreamUpdateRef.current = payload.updatedAt || "";
       startTransition(() => {
-        setMatch(payload.match || null);
+        setMatch((current) =>
+          mergeResultMatchUpdate(current, payload.match || null),
+        );
         setStreamError("");
       });
     },
@@ -384,7 +390,9 @@ export default function ResultPageClient({ matchId, initialMatch }) {
               appendOnUpload={matchImages.length > 0 || Boolean(match?.matchImageUrl)}
               onUploaded={(updatedMatch) => {
                 startTransition(() => {
-                  setMatch(updatedMatch);
+                  setMatch((current) =>
+                    mergeResultMatchUpdate(current, updatedMatch),
+                  );
                 });
               }}
               onComplete={() => {
