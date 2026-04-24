@@ -21,14 +21,14 @@ export default function PlayerLists({ match }) {
       players: teamA.players,
       accent: "text-cyan-300",
       border: "border-cyan-400/20",
-      glow: "bg-cyan-400/8",
+      strip: "from-cyan-300 via-sky-400 to-blue-500",
     },
     {
       name: teamB.name,
       players: teamB.players,
       accent: "text-rose-300",
       border: "border-rose-400/20",
-      glow: "bg-rose-400/8",
+      strip: "from-rose-300 via-rose-400 to-orange-300",
     },
   ];
 
@@ -41,8 +41,12 @@ export default function PlayerLists({ match }) {
         {teamCards.map((team) => (
           <div
             key={team.name}
-            className={`rounded-[24px] border ${team.border} ${team.glow} p-4 text-center backdrop-blur-sm sm:p-5`}
+            className={`relative overflow-hidden rounded-[24px] border ${team.border} bg-[linear-gradient(180deg,rgba(22,22,28,0.92),rgba(10,10,14,0.96))] p-4 text-center shadow-[0_18px_48px_rgba(0,0,0,0.24)] sm:p-5`}
           >
+            <div
+              className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${team.strip}`}
+              aria-hidden="true"
+            />
             <h3 className={`text-lg font-black uppercase ${team.accent}`}>
               {team.name}
             </h3>

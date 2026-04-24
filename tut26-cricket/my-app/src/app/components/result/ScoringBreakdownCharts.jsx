@@ -143,7 +143,11 @@ export default function ScoringBreakdownCharts({
         This split shows how each innings was built through boundaries and runs taken between the wickets.
       </p>
       <div className="grid items-start gap-10 xl:grid-cols-2">
-        <div className="rounded-[24px] border border-cyan-400/16 bg-cyan-400/6 p-4 sm:p-5">
+        <div className="relative overflow-hidden rounded-[24px] border border-cyan-400/16 bg-[linear-gradient(180deg,rgba(22,22,28,0.92),rgba(10,10,14,0.96))] p-4 shadow-[0_18px_48px_rgba(0,0,0,0.24)] sm:p-5">
+          <div
+            className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-cyan-300 via-sky-400 to-blue-500"
+            aria-hidden="true"
+          />
           <h3 className="mb-4 text-center text-lg font-black uppercase text-cyan-300">
             {team1Name}
           </h3>
@@ -190,7 +194,11 @@ export default function ScoringBreakdownCharts({
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-rose-400/16 bg-rose-400/6 p-4 sm:p-5">
+        <div className="relative overflow-hidden rounded-[24px] border border-rose-400/16 bg-[linear-gradient(180deg,rgba(22,22,28,0.92),rgba(10,10,14,0.96))] p-4 shadow-[0_18px_48px_rgba(0,0,0,0.24)] sm:p-5">
+          <div
+            className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-rose-300 via-rose-400 to-orange-300"
+            aria-hidden="true"
+          />
           <h3 className="mb-4 text-center text-lg font-black uppercase text-rose-300">
             {team2Name}
           </h3>
