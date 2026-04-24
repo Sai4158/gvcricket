@@ -56,13 +56,15 @@ function StatMiniCard({ label, value, tone = "text-white" }) {
 
 function PerformerCard({ label, primary, secondary, accent = "text-white" }) {
   return (
-    <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4">
+    <div className="flex min-h-[220px] w-full max-w-[320px] flex-col items-center justify-center rounded-[24px] border border-white/8 bg-white/[0.03] p-5 text-center">
       <p className="text-[11px] uppercase tracking-[0.24em] text-zinc-500">
         {label}
       </p>
-      <p className={`mt-3 text-xl font-bold ${accent}`}>{primary}</p>
+      <p className={`mt-3 text-2xl font-bold ${accent}`}>{primary}</p>
       {secondary ? (
-        <p className="mt-2 text-sm text-zinc-400">{secondary}</p>
+        <p className="mt-3 max-w-[24ch] text-sm leading-6 text-zinc-300">
+          {secondary}
+        </p>
       ) : null}
     </div>
   );
@@ -128,7 +130,7 @@ function SplitTeamFeed({
     <div className="overflow-hidden rounded-[24px] border border-white/8 bg-white/[0.03]">
       <div className="grid grid-cols-2 gap-0">
         <div className="p-3 border-r border-white/8 sm:p-4">
-          <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="mb-4 flex flex-col items-center justify-center gap-2 text-center">
             <h3
               className={`text-sm font-bold uppercase tracking-[0.08em] sm:text-xl sm:normal-case ${leftAccentClass}`}
             >
@@ -147,7 +149,7 @@ function SplitTeamFeed({
           </div>
         </div>
         <div className="p-3 sm:p-4">
-          <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="mb-4 flex flex-col items-center justify-center gap-2 text-center">
             <h3
               className={`text-sm font-bold uppercase tracking-[0.08em] sm:text-xl sm:normal-case ${rightAccentClass}`}
             >
@@ -262,7 +264,9 @@ export default function ResultInsightsSections({ match }) {
       label: "Player of the match",
       primary: insights.topPerformers.playerOfMatch,
       secondary:
-        match?.result ||
+        match?.result
+          ? `${match.result} Final result standout.`
+          : 
         (insights.tracked
           ? "Key impact across the match."
           : "Picked from the final result."),
@@ -303,7 +307,7 @@ export default function ResultInsightsSections({ match }) {
   return (
     <div className="space-y-8">
       <SectionShell title="Top Performers" icon={<FaStar />}>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="flex flex-wrap justify-center gap-4">
           {topPerformerCards.map((card) => (
             <PerformerCard
               key={card.label}
@@ -381,9 +385,9 @@ export default function ResultInsightsSections({ match }) {
             renderLeftItem={(wicket, index) => (
               <div
                 key={`innings1-wicket-${wicket.overBall}-${index}`}
-                className="flex items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
+                className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4 text-center"
               >
-                <p className="text-sm font-semibold text-white">
+                <p className="text-sm font-semibold leading-5 text-white">
                   {wicket.detail}
                 </p>
                 <span className="rounded-full bg-sky-500/12 px-3 py-1 text-sm font-semibold text-sky-200">
@@ -398,9 +402,9 @@ export default function ResultInsightsSections({ match }) {
             renderRightItem={(wicket, index) => (
               <div
                 key={`innings2-wicket-${wicket.overBall}-${index}`}
-                className="flex items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
+                className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4 text-center"
               >
-                <p className="text-sm font-semibold text-white">
+                <p className="text-sm font-semibold leading-5 text-white">
                   {wicket.detail}
                 </p>
                 <span className="rounded-full bg-rose-500/12 px-3 py-1 text-sm font-semibold text-rose-200">
