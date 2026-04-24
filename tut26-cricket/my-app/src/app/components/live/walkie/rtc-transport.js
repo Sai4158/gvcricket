@@ -20,6 +20,9 @@ import {
 } from "./walkie-talkie-support";
 import { shouldPlayWalkieRemoteAudio } from "./walkie-talkie-gates";
 
+export const WALKIE_REMOTE_PLAYBACK_VOLUME = 100;
+export const WALKIE_MIC_SEND_VOLUME = 220;
+
 export function createWalkieRtcTransportApi({
   audioRetryTimerRef,
   countdownTimerRef,
@@ -92,7 +95,7 @@ export function createWalkieRtcTransportApi({
     }
 
     try {
-      track.setVolume?.(100);
+      track.setVolume?.(WALKIE_REMOTE_PLAYBACK_VOLUME);
     } catch {
       // Volume control is optional on some track implementations.
     }
@@ -141,7 +144,7 @@ export function createWalkieRtcTransportApi({
       const track = user.audioTrack;
       if (track) {
         try {
-          track.setVolume?.(100);
+          track.setVolume?.(WALKIE_REMOTE_PLAYBACK_VOLUME);
         } catch {
           // Best-effort volume sync.
         }
@@ -304,6 +307,11 @@ export function createWalkieRtcTransportApi({
       });
       const mediaTrack = track.getMediaStreamTrack?.();
       if (mediaTrack) mediaTrack.contentHint = "speech";
+      try {
+        track.setVolume?.(WALKIE_MIC_SEND_VOLUME);
+      } catch {
+        // Local send volume is best-effort; some SDK/browser versions ignore it.
+      }
       if (typeof track.setMuted === "function") await track.setMuted(true);
       rtcTrackRef.current = track;
       return track;
@@ -367,6 +375,11 @@ export function createWalkieRtcTransportApi({
             }
 
             if (!rtcPublishedRef.current) {
+              try {
+                track.setVolume?.(WALKIE_MIC_SEND_VOLUME);
+              } catch {
+                // Keep publishing even if local gain control is unavailable.
+              }
               if (typeof track.setMuted === "function") {
                 await track.setMuted(true);
               }
@@ -395,6 +408,11 @@ export function createWalkieRtcTransportApi({
 
     const trackPromise = ensureTrack();
     const [rtcClient, track] = await Promise.all([joinRtc(), trackPromise]);
+    try {
+      track?.setVolume?.(WALKIE_MIC_SEND_VOLUME);
+    } catch {
+      // Keep the hot talk path available even if volume control fails.
+    }
     return { rtcClient, track };
   };
 
