@@ -17,7 +17,9 @@ export default function CongratulationsCard({ result }) {
   const safeResult = typeof result === "string" ? result.trim() : "";
   const winnerMatch = safeResult.match(/^(.*?)\s+won by\s+/i);
   const winnerName = winnerMatch?.[1]?.trim() || "Winning Team";
+  const resultSuffix = safeResult.replace(/^(.*?)\s+won by\s+/i, "").trim();
   const summaryText =
+    resultSuffix ? `Won by ${resultSuffix}` :
     safeResult ||
     "Match complete.";
 
