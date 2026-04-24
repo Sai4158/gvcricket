@@ -88,27 +88,55 @@ function TeamCompareColumn({ teamName, stats, accentClass }) {
   );
 }
 
-function TeamFeedColumn({
-  teamName,
-  accentClass,
-  items,
-  emptyText,
-  renderItem,
+function SplitTeamFeed({
+  leftTeamName,
+  leftAccentClass,
+  leftItems,
+  leftEmptyText,
+  renderLeftItem,
+  rightTeamName,
+  rightAccentClass,
+  rightItems,
+  rightEmptyText,
+  renderRightItem,
 }) {
   return (
-    <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-4">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className={`text-xl font-bold ${accentClass}`}>{teamName}</h3>
-        <span className="rounded-full bg-white/[0.05] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-300">
-          {items.length}
-        </span>
-      </div>
-      <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
-        {items.length ? (
-          items.map(renderItem)
-        ) : (
-          <p className="text-sm text-zinc-400">{emptyText}</p>
-        )}
+    <div className="overflow-hidden rounded-[24px] border border-white/8 bg-white/[0.03]">
+      <div className="grid grid-cols-2 gap-0">
+        <div className="p-3 border-r border-white/8 sm:p-4">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h3 className={`text-sm font-bold uppercase tracking-[0.08em] sm:text-xl sm:normal-case ${leftAccentClass}`}>
+              {leftTeamName}
+            </h3>
+            <span className="rounded-full bg-white/[0.05] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-300 sm:px-3 sm:text-xs">
+              {leftItems.length}
+            </span>
+          </div>
+          <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+            {leftItems.length ? (
+              leftItems.map(renderLeftItem)
+            ) : (
+              <p className="text-sm text-zinc-400">{leftEmptyText}</p>
+            )}
+          </div>
+        </div>
+        <div className="p-3 sm:p-4">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h3 className={`text-sm font-bold uppercase tracking-[0.08em] sm:text-xl sm:normal-case ${rightAccentClass}`}>
+              {rightTeamName}
+            </h3>
+            <span className="rounded-full bg-white/[0.05] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-300 sm:px-3 sm:text-xs">
+              {rightItems.length}
+            </span>
+          </div>
+          <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+            {rightItems.length ? (
+              rightItems.map(renderRightItem)
+            ) : (
+              <p className="text-sm text-zinc-400">{rightEmptyText}</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -275,78 +303,70 @@ export default function ResultInsightsSections({ match }) {
       </SectionShell>
 
       <SectionShell title="Over Summary" icon={<FaChartBar />}>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <TeamFeedColumn
-            teamName={insights.innings1.team || "Innings 1"}
-            accentClass="text-sky-300"
-            items={insights.innings1.overSummaries}
-            emptyText="No over summary available."
-            renderItem={(over, index) => (
-              <div
-                key={`innings1-over-${over.over}-${index}`}
-                className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
-              >
-                <p className="text-sm font-bold text-white">{over.label}</p>
-                <p className="mt-2 text-sm text-zinc-300">{over.summary}</p>
-              </div>
-            )}
-          />
-          <TeamFeedColumn
-            teamName={insights.innings2.team || "Innings 2"}
-            accentClass="text-rose-300"
-            items={insights.innings2.overSummaries}
-            emptyText="No over summary available."
-            renderItem={(over, index) => (
-              <div
-                key={`innings2-over-${over.over}-${index}`}
-                className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
-              >
-                <p className="text-sm font-bold text-white">{over.label}</p>
-                <p className="mt-2 text-sm text-zinc-300">{over.summary}</p>
-              </div>
-            )}
-          />
-        </div>
+        <SplitTeamFeed
+          leftTeamName={insights.innings1.team || "Innings 1"}
+          leftAccentClass="text-sky-300"
+          leftItems={insights.innings1.overSummaries}
+          leftEmptyText="No over summary available."
+          renderLeftItem={(over, index) => (
+            <div
+              key={`innings1-over-${over.over}-${index}`}
+              className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
+            >
+              <p className="text-sm font-bold text-white">{over.label}</p>
+              <p className="mt-2 text-sm text-zinc-300">{over.summary}</p>
+            </div>
+          )}
+          rightTeamName={insights.innings2.team || "Innings 2"}
+          rightAccentClass="text-rose-300"
+          rightItems={insights.innings2.overSummaries}
+          rightEmptyText="No over summary available."
+          renderRightItem={(over, index) => (
+            <div
+              key={`innings2-over-${over.over}-${index}`}
+              className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
+            >
+              <p className="text-sm font-bold text-white">{over.label}</p>
+              <p className="mt-2 text-sm text-zinc-300">{over.summary}</p>
+            </div>
+          )}
+        />
       </SectionShell>
 
       {insights.innings1.wicketTimeline.length || insights.innings2.wicketTimeline.length ? (
         <SectionShell title="Wicket Timeline" icon={<FaBolt />}>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <TeamFeedColumn
-              teamName={insights.innings1.team || "Innings 1"}
-              accentClass="text-sky-300"
-              items={insights.innings1.wicketTimeline}
-              emptyText="No wickets fell."
-              renderItem={(wicket, index) => (
-                <div
-                  key={`innings1-wicket-${wicket.overBall}-${index}`}
-                  className="flex items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
-                >
-                  <p className="text-sm font-semibold text-white">{wicket.detail}</p>
-                  <span className="rounded-full bg-sky-500/12 px-3 py-1 text-sm font-semibold text-sky-200">
-                    {wicket.overBall}
-                  </span>
-                </div>
-              )}
-            />
-            <TeamFeedColumn
-              teamName={insights.innings2.team || "Innings 2"}
-              accentClass="text-rose-300"
-              items={insights.innings2.wicketTimeline}
-              emptyText="No wickets fell."
-              renderItem={(wicket, index) => (
+          <SplitTeamFeed
+            leftTeamName={insights.innings1.team || "Innings 1"}
+            leftAccentClass="text-sky-300"
+            leftItems={insights.innings1.wicketTimeline}
+            leftEmptyText="No wickets fell."
+            renderLeftItem={(wicket, index) => (
               <div
-                  key={`innings2-wicket-${wicket.overBall}-${index}`}
+                key={`innings1-wicket-${wicket.overBall}-${index}`}
                 className="flex items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
               >
-                  <p className="text-sm font-semibold text-white">{wicket.detail}</p>
+                <p className="text-sm font-semibold text-white">{wicket.detail}</p>
+                <span className="rounded-full bg-sky-500/12 px-3 py-1 text-sm font-semibold text-sky-200">
+                  {wicket.overBall}
+                </span>
+              </div>
+            )}
+            rightTeamName={insights.innings2.team || "Innings 2"}
+            rightAccentClass="text-rose-300"
+            rightItems={insights.innings2.wicketTimeline}
+            rightEmptyText="No wickets fell."
+            renderRightItem={(wicket, index) => (
+              <div
+                key={`innings2-wicket-${wicket.overBall}-${index}`}
+                className="flex items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3"
+              >
+                <p className="text-sm font-semibold text-white">{wicket.detail}</p>
                 <span className="rounded-full bg-rose-500/12 px-3 py-1 text-sm font-semibold text-rose-200">
                   {wicket.overBall}
                 </span>
               </div>
-              )}
-            />
-          </div>
+            )}
+          />
         </SectionShell>
       ) : null}
 
