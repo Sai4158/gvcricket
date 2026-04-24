@@ -446,7 +446,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
             <div
               className="relative overflow-hidden rounded-[24px]"
               onContextMenu={(event) => event.preventDefault()}
-            >i w
+            >
               <button
                 type="button"
                 onClick={() => {
@@ -456,7 +456,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
                 className="absolute right-3 top-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-xl font-bold text-white backdrop-blur-sm transition hover:bg-black/75"
                 aria-label="Close image preview"
               >
-                ×
+                X
               </button>
               <div
                 className="max-h-[70vh] overflow-auto overscroll-contain"

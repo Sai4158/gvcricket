@@ -101,9 +101,28 @@ export function createLogoOnlySocialImage() {
   );
 }
 
-function getShareableResultImages(match = null) {
+function resolveSocialImageUrl(url = "", baseUrl = "") {
+  const cleanUrl = String(url || "").trim();
+  if (!cleanUrl) {
+    return "";
+  }
+
+  try {
+    return new URL(cleanUrl, baseUrl || absoluteUrl("/")).toString();
+  } catch {
+    return cleanUrl;
+  }
+}
+
+function getShareableResultImages(match = null, baseUrl = "") {
   const images = Array.isArray(match?.matchImages)
-    ? match.matchImages.filter((image) => image?.url).slice(0, 4)
+    ? match.matchImages
+        .filter((image) => image?.url)
+        .slice(0, 4)
+        .map((image) => ({
+          ...image,
+          url: resolveSocialImageUrl(image.url, baseUrl),
+        }))
     : [];
 
   return images.length >= 2 ? images : [];
@@ -141,34 +160,44 @@ function buildResultSubline(match = null) {
 function buildCollageLayout(images = []) {
   const collageImages = images.slice(0, 4);
 
+  const renderSlot = (image, style, width, height) => (
+    <div
+      key={image.id || image.url}
+      style={{
+        position: "absolute",
+        overflow: "hidden",
+        display: "flex",
+        ...style,
+      }}
+    >
+      <img
+        src={image.url}
+        alt=""
+        width={width}
+        height={height}
+        style={{
+          width,
+          height,
+          objectFit: "cover",
+        }}
+      />
+    </div>
+  );
+
   if (collageImages.length === 2) {
     return (
       <div
         style={{
           position: "absolute",
-          inset: 0,
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
+          left: 0,
+          top: 0,
+          width: 1200,
+          height: 630,
+          display: "flex",
         }}
       >
-        {collageImages.map((image) => (
-          <div
-            key={image.id || image.url}
-            style={{ position: "relative", overflow: "hidden" }}
-          >
-            <img
-              src={image.url}
-              alt=""
-              width="600"
-              height="630"
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-              }}
-            />
-          </div>
-        ))}
+        {renderSlot(collageImages[0], { left: 0, top: 0, width: 600, height: 630 }, 600, 630)}
+        {renderSlot(collageImages[1], { left: 600, top: 0, width: 600, height: 630 }, 600, 630)}
       </div>
     );
   }
@@ -178,41 +207,16 @@ function buildCollageLayout(images = []) {
       <div
         style={{
           position: "absolute",
-          inset: 0,
-          display: "grid",
-          gridTemplateColumns: "1.15fr 0.85fr",
+          left: 0,
+          top: 0,
+          width: 1200,
+          height: 630,
+          display: "flex",
         }}
       >
-        <div style={{ position: "relative", overflow: "hidden" }}>
-          <img
-            src={collageImages[0].url}
-            alt=""
-            width="690"
-            height="630"
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateRows: "1fr 1fr",
-          }}
-        >
-          {collageImages.slice(1).map((image) => (
-            <div
-              key={image.id || image.url}
-              style={{ position: "relative", overflow: "hidden" }}
-            >
-              <img
-                src={image.url}
-                alt=""
-                width="510"
-                height="315"
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            </div>
-          ))}
-        </div>
+        {renderSlot(collageImages[0], { left: 0, top: 0, width: 690, height: 630 }, 690, 630)}
+        {renderSlot(collageImages[1], { left: 690, top: 0, width: 510, height: 315 }, 510, 315)}
+        {renderSlot(collageImages[2], { left: 690, top: 315, width: 510, height: 315 }, 510, 315)}
       </div>
     );
   }
@@ -221,34 +225,25 @@ function buildCollageLayout(images = []) {
     <div
       style={{
         position: "absolute",
-        inset: 0,
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gridTemplateRows: "1fr 1fr",
+        left: 0,
+        top: 0,
+        width: 1200,
+        height: 630,
+        display: "flex",
       }}
     >
-      {collageImages.map((image) => (
-        <div
-          key={image.id || image.url}
-          style={{ position: "relative", overflow: "hidden" }}
-        >
-          <img
-            src={image.url}
-            alt=""
-            width="600"
-            height="315"
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        </div>
-      ))}
+      {renderSlot(collageImages[0], { left: 0, top: 0, width: 600, height: 315 }, 600, 315)}
+      {renderSlot(collageImages[1], { left: 600, top: 0, width: 600, height: 315 }, 600, 315)}
+      {renderSlot(collageImages[2], { left: 0, top: 315, width: 600, height: 315 }, 600, 315)}
+      {renderSlot(collageImages[3], { left: 600, top: 315, width: 600, height: 315 }, 600, 315)}
     </div>
   );
 }
 
-export function createResultSocialImage(match = null) {
+export function createResultSocialImage(match = null, options = {}) {
   const logoSource = getEmbeddedLogoSource();
   const winningSummary = getWinningInningsSummary(match);
-  const shareImages = getShareableResultImages(match);
+  const shareImages = getShareableResultImages(match, options.baseUrl);
   const usePhotoCollage = shareImages.length >= 2;
   const matchupText = buildMatchupText(match);
   const headlineText = buildResultHeadline(match);
@@ -277,6 +272,7 @@ export function createResultSocialImage(match = null) {
           style={{
             position: "absolute",
             inset: 0,
+            display: "flex",
             background: usePhotoCollage
               ? "linear-gradient(180deg, rgba(4,6,10,0.18), rgba(4,6,10,0.55) 34%, rgba(4,6,10,0.84) 100%)"
               : "radial-gradient(circle at top, rgba(59,130,246,0.18), transparent 26%), linear-gradient(180deg, rgba(4,6,10,0.9), rgba(4,6,10,0.98))",
@@ -286,6 +282,7 @@ export function createResultSocialImage(match = null) {
           style={{
             position: "absolute",
             inset: 28,
+            display: "flex",
             borderRadius: 34,
             border: "1px solid rgba(255,255,255,0.09)",
             background:
@@ -393,6 +390,7 @@ export function createResultSocialImage(match = null) {
           >
             <div
               style={{
+                display: "flex",
                 fontSize: 54,
                 fontWeight: 900,
                 lineHeight: 1.02,
@@ -403,6 +401,7 @@ export function createResultSocialImage(match = null) {
             </div>
             <div
               style={{
+                display: "flex",
                 fontSize: 28,
                 lineHeight: 1.35,
                 color: "rgba(255,255,255,0.88)",
