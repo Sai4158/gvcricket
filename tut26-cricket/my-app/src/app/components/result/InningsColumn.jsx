@@ -9,7 +9,15 @@
  * Read next: ./README.md
  */
 
-export default function InningsColumn({ innings, summary, players, teamColor }) {
+import { FaStar } from "react-icons/fa";
+
+export default function InningsColumn({
+  innings,
+  summary,
+  players,
+  teamColor,
+  isWinner = false,
+}) {
   const wickets = (innings.history || [])
     .flatMap((over) => over.balls || [])
     .filter((ball) => ball.isOut).length;
@@ -25,7 +33,15 @@ export default function InningsColumn({ innings, summary, players, teamColor }) 
         className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${accentClass}`}
         aria-hidden="true"
       />
-      <h3 className="text-2xl font-bold text-white mb-4">{innings.team}</h3>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <h3 className="text-2xl font-bold text-white">{innings.team}</h3>
+        {isWinner ? (
+          <span className="inline-flex items-center gap-2 rounded-full border border-amber-300/25 bg-amber-400/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-200">
+            <FaStar className="text-[10px]" />
+            Winner
+          </span>
+        ) : null}
+      </div>
       <p className="text-5xl font-extrabold text-white mb-4">
         <span className="text-green-400">{innings.score}</span>/
         <span className="text-red-400">{wickets}</span>

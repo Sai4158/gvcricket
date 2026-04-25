@@ -13,7 +13,7 @@ export const siteConfig = {
   url: "https://www.gvcricket.com",
   logoPath: "/gvLogo.png",
   shareLogoPath: "/gvLogo.png",
-  socialImageVersion: "2026-03-21-gvLogo",
+  socialImageVersion: "2026-04-23-result-share-collage",
   description:
     "GV Cricket is a free live cricket scoring app for local matches, leagues, tournaments, school cricket, box cricket, and tennis-ball cricket with umpire mode, spectator scoreboards, match results, and mobile-first control for cricket communities in India, Pakistan, Bangladesh, Sri Lanka, Nepal, UAE, and more.",
   defaultTitle:
@@ -65,8 +65,8 @@ export const siteConfig = {
     "community cricket scoring app",
     "cricket scoring app alternative",
   ],
-  ogImagePath: "/opengraph-image?v=2026-03-21-gvLogo",
-  twitterImagePath: "/twitter-image?v=2026-03-21-gvLogo",
+  ogImagePath: "/opengraph-image?v=2026-04-23-result-share-collage",
+  twitterImagePath: "/twitter-image?v=2026-04-23-result-share-collage",
 };
 
 function normalizeSiteUrl(value = "") {
@@ -129,8 +129,8 @@ export function absoluteUrl(path = "/") {
 export function buildShareUrl(path = "/", currentOrigin = "") {
   const normalizedCurrentOrigin = normalizeSiteUrl(currentOrigin);
   const baseUrl = isLocalOrigin(normalizedCurrentOrigin)
-    ? normalizedCurrentOrigin
-    : getPublicSiteUrl() || normalizedCurrentOrigin || getSiteUrl();
+    ? getPublicSiteUrl() || getSiteUrl()
+    : normalizedCurrentOrigin || getPublicSiteUrl() || getSiteUrl();
   return new URL(path, baseUrl).toString();
 }
 

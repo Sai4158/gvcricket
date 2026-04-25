@@ -20,6 +20,9 @@ import {
   setPreferredAudioSessionType,
 } from "../../lib/page-audio";
 
+export const LOUDSPEAKER_DEFAULT_GAIN = 3.2;
+export const LOUDSPEAKER_MAX_GAIN = 4;
+
 function getMicErrorMessage(error) {
   const name = String(error?.name || "");
 
@@ -46,7 +49,7 @@ export default function useLocalMicMonitor() {
   const audioContextRef = useRef(null);
   const startPromiseRef = useRef(null);
   const preparePromiseRef = useRef(null);
-  const gainLevelRef = useRef(2);
+  const gainLevelRef = useRef(LOUDSPEAKER_DEFAULT_GAIN);
   const pausedMediaRef = useRef([]);
   const audioSessionTypeRef = useRef("");
   const permissionPrimedRef = useRef(false);
@@ -55,7 +58,7 @@ export default function useLocalMicMonitor() {
   const [isActive, setIsActive] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
-  const [gainLevel, setGainLevelState] = useState(2);
+  const [gainLevel, setGainLevelState] = useState(LOUDSPEAKER_DEFAULT_GAIN);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -332,7 +335,10 @@ export default function useLocalMicMonitor() {
   };
 
   const setGainLevel = (nextLevel) => {
-    const safeLevel = Math.min(2, Math.max(0, Number(nextLevel) || 0));
+    const safeLevel = Math.min(
+      LOUDSPEAKER_MAX_GAIN,
+      Math.max(0, Number(nextLevel) || 0)
+    );
     gainLevelRef.current = safeLevel;
     setGainLevelState(safeLevel);
 

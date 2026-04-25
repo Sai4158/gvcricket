@@ -10,6 +10,7 @@
  */
 
 import { GiCricketBat } from "react-icons/gi";
+import { getWinningTeamName } from "../../lib/match-result-display";
 import { getTeamBundle } from "../../lib/team-utils";
 import InningsColumn from "./InningsColumn";
 
@@ -24,6 +25,7 @@ export default function EnhancedScorecard({
     match.innings1.team === teamB.name ? teamB.players : teamA.players;
   const innings2Team =
     match.innings2.team === teamA.name ? teamA.players : teamB.players;
+  const winningTeamName = getWinningTeamName(match?.result || "");
 
   return (
     <div className="bg-zinc-900/50 rounded-2xl shadow-lg p-6 space-y-6 ring-1 ring-white/10">
@@ -36,12 +38,14 @@ export default function EnhancedScorecard({
           summary={innings1Summary}
           players={innings1Team}
           teamColor="border-sky-400"
+          isWinner={Boolean(winningTeamName && match?.innings1?.team === winningTeamName)}
         />
         <InningsColumn
           innings={match.innings2}
           summary={innings2Summary}
           players={innings2Team}
           teamColor="border-red-400"
+          isWinner={Boolean(winningTeamName && match?.innings2?.team === winningTeamName)}
         />
       </div>
       <p className="text-center text-sm text-zinc-400 pt-4 border-t border-white/10">

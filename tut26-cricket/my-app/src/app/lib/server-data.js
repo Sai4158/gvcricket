@@ -689,14 +689,18 @@ export async function loadPublicMatchData(matchId) {
     return null;
   }
   const finalizedMatch = await finalizePendingResultIfExpired(match);
+  const fallbackSession = await loadFallbackSession(finalizedMatch.sessionId);
+  const tossStateChanged = hydrateLegacyTossState(finalizedMatch, fallbackSession);
   const { match: repairedMatch, changed } =
     recoverMatchInningsHistory(finalizedMatch);
 
-  if (changed && repairedMatch?._id) {
+  if ((changed || tossStateChanged) && repairedMatch?._id) {
     await Match.findByIdAndUpdate(
       repairedMatch._id,
       {
         $set: {
+          tossWinner: repairedMatch.tossWinner,
+          tossDecision: repairedMatch.tossDecision,
           innings1: repairedMatch.innings1,
           innings2: repairedMatch.innings2,
         },
@@ -720,9 +724,6 @@ export async function loadPublicMatchData(matchId) {
     }
   }
 
-  const fallbackSession = await loadFallbackSession(
-    repairedMatch?.sessionId || finalizedMatch.sessionId,
-  );
   return serializePublicMatch(repairedMatch, fallbackSession);
 }
 

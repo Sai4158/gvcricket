@@ -690,6 +690,26 @@ test("[security] legacy toss-complete matches normalize innings teams and expose
   assert.equal(publicMatch.tossReady, true);
 });
 
+test("[security] public result data repairs duplicated stale innings names after a session rename", () => {
+  const renamedMatch = {
+    ...buildBaseMatch(),
+    teamAName: "Harry",
+    teamBName: "Shiv",
+    tossWinner: "Harry",
+    tossDecision: "bat",
+    innings1: { team: "Harry", score: 77, history: [] },
+    innings2: { team: "Harry", score: 42, history: [] },
+  };
+
+  const normalized = normalizeLegacyTossState(renamedMatch);
+  const publicMatch = serializePublicMatch(renamedMatch);
+
+  assert.equal(normalized.innings1.team, "Harry");
+  assert.equal(normalized.innings2.team, "Shiv");
+  assert.equal(publicMatch.innings1.team, "Harry");
+  assert.equal(publicMatch.innings2.team, "Shiv");
+});
+
 
 test("[security] legacy matches can inherit toss state from the linked session safely", () => {
   const legacyMatch = {

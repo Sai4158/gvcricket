@@ -27,6 +27,7 @@ import { enforceRateLimit } from "../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../lib/request-security";
 import { hasValidDraftToken } from "../../../lib/session-draft";
 import { invalidateSessionsDataCache } from "../../../lib/server-data";
+import { syncTeamNamesAcrossMatch } from "../../../lib/match-scoring";
 import {
   pinSchema,
   sessionPatchObjectSchema,
@@ -148,13 +149,35 @@ export async function PATCH(req, { params }) {
     }
 
     const { pin: _pin, ...safePatch } = parsedRequest.value;
-    const nextIsLive = safePatch.isLive ?? session.isLive;
+    const previousNames = {
+      teamAName: String(session.teamAName || "").trim(),
+      teamBName: String(session.teamBName || "").trim(),
+    };
+    const nextNames = {
+      teamAName:
+        safePatch.teamAName !== undefined
+          ? String(safePatch.teamAName || "").trim()
+          : previousNames.teamAName,
+      teamBName:
+        safePatch.teamBName !== undefined
+          ? String(safePatch.teamBName || "").trim()
+          : previousNames.teamBName,
+    };
+    const normalizedSessionPatch = { ...safePatch };
+
+    if (session.tossWinner === previousNames.teamAName) {
+      normalizedSessionPatch.tossWinner = nextNames.teamAName;
+    } else if (session.tossWinner === previousNames.teamBName) {
+      normalizedSessionPatch.tossWinner = nextNames.teamBName;
+    }
+
+    const nextIsLive = normalizedSessionPatch.isLive ?? session.isLive;
     const preserveEndedTimestamp = Boolean(session.match && !nextIsLive);
 
     const updatedSession = await Session.findByIdAndUpdate(
       id,
       {
-        $set: safePatch,
+        $set: normalizedSessionPatch,
       },
       {
         new: true,
@@ -167,27 +190,43 @@ export async function PATCH(req, { params }) {
     }
 
     if (updatedSession.match) {
+      const linkedMatch = await Match.findById(updatedSession.match)
+        .select("tossWinner innings1 innings2")
+        .lean();
+      const syncedMatch = linkedMatch
+        ? syncTeamNamesAcrossMatch(linkedMatch, previousNames, nextNames)
+        : null;
+      const linkedMatchUpdate = {
+        teamA: updatedSession.teamA,
+        teamB: updatedSession.teamB,
+        teamAName: updatedSession.teamAName,
+        teamBName: updatedSession.teamBName,
+        overs: updatedSession.overs,
+        tossWinner: syncedMatch?.tossWinner || updatedSession.tossWinner,
+        matchImages: updatedSession.matchImages,
+        matchImageUrl: updatedSession.matchImageUrl,
+        matchImagePublicId: updatedSession.matchImagePublicId,
+        matchImageUploadedAt: updatedSession.matchImageUploadedAt,
+        matchImageUploadedBy: updatedSession.matchImageUploadedBy,
+        announcerEnabled: updatedSession.announcerEnabled,
+        announcerMode: updatedSession.announcerMode,
+        lastEventType: updatedSession.lastEventType,
+        lastEventText: updatedSession.lastEventText,
+        adminAccessVersion: updatedSession.adminAccessVersion,
+      };
+
+      if (syncedMatch?.innings1) {
+        linkedMatchUpdate.innings1 = syncedMatch.innings1;
+      }
+
+      if (syncedMatch?.innings2) {
+        linkedMatchUpdate.innings2 = syncedMatch.innings2;
+      }
+
       await Match.findByIdAndUpdate(
         updatedSession.match,
         {
-          $set: {
-            teamA: updatedSession.teamA,
-            teamB: updatedSession.teamB,
-            teamAName: updatedSession.teamAName,
-            teamBName: updatedSession.teamBName,
-            overs: updatedSession.overs,
-            tossWinner: updatedSession.tossWinner,
-            matchImages: updatedSession.matchImages,
-            matchImageUrl: updatedSession.matchImageUrl,
-            matchImagePublicId: updatedSession.matchImagePublicId,
-            matchImageUploadedAt: updatedSession.matchImageUploadedAt,
-            matchImageUploadedBy: updatedSession.matchImageUploadedBy,
-            announcerEnabled: updatedSession.announcerEnabled,
-            announcerMode: updatedSession.announcerMode,
-            lastEventType: updatedSession.lastEventType,
-            lastEventText: updatedSession.lastEventText,
-            adminAccessVersion: updatedSession.adminAccessVersion,
-          },
+          $set: linkedMatchUpdate,
         },
         preserveEndedTimestamp ? { timestamps: false } : undefined
       );
@@ -211,7 +250,7 @@ export async function PATCH(req, { params }) {
       status: "success",
       ip: meta.ip,
       userAgent: meta.userAgent,
-      metadata: { fields: Object.keys(safePatch) },
+      metadata: { fields: Object.keys(normalizedSessionPatch) },
     });
 
     return Response.json(serializePublicSession(updatedSession), {
