@@ -1027,6 +1027,9 @@ export function applySafeMatchPatch(matchDocument, patch) {
     nextMatch.announcerBroadcastScoreSoundEffectsEnabled =
       patch.announcerBroadcastScoreSoundEffectsEnabled;
   }
+  if (Object.prototype.hasOwnProperty.call(patch, "liveStream")) {
+    nextMatch.liveStream = patch.liveStream || null;
+  }
 
   // If team names change, update the same names in toss and innings too.
   if (
@@ -1104,6 +1107,7 @@ export function buildSessionMirrorUpdate(matchDocument) {
     matchImagePublicId: match?.matchImagePublicId || "",
     matchImageUploadedAt: match?.matchImageUploadedAt || null,
     matchImageUploadedBy: match?.matchImageUploadedBy || "",
+    liveStream: match?.liveStream || null,
     announcerEnabled: Boolean(match?.announcerEnabled),
     announcerMode: match?.announcerMode || "",
     announcerScoreSoundEffectsEnabled:

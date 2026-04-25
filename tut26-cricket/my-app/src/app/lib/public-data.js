@@ -14,6 +14,7 @@ import { isSafeMatchImageUrl } from "./match-image";
 import { hasCompleteTossState, normalizeLegacyTossState } from "./match-toss";
 import { normalizeScoreSoundEffectMap } from "./score-sound-effects";
 import { addBallToHistory, countLegalBalls } from "./match-scoring";
+import { normalizeStoredLiveStream } from "./youtube-live-stream";
 
 function getPublicMatchImagesWithFallback(match, fallbackState = null) {
   const matchId = String(match?._id || "");
@@ -342,6 +343,10 @@ function getPublicMatchImageUrl(match, fallbackState = null) {
   return publicImages[0]?.url || getPublicMatchImagePath(match);
 }
 
+function getPublicLiveStream(match, fallbackState = null) {
+  return normalizeStoredLiveStream(match?.liveStream || fallbackState?.liveStream || null);
+}
+
 export function serializeLiveMatchPatch(matchDocument) {
   if (!matchDocument) {
     return null;
@@ -410,6 +415,7 @@ export function serializeMatchMediaPatch(matchDocument, fallbackState = null) {
   return {
     matchImageUrl: publicImages[0]?.url || getPublicMatchImagePath(match),
     matchImages: publicImages,
+    liveStream: getPublicLiveStream(match, fallbackState),
     mediaVersion: getMediaVersion(match),
     lastLiveEvent: match?.lastLiveEvent || null,
     lastEventType: match?.lastEventType || "",
@@ -468,6 +474,7 @@ export function serializeUmpireBootstrap(matchDocument, fallbackState = null) {
     mediaVersion: getMediaVersion(match),
     matchImageUrl: publicImages[0]?.url || getPublicMatchImagePath(match),
     matchImages: [],
+    liveStream: getPublicLiveStream(match, fallbackState),
     announcerEnabled: Boolean(match.announcerEnabled),
     announcerMode: match.announcerMode || "",
     announcerScoreSoundEffectsEnabled:
@@ -536,6 +543,7 @@ export function serializePublicMatch(
     secondInningsLegalBallCount: compactOverState.secondInningsLegalBallCount,
     matchImageUrl: publicImages[0]?.url || getPublicMatchImagePath(match),
     matchImages: publicImages,
+    liveStream: getPublicLiveStream(match, fallbackState),
     announcerEnabled: Boolean(match.announcerEnabled),
     announcerMode: match.announcerMode || "",
     announcerScoreSoundEffectsEnabled:
@@ -655,6 +663,7 @@ export function serializeSessionViewBootstrap(
     innings1: buildCompactInnings(match, "innings1"),
     innings2: buildCompactInnings(match, "innings2"),
     matchImageUrl: getPublicMatchImageUrl(match, fallbackState),
+    liveStream: getPublicLiveStream(match, fallbackState),
     legalBallCount: compactOverState.legalBallCount,
     activeOverNumber: compactOverState.activeOverNumber,
     activeOverBalls: compactOverState.activeOverBalls,

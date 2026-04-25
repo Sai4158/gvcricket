@@ -17,6 +17,30 @@ function normalizeInnings(innings) {
   };
 }
 
+function normalizeLiveStream(liveStream) {
+  if (!liveStream || typeof liveStream !== "object") {
+    return null;
+  }
+
+  const provider = String(liveStream.provider || "").trim();
+  const watchUrl = String(liveStream.watchUrl || "").trim();
+  const embedUrl = String(liveStream.embedUrl || "").trim();
+  const videoId = String(liveStream.videoId || "").trim();
+
+  if (!watchUrl || !embedUrl || !videoId) {
+    return null;
+  }
+
+  return {
+    provider: provider || "youtube",
+    inputUrl: String(liveStream.inputUrl || watchUrl).trim(),
+    watchUrl,
+    embedUrl,
+    videoId,
+    updatedAt: liveStream.updatedAt || null,
+  };
+}
+
 export function normalizeResultMatch(match) {
   if (!match || typeof match !== "object") {
     return null;
@@ -27,6 +51,7 @@ export function normalizeResultMatch(match) {
     innings1: normalizeInnings(match?.innings1),
     innings2: normalizeInnings(match?.innings2),
     matchImages: Array.isArray(match?.matchImages) ? match.matchImages : [],
+    liveStream: normalizeLiveStream(match?.liveStream),
   };
 }
 

@@ -21,10 +21,13 @@ import MatchImageUploader from "../match/MatchImageUploader";
 import { ModalBase } from "../match/MatchBaseModals";
 import SafeMatchImage from "../shared/SafeMatchImage";
 import MatchImageCarousel from "../shared/MatchImageCarousel";
+import ImagePinModal from "../shared/ImagePinModal";
 import LoadingButton from "../shared/LoadingButton";
 import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
+import YouTubeLiveStreamCard from "../shared/YouTubeLiveStreamCard";
 import { calculateInningsSummary } from "../../lib/match-stats";
 import { getWinningInningsSummary } from "../../lib/match-result-display";
+import { buildPinRequestError } from "../../lib/pin-attempt-client";
 import CongratulationsCard from "./CongratulationsCard";
 import EnhancedScorecard from "./EnhancedScorecard";
 import PlayerLists from "./PlayerLists";
@@ -68,6 +71,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   const [activeGalleryImageId, setActiveGalleryImageId] = useState("");
   const [zoomedImage, setZoomedImage] = useState(null);
   const [zoomedImageScale, setZoomedImageScale] = useState(1);
+  const [isLiveStreamPinOpen, setIsLiveStreamPinOpen] = useState(false);
   const lastStreamUpdateRef = useRef(initialMatch?.updatedAt || "");
 
   const confettiPieces = useMemo(
@@ -198,6 +202,30 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   const handleOpenImageManager = (preferredImageId = "") => {
     setActiveGalleryImageId(preferredImageId || matchImages[0]?.id || "");
     setIsImageManagerOpen(true);
+  };
+
+  const handleRemoveLiveStream = async (pin) => {
+    const response = await fetch(`/api/matches/${match._id}/live-stream`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ pin }),
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw buildPinRequestError(
+        response,
+        payload,
+        "Could not remove the live stream.",
+      );
+    }
+
+    startTransition(() => {
+      setMatch((current) => mergeResultMatchUpdate(current, payload || null));
+      setIsLiveStreamPinOpen(false);
+    });
   };
 
   const gallerySection = (
@@ -341,6 +369,17 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           </div>
         </MatchHeroBackdrop>
 
+        {match.liveStream ? (
+          <YouTubeLiveStreamCard
+            stream={match.liveStream}
+            title="Live Match Stream"
+            subtitle="This YouTube stream stays attached to the result until it is intentionally removed."
+            className="max-w-5xl mx-auto"
+            holdToRemoveEnabled
+            onHoldRemove={() => setIsLiveStreamPinOpen(true)}
+          />
+        ) : null}
+
         {hasGalleryImages ? gallerySection : null}
 
         <section className="space-y-8">
@@ -432,6 +471,22 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           </ModalBase>
         ) : null}
       </AnimatePresence>
+      <ImagePinModal
+        isOpen={isLiveStreamPinOpen}
+        title="Remove Live Stream"
+        subtitle="Enter the 6-digit manage PIN to remove this YouTube stream from the result and spectator pages."
+        confirmLabel="Remove Stream"
+        pinLabel="Manage PIN"
+        summaryTitle="Stream removal"
+        summaryItems={
+          match?.liveStream?.watchUrl
+            ? [match.liveStream.watchUrl]
+            : []
+        }
+        rateLimitScope={`result-live-stream-pin:${matchId}`}
+        onConfirm={handleRemoveLiveStream}
+        onClose={() => setIsLiveStreamPinOpen(false)}
+      />
       <AnimatePresence>
         {zoomedImage?.url ? (
           <ModalBase

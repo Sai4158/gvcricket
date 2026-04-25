@@ -21,6 +21,7 @@ import { cache } from "react";
 
 export const dynamic = "force-dynamic";
 const loadPublicMatchDataCached = cache(loadPublicMatchData);
+const SHARE_IMAGE_SIZE = { width: 1200, height: 630 };
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
@@ -47,6 +48,9 @@ export async function generateMetadata({ params }) {
   const pageLabel =
     matchup === "Cricket match" ? "Match Result and Stats" : `${matchup} Result and Stats`;
   const descriptionParts = [];
+  const shareImageUrl = absoluteUrl(versionedSocialImagePath(`/result/${id}/opengraph-image`));
+  const twitterImageUrl = absoluteUrl(versionedSocialImagePath(`/result/${id}/twitter-image`));
+  const shareImageAlt = `${matchup} result preview with GV Cricket branding`;
 
   if (match?.result) {
     descriptionParts.push(match.result);
@@ -83,12 +87,31 @@ export async function generateMetadata({ params }) {
       title: `${pageLabel} | GV Cricket`,
       description: descriptionText,
       url: absoluteUrl(`/result/${id}`),
-      images: [absoluteUrl(versionedSocialImagePath(`/result/${id}/opengraph-image`))],
+      images: [
+        {
+          url: shareImageUrl,
+          width: SHARE_IMAGE_SIZE.width,
+          height: SHARE_IMAGE_SIZE.height,
+          alt: shareImageAlt,
+        },
+      ],
     },
     twitter: {
+      card: "summary_large_image",
       title: `${pageLabel} | GV Cricket`,
       description: descriptionText,
-      images: [absoluteUrl(versionedSocialImagePath(`/result/${id}/twitter-image`))],
+      images: [
+        {
+          url: twitterImageUrl,
+          alt: shareImageAlt,
+        },
+      ],
+    },
+    other: {
+      "og:image:secure_url": shareImageUrl,
+      "og:image:type": "image/png",
+      "og:image:width": String(SHARE_IMAGE_SIZE.width),
+      "og:image:height": String(SHARE_IMAGE_SIZE.height),
     },
   };
 }

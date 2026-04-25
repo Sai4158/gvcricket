@@ -13,7 +13,7 @@ export const siteConfig = {
   url: "https://www.gvcricket.com",
   logoPath: "/gvLogo.png",
   shareLogoPath: "/gvLogo.png",
-  socialImageVersion: "2026-04-23-result-share-collage",
+  socialImageVersion: "2026-04-25-result-share-whatsapp-fix",
   description:
     "GV Cricket is a free live cricket scoring app for local matches, leagues, tournaments, school cricket, box cricket, and tennis-ball cricket with umpire mode, spectator scoreboards, match results, and mobile-first control for cricket communities in India, Pakistan, Bangladesh, Sri Lanka, Nepal, UAE, and more.",
   defaultTitle:
@@ -65,8 +65,8 @@ export const siteConfig = {
     "community cricket scoring app",
     "cricket scoring app alternative",
   ],
-  ogImagePath: "/opengraph-image?v=2026-04-23-result-share-collage",
-  twitterImagePath: "/twitter-image?v=2026-04-23-result-share-collage",
+  ogImagePath: "/opengraph-image?v=2026-04-25-result-share-whatsapp-fix",
+  twitterImagePath: "/twitter-image?v=2026-04-25-result-share-whatsapp-fix",
 };
 
 function normalizeSiteUrl(value = "") {

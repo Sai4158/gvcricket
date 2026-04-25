@@ -25,6 +25,7 @@ export function SessionViewTopShell({
   trackerHistory,
   activeOverBalls,
   activeOverNumber,
+  liveStreamCard = null,
 }) {
   return (
     <>
@@ -74,6 +75,11 @@ export function SessionViewTopShell({
           </header>
 
           <div className="mt-7 flex justify-center">
+            {liveStreamCard ? (
+              <div className="mb-5 w-full max-w-3xl">{liveStreamCard}</div>
+            ) : null}
+          </div>
+          <div className="flex justify-center">
             <LiveScoreCard match={match} />
           </div>
           <div className="mt-3 flex justify-center">

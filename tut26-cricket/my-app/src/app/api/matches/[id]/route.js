@@ -37,6 +37,7 @@ import {
 import { hydrateLegacyTossState } from "../../../lib/match-toss";
 import { matchPatchSchema } from "../../../lib/validators";
 import { invalidateSessionsDataCache } from "../../../lib/server-data";
+import { normalizeYouTubeLiveStream } from "../../../lib/youtube-live-stream";
 import Match from "../../../../models/Match";
 import MatchUndoEntry from "../../../../models/MatchUndoEntry";
 import Session from "../../../../models/Session";
@@ -196,7 +197,26 @@ export async function PATCH(req, { params }) {
       );
     }
 
-    const nextState = applySafeMatchPatch(finalizedMatch, parsedRequest.value);
+    const patchValue = { ...parsedRequest.value };
+    if (Object.prototype.hasOwnProperty.call(patchValue, "liveStreamUrl")) {
+      const submittedLiveStreamUrl = String(patchValue.liveStreamUrl || "").trim();
+      if (!submittedLiveStreamUrl) {
+        patchValue.liveStream = null;
+      } else {
+        const normalizedStream = normalizeYouTubeLiveStream(submittedLiveStreamUrl);
+        if (!normalizedStream.ok) {
+          return jsonError(normalizedStream.message, 400);
+        }
+
+        patchValue.liveStream = {
+          ...normalizedStream.value,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+    }
+
+    const previousLiveStreamVideoId = String(finalizedMatch?.liveStream?.videoId || "");
+    const nextState = applySafeMatchPatch(finalizedMatch, patchValue);
     finalizedMatch.teamA = nextState.teamA;
     finalizedMatch.teamB = nextState.teamB;
     finalizedMatch.teamAName = nextState.teamAName;
@@ -217,12 +237,30 @@ export async function PATCH(req, { params }) {
     finalizedMatch.lastLiveEvent = nextState.lastLiveEvent;
     finalizedMatch.lastEventType = nextState.lastEventType;
     finalizedMatch.lastEventText = nextState.lastEventText;
+    finalizedMatch.liveStream = nextState.liveStream;
     finalizedMatch.announcerEnabled = nextState.announcerEnabled;
     finalizedMatch.announcerMode = nextState.announcerMode;
     finalizedMatch.announcerScoreSoundEffectsEnabled =
       nextState.announcerScoreSoundEffectsEnabled;
     finalizedMatch.announcerBroadcastScoreSoundEffectsEnabled =
       nextState.announcerBroadcastScoreSoundEffectsEnabled;
+    if (Object.prototype.hasOwnProperty.call(patchValue, "liveStream")) {
+      const nextLiveStreamVideoId = String(nextState?.liveStream?.videoId || "");
+      const liveStreamChanged = previousLiveStreamVideoId !== nextLiveStreamVideoId;
+      if (liveStreamChanged || (!nextLiveStreamVideoId && previousLiveStreamVideoId)) {
+        const summaryText = nextLiveStreamVideoId
+          ? "Live stream updated."
+          : "Live stream removed.";
+        finalizedMatch.lastEventType = "live_stream_update";
+        finalizedMatch.lastEventText = summaryText;
+        finalizedMatch.lastLiveEvent = {
+          id: `live-stream-${Date.now()}`,
+          type: "live_stream_update",
+          summaryText,
+          createdAt: new Date().toISOString(),
+        };
+      }
+    }
     await finalizedMatch.save();
 
     await Session.findByIdAndUpdate(

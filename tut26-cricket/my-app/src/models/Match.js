@@ -46,6 +46,23 @@ const MatchImageEntrySchema = new mongoose.Schema(
   { _id: false }
 );
 
+const MatchLiveStreamSchema = new mongoose.Schema(
+  {
+    provider: {
+      type: String,
+      enum: ["youtube"],
+      default: "youtube",
+      trim: true,
+    },
+    inputUrl: { type: String, default: "", trim: true },
+    watchUrl: { type: String, default: "", trim: true },
+    embedUrl: { type: String, default: "", trim: true },
+    videoId: { type: String, default: "", trim: true },
+    updatedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const MatchSchema = new mongoose.Schema(
   {
     teamA: { type: [String], required: true },
@@ -97,6 +114,7 @@ const MatchSchema = new mongoose.Schema(
     matchImageStorageUrlHash: { type: String, default: "", trim: true },
     matchImageUploadedAt: { type: Date, default: null },
     matchImageUploadedBy: { type: String, default: "", trim: true },
+    liveStream: { type: MatchLiveStreamSchema, default: null },
     announcerEnabled: { type: Boolean, default: false },
     announcerMode: {
       type: String,

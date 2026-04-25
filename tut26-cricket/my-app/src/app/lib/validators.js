@@ -200,6 +200,7 @@ export const matchPatchObjectSchema = z
     teamB: playerArraySchema.optional(),
     overs: oversSchema.optional(),
     innings1Score: z.number().int().min(0).max(999).optional(),
+    liveStreamUrl: optionalStringSchema.optional(),
     announcerEnabled: z.boolean().optional(),
     announcerMode: z.enum(["simple", "full", ""]).optional(),
     announcerScoreSoundEffectsEnabled: z.boolean().optional(),

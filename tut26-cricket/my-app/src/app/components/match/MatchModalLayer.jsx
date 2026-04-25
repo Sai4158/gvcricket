@@ -23,7 +23,11 @@ import {
   RulesModal,
   RunInputModal,
 } from "./MatchBaseModals";
-import { EditOversModal, EditTeamsModal } from "./MatchEditModals";
+import {
+  EditLiveStreamModal,
+  EditOversModal,
+  EditTeamsModal,
+} from "./MatchEditModals";
 
 export default function MatchModalLayer({
   showInningsEnd,
@@ -219,6 +223,15 @@ export default function MatchModalLayer({
       {modalType === "editTeams" && (
         <EditTeamsModal
           key="edit-teams"
+          match={match}
+          onUpdate={onUpdate}
+          onClose={onClose}
+          isUpdating={isUpdating}
+        />
+      )}
+      {modalType === "liveStream" && (
+        <EditLiveStreamModal
+          key="live-stream"
           match={match}
           onUpdate={onUpdate}
           onClose={onClose}

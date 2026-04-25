@@ -12,6 +12,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  FaBroadcastTower,
   FaBookOpen,
   FaImage,
   FaInfoCircle,
@@ -481,6 +482,7 @@ const MatchActionGrid = memo(function MatchActionGrid({
   undoDisabled = false,
   onHistory,
   onImage,
+  onLiveStream,
   onCommentary,
   onWalkie,
   onMic,
@@ -653,6 +655,14 @@ const MatchActionGrid = memo(function MatchActionGrid({
             compact
           />
           <ActionIconButton
+            onClick={onLiveStream}
+            onPressFeedback={onPressFeedback}
+            icon={<FaBroadcastTower />}
+            label="Live Stream"
+            colorClass="text-rose-300"
+            compact
+          />
+          <ActionIconButton
             onClick={onImage}
             onPressFeedback={onPressFeedback}
             icon={<FaImage />}
@@ -814,6 +824,17 @@ const MatchActionGrid = memo(function MatchActionGrid({
                 />
                 <ActionHelpItem
                   rank={showLiveControls ? 7 : 4}
+                  icon={<FaBroadcastTower />}
+                  title="Live Stream"
+                  description={[
+                    "Attach a YouTube live link to the current match.",
+                    "Spectators see it above the score while the match is live.",
+                    "The stream can stay on the result page after the match ends.",
+                  ]}
+                  colorClass="text-rose-300"
+                />
+                <ActionHelpItem
+                  rank={showLiveControls ? 8 : 5}
                   icon={<FaImage />}
                   title="Image"
                   description={[
@@ -824,7 +845,7 @@ const MatchActionGrid = memo(function MatchActionGrid({
                   colorClass="text-zinc-200"
                 />
                 <ActionHelpItem
-                  rank={showLiveControls ? 8 : 5}
+                  rank={showLiveControls ? 9 : 6}
                   icon={<FaUserEdit />}
                   title="Edit Teams"
                   description={[
@@ -835,7 +856,7 @@ const MatchActionGrid = memo(function MatchActionGrid({
                   colorClass="text-sky-400"
                 />
                 <ActionHelpItem
-                  rank={showLiveControls ? 9 : 6}
+                  rank={showLiveControls ? 10 : 7}
                   icon={<FaRegClock />}
                   title="Edit Overs / Innings"
                   description={[

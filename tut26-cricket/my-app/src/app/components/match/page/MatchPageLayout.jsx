@@ -323,6 +323,7 @@ export default function MatchPageLayout({
             onUndo={handleAnnouncedUndo}
             undoDisabled={isUndoCoolingDown}
             onHistory={() => setModal({ type: "history" })}
+            onLiveStream={() => setModal({ type: "liveStream" })}
             onImage={() => setModal({ type: "image" })}
             onCommentary={() => {
               void prime({ userGesture: true });

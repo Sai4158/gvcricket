@@ -12,10 +12,18 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { FaMinus, FaPen, FaPlus, FaTrash } from "react-icons/fa";
+import {
+  FaMinus,
+  FaPen,
+  FaPlus,
+  FaTrash,
+  FaYoutube,
+} from "react-icons/fa";
+import { LuClipboardPaste } from "react-icons/lu";
 import LoadingButton from "../shared/LoadingButton";
 import { getTeamBundle } from "../../lib/team-utils";
 import { ModalBase } from "./MatchBaseModals";
+import { normalizeYouTubeLiveStream } from "../../lib/youtube-live-stream";
 
 function EditableRoster({
   title,
@@ -496,6 +504,208 @@ export function EditOversModal({
       >
         {saveLabel}
       </LoadingButton>
+    </ModalBase>
+  );
+}
+
+export function EditLiveStreamModal({
+  match,
+  onUpdate,
+  onClose,
+  isUpdating = false,
+}) {
+  const existingStream = match?.liveStream || null;
+  const [liveStreamUrl, setLiveStreamUrl] = useState(
+    String(existingStream?.inputUrl || existingStream?.watchUrl || "").trim(),
+  );
+  const [error, setError] = useState("");
+  const [isPasting, setIsPasting] = useState(false);
+  const normalizedPreview = normalizeYouTubeLiveStream(liveStreamUrl);
+  const previewStream = normalizedPreview.ok
+    ? normalizedPreview.value
+    : existingStream;
+
+  const handlePasteLink = async () => {
+    if (!navigator?.clipboard?.readText) {
+      setError("Paste is not supported in this browser.");
+      return;
+    }
+
+    setIsPasting(true);
+    try {
+      const pastedText = await navigator.clipboard.readText();
+      if (!String(pastedText || "").trim()) {
+        setError("Clipboard is empty.");
+        return;
+      }
+
+      setLiveStreamUrl(String(pastedText || "").trim());
+      setError("");
+    } catch {
+      setError("Could not paste the link. Try pasting it manually.");
+    } finally {
+      setIsPasting(false);
+    }
+  };
+
+  const handleSaveStream = async () => {
+    const trimmedUrl = String(liveStreamUrl || "").trim();
+    if (!trimmedUrl) {
+      setError("Enter a YouTube link first.");
+      return;
+    }
+
+    const normalizedStream = normalizeYouTubeLiveStream(trimmedUrl);
+    if (!normalizedStream.ok) {
+      setError(normalizedStream.message);
+      return;
+    }
+
+    setError("");
+    await onUpdate({
+      liveStreamUrl: trimmedUrl,
+    });
+    onClose();
+  };
+
+  const handleRemoveStream = async () => {
+    setError("");
+    await onUpdate({
+      liveStreamUrl: "",
+    });
+    onClose();
+  };
+
+  return (
+    <ModalBase
+      title=""
+      onExit={onClose}
+      hideHeader
+      panelClassName="max-w-xl"
+    >
+      <div className="space-y-5">
+        <div className="flex items-start gap-4 rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(239,68,68,0.08),transparent_28%),linear-gradient(180deg,rgba(28,28,34,0.98),rgba(14,15,20,0.99))] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+          <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-red-400/20 bg-red-500/10 text-[1.75rem] text-red-400">
+            <FaYoutube />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-zinc-500">
+              YouTube Stream
+            </p>
+            <h3 className="mt-1 text-2xl font-black tracking-tight text-white">
+              Attach Match Video
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-zinc-300">
+              Paste any YouTube watch, live, share, shorts, music, or embed
+              link. The video shows above the spectator score and stays on the
+              result page until removed.
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <label
+              htmlFor="match-live-stream-url"
+              className="block text-[11px] font-semibold uppercase tracking-[0.28em] text-zinc-500"
+            >
+              Paste YouTube Link
+            </label>
+            <button
+              type="button"
+              onClick={handlePasteLink}
+              disabled={isPasting}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-200 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <LuClipboardPaste className="text-sm" />
+              {isPasting ? "Pasting" : "Paste link"}
+            </button>
+          </div>
+          <textarea
+            id="match-live-stream-url"
+            rows={3}
+            value={liveStreamUrl}
+            onChange={(event) => setLiveStreamUrl(event.target.value)}
+            placeholder="https://www.youtube.com/watch?v=... or youtu.be/... or /live/... or /embed/..."
+            className="w-full rounded-[24px] border border-white/10 bg-zinc-950/70 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-500 focus:border-red-300/30 focus:bg-zinc-950"
+          />
+        </div>
+
+        {previewStream?.watchUrl ? (
+          <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.98),rgba(10,10,14,0.98))]">
+            <div className="border-b border-white/8 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-zinc-500">
+                Preview
+              </p>
+              <p className="mt-1 text-sm text-zinc-300">
+                This is the video spectators will see.
+              </p>
+            </div>
+            <div className="aspect-video bg-black">
+              <iframe
+                src={previewStream.embedUrl}
+                title="YouTube stream preview"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                allowFullScreen
+                className="h-full w-full"
+              />
+            </div>
+            <div className="border-t border-white/8 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500">
+                Linked video
+              </p>
+              <a
+                href={previewStream.watchUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 block break-all text-sm font-semibold text-white underline decoration-white/25 underline-offset-4"
+              >
+                {previewStream.watchUrl}
+              </a>
+            </div>
+          </div>
+        ) : existingStream?.watchUrl ? (
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500">
+              Current YouTube stream
+            </p>
+            <a
+              href={existingStream.watchUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 block break-all text-sm font-semibold text-white underline decoration-white/25 underline-offset-4"
+            >
+              {existingStream.watchUrl}
+            </a>
+          </div>
+        ) : null}
+
+        {error ? (
+          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+            {error}
+          </div>
+        ) : null}
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <LoadingButton
+            onClick={handleSaveStream}
+            loading={isUpdating}
+            pendingLabel="Saving..."
+            className="rounded-[20px] border border-white/12 bg-white/[0.06] px-4 py-3 text-sm font-bold text-white transition hover:bg-white/[0.1]"
+          >
+            Save YouTube Link
+          </LoadingButton>
+          <button
+            type="button"
+            onClick={handleRemoveStream}
+            disabled={isUpdating || !existingStream?.watchUrl}
+            className="rounded-[20px] border border-white/10 bg-transparent px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Clear Link
+          </button>
+        </div>
+      </div>
     </ModalBase>
   );
 }

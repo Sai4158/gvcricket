@@ -139,9 +139,9 @@ const MAX_SESSIONS_PAGE_LIMIT = 68;
 const DEFAULT_SESSIONS_SORT = "live-newest";
 const DEFAULT_SESSIONS_FILTER = "all";
 const SESSION_VIEW_MATCH_FIELDS =
-  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1.team innings1.score innings2.team innings2.score balls matchImageUrl announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled walkieTalkieEnabled mediaUpdatedAt lastLiveEvent lastEventType lastEventText updatedAt";
+  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1.team innings1.score innings2.team innings2.score balls matchImageUrl liveStream announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled walkieTalkieEnabled mediaUpdatedAt lastLiveEvent lastEventType lastEventText updatedAt";
 const SESSION_VIEW_MATCH_DETAIL_FIELDS =
-  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy mediaUpdatedAt lastLiveEvent lastEventType lastEventText updatedAt";
+  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1 innings2 balls matchImages matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy liveStream mediaUpdatedAt lastLiveEvent lastEventType lastEventText updatedAt";
 
 function normalizeSearchValue(value) {
   return String(value || "").trim().toLowerCase();

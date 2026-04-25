@@ -22,6 +22,13 @@ function buildResultMatchFixture() {
     outs: 7,
     result: "Titans won by 3 wickets.",
     matchImageUrl: "https://example.com/original.jpg",
+    liveStream: {
+      provider: "youtube",
+      watchUrl: "https://www.youtube.com/watch?v=M7lc1UVf-VE",
+      embedUrl:
+        "https://www.youtube-nocookie.com/embed/M7lc1UVf-VE?rel=0&playsinline=1",
+      videoId: "M7lc1UVf-VE",
+    },
     matchImages: [
       {
         id: "cover",
@@ -63,6 +70,7 @@ test("[match] result page merge keeps innings state when upload returns a media-
   assert.equal(mergedMatch.result, "Titans won by 3 wickets.");
   assert.equal(mergedMatch.matchImageUrl, "https://example.com/updated.jpg");
   assert.equal(mergedMatch.matchImages.length, 2);
+  assert.equal(mergedMatch.liveStream.videoId, "M7lc1UVf-VE");
 });
 
 test("[match] result page merge keeps scorecard state when delete returns an empty media patch", () => {
@@ -78,6 +86,7 @@ test("[match] result page merge keeps scorecard state when delete returns an emp
   assert.equal(mergedMatch.score, 94);
   assert.equal(mergedMatch.matchImageUrl, "");
   assert.deepEqual(mergedMatch.matchImages, []);
+  assert.equal(mergedMatch.liveStream.videoId, "M7lc1UVf-VE");
 });
 
 test("[match] result page normalization fills missing innings shells safely", () => {
@@ -91,4 +100,20 @@ test("[match] result page normalization fills missing innings shells safely", ()
   assert.equal(normalizedMatch.innings1.score, 0);
   assert.equal(normalizedMatch.innings2.score, 0);
   assert.deepEqual(normalizedMatch.matchImages, []);
+  assert.equal(normalizedMatch.liveStream, null);
+});
+
+test("[match] result page normalization keeps valid live stream payloads only", () => {
+  const normalizedMatch = normalizeResultMatch({
+    _id: "507f1f77bcf86cd799439313",
+    liveStream: {
+      provider: "youtube",
+      watchUrl: "https://www.youtube.com/watch?v=M7lc1UVf-VE",
+      embedUrl:
+        "https://www.youtube-nocookie.com/embed/M7lc1UVf-VE?rel=0&playsinline=1",
+      videoId: "M7lc1UVf-VE",
+    },
+  });
+
+  assert.equal(normalizedMatch.liveStream.videoId, "M7lc1UVf-VE");
 });

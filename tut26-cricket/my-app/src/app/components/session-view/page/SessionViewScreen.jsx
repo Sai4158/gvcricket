@@ -48,6 +48,7 @@ import { duckPageMedia, restorePageMedia } from "../../../lib/page-audio";
 import { buildShareUrl } from "../../../lib/site-metadata";
 import OptionalFeatureBoundary from "../../shared/OptionalFeatureBoundary";
 import SiteFooter from "../../shared/SiteFooter";
+import YouTubeLiveStreamCard from "../../shared/YouTubeLiveStreamCard";
 import { useRouteFeedback } from "../../shared/RouteFeedbackProvider";
 import { navigateToSessions } from "./result-navigation";
 import {
@@ -1990,6 +1991,15 @@ export default function SessionViewClient({ sessionId, initialData }) {
         trackerHistory={trackerHistory}
         activeOverBalls={match?.activeOverBalls || []}
         activeOverNumber={match?.activeOverNumber || 1}
+        liveStreamCard={
+          match?.liveStream ? (
+            <YouTubeLiveStreamCard
+              stream={match.liveStream}
+              title="Live Match Stream"
+              subtitle="Watch the YouTube live stream before following the score below."
+            />
+          ) : null
+        }
       />
 
       <OptionalFeatureBoundary
