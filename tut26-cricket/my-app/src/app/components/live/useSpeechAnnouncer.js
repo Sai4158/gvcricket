@@ -681,9 +681,11 @@ export default function useSpeechAnnouncer(settings) {
 
   const ensureSpeechAudioSession = useCallback(() => {
     const previousType =
-      setPlaybackFriendlyAudioSessionType({
-        preferMixing: true,
-      }) || "";
+      platformRef.current.isIOS && platformRef.current.isSafari
+        ? setPreferredAudioSessionType("ambient") || ""
+        : setPlaybackFriendlyAudioSessionType({
+            preferMixing: true,
+          }) || "";
     if (!audioSessionTypeRef.current) {
       audioSessionTypeRef.current = previousType;
     }

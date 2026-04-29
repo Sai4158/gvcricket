@@ -79,7 +79,7 @@ export default function MatchModalLayer({
       ? {
           title: "Turn Score Music Effects On?",
           description:
-            "Turn off when playing music to avoid cutting off. Score tap sound effect will play after each ball.",
+            "Score tap sound effects will play after each ball. On iPhone, background music should duck instead of stopping.",
           emphasizedAction: "cancel",
         }
       : {
@@ -393,7 +393,7 @@ export default function MatchModalLayer({
                     Score Music Effects
                   </p>
                   <p className="mt-2 text-sm leading-5 text-zinc-400">
-                    Turn off when playing music to avoid cutting off.
+                    On iPhone, background music should duck instead of stopping.
                   </p>
                   <p className="mt-2 text-xs text-zinc-500">
                     Can be edited later.

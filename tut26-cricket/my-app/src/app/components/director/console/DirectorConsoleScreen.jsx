@@ -114,7 +114,7 @@ export default function DirectorConsoleScreen({
   const [musicTracks, setMusicTracks] = useState([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [musicState, setMusicState] = useState("idle");
-  const [directorAudioMode, setDirectorAudioMode] = useState("cut");
+  const [directorAudioMode, setDirectorAudioMode] = useState("duck");
   const [musicVolume, setMusicVolume] = useState(0.8);
   const [musicInput, setMusicInput] = useState("");
   const [isAddingMusicTrack, setIsAddingMusicTrack] = useState(false);

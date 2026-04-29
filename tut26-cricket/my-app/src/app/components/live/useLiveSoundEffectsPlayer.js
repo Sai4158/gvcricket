@@ -18,6 +18,7 @@ import {
   playBufferedUiAudio,
   primeUiAudio,
   restorePreferredAudioSessionType,
+  setPreferredAudioSessionType,
   setPlaybackFriendlyAudioSessionType,
   subscribeUiAudioUnlock,
 } from "../../lib/page-audio";
@@ -163,9 +164,7 @@ export default function useLiveSoundEffectsPlayer({
       return;
     }
 
-    const previousType = setPlaybackFriendlyAudioSessionType({
-      preferMixing: true,
-    }) || "";
+    const previousType = setPreferredAudioSessionType("ambient") || "";
     if (!audioSessionTypeRef.current) {
       audioSessionTypeRef.current = previousType;
     }
