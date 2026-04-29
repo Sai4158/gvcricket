@@ -152,15 +152,15 @@ function SessionCard({
       : "";
   const dateLabel = formatSessionDateLabel(session);
   const canOpenCard = Boolean(scoreHref);
+  const isTiedResult = isTiedMatchResult(session.result);
   const winningSummary =
-    !isLive && session.result
+    !isLive && session.result && !isTiedResult
       ? {
           teamName: session.winningTeamName || "",
           score: Number(session.winningScore || 0),
           wickets: Number(session.winningWickets || 0),
         }
       : null;
-  const isTiedResult = isTiedMatchResult(session.result);
   const hasScoreCard = Boolean(
     session.match &&
       (isLive ||
@@ -178,7 +178,7 @@ function SessionCard({
     : Number.isFinite(Number(session.outs))
     ? Number(session.outs)
     : 0;
-  const hasSplitScore = winningSummary || displayOuts > 0;
+  const hasSplitScore = Boolean(winningSummary) || displayOuts > 0 || isTiedResult;
   const scoreMetaLabel = isLive
     ? "Runs"
     : isTiedResult
