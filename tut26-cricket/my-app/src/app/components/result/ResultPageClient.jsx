@@ -373,17 +373,6 @@ export default function ResultPageClient({ matchId, initialMatch }) {
           </div>
         </MatchHeroBackdrop>
 
-        {match.liveStream ? (
-          <YouTubeLiveStreamCard
-            stream={match.liveStream}
-            title="Live Match Stream"
-            subtitle="This YouTube stream stays attached to the result until it is intentionally removed."
-            className="max-w-5xl mx-auto"
-            holdToRemoveEnabled
-            onHoldRemove={() => setIsLiveStreamPinOpen(true)}
-          />
-        ) : null}
-
         {hasGalleryImages ? gallerySection : null}
 
         <section className="space-y-8">
@@ -393,6 +382,16 @@ export default function ResultPageClient({ matchId, initialMatch }) {
             innings2Summary={innings2Summary}
           />
         </section>
+
+        {match.liveStream ? (
+          <YouTubeLiveStreamCard
+            stream={match.liveStream}
+            className="mx-auto max-w-5xl"
+            minimal
+            holdToRemoveEnabled
+            onHoldRemove={() => setIsLiveStreamPinOpen(true)}
+          />
+        ) : null}
 
         {!hasGalleryImages ? gallerySection : null}
 
