@@ -12,7 +12,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FaArrowLeft, FaArrowRight, FaImage, FaPen } from "react-icons/fa";
+import { FaArrowLeft, FaArrowRight, FaImage, FaPen, FaTimes } from "react-icons/fa";
 import ImagePinModal from "../../components/shared/ImagePinModal";
 import InlineSpinner from "../../components/shared/InlineSpinner";
 import LoadingButton from "../../components/shared/LoadingButton";
@@ -314,8 +314,18 @@ export default function NewSessionPage() {
                     placeholder="Game 1, finals, or practice"
                     autoComplete="off"
                     spellCheck={false}
-                    className="session-form-input w-full rounded-2xl border border-white/8 bg-white/[0.04] py-4 pl-12 pr-4 text-base text-white outline-none transition placeholder:text-zinc-500 focus:border-amber-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(251,191,36,0.08)]"
+                    className="session-form-input w-full rounded-2xl border border-white/8 bg-white/[0.04] py-4 pl-12 pr-12 text-base text-white outline-none transition placeholder:text-zinc-500 focus:border-amber-400/30 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(251,191,36,0.08)]"
                   />
+                  {name ? (
+                    <button
+                      type="button"
+                      onClick={() => setName("")}
+                      className="absolute right-3 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-400 transition hover:bg-white/[0.08] hover:text-white"
+                      aria-label="Clear session name"
+                    >
+                      <FaTimes className="text-xs" />
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
