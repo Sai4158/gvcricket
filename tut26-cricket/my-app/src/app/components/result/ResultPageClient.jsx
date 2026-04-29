@@ -100,7 +100,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   useEventSource({
     url: matchId ? `/api/live/matches/${matchId}?history=0` : null,
     event: "match",
-    enabled: Boolean(matchId) && Boolean(!match || match.isOngoing),
+    enabled: Boolean(matchId),
     onMessage: (payload) => {
       if (
         payload.updatedAt &&

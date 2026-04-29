@@ -10,6 +10,7 @@ import { buildSessionMirrorUpdate } from "../../../../lib/match-engine";
 import { isValidManagePin } from "../../../../lib/match-access";
 import { publishMatchUpdate, publishSessionUpdate } from "../../../../lib/live-updates";
 import { serializePublicMatch } from "../../../../lib/public-data";
+import { finalizePendingResultIfExpired } from "../../../../lib/pending-match-result";
 import { enforceSmartPinRateLimit } from "../../../../lib/pin-attempt-server";
 import { getRequestMeta } from "../../../../lib/request-meta";
 import { enforceRateLimit } from "../../../../lib/rate-limit";
@@ -138,14 +139,15 @@ export async function PUT(req, { params }) {
     if (!match) {
       return jsonError("Match not found.", 404);
     }
+    const finalizedMatch = await finalizePendingResultIfExpired(match);
 
-    match.liveStream = {
+    finalizedMatch.liveStream = {
       ...normalizedStream.value,
       updatedAt: new Date().toISOString(),
     };
-    match.lastEventType = "live_stream_update";
-    match.lastEventText = "Live stream updated.";
-    match.lastLiveEvent = {
+    finalizedMatch.lastEventType = "live_stream_update";
+    finalizedMatch.lastEventText = "Live stream updated.";
+    finalizedMatch.lastLiveEvent = {
       id: `live-stream-update-${Date.now()}`,
       type: "live_stream_update",
       summaryText: "Live stream updated.",
@@ -153,8 +155,8 @@ export async function PUT(req, { params }) {
     };
 
     const responseBody = await saveAndPublish(
-      match,
-      getFallbackSession(match.sessionId),
+      finalizedMatch,
+      getFallbackSession(finalizedMatch.sessionId),
     );
 
     await writeAuditLog({
@@ -251,11 +253,12 @@ export async function DELETE(req, { params }) {
     if (!match) {
       return jsonError("Match not found.", 404);
     }
+    const finalizedMatch = await finalizePendingResultIfExpired(match);
 
-    match.liveStream = null;
-    match.lastEventType = "live_stream_update";
-    match.lastEventText = "Live stream removed.";
-    match.lastLiveEvent = {
+    finalizedMatch.liveStream = null;
+    finalizedMatch.lastEventType = "live_stream_update";
+    finalizedMatch.lastEventText = "Live stream removed.";
+    finalizedMatch.lastLiveEvent = {
       id: `live-stream-remove-${Date.now()}`,
       type: "live_stream_update",
       summaryText: "Live stream removed.",
@@ -263,8 +266,8 @@ export async function DELETE(req, { params }) {
     };
 
     const responseBody = await saveAndPublish(
-      match,
-      getFallbackSession(match.sessionId),
+      finalizedMatch,
+      getFallbackSession(finalizedMatch.sessionId),
     );
 
     await writeAuditLog({
