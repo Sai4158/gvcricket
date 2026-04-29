@@ -44,6 +44,7 @@ import useDirectorWalkieControls from "./hooks/useDirectorWalkieControls";
 import LoadingButton from "../../shared/LoadingButton";
 import DirectorAudioOutputPanel from "./panels/DirectorAudioOutputPanel";
 import DirectorConsoleEntrySection from "./panels/DirectorConsoleEntrySection";
+import DirectorLiveStreamPanel from "./panels/DirectorLiveStreamPanel";
 import DirectorLoudspeakerPanel from "./panels/DirectorLoudspeakerPanel";
 import DirectorScoreAnnouncerPanel from "./panels/DirectorScoreAnnouncerPanel";
 import DirectorSoundEffectsPanel from "./panels/DirectorSoundEffectsPanel";
@@ -581,6 +582,28 @@ export default function DirectorConsoleScreen({
     };
   }, [iOSSafari]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const nextUrl = new URL(window.location.href);
+    if (authorized && managedSessionId) {
+      nextUrl.pathname = "/director";
+      nextUrl.searchParams.set("session", managedSessionId);
+      nextUrl.searchParams.set("manage", "1");
+    } else {
+      nextUrl.searchParams.delete("session");
+      nextUrl.searchParams.delete("manage");
+    }
+
+    const nextHref = `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`;
+    const currentHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (nextHref !== currentHref) {
+      window.history.replaceState({}, "", nextHref);
+    }
+  }, [authorized, managedSessionId]);
+
   useEventSource({
     url:
       authorized && managedSession?.match?._id
@@ -615,6 +638,25 @@ export default function DirectorConsoleScreen({
       }
     },
   });
+
+  const handleDirectorMatchUpdated = useCallback(
+    (nextMatch) => {
+      if (!nextMatch?._id) {
+        return;
+      }
+
+      setLiveMatch(nextMatch);
+      setSessions((current) => {
+        const nextSessions = mergeDirectorMatchIntoSessions(current, nextMatch);
+        if (nextSessions !== current) {
+          writeCachedDirectorSessions(nextSessions);
+        }
+        return nextSessions;
+      });
+      setConsoleError("");
+    },
+    [setSessions],
+  );
 
   const walkieControls = useDirectorWalkieControls({
     authorized,
@@ -1589,6 +1631,13 @@ export default function DirectorConsoleScreen({
             setSpeechSettings={setSpeechSettings}
             speech={speech}
             speechSettings={speechSettings}
+          />
+
+          <DirectorLiveStreamPanel
+            canManageSession={canManageSession}
+            liveMatch={liveMatch}
+            managedSession={managedSession}
+            onMatchUpdated={handleDirectorMatchUpdated}
           />
 
           <div className="hidden md:block">

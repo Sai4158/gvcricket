@@ -1,6 +1,11 @@
+import { cookies } from "next/headers";
 import { jsonError, jsonRateLimit } from "../../../../lib/api-response";
 import { writeAuditLog } from "../../../../lib/audit-log";
 import { connectDB } from "../../../../lib/db";
+import {
+  getDirectorAccessCookieName,
+  hasValidDirectorAccess,
+} from "../../../../lib/director-access";
 import { buildSessionMirrorUpdate } from "../../../../lib/match-engine";
 import { isValidManagePin } from "../../../../lib/match-access";
 import { publishMatchUpdate, publishSessionUpdate } from "../../../../lib/live-updates";
@@ -11,18 +16,24 @@ import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../../lib/request-security";
 import { invalidateSessionsDataCache } from "../../../../lib/server-data";
 import { normalizeYouTubeLiveStream } from "../../../../lib/youtube-live-stream";
-import { secretPinPayloadSchema } from "../../../../lib/validators";
 import Match from "../../../../../models/Match";
 import Session from "../../../../../models/Session";
 import { z } from "zod";
 
 const liveStreamUpsertSchema = z.object({
-  pin: z
-    .string()
-    .trim()
-    .regex(/^\d{6}$/, "Enter the 6-digit manage PIN."),
+  pin: z.string().trim().optional(),
   liveStreamUrl: z.string().trim().min(1, "Enter a YouTube link."),
 });
+
+const optionalPinSchema = z.object({
+  pin: z.string().trim().optional(),
+});
+
+async function hasDirectorRouteAccess() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(getDirectorAccessCookieName())?.value;
+  return hasValidDirectorAccess(token);
+}
 
 async function getFallbackSession(sessionId) {
   return sessionId
@@ -80,31 +91,39 @@ export async function PUT(req, { params }) {
       return jsonError(parsedRequest.message, parsedRequest.status);
     }
 
-    const pinAttemptLimit = enforceSmartPinRateLimit({
-      key: `match-live-stream-put-pin:${id}:${meta.ip}`,
-      longLimit: 5,
-      longWindowMs: 5 * 60 * 1000,
-      longBlockMs: 2 * 60 * 1000,
-    });
+    const directorAccessGranted = await hasDirectorRouteAccess();
 
-    if (!pinAttemptLimit.allowed) {
-      return jsonRateLimit(
-        "Too many PIN attempts. Try again shortly.",
-        pinAttemptLimit.retryAfterMs,
-      );
-    }
-
-    if (!isValidManagePin(parsedRequest.value.pin)) {
-      await writeAuditLog({
-        action: "match_live_stream_put_denied",
-        targetType: "match",
-        targetId: id,
-        status: "failure",
-        ip: meta.ip,
-        userAgent: meta.userAgent,
+    if (!directorAccessGranted) {
+      const pinAttemptLimit = enforceSmartPinRateLimit({
+        key: `match-live-stream-put-pin:${id}:${meta.ip}`,
+        longLimit: 5,
+        longWindowMs: 5 * 60 * 1000,
+        longBlockMs: 2 * 60 * 1000,
       });
 
-      return jsonError("Incorrect PIN.", 401);
+      if (!pinAttemptLimit.allowed) {
+        return jsonRateLimit(
+          "Too many PIN attempts. Try again shortly.",
+          pinAttemptLimit.retryAfterMs,
+        );
+      }
+
+      if (!/^\d{6}$/.test(String(parsedRequest.value.pin || ""))) {
+        return jsonError("Enter the 6-digit manage PIN.", 400);
+      }
+
+      if (!isValidManagePin(parsedRequest.value.pin)) {
+        await writeAuditLog({
+          action: "match_live_stream_put_denied",
+          targetType: "match",
+          targetId: id,
+          status: "failure",
+          ip: meta.ip,
+          userAgent: meta.userAgent,
+        });
+
+        return jsonError("Incorrect PIN.", 401);
+      }
     }
 
     const normalizedStream = normalizeYouTubeLiveStream(
@@ -185,38 +204,46 @@ export async function DELETE(req, { params }) {
   }
 
   try {
-    const parsedRequest = await parseJsonRequest(req, secretPinPayloadSchema, {
+    const parsedRequest = await parseJsonRequest(req, optionalPinSchema, {
       maxBytes: 2048,
     });
     if (!parsedRequest.ok) {
       return jsonError(parsedRequest.message, parsedRequest.status);
     }
 
-    const pinAttemptLimit = enforceSmartPinRateLimit({
-      key: `match-live-stream-delete-pin:${id}:${meta.ip}`,
-      longLimit: 5,
-      longWindowMs: 5 * 60 * 1000,
-      longBlockMs: 2 * 60 * 1000,
-    });
+    const directorAccessGranted = await hasDirectorRouteAccess();
 
-    if (!pinAttemptLimit.allowed) {
-      return jsonRateLimit(
-        "Too many PIN attempts. Try again shortly.",
-        pinAttemptLimit.retryAfterMs,
-      );
-    }
-
-    if (!isValidManagePin(parsedRequest.value.pin)) {
-      await writeAuditLog({
-        action: "match_live_stream_delete_denied",
-        targetType: "match",
-        targetId: id,
-        status: "failure",
-        ip: meta.ip,
-        userAgent: meta.userAgent,
+    if (!directorAccessGranted) {
+      const pinAttemptLimit = enforceSmartPinRateLimit({
+        key: `match-live-stream-delete-pin:${id}:${meta.ip}`,
+        longLimit: 5,
+        longWindowMs: 5 * 60 * 1000,
+        longBlockMs: 2 * 60 * 1000,
       });
 
-      return jsonError("Incorrect PIN.", 401);
+      if (!pinAttemptLimit.allowed) {
+        return jsonRateLimit(
+          "Too many PIN attempts. Try again shortly.",
+          pinAttemptLimit.retryAfterMs,
+        );
+      }
+
+      if (!/^\d{6}$/.test(String(parsedRequest.value.pin || ""))) {
+        return jsonError("Enter the 6-digit manage PIN.", 400);
+      }
+
+      if (!isValidManagePin(parsedRequest.value.pin)) {
+        await writeAuditLog({
+          action: "match_live_stream_delete_denied",
+          targetType: "match",
+          targetId: id,
+          status: "failure",
+          ip: meta.ip,
+          userAgent: meta.userAgent,
+        });
+
+        return jsonError("Incorrect PIN.", 401);
+      }
     }
 
     await connectDB();
