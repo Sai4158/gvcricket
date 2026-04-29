@@ -10,12 +10,13 @@
  */
 
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   FaMinus,
   FaPen,
   FaPlus,
+  FaShareAlt,
   FaTimes,
   FaTrash,
   FaYoutube,
@@ -25,6 +26,7 @@ import LoadingButton from "../shared/LoadingButton";
 import { getTeamBundle } from "../../lib/team-utils";
 import { ModalBase } from "./MatchBaseModals";
 import { normalizeYouTubeLiveStream } from "../../lib/youtube-live-stream";
+import { buildShareUrl } from "../../lib/site-metadata";
 
 function EditableRoster({
   title,
@@ -521,15 +523,39 @@ export function EditLiveStreamModal({
   );
   const [error, setError] = useState("");
   const [isPasting, setIsPasting] = useState(false);
+  const [showSavedState, setShowSavedState] = useState(false);
+  const [isSharingSpectatorPage, setIsSharingSpectatorPage] = useState(false);
   const normalizedPreview = normalizeYouTubeLiveStream(liveStreamUrl);
   const previewStream = normalizedPreview.ok
     ? normalizedPreview.value
     : existingStream;
   const hasTypedLink = String(liveStreamUrl || "").trim().length > 0;
+  const modalScrollRef = useRef(null);
+  const saveButtonRef = useRef(null);
+  const spectatorUrl =
+    match?.sessionId && typeof window !== "undefined"
+      ? buildShareUrl(`/session/${match.sessionId}/view`, window.location.origin)
+      : "";
+
+  useEffect(() => {
+    if (!hasTypedLink) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      saveButtonRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [hasTypedLink, previewStream?.watchUrl]);
 
   const handleClearInput = () => {
     setLiveStreamUrl("");
     setError("");
+    setShowSavedState(false);
   };
 
   const handlePasteLink = async () => {
@@ -572,7 +598,7 @@ export function EditLiveStreamModal({
     await onUpdate({
       liveStreamUrl: trimmedUrl,
     });
-    onClose();
+    setShowSavedState(true);
   };
 
   const handleRemoveStream = async () => {
@@ -583,6 +609,45 @@ export function EditLiveStreamModal({
     onClose();
   };
 
+  const handleShareSpectatorPage = async () => {
+    if (!spectatorUrl) {
+      return;
+    }
+
+    setIsSharingSpectatorPage(true);
+    try {
+      const shareTitle = `${match?.innings1?.team || "Team A"} vs ${match?.innings2?.team || "Team B"}`;
+      const shareText = "Watch this game on the spectator page.";
+
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: shareTitle,
+            text: shareText,
+            url: spectatorUrl,
+          });
+          return;
+        } catch (error) {
+          if (error?.name === "AbortError") {
+            return;
+          }
+        }
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(spectatorUrl);
+        window.alert("Spectator page link copied.");
+        return;
+      }
+
+      window.prompt("Copy spectator page link", spectatorUrl);
+    } catch {
+      window.prompt("Copy spectator page link", spectatorUrl);
+    } finally {
+      setIsSharingSpectatorPage(false);
+    }
+  };
+
   return (
     <ModalBase
       title=""
@@ -590,11 +655,69 @@ export function EditLiveStreamModal({
       hideHeader
       panelClassName="max-w-md max-h-[82vh] overflow-hidden"
     >
-      <div className="max-h-[74vh] space-y-4 overflow-y-auto pr-1">
+      <div ref={modalScrollRef} className="max-h-[74vh] space-y-4 overflow-y-auto pr-1">
+        {showSavedState ? (
+          <div className="space-y-4">
+            <div className="rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_32%),linear-gradient(180deg,rgba(26,26,30,0.985),rgba(12,12,16,0.99))] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="inline-flex h-8 w-11 shrink-0 items-center justify-center rounded-[10px] bg-[#FF0033] text-white shadow-[0_10px_24px_rgba(255,0,51,0.24)]">
+                    <FaYoutube className="text-[1.15rem]" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[1.7rem] font-black leading-none tracking-[-0.04em] text-white">
+                      Saved
+                    </p>
+                    <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.26em] text-zinc-500">
+                      Live stream ready
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
+                  aria-label="Close saved live stream popup"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+              <div className="mt-5 space-y-3 text-left">
+                <p className="text-base font-semibold text-white">
+                  Your YouTube live stream is saved.
+                </p>
+                <p className="text-sm leading-6 text-zinc-300">
+                  It will now show on the spectator page for this game.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleShareSpectatorPage}
+              disabled={isSharingSpectatorPage || !spectatorUrl}
+              className="flex w-full items-center justify-center gap-2 rounded-[20px] border border-white/12 bg-white/[0.06] px-4 py-3 text-sm font-bold text-white transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <FaShareAlt />
+              {isSharingSpectatorPage ? "Sharing..." : "Share Spectator Page"}
+            </button>
+          </div>
+        ) : (
+          <>
         <div className="rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_32%),linear-gradient(180deg,rgba(26,26,30,0.985),rgba(12,12,16,0.99))] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
           <div className="flex items-start justify-between gap-4">
-            <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[2.2rem] text-red-500 shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
-              <FaYoutube />
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="inline-flex h-8 w-11 shrink-0 items-center justify-center rounded-[10px] bg-[#FF0033] text-white shadow-[0_10px_24px_rgba(255,0,51,0.24)]">
+                <FaYoutube className="text-[1.15rem]" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[1.7rem] font-black leading-none tracking-[-0.04em] text-white">
+                  YouTube
+                </p>
+                <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.26em] text-zinc-500">
+                  Live stream
+                </p>
+              </div>
             </div>
             <button
               type="button"
@@ -606,12 +729,9 @@ export function EditLiveStreamModal({
             </button>
           </div>
           <div className="mt-4 text-left">
-            <h3 className="text-xl font-black tracking-tight text-white">
-              YouTube Live
-            </h3>
             <div className="mt-4 grid gap-2 text-sm text-zinc-300">
               <p>
-                <span className="font-semibold text-white">1.</span> Paste any YouTube link
+                <span className="font-semibold text-white">1.</span> Paste YouTube live link
               </p>
               <p>
                 <span className="font-semibold text-white">2.</span> Check the preview below
@@ -698,7 +818,7 @@ export function EditLiveStreamModal({
               rel="noreferrer"
               className="mt-2 block break-all text-sm font-medium text-zinc-300 underline decoration-white/20 underline-offset-4"
             >
-              {existingStream.watchUrl}
+            {existingStream.watchUrl}
             </a>
           </div>
         ) : null}
@@ -710,14 +830,16 @@ export function EditLiveStreamModal({
         ) : null}
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <LoadingButton
-            onClick={handleSaveStream}
-            loading={isUpdating}
-            pendingLabel="Saving..."
-            className="rounded-[20px] border border-white/12 bg-white/[0.06] px-4 py-3 text-sm font-bold text-white transition hover:bg-white/[0.1]"
-          >
-            Save
-          </LoadingButton>
+          <div ref={saveButtonRef}>
+            <LoadingButton
+              onClick={handleSaveStream}
+              loading={isUpdating}
+              pendingLabel="Saving..."
+              className="w-full rounded-[20px] border border-red-400/18 bg-[#FF0033] px-4 py-3 text-sm font-bold text-white transition hover:brightness-110"
+            >
+              Save
+            </LoadingButton>
+          </div>
           <button
             type="button"
             onClick={handleRemoveStream}
@@ -727,6 +849,8 @@ export function EditLiveStreamModal({
             Remove
           </button>
         </div>
+          </>
+        )}
       </div>
     </ModalBase>
   );
