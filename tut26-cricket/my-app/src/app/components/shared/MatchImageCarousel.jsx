@@ -43,7 +43,7 @@ export default function MatchImageCarousel({
   const [activeIndex, setActiveIndex] = useState(0);
   const [isInteracting, setIsInteracting] = useState(false);
   const [transitionDirection, setTransitionDirection] = useState(1);
-  const [loadedImageKey, setLoadedImageKey] = useState("");
+  const [loadedImageKeys, setLoadedImageKeys] = useState(() => new Set());
   const holdTimerRef = useRef(null);
   const interactionTimerRef = useRef(null);
   const pointerStartRef = useRef(null);
@@ -54,10 +54,16 @@ export default function MatchImageCarousel({
     : 0;
   const activeImage = normalizedImages[resolvedActiveIndex] || null;
   const activeImageKey = activeImage?.id || activeImage?.url || "";
-  const isImageReady = Boolean(activeImageKey) && loadedImageKey === activeImageKey;
+  const isImageReady = Boolean(activeImageKey) && loadedImageKeys.has(activeImageKey);
   const nextImage =
     normalizedImages.length > 1
       ? normalizedImages[(resolvedActiveIndex + 1) % normalizedImages.length]
+      : null;
+  const previousImage =
+    normalizedImages.length > 1
+      ? normalizedImages[
+          (resolvedActiveIndex - 1 + normalizedImages.length) % normalizedImages.length
+        ]
       : null;
 
   const setCarouselIndex = useCallback((nextIndex, direction = 1) => {
@@ -215,19 +221,22 @@ export default function MatchImageCarousel({
 
   const slideVariants = {
     enter: (direction) => ({
-      x: direction > 0 ? "12%" : "-12%",
-      opacity: 0.55,
-      scale: 0.985,
+      x: direction > 0 ? "5%" : "-5%",
+      opacity: 0.72,
+      scale: 0.992,
+      filter: "blur(3px)",
     }),
     center: {
       x: 0,
       opacity: 1,
       scale: 1,
+      filter: "blur(0px)",
     },
     exit: (direction) => ({
-      x: direction > 0 ? "-12%" : "12%",
-      opacity: 0.55,
-      scale: 0.985,
+      x: direction > 0 ? "-5%" : "5%",
+      opacity: 0.72,
+      scale: 0.992,
+      filter: "blur(3px)",
     }),
   };
 
@@ -244,19 +253,32 @@ export default function MatchImageCarousel({
         onPointerLeave={handlePointerEnd}
         onContextMenu={(event) => event.preventDefault()}
       >
-        <AnimatePresence initial={false} custom={transitionDirection} mode="popLayout">
+        <AnimatePresence initial={false} custom={transitionDirection} mode="sync">
           <motion.div
             key={activeImage?.id || activeImage?.url || "fallback"}
             className="absolute inset-0"
+            style={{ willChange: "transform, opacity, filter" }}
             custom={transitionDirection}
-            initial={transitionStyle === "slide" ? "enter" : { opacity: 0 }}
-            animate={transitionStyle === "slide" ? "center" : { opacity: 1 }}
-            exit={transitionStyle === "slide" ? "exit" : { opacity: 0 }}
+            initial={
+              transitionStyle === "slide"
+                ? "enter"
+                : { opacity: 0.01, scale: 1.01, filter: "blur(2px)" }
+            }
+            animate={
+              transitionStyle === "slide"
+                ? "center"
+                : { opacity: 1, scale: 1, filter: "blur(0px)" }
+            }
+            exit={
+              transitionStyle === "slide"
+                ? "exit"
+                : { opacity: 0.01, scale: 0.995, filter: "blur(2px)" }
+            }
             variants={transitionStyle === "slide" ? slideVariants : undefined}
             transition={
               transitionStyle === "slide"
-                ? { duration: 0.3, ease: [0.22, 1, 0.36, 1] }
-                : { duration: 0.18, ease: "easeOut" }
+                ? { duration: 0.42, ease: [0.22, 1, 0.36, 1] }
+                : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
             }
           >
             <SafeMatchImage
@@ -269,26 +291,53 @@ export default function MatchImageCarousel({
               draggable={false}
               loading={compact ? "lazy" : "eager"}
               onLoad={() => {
-                setLoadedImageKey(activeImageKey);
+                if (!activeImageKey) {
+                  return;
+                }
+                setLoadedImageKeys((current) => {
+                  if (current.has(activeImageKey)) {
+                    return current;
+                  }
+                  const next = new Set(current);
+                  next.add(activeImageKey);
+                  return next;
+                });
               }}
             />
           </motion.div>
         </AnimatePresence>
-        {!isImageReady ? (
-          <div className="pointer-events-none absolute inset-0 z-[1] bg-[linear-gradient(180deg,rgba(12,12,16,0.5),rgba(8,8,12,0.24))]">
+        <motion.div
+          className="pointer-events-none absolute inset-0 z-[1] bg-[linear-gradient(180deg,rgba(12,12,16,0.5),rgba(8,8,12,0.24))]"
+          initial={false}
+          animate={{ opacity: isImageReady ? 0 : 1 }}
+          transition={{ duration: isImageReady ? 0.24 : 0.12, ease: "easeOut" }}
+        >
+          {!isImageReady ? (
             <div className="absolute inset-0 pending-shimmer bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))]" />
-          </div>
-        ) : null}
-        {!compact && nextImage ? (
+          ) : null}
+        </motion.div>
+        {!compact && (nextImage || previousImage) ? (
           <div className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0">
-            <SafeMatchImage
-              src={nextImage.url || ""}
-              alt=""
-              width={16}
-              height={9}
-              className="h-auto w-auto"
-              loading="eager"
-            />
+            {nextImage ? (
+              <SafeMatchImage
+                src={nextImage.url || ""}
+                alt=""
+                width={16}
+                height={9}
+                className="h-auto w-auto"
+                loading="eager"
+              />
+            ) : null}
+            {previousImage ? (
+              <SafeMatchImage
+                src={previousImage.url || ""}
+                alt=""
+                width={16}
+                height={9}
+                className="h-auto w-auto"
+                loading="eager"
+              />
+            ) : null}
           </div>
         ) : null}
         {normalizedImages.length > 1 ? (
