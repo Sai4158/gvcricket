@@ -11,6 +11,7 @@ import { getTeamBundle } from "./team-utils";
 import { getPublicMatchImagePath } from "./match-image-secure";
 import { getPublicMatchImages } from "./match-image-gallery";
 import { isSafeMatchImageUrl } from "./match-image";
+import { normalizeMatchResultText } from "./match-result-display";
 import { hasCompleteTossState, normalizeLegacyTossState } from "./match-toss";
 import { normalizeScoreSoundEffectMap } from "./score-sound-effects";
 import { addBallToHistory, countLegalBalls } from "./match-scoring";
@@ -364,8 +365,8 @@ export function serializeLiveMatchPatch(matchDocument) {
     innings: match?.innings || "first",
     innings1: buildUmpireInnings(match, "innings1", false),
     innings2: buildUmpireInnings(match, "innings2", false),
-    result: match?.result || "",
-    pendingResult: match?.pendingResult || "",
+    result: normalizeMatchResultText(match, match?.result || ""),
+    pendingResult: normalizeMatchResultText(match, match?.pendingResult || ""),
     pendingResultAt: match?.pendingResultAt || null,
     resultAutoFinalizeAt: match?.resultAutoFinalizeAt || null,
     isOngoing: Boolean(match?.isOngoing),
@@ -458,8 +459,8 @@ export function serializeUmpireBootstrap(matchDocument, fallbackState = null) {
     outs: match.outs ?? 0,
     isOngoing: Boolean(match.isOngoing),
     innings: match.innings || "first",
-    result: match.result || "",
-    pendingResult: match.pendingResult || "",
+    result: normalizeMatchResultText(match, match.result || ""),
+    pendingResult: normalizeMatchResultText(match, match.pendingResult || ""),
     pendingResultAt: match.pendingResultAt || null,
     resultAutoFinalizeAt: match.resultAutoFinalizeAt || null,
     innings1: buildUmpireInnings(match, "innings1", activeInningsKey === "innings1"),
@@ -528,8 +529,8 @@ export function serializePublicMatch(
     outs: match.outs ?? 0,
     isOngoing: Boolean(match.isOngoing),
     innings: match.innings || "first",
-    result: match.result || "",
-    pendingResult: match.pendingResult || "",
+    result: normalizeMatchResultText(match, match.result || ""),
+    pendingResult: normalizeMatchResultText(match, match.pendingResult || ""),
     pendingResultAt: match.pendingResultAt || null,
     resultAutoFinalizeAt: match.resultAutoFinalizeAt || null,
     innings1: match.innings1 || { team: "", score: 0, history: [] },
@@ -656,8 +657,8 @@ export function serializeSessionViewBootstrap(
     outs: Number(match.outs || 0),
     isOngoing: Boolean(match.isOngoing),
     innings: match.innings || "first",
-    result: match.result || "",
-    pendingResult: match.pendingResult || "",
+    result: normalizeMatchResultText(match, match.result || ""),
+    pendingResult: normalizeMatchResultText(match, match.pendingResult || ""),
     pendingResultAt: match.pendingResultAt || null,
     resultAutoFinalizeAt: match.resultAutoFinalizeAt || null,
     innings1: buildCompactInnings(match, "innings1"),

@@ -23,8 +23,46 @@ function countInningsWickets(history = []) {
   }, 0);
 }
 
+export function isTiedMatchResult(resultText = "") {
+  return /match\s+tied/i.test(String(resultText || "").trim());
+}
+
+export function normalizeMatchResultText(match = null, resultText = "") {
+  const safeResult = String(resultText || match?.result || "").trim();
+  if (!safeResult) {
+    return "";
+  }
+
+  if (isTiedMatchResult(safeResult)) {
+    return "Match Tied";
+  }
+
+  const winnerMatch = safeResult.match(/^(.+?)\s+won by\s+(.+)$/i);
+  if (!winnerMatch) {
+    return safeResult;
+  }
+
+  const marginText = String(winnerMatch[2] || "").trim();
+  const normalizedMargin = marginText.toLowerCase();
+
+  if (normalizedMargin.includes("wicket")) {
+    const teamName = String(match?.innings2?.team || winnerMatch[1] || "").trim();
+    return teamName ? `${teamName} won by ${marginText}` : safeResult;
+  }
+
+  if (normalizedMargin.includes("run")) {
+    const teamName = String(match?.innings1?.team || winnerMatch[1] || "").trim();
+    return teamName ? `${teamName} won by ${marginText}` : safeResult;
+  }
+
+  return safeResult;
+}
+
 export function getWinningTeamName(resultText = "") {
   const safeResult = String(resultText || "").trim();
+  if (isTiedMatchResult(safeResult)) {
+    return "";
+  }
   const winnerMatch = safeResult.match(/^(.+?)\s+won by\s+/i);
   return winnerMatch?.[1]?.trim() || "";
 }
@@ -36,6 +74,9 @@ export function getWinningInningsSummary(match = null) {
 
   const innings1 = match?.innings1 || { team: "", score: 0, history: [] };
   const innings2 = match?.innings2 || { team: "", score: 0, history: [] };
+  if (isTiedMatchResult(match?.result || "")) {
+    return null;
+  }
   const winnerName = getWinningTeamName(match?.result || "");
   const normalizedWinnerName = normalizeTeamName(winnerName);
   const normalizedInnings1Team = normalizeTeamName(innings1?.team);

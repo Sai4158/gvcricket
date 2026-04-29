@@ -26,7 +26,10 @@ import LoadingButton from "../shared/LoadingButton";
 import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
 import YouTubeLiveStreamCard from "../shared/YouTubeLiveStreamCard";
 import { calculateInningsSummary } from "../../lib/match-stats";
-import { getWinningInningsSummary } from "../../lib/match-result-display";
+import {
+  getWinningInningsSummary,
+  isTiedMatchResult,
+} from "../../lib/match-result-display";
 import { buildPinRequestError } from "../../lib/pin-attempt-client";
 import CongratulationsCard from "./CongratulationsCard";
 import EnhancedScorecard from "./EnhancedScorecard";
@@ -161,6 +164,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
     legalBallCount: Number(match?.secondInningsLegalBallCount),
   });
   const winningInningsSummary = getWinningInningsSummary(match);
+  const isTiedResult = isTiedMatchResult(match?.result || "");
   const winningScore = winningInningsSummary
     ? winningInningsSummary.score
     : match.score;
@@ -336,7 +340,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
                 <div className="grid grid-cols-2 gap-3 text-center">
                   <div className="flex min-h-[150px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-5">
                     <p className="text-xs uppercase tracking-[0.28em] text-zinc-400">
-                      Winning score
+                      {isTiedResult ? "Final score" : "Winning score"}
                     </p>
                     <p className="mt-3 text-center text-5xl font-black uppercase leading-none sm:text-6xl">
                       <span className="text-emerald-400">{winningScore}</span>

@@ -64,6 +64,32 @@ export function buildWinByWicketsText(match, outs) {
   }.`;
 }
 
+function replaceLeadingTeamName(resultText, previousNames, nextNames) {
+  const safeResult = String(resultText || "").trim();
+  if (!safeResult) {
+    return "";
+  }
+
+  const winnerMatch = safeResult.match(/^(.+?)\s+won by\s+/i);
+  const winnerName = String(winnerMatch?.[1] || "").trim();
+  if (!winnerName) {
+    return safeResult;
+  }
+
+  let nextWinnerName = winnerName;
+  if (winnerName === previousNames.teamAName) {
+    nextWinnerName = nextNames.teamAName;
+  } else if (winnerName === previousNames.teamBName) {
+    nextWinnerName = nextNames.teamBName;
+  }
+
+  if (nextWinnerName === winnerName) {
+    return safeResult;
+  }
+
+  return `${nextWinnerName}${safeResult.slice(winnerName.length)}`;
+}
+
 export function syncTeamNamesAcrossMatch(match, previousNames, nextNames) {
   const updated = structuredClone(match);
 
@@ -84,6 +110,17 @@ export function syncTeamNamesAcrossMatch(match, previousNames, nextNames) {
   } else if (updated.innings2?.team === previousNames.teamBName) {
     updated.innings2.team = nextNames.teamBName;
   }
+
+  updated.result = replaceLeadingTeamName(
+    updated.result,
+    previousNames,
+    nextNames,
+  );
+  updated.pendingResult = replaceLeadingTeamName(
+    updated.pendingResult,
+    previousNames,
+    nextNames,
+  );
 
   return updated;
 }

@@ -10,7 +10,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getWinningInningsSummary } from "../../src/app/lib/match-result-display.js";
+import {
+  getWinningInningsSummary,
+  getWinningTeamName,
+  isTiedMatchResult,
+  normalizeMatchResultText,
+} from "../../src/app/lib/match-result-display.js";
 import { calculateInningsSummary } from "../../src/app/lib/match-stats.js";
 
 test("[match] result display uses the first innings score when the first batting team wins by runs", () => {
@@ -96,4 +101,36 @@ test("[match] innings summary uses saved legal-ball counts when history is incom
   assert.equal(summary.overs, "6.0");
   assert.equal(summary.balls, 36);
   assert.equal(summary.runRate, "15.83");
+});
+
+test("[match] tied results do not expose a winning team summary", () => {
+  const summary = getWinningInningsSummary({
+    result: "Match Tied",
+    innings1: {
+      team: "Team Red",
+      score: 44,
+      history: [{ balls: [{ runs: 1, isOut: false }] }],
+    },
+    innings2: {
+      team: "Team Blue",
+      score: 44,
+      history: [{ balls: [{ runs: 1, isOut: true }] }],
+    },
+  });
+
+  assert.equal(summary, null);
+  assert.equal(isTiedMatchResult("Match Tied"), true);
+  assert.equal(getWinningTeamName("Match Tied"), "");
+});
+
+test("[match] result display repairs stale winner names from the current innings teams", () => {
+  const resultText = normalizeMatchResultText(
+    {
+      innings1: { team: "SHIVA" },
+      innings2: { team: "SARDAR4" },
+    },
+    "SARDAR UNCLE won by 1 wicket.",
+  );
+
+  assert.equal(resultText, "SARDAR4 won by 1 wicket.");
 });

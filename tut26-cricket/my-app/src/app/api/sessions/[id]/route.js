@@ -28,6 +28,7 @@ import { parseJsonRequest } from "../../../lib/request-security";
 import { hasValidDraftToken } from "../../../lib/session-draft";
 import { invalidateSessionsDataCache } from "../../../lib/server-data";
 import { syncTeamNamesAcrossMatch } from "../../../lib/match-scoring";
+import { buildSessionMirrorUpdate } from "../../../lib/match-engine";
 import {
   pinSchema,
   sessionPatchObjectSchema,
@@ -191,7 +192,7 @@ export async function PATCH(req, { params }) {
 
     if (updatedSession.match) {
       const linkedMatch = await Match.findById(updatedSession.match)
-        .select("tossWinner innings1 innings2")
+        .select("teamA teamB teamAName teamBName overs tossWinner tossDecision score outs isOngoing innings result pendingResult innings1 innings2 matchImages matchImageUrl matchImagePublicId matchImageUploadedAt matchImageUploadedBy liveStream announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled lastEventType lastEventText adminAccessVersion")
         .lean();
       const syncedMatch = linkedMatch
         ? syncTeamNamesAcrossMatch(linkedMatch, previousNames, nextNames)
@@ -203,6 +204,13 @@ export async function PATCH(req, { params }) {
         teamBName: updatedSession.teamBName,
         overs: updatedSession.overs,
         tossWinner: syncedMatch?.tossWinner || updatedSession.tossWinner,
+        tossDecision: syncedMatch?.tossDecision || updatedSession.tossDecision,
+        score: syncedMatch?.score,
+        outs: syncedMatch?.outs,
+        isOngoing: syncedMatch?.isOngoing,
+        innings: syncedMatch?.innings,
+        result: syncedMatch?.result,
+        pendingResult: syncedMatch?.pendingResult,
         matchImages: updatedSession.matchImages,
         matchImageUrl: updatedSession.matchImageUrl,
         matchImagePublicId: updatedSession.matchImagePublicId,
@@ -223,13 +231,23 @@ export async function PATCH(req, { params }) {
         linkedMatchUpdate.innings2 = syncedMatch.innings2;
       }
 
-      await Match.findByIdAndUpdate(
+      const updatedMatch = await Match.findByIdAndUpdate(
         updatedSession.match,
         {
           $set: linkedMatchUpdate,
         },
-        preserveEndedTimestamp ? { timestamps: false } : undefined
+        {
+          new: true,
+          ...(preserveEndedTimestamp ? { timestamps: false } : {}),
+        },
       );
+
+      if (updatedMatch) {
+        Object.assign(updatedSession, buildSessionMirrorUpdate(updatedMatch));
+        await updatedSession.save(
+          preserveEndedTimestamp ? { timestamps: false } : undefined,
+        );
+      }
     }
 
     invalidateSessionsDataCache();

@@ -212,6 +212,68 @@ test("[match] mixed scoring, undo, innings switch, and winning-shot undo stay co
   assert.equal(finalMatch.score, 14);
 });
 
+test("[match] finished result text and winner mirror stay synced after team rename patches", () => {
+  const renamed = applySafeMatchPatch(
+    {
+      ...buildBaseMatch(),
+      isOngoing: false,
+      innings: "second",
+      score: 30,
+      outs: 1,
+      result: "SARDAR UNCLE won by 1 wicket.",
+      innings1: {
+        team: "SHIVA",
+        score: 29,
+        history: [{ balls: [{ runs: 1, isOut: false }] }],
+      },
+      innings2: {
+        team: "SARDAR UNCLE",
+        score: 30,
+        history: [{ balls: [{ runs: 1, isOut: true }] }],
+      },
+      teamAName: "SHIVA",
+      teamBName: "SARDAR UNCLE",
+    },
+    {
+      teamBName: "SARDAR",
+    },
+  );
+
+  const sessionMirror = buildSessionMirrorUpdate(renamed);
+
+  assert.equal(renamed.teamBName, "SARDAR");
+  assert.equal(renamed.innings2.team, "SARDAR");
+  assert.equal(renamed.result, "SARDAR won by 1 wicket.");
+  assert.equal(sessionMirror.winningTeamName, "SARDAR");
+  assert.equal(sessionMirror.result, "SARDAR won by 1 wicket.");
+});
+
+test("[match] tied session mirror clears stale winner fields", () => {
+  const sessionMirror = buildSessionMirrorUpdate({
+    ...buildBaseMatch(),
+    isOngoing: false,
+    innings: "second",
+    score: 44,
+    outs: 1,
+    result: "Match Tied",
+    innings1: {
+      team: "SHIVA",
+      score: 44,
+      history: [{ balls: [{ runs: 1, isOut: false }] }],
+    },
+    innings2: {
+      team: "SARDAR",
+      score: 44,
+      history: [{ balls: [{ runs: 1, isOut: true }] }],
+    },
+  });
+
+  assert.equal(sessionMirror.winningTeamName, "");
+  assert.equal(sessionMirror.winningScore, 0);
+  assert.equal(sessionMirror.winningWickets, 0);
+  assert.equal(sessionMirror.result, "Match Tied");
+});
+
 test("[match] image serialization stays safe during scoring and fallback paths stay stable", () => {
   let match = setToss(buildBaseMatch());
   match = applyMatchAction(match, {

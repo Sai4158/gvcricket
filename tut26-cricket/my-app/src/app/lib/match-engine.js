@@ -24,7 +24,11 @@ import {
   createScoreLiveEvent,
   createUndoLiveEvent,
 } from "./live-announcements";
-import { getWinningTeamName } from "./match-result-display";
+import {
+  getWinningTeamName,
+  isTiedMatchResult,
+  normalizeMatchResultText,
+} from "./match-result-display";
 import { getBattingTeamBundle, getTotalDismissalsAllowed } from "./team-utils";
 
 // These are the match fields we save for undo and fixes.
@@ -1040,6 +1044,8 @@ export function applySafeMatchPatch(matchDocument, patch) {
     nextMatch.tossWinner = syncedMatch.tossWinner;
     nextMatch.innings1 = syncedMatch.innings1;
     nextMatch.innings2 = syncedMatch.innings2;
+    nextMatch.result = syncedMatch.result;
+    nextMatch.pendingResult = syncedMatch.pendingResult;
   }
 
   // Only real score or roster changes should create a correction event.
@@ -1062,7 +1068,8 @@ export function applySafeMatchPatch(matchDocument, patch) {
 // Build the smaller match data object used on session screens.
 export function buildSessionMirrorUpdate(matchDocument) {
   const match = toPlainMatch(matchDocument);
-  const resultText = String(match?.result || "").trim();
+  const resultText = normalizeMatchResultText(match, match?.result || "");
+  const isTied = isTiedMatchResult(resultText);
   const winnerName = getWinningTeamName(resultText);
   const resultLower = resultText.toLowerCase();
   const firstInningsWon = resultLower.includes(" won by ") && resultLower.includes(" runs");
@@ -1084,16 +1091,22 @@ export function buildSessionMirrorUpdate(matchDocument) {
     outs: Number(match?.outs || 0),
     innings: match?.innings || "",
     result: resultText,
-    pendingResult: match?.pendingResult || "",
+    pendingResult: normalizeMatchResultText(match, match?.pendingResult || ""),
     winningTeamName:
-      winnerName ||
+      isTied
+        ? ""
+        : winnerName ||
       (firstInningsWon ? innings1.team || "" : secondInningsWon ? innings2.team || "" : ""),
-    winningScore: firstInningsWon
+    winningScore: isTied
+      ? 0
+      : firstInningsWon
       ? Number(innings1.score || 0)
       : secondInningsWon
         ? Number(innings2.score ?? match?.score ?? 0)
         : Number(match?.score || 0),
-    winningWickets: firstInningsWon
+    winningWickets: isTied
+      ? 0
+      : firstInningsWon
       ? countInningsWickets(innings1.history)
       : secondInningsWon
         ? countInningsWickets(innings2.history)

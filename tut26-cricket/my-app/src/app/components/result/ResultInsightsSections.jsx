@@ -20,7 +20,10 @@ import {
   FaStar,
   FaTrophy,
 } from "react-icons/fa";
-import { getWinningInningsSummary } from "../../lib/match-result-display";
+import {
+  getWinningInningsSummary,
+  isTiedMatchResult,
+} from "../../lib/match-result-display";
 import { buildResultInsights } from "../../lib/result-insights";
 import { buildShareUrl } from "../../lib/site-metadata";
 
@@ -290,6 +293,9 @@ function SplitTeamFeed({
 
 function getResultDetailText(resultText) {
   const safeResult = String(resultText || "").trim();
+  if (isTiedMatchResult(safeResult)) {
+    return "Match tied.";
+  }
   const resultSuffix = safeResult.replace(/^(.*?)\s+won by\s+/i, "").trim();
   return resultSuffix ? `Won by ${resultSuffix}` : safeResult || "Match complete.";
 }

@@ -8,8 +8,15 @@
  */
 
 import Session from "../../models/Session";
+import Match from "../../models/Match";
+import { Types, isValidObjectId } from "mongoose";
 import { connectDB } from "./db";
 import { serializeSessionCard } from "./public-data";
+import { buildSessionMirrorUpdate } from "./match-engine";
+import {
+  getWinningTeamName,
+  isTiedMatchResult,
+} from "./match-result-display";
 import { NON_DRAFT_SESSION_COLLECTION_FILTER } from "./server-data-helpers";
 
 export const DEFAULT_SESSIONS_PAGE_LIMIT = 28;
@@ -158,6 +165,49 @@ function toSessionCard(session) {
   });
 }
 
+function needsSessionCardMirrorBackfill(session) {
+  if (!session?.match) {
+    return false;
+  }
+
+  const winningTeamName = String(session?.winningTeamName || "").trim();
+  const resultText = String(session?.result || "").trim();
+  const teamAName = String(session?.teamAName || "").trim();
+  const teamBName = String(session?.teamBName || "").trim();
+  const resultWinnerName = getWinningTeamName(resultText);
+  const isTied = isTiedMatchResult(resultText);
+
+  if (
+    !Number.isFinite(Number(session?.score)) ||
+    !Number.isFinite(Number(session?.outs)) ||
+    typeof session?.innings !== "string" ||
+    typeof session?.result !== "string" ||
+    typeof session?.winningTeamName !== "string" ||
+    !Number.isFinite(Number(session?.winningScore)) ||
+    !Number.isFinite(Number(session?.winningWickets))
+  ) {
+    return true;
+  }
+
+  if (isTied) {
+    return Boolean(
+      winningTeamName ||
+        Number(session?.winningScore || 0) > 0 ||
+        Number(session?.winningWickets || 0) > 0,
+    );
+  }
+
+  if (resultWinnerName && ![teamAName, teamBName].includes(resultWinnerName)) {
+    return true;
+  }
+
+  if (winningTeamName && ![teamAName, teamBName].includes(winningTeamName)) {
+    return true;
+  }
+
+  return false;
+}
+
 export async function loadSessionsIndexPageData(options = {}) {
   const cacheKey = getSessionsIndexCacheKey("cards", options);
   return readCachedSessionsIndex(
@@ -245,8 +295,90 @@ export async function loadSessionsIndexPageData(options = {}) {
         ? pageSessionsWithPeek
         : pageSessionsWithPeek.slice(0, normalizedLimit);
 
+      const backfillSessions = pageSessions.filter(needsSessionCardMirrorBackfill);
+      const backfilledMirrorBySessionId = new Map();
+
+      if (backfillSessions.length) {
+        const backfillMatchIds = backfillSessions
+          .map((session) => String(session.match || "").trim())
+          .filter((matchId) => isValidObjectId(matchId))
+          .map((matchId) => new Types.ObjectId(matchId));
+
+        if (backfillMatchIds.length) {
+          const backfillMatches = await Match.collection
+            .find(
+              {
+                _id: { $in: backfillMatchIds },
+              },
+              {
+                projection: {
+                  _id: 1,
+                  sessionId: 1,
+                  teamA: 1,
+                  teamB: 1,
+                  teamAName: 1,
+                  teamBName: 1,
+                  overs: 1,
+                  tossWinner: 1,
+                  tossDecision: 1,
+                  score: 1,
+                  outs: 1,
+                  isOngoing: 1,
+                  innings: 1,
+                  result: 1,
+                  pendingResult: 1,
+                  innings1: 1,
+                  innings2: 1,
+                  matchImages: 1,
+                  matchImageUrl: 1,
+                  matchImagePublicId: 1,
+                  matchImageUploadedAt: 1,
+                  matchImageUploadedBy: 1,
+                  liveStream: 1,
+                  announcerEnabled: 1,
+                  announcerMode: 1,
+                  announcerScoreSoundEffectsEnabled: 1,
+                  announcerBroadcastScoreSoundEffectsEnabled: 1,
+                  lastEventType: 1,
+                  lastEventText: 1,
+                  adminAccessVersion: 1,
+                },
+              },
+            )
+            .toArray();
+
+          const bulkUpdates = [];
+
+          for (const backfillMatch of backfillMatches) {
+            const sessionId = String(backfillMatch?.sessionId || "").trim();
+            if (!sessionId) {
+              continue;
+            }
+
+            const mirrorUpdate = buildSessionMirrorUpdate(backfillMatch);
+            backfilledMirrorBySessionId.set(sessionId, mirrorUpdate);
+            bulkUpdates.push({
+              updateOne: {
+                filter: { _id: backfillMatch.sessionId },
+                update: { $set: mirrorUpdate },
+                timestamps: false,
+              },
+            });
+          }
+
+          if (bulkUpdates.length) {
+            await Session.bulkWrite(bulkUpdates, { ordered: false });
+          }
+        }
+      }
+
       return {
-        sessions: pageSessions.map(toSessionCard),
+        sessions: pageSessions.map((session) =>
+          toSessionCard({
+            ...session,
+            ...(backfilledMirrorBySessionId.get(String(session?._id || "")) || {}),
+          }),
+        ),
         page,
         limit: normalizedLimit,
         totalCount: includeCounts ? Number(totalCount || 0) : null,

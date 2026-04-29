@@ -12,14 +12,18 @@
 
 import { motion } from "framer-motion";
 import { FaTrophy } from "react-icons/fa";
+import { isTiedMatchResult } from "../../lib/match-result-display";
 
 export default function CongratulationsCard({ result }) {
   const safeResult = typeof result === "string" ? result.trim() : "";
+  const isTied = isTiedMatchResult(safeResult);
   const winnerMatch = safeResult.match(/^(.*?)\s+won by\s+/i);
-  const winnerName = winnerMatch?.[1]?.trim() || "Winning Team";
+  const winnerName = isTied ? "Match Tied" : winnerMatch?.[1]?.trim() || "Winning Team";
   const resultSuffix = safeResult.replace(/^(.*?)\s+won by\s+/i, "").trim();
   const summaryText =
-    resultSuffix ? `Won by ${resultSuffix}` :
+    isTied
+      ? "Both teams finished level."
+      : resultSuffix ? `Won by ${resultSuffix}` :
     safeResult ||
     "Match complete.";
 
@@ -34,7 +38,7 @@ export default function CongratulationsCard({ result }) {
       <div className="relative z-10 mx-auto flex max-w-[24rem] flex-col items-center text-center">
         <FaTrophy className="mx-auto mb-4 text-5xl text-yellow-50 sm:text-6xl" />
         <h2 className="w-full text-center text-[2rem] font-black uppercase leading-[0.95] tracking-[-0.05em] text-white [text-shadow:0_1px_0_rgba(255,255,255,0.16),0_0_18px_rgba(255,255,255,0.12)] sm:text-[2.65rem]">
-          Congratulations
+          {isTied ? "Result" : "Congratulations"}
         </h2>
         <p className="mt-3 w-full text-center text-[2.15rem] font-black uppercase leading-[0.95] tracking-[-0.05em] text-rose-100 [text-shadow:0_1px_0_rgba(255,255,255,0.18),0_0_20px_rgba(251,113,133,0.2)] sm:text-[3rem]">
           {winnerName}

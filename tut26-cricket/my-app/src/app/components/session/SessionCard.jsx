@@ -29,6 +29,7 @@ import {
 } from "../shared/SafeMatchImage";
 import MatchImageCarousel from "../shared/MatchImageCarousel";
 import { primeUiAudio } from "../../lib/page-audio";
+import { isTiedMatchResult } from "../../lib/match-result-display";
 
 const CARD_MANAGE_HOLD_MS = 2500;
 const CARD_HOLD_MOVE_THRESHOLD_PX = 16;
@@ -159,6 +160,7 @@ function SessionCard({
           wickets: Number(session.winningWickets || 0),
         }
       : null;
+  const isTiedResult = isTiedMatchResult(session.result);
   const hasScoreCard = Boolean(
     session.match &&
       (isLive ||
@@ -177,9 +179,17 @@ function SessionCard({
     ? Number(session.outs)
     : 0;
   const hasSplitScore = winningSummary || displayOuts > 0;
-  const scoreMetaLabel = isLive ? "Runs" : winningSummary ? "Winner" : "Final";
+  const scoreMetaLabel = isLive
+    ? "Runs"
+    : isTiedResult
+      ? "Tied"
+      : winningSummary?.teamName
+        ? "Winner"
+        : "Final";
   const scoreDetailLabel =
-    winningSummary?.teamName
+    isTiedResult
+      ? "MATCH TIED"
+      : winningSummary?.teamName
       ? winningSummary.teamName
       : displayOuts > 0
       ? `${displayOuts} ${displayOuts === 1 ? "WKT" : "WKTS"}`

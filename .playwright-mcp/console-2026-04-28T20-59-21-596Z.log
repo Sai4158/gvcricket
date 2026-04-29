@@ -1,0 +1,6 @@
+[    1164ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://intuit.uptimecrew.com/dashboard:0
+[    5792ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://api.uptimecrew.com/cda/auth/refresh:0
+[    5812ms] ApiError: Missing refresh token cookie
+    at yf (https://intuit.uptimecrew.com/assets/index-B2KhapDN.js:12:64818)
+[    5926ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ https://intuit.uptimecrew.com/login?redirectTo=%2Fdashboard:0
+[  637363ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ https://intuit.uptimecrew.com/login:0
