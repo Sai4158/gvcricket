@@ -16,6 +16,7 @@ import {
   FaMinus,
   FaPen,
   FaPlus,
+  FaTimes,
   FaTrash,
   FaYoutube,
 } from "react-icons/fa";
@@ -524,6 +525,12 @@ export function EditLiveStreamModal({
   const previewStream = normalizedPreview.ok
     ? normalizedPreview.value
     : existingStream;
+  const hasTypedLink = String(liveStreamUrl || "").trim().length > 0;
+
+  const handleClearInput = () => {
+    setLiveStreamUrl("");
+    setError("");
+  };
 
   const handlePasteLink = async () => {
     if (!navigator?.clipboard?.readText) {
@@ -581,24 +588,40 @@ export function EditLiveStreamModal({
       title=""
       onExit={onClose}
       hideHeader
-      panelClassName="max-w-xl"
+      panelClassName="max-w-md max-h-[82vh] overflow-hidden"
     >
-      <div className="space-y-5">
-        <div className="flex items-start gap-4 rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(239,68,68,0.08),transparent_28%),linear-gradient(180deg,rgba(28,28,34,0.98),rgba(14,15,20,0.99))] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
-          <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-red-400/20 bg-red-500/10 text-[1.75rem] text-red-400">
-            <FaYoutube />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-zinc-500">
-              YouTube Stream
-            </p>
-            <h3 className="mt-1 text-2xl font-black tracking-tight text-white">
-              Attach Match Video
+      <div className="max-h-[74vh] space-y-4 overflow-y-auto pr-1">
+        <div className="rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_32%),linear-gradient(180deg,rgba(26,26,30,0.985),rgba(12,12,16,0.99))] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+          <div className="flex items-start justify-between gap-4">
+            <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[2.2rem] text-red-500 shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
+              <FaYoutube />
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
+              aria-label="Close live stream popup"
+            >
+              <FaTimes />
+            </button>
+          </div>
+          <div className="mt-4 text-left">
+            <h3 className="text-xl font-black tracking-tight text-white">
+              YouTube Live
             </h3>
-            <p className="mt-2 text-sm leading-6 text-zinc-300">
-              Paste any YouTube watch, live, share, shorts, music, or embed
-              link. The video shows above the spectator score and stays on the
-              result page until removed.
+            <div className="mt-4 grid gap-2 text-sm text-zinc-300">
+              <p>
+                <span className="font-semibold text-white">1.</span> Paste any YouTube link
+              </p>
+              <p>
+                <span className="font-semibold text-white">2.</span> Check the preview below
+              </p>
+              <p>
+                <span className="font-semibold text-white">3.</span> Save to show it on spectator and result
+              </p>
+            </div>
+            <p className="mt-4 text-sm leading-6 text-zinc-400">
+              Any video or live stream added here will show on the spectator page for this game.
             </p>
           </div>
         </div>
@@ -609,37 +632,38 @@ export function EditLiveStreamModal({
               htmlFor="match-live-stream-url"
               className="block text-[11px] font-semibold uppercase tracking-[0.28em] text-zinc-500"
             >
-              Paste YouTube Link
+              YouTube Link
             </label>
             <button
               type="button"
-              onClick={handlePasteLink}
-              disabled={isPasting}
+              onClick={hasTypedLink ? handleClearInput : handlePasteLink}
+              disabled={isPasting && !hasTypedLink}
               className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-200 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label={hasTypedLink ? "Clear YouTube link" : "Paste YouTube link"}
             >
-              <LuClipboardPaste className="text-sm" />
-              {isPasting ? "Pasting" : "Paste link"}
+              {hasTypedLink ? (
+                <FaTimes className="text-sm" />
+              ) : (
+                <LuClipboardPaste className="text-sm" />
+              )}
+              {hasTypedLink ? "Clear" : isPasting ? "Pasting" : "Paste link"}
             </button>
           </div>
           <textarea
             id="match-live-stream-url"
-            rows={3}
+            rows={2}
             value={liveStreamUrl}
             onChange={(event) => setLiveStreamUrl(event.target.value)}
-            placeholder="https://www.youtube.com/watch?v=... or youtu.be/... or /live/... or /embed/..."
+            placeholder="Paste watch, live, share, shorts, embed, or youtu.be link"
             className="w-full rounded-[24px] border border-white/10 bg-zinc-950/70 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-500 focus:border-red-300/30 focus:bg-zinc-950"
           />
         </div>
 
         {previewStream?.watchUrl ? (
           <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.98),rgba(10,10,14,0.98))]">
-            <div className="border-b border-white/8 px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-zinc-500">
-                Preview
-              </p>
-              <p className="mt-1 text-sm text-zinc-300">
-                This is the video spectators will see.
-              </p>
+            <div className="flex items-center gap-3 border-b border-white/8 px-4 py-3">
+              <FaYoutube className="text-lg text-red-500" />
+              <p className="text-sm font-semibold text-white">Preview</p>
             </div>
             <div className="aspect-video bg-black">
               <iframe
@@ -652,14 +676,11 @@ export function EditLiveStreamModal({
               />
             </div>
             <div className="border-t border-white/8 px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500">
-                Linked video
-              </p>
               <a
                 href={previewStream.watchUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-2 block break-all text-sm font-semibold text-white underline decoration-white/25 underline-offset-4"
+                className="block break-all text-sm font-medium text-zinc-300 underline decoration-white/20 underline-offset-4"
               >
                 {previewStream.watchUrl}
               </a>
@@ -667,14 +688,15 @@ export function EditLiveStreamModal({
           </div>
         ) : existingStream?.watchUrl ? (
           <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-500">
-              Current YouTube stream
-            </p>
+            <div className="flex items-center gap-2">
+              <FaYoutube className="text-red-500" />
+              <p className="text-sm font-semibold text-white">Current video</p>
+            </div>
             <a
               href={existingStream.watchUrl}
               target="_blank"
               rel="noreferrer"
-              className="mt-2 block break-all text-sm font-semibold text-white underline decoration-white/25 underline-offset-4"
+              className="mt-2 block break-all text-sm font-medium text-zinc-300 underline decoration-white/20 underline-offset-4"
             >
               {existingStream.watchUrl}
             </a>
@@ -694,7 +716,7 @@ export function EditLiveStreamModal({
             pendingLabel="Saving..."
             className="rounded-[20px] border border-white/12 bg-white/[0.06] px-4 py-3 text-sm font-bold text-white transition hover:bg-white/[0.1]"
           >
-            Save YouTube Link
+            Save
           </LoadingButton>
           <button
             type="button"
@@ -702,7 +724,7 @@ export function EditLiveStreamModal({
             disabled={isUpdating || !existingStream?.watchUrl}
             className="rounded-[20px] border border-white/10 bg-transparent px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Clear Link
+            Remove
           </button>
         </div>
       </div>

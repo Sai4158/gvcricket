@@ -12,7 +12,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  FaBroadcastTower,
   FaBookOpen,
   FaImage,
   FaInfoCircle,
@@ -20,6 +19,7 @@ import {
   FaShareAlt,
   FaTimes,
   FaUserEdit,
+  FaYoutube,
 } from "react-icons/fa";
 import { LuUndo2 } from "react-icons/lu";
 import ModalGradientTitle from "../shared/ModalGradientTitle";
@@ -655,14 +655,6 @@ const MatchActionGrid = memo(function MatchActionGrid({
             compact
           />
           <ActionIconButton
-            onClick={onLiveStream}
-            onPressFeedback={onPressFeedback}
-            icon={<FaBroadcastTower />}
-            label="Live Stream"
-            colorClass="text-rose-300"
-            compact
-          />
-          <ActionIconButton
             onClick={onImage}
             onPressFeedback={onPressFeedback}
             icon={<FaImage />}
@@ -678,6 +670,16 @@ const MatchActionGrid = memo(function MatchActionGrid({
             colorClass="text-green-400"
             compact
           />
+          <div aria-hidden="true" />
+          <ActionIconButton
+            onClick={onLiveStream}
+            onPressFeedback={onPressFeedback}
+            icon={<FaYoutube />}
+            label="Live Stream"
+            colorClass="text-red-500"
+            compact
+          />
+          <div aria-hidden="true" />
         </div>
       </div>
       </div>
@@ -824,14 +826,14 @@ const MatchActionGrid = memo(function MatchActionGrid({
                 />
                 <ActionHelpItem
                   rank={showLiveControls ? 7 : 4}
-                  icon={<FaBroadcastTower />}
+                  icon={<FaYoutube />}
                   title="Live Stream"
                   description={[
                     "Attach a YouTube live link to the current match.",
                     "Spectators see it above the score while the match is live.",
                     "The stream can stay on the result page after the match ends.",
                   ]}
-                  colorClass="text-rose-300"
+                  colorClass="text-red-500"
                 />
                 <ActionHelpItem
                   rank={showLiveControls ? 8 : 5}
