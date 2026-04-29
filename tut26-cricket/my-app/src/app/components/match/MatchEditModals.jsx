@@ -655,11 +655,19 @@ export function EditLiveStreamModal({
       hideHeader
       panelClassName="max-w-md max-h-[82vh] overflow-hidden"
     >
-      <div ref={modalScrollRef} className="max-h-[74vh] space-y-4 overflow-y-auto pr-1">
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute left-4 top-4 z-20 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/[0.12] text-white shadow-[0_12px_32px_rgba(255,255,255,0.12)] transition hover:bg-white/[0.18] hover:text-white"
+        aria-label="Close live stream popup"
+      >
+        <FaTimes className="text-lg" />
+      </button>
+      <div ref={modalScrollRef} className="max-h-[74vh] space-y-4 overflow-y-auto pr-1 pt-12">
         {showSavedState ? (
           <div className="space-y-4">
             <div className="rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_32%),linear-gradient(180deg,rgba(26,26,30,0.985),rgba(12,12,16,0.99))] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
                 <div className="flex min-w-0 items-center gap-3">
                   <span className="inline-flex h-8 w-11 shrink-0 items-center justify-center rounded-[10px] bg-[#FF0033] text-white shadow-[0_10px_24px_rgba(255,0,51,0.24)]">
                     <FaYoutube className="text-[1.15rem]" />
@@ -673,14 +681,6 @@ export function EditLiveStreamModal({
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
-                  aria-label="Close saved live stream popup"
-                >
-                  <FaTimes />
-                </button>
               </div>
               <div className="mt-5 space-y-3 text-left">
                 <p className="text-base font-semibold text-white">
@@ -705,7 +705,7 @@ export function EditLiveStreamModal({
         ) : (
           <>
         <div className="rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_32%),linear-gradient(180deg,rgba(26,26,30,0.985),rgba(12,12,16,0.99))] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
             <div className="flex min-w-0 items-center gap-3">
               <span className="inline-flex h-8 w-11 shrink-0 items-center justify-center rounded-[10px] bg-[#FF0033] text-white shadow-[0_10px_24px_rgba(255,0,51,0.24)]">
                 <FaYoutube className="text-[1.15rem]" />
@@ -719,14 +719,6 @@ export function EditLiveStreamModal({
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
-              aria-label="Close live stream popup"
-            >
-              <FaTimes />
-            </button>
           </div>
           <div className="mt-4 text-left">
             <div className="mt-4 grid gap-2 text-sm text-zinc-300">
