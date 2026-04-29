@@ -531,7 +531,7 @@ export function EditLiveStreamModal({
     : existingStream;
   const hasTypedLink = String(liveStreamUrl || "").trim().length > 0;
   const modalScrollRef = useRef(null);
-  const saveButtonRef = useRef(null);
+  const removeButtonRef = useRef(null);
   const spectatorUrl =
     match?.sessionId && typeof window !== "undefined"
       ? buildShareUrl(`/session/${match.sessionId}/view`, window.location.origin)
@@ -543,7 +543,7 @@ export function EditLiveStreamModal({
     }
 
     const frame = window.requestAnimationFrame(() => {
-      saveButtonRef.current?.scrollIntoView({
+      removeButtonRef.current?.scrollIntoView({
         behavior: "smooth",
         block: "nearest",
       });
@@ -666,10 +666,10 @@ export function EditLiveStreamModal({
                   </span>
                   <div className="min-w-0">
                     <p className="text-[1.7rem] font-black leading-none tracking-[-0.04em] text-white">
-                      Saved
+                      YouTube
                     </p>
                     <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.26em] text-zinc-500">
-                      Live stream ready
+                      Live stream saved
                     </p>
                   </div>
                 </div>
@@ -684,7 +684,7 @@ export function EditLiveStreamModal({
               </div>
               <div className="mt-5 space-y-3 text-left">
                 <p className="text-base font-semibold text-white">
-                  Your YouTube live stream is saved.
+                  Your YouTube live stream is ready.
                 </p>
                 <p className="text-sm leading-6 text-zinc-300">
                   It will now show on the spectator page for this game.
@@ -830,7 +830,7 @@ export function EditLiveStreamModal({
         ) : null}
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <div ref={saveButtonRef}>
+          <div>
             <LoadingButton
               onClick={handleSaveStream}
               loading={isUpdating}
@@ -841,6 +841,7 @@ export function EditLiveStreamModal({
             </LoadingButton>
           </div>
           <button
+            ref={removeButtonRef}
             type="button"
             onClick={handleRemoveStream}
             disabled={isUpdating || !existingStream?.watchUrl}
