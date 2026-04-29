@@ -1,0 +1,96 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - button "Back to Sessions" [ref=e4]:
+        - img [ref=e5]
+        - text: Back
+      - generic [ref=e10]: Live Spectator View
+      - button "Share Link" [ref=e11]:
+        - img [ref=e12]
+    - generic [ref=e14]:
+      - img "Match cover" [ref=e16]
+      - generic [ref=e21]:
+        - heading "Live Stream Browser Test 1777443622591" [level=1] [ref=e24]:
+          - generic [ref=e25]:
+            - generic [ref=e26]: Live Stream Browser Test 1777443622591
+            - generic: Live Stream Browser Test 1777443622591
+        - generic [ref=e51]:
+          - paragraph [ref=e52]: Gamma
+          - paragraph [ref=e53]: 0/0
+          - generic [ref=e54]:
+            - generic [ref=e56]:
+              - paragraph [ref=e57]: Players
+              - paragraph [ref=e58]: "2"
+            - generic [ref=e60]:
+              - paragraph [ref=e61]: Overs
+              - paragraph [ref=e62]: "0.0"
+        - generic [ref=e66]:
+          - generic [ref=e67]: RATE 0.00
+          - heading "OVER 1" [level=3] [ref=e68]
+          - generic [ref=e69]: 6 LEFT
+    - generic [ref=e72]:
+      - generic [ref=e75]:
+        - img [ref=e77]
+        - generic [ref=e84]:
+          - generic [ref=e85]: Walkie-Talkie
+          - generic [ref=e86]: Turn it on to request access.
+        - switch "Toggle walkie-talkie for this device" [ref=e88]
+      - generic [ref=e91]:
+        - button "Open loudspeaker" [ref=e92]:
+          - generic [ref=e93]:
+            - generic [ref=e94]:
+              - img [ref=e97]
+              - switch "Toggle loudspeaker" [ref=e100]
+            - generic [ref=e103]:
+              - generic [ref=e104]: Loudspeaker
+              - generic [ref=e105]: Use phone as a mic.
+        - button "Open score announcer" [ref=e106]:
+          - generic [ref=e107]:
+            - generic [ref=e108]:
+              - button "Announce current score" [ref=e109]:
+                - img [ref=e110]
+              - switch "Toggle score announcer" [checked] [ref=e113]
+            - generic [ref=e116]:
+              - generic [ref=e117]: Score Announcer
+              - generic [ref=e118]: Reads each update.
+            - img [ref=e121]
+    - generic [ref=e123]:
+      - generic [ref=e124]:
+        - generic [ref=e126]:
+          - generic [ref=e128]:
+            - heading "Gamma" [level=2] [ref=e129]
+            - generic [ref=e130]: Live
+          - generic [ref=e131]:
+            - generic [ref=e132]: "0"
+            - generic [ref=e133]: Runs
+        - generic [ref=e134]: "Run Rate: 0.00"
+        - paragraph [ref=e136]: No overs bowled yet.
+      - generic [ref=e137]:
+        - generic [ref=e139]:
+          - heading "Delta" [level=2] [ref=e142]
+          - generic [ref=e143]:
+            - generic [ref=e144]: "0"
+            - generic [ref=e145]: Runs
+        - generic [ref=e146]: "Run Rate: 0.00"
+        - paragraph [ref=e148]: No overs bowled yet.
+    - generic [ref=e149]:
+      - button "Back to top" [ref=e151]:
+        - img [ref=e152]
+      - generic [ref=e155]: Footer divider
+      - img "GV Cricket logo" [ref=e157]
+      - navigation "Popular pages" [ref=e159]:
+        - paragraph [ref=e160]: Popular Pages
+        - generic [ref=e161]:
+          - link "Start Match" [ref=e162] [cursor=pointer]:
+            - /url: /session/new
+          - link "View All Games" [ref=e163] [cursor=pointer]:
+            - /url: /session
+          - link "Updates" [ref=e164] [cursor=pointer]:
+            - /url: /update
+      - paragraph [ref=e166]: © 2026 GV Cricket. All rights reserved.
+      - paragraph [ref=e168]: GV Cricket brings live score, umpire mode, spectator view, director controls, walkie-talkie, and results into one fast mobile flow.
+      - link "gvcricket.com" [ref=e170] [cursor=pointer]:
+        - /url: https://gvcricket.com
+  - button "Open Next.js Dev Tools" [ref=e176] [cursor=pointer]:
+    - img [ref=e177]
+  - alert [ref=e180]
