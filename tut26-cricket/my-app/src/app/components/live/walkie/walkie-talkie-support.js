@@ -68,9 +68,29 @@ export function isRtmPublishDisconnectedError(error) {
   );
 }
 
+function isAgoraConfigurationError(error) {
+  const rawCode = String(error?.code || "");
+  const rawName = String(error?.name || "");
+  const rawMessage = String(error?.message || "");
+  const haystack = `${rawCode} ${rawName} ${rawMessage}`.toUpperCase();
+
+  return (
+    haystack.includes("INVALID APP ID") ||
+    haystack.includes("APP_ID_NO_ACTIVATED") ||
+    haystack.includes("THE VENDOR IS NOT ACTIVATED") ||
+    haystack.includes("AGORA CREDENTIALS ARE INVALID") ||
+    haystack.includes("AGORA CREDENTIALS ARE NOT CONFIGURED") ||
+    haystack.includes("WALKIE-TALKIE SIGNALING IS NOT CONFIGURED ON THE SERVER") ||
+    haystack.includes("WALKIE-TALKIE AUDIO IS NOT CONFIGURED ON THE SERVER")
+  );
+}
+
 export function walkieMessageFor(error, fallback) {
   if (isWalkieNetworkError(error)) {
     return "Could not reach live walkie. Check the connection and try again.";
+  }
+  if (isAgoraConfigurationError(error)) {
+    return "Walkie-talkie is not configured correctly on the server.";
   }
   if (isRtmPublishDisconnectedError(error)) {
     return "Walkie is reconnecting. Try again.";
@@ -128,7 +148,12 @@ export function classifyWalkieSignalingSetupError(error) {
     haystack.includes("SIGNALING TOKEN MISSING") ||
     haystack.includes("SIGNALING APP ID MISSING") ||
     haystack.includes("INVALID SIGNALING TOKEN PAYLOAD") ||
-    haystack.includes("AGORA SIGNALING IS UNAVAILABLE")
+    haystack.includes("AGORA SIGNALING IS UNAVAILABLE") ||
+    haystack.includes("INVALID APP ID") ||
+    haystack.includes("APP_ID_NO_ACTIVATED") ||
+    haystack.includes("THE VENDOR IS NOT ACTIVATED") ||
+    haystack.includes("AGORA CREDENTIALS ARE INVALID") ||
+    haystack.includes("WALKIE-TALKIE SIGNALING IS NOT CONFIGURED ON THE SERVER")
   ) {
     return "fatal";
   }

@@ -126,9 +126,13 @@ export function createWalkieTokenLifecycleApi({
     if (!matchId || !id) throw new Error("Walkie is not ready yet.");
     const cached = readStoredWalkieToken("rtc", matchId, role, id, parseJson);
     if (isTokenFresh(cached, ensureRtcTokenFreshBufferMs)) {
-      const next = validateWalkieTokenPayload(cached, "RTC");
-      rtcTokenRef.current = next;
-      return next;
+      try {
+        const next = validateWalkieTokenPayload(cached, "RTC");
+        rtcTokenRef.current = next;
+        return next;
+      } catch {
+        clearStoredWalkieToken("rtc", matchId, role, id);
+      }
     }
     rtcTokenPromiseRef.current = requestJson("/api/agora/rtc-token", {
       matchId,
@@ -170,14 +174,18 @@ export function createWalkieTokenLifecycleApi({
       isTokenFresh(cached, ensureSignalTokenFreshBufferMs) &&
       cached?.participantToken
     ) {
-      const next = validateWalkieTokenPayload(cached, "Signaling");
-      signalTokenRef.current = next;
-      participantTokenRef.current = String(next.participantToken || "");
-      signalingUserIdRef.current = next?.userId || buildAgoraUserId(matchId, id, role);
-      signalingChannelRef.current =
-        next?.channelName || buildAgoraSignalingChannelName(matchId);
-      setHasWalkieToken(Boolean(next?.token));
-      return next;
+      try {
+        const next = validateWalkieTokenPayload(cached, "Signaling");
+        signalTokenRef.current = next;
+        participantTokenRef.current = String(next.participantToken || "");
+        signalingUserIdRef.current = next?.userId || buildAgoraUserId(matchId, id, role);
+        signalingChannelRef.current =
+          next?.channelName || buildAgoraSignalingChannelName(matchId);
+        setHasWalkieToken(Boolean(next?.token));
+        return next;
+      } catch {
+        clearStoredWalkieToken("signal", matchId, role, id);
+      }
     }
     clearStoredWalkieToken("signal", matchId, role, id);
     signalTokenPromiseRef.current = requestJson("/api/agora/signaling-token", {

@@ -39,7 +39,11 @@ function newNotification(type, message, request = null) {
 }
 
 function isRetryableWalkieStateError(error) {
-  return error?.name === "VersionError";
+  return (
+    error?.name === "VersionError" ||
+    error?.code === 11000 ||
+    String(error?.message || "").includes("E11000")
+  );
 }
 
 function touchIdleExpiry(doc) {
@@ -104,21 +108,32 @@ function buildSnapshot(doc) {
 async function touchAndCleanState(matchId, attempt = 0) {
   const now = nowDate();
   const staleBefore = new Date(now.getTime() - PARTICIPANT_STALE_MS);
-  const doc = await WalkieState.findOneAndUpdate(
-    { matchId },
-    {
-      $setOnInsert: {
-        matchId,
-        idleExpiresAt: new Date(Date.now() + STATE_IDLE_TTL_MS),
+  let doc;
+  try {
+    doc = await WalkieState.findOneAndUpdate(
+      { matchId },
+      {
+        $setOnInsert: {
+          matchId,
+          idleExpiresAt: new Date(Date.now() + STATE_IDLE_TTL_MS),
+        },
+        $pull: {
+          participants: { lastSeenAt: { $lt: staleBefore } },
+          pendingRequests: { expiresAt: { $lte: now } },
+          requestCooldowns: { until: { $lte: now } },
+        },
       },
-      $pull: {
-        participants: { lastSeenAt: { $lt: staleBefore } },
-        pendingRequests: { expiresAt: { $lte: now } },
-        requestCooldowns: { until: { $lte: now } },
-      },
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  } catch (error) {
+    if (
+      isRetryableWalkieStateError(error) &&
+      attempt < WALKIE_STATE_RETRY_LIMIT - 1
+    ) {
+      return touchAndCleanState(matchId, attempt + 1);
+    }
+    throw error;
+  }
 
   if (doc.activeSpeakerId) {
     const activeParticipant = doc.participants.find((item) => item.id === doc.activeSpeakerId);

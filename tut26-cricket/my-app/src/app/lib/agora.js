@@ -17,13 +17,19 @@ import {
 
 const AGORA_RTC_TOKEN_TTL_SECONDS = 60 * 15;
 const AGORA_SIGNALING_TOKEN_TTL_SECONDS = 60 * 30;
+const AGORA_APP_ID_PATTERN = /^[a-fA-F0-9]{32}$/;
+const AGORA_APP_CERT_PATTERN = /^[a-fA-F0-9]{32}$/;
 
 export function getAgoraCredentials() {
-  const appId = process.env.AGORA_APP_ID || "";
-  const appCertificate = process.env.AGORA_APP_CERTIFICATE || "";
+  const appId = String(process.env.AGORA_APP_ID || "").trim();
+  const appCertificate = String(process.env.AGORA_APP_CERTIFICATE || "").trim();
 
   if (!appId || !appCertificate) {
     throw new Error("Agora credentials are not configured.");
+  }
+
+  if (!AGORA_APP_ID_PATTERN.test(appId) || !AGORA_APP_CERT_PATTERN.test(appCertificate)) {
+    throw new Error("Agora credentials are invalid.");
   }
 
   return {

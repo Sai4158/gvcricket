@@ -11,6 +11,7 @@ import { filterAgoraWalkieRequests } from "../../../lib/walkie-agora-runtime";
 
 const AGORA_CHANNEL_NAME_MAX = 64;
 const AGORA_USER_ID_MAX = 64;
+const AGORA_APP_ID_PATTERN = /^[a-fA-F0-9]{32}$/;
 
 export const EMPTY_WALKIE_SNAPSHOT = {
   enabled: false,
@@ -171,6 +172,9 @@ export function validateWalkieTokenPayload(payload, type) {
 
   if (!appId || !token || !userId || !channelName) {
     throw new Error(`Invalid ${type} token payload.`);
+  }
+  if (!AGORA_APP_ID_PATTERN.test(appId)) {
+    throw new Error(`Invalid ${type} app id.`);
   }
   if (channelName.length > AGORA_CHANNEL_NAME_MAX) {
     throw new Error(`${type} channel name is too long.`);

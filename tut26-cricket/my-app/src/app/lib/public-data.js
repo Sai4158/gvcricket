@@ -660,7 +660,7 @@ export function serializeSessionViewBootstrap(
       ? matchDocument.toObject()
       : matchDocument;
   const match = normalizeLegacyTossState(rawMatch, fallbackState);
-  const compactOverState = getCompactOverStateFromBalls(match);
+  const compactOverState = getCompactOverState(match);
 
   return {
     _id: String(match._id),
