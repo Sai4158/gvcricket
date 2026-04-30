@@ -23,6 +23,7 @@ import {
 } from "react-icons/fa";
 import { LuClipboardPaste } from "react-icons/lu";
 import LoadingButton from "../shared/LoadingButton";
+import StreamingOverlayAccessCard from "../shared/StreamingOverlayAccessCard";
 import { getTeamBundle } from "../../lib/team-utils";
 import { ModalBase } from "./MatchBaseModals";
 import { normalizeYouTubeLiveStream } from "../../lib/youtube-live-stream";
@@ -516,6 +517,7 @@ export function EditLiveStreamModal({
   onUpdate,
   onClose,
   isUpdating = false,
+  overlayAccess = null,
 }) {
   const existingStream = match?.liveStream || null;
   const [liveStreamUrl, setLiveStreamUrl] = useState(
@@ -842,6 +844,15 @@ export function EditLiveStreamModal({
             Remove
           </button>
         </div>
+
+        {overlayAccess?.overlayUrl ? (
+          <StreamingOverlayAccessCard
+            overlayUrl={overlayAccess.overlayUrl}
+            onCopy={overlayAccess.onCopy}
+            onOpen={overlayAccess.onOpen}
+            copied={overlayAccess.copied}
+          />
+        ) : null}
           </>
         )}
       </div>

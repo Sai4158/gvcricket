@@ -12,7 +12,7 @@
 import SiteFooter from "../../shared/SiteFooter";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FaBroadcastTower, FaEllipsisV } from "react-icons/fa";
+import { FaBroadcastTower, FaCheck, FaEllipsisV, FaShareAlt } from "react-icons/fa";
 import {
   buildFallbackSoundEffectFromId,
   createScoreActionId,
@@ -105,6 +105,8 @@ export default function MatchPageClient({
   const router = useRouter();
   const [modal, setModal] = useState({ type: null });
   const [infoText, setInfoText] = useState(null);
+  const [overlayCopied, setOverlayCopied] = useState(false);
+  const [clientOrigin, setClientOrigin] = useState("");
   const [soundEffectsOpen, setSoundEffectsOpen] = useState(false);
   const [soundEffectFiles, setSoundEffectFiles] = useState([]);
   const [soundEffectLibraryStatus, setSoundEffectLibraryStatus] =
@@ -224,6 +226,14 @@ export default function MatchPageClient({
       isMountedRef.current = false;
     };
   }, [clearAllScoreControlCooldownTimers]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    setClientOrigin(window.location.origin);
+  }, []);
 
   const isScoreControlCoolingDown = useCallback(
     (controlKey = "") => {
@@ -1755,6 +1765,36 @@ export default function MatchPageClient({
 
     window.prompt("Copy spectator link", link);
   };
+  const overlayPath = match?.sessionId ? `/session/${match.sessionId}/overlay` : "";
+  const overlayUrl =
+    overlayPath && clientOrigin
+      ? new URL(overlayPath, clientOrigin).toString()
+      : overlayPath;
+  const handleCopyOverlayLink = useCallback(async () => {
+    if (!overlayUrl) {
+      return;
+    }
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(overlayUrl);
+        setOverlayCopied(true);
+        window.setTimeout(() => setOverlayCopied(false), 2000);
+        return;
+      }
+
+      window.prompt("Copy overlay link", overlayUrl);
+    } catch (error) {
+      console.error("Overlay link copy failed:", error);
+    }
+  }, [overlayUrl]);
+  const handleOpenOverlayLink = useCallback(() => {
+    if (typeof window === "undefined" || !overlayUrl) {
+      return;
+    }
+
+    window.open(overlayUrl, "_blank", "noopener,noreferrer");
+  }, [overlayUrl]);
 
   const handleWalkieHoldStart = async () => {
     if (!isLiveMatch) {
@@ -2197,6 +2237,7 @@ export default function MatchPageClient({
         handleAnnouncedUndo,
         handleCommentaryReadScoreAction,
         handleCommentaryTestSequenceAction,
+        handleCopyOverlayLink,
         handleCopyShareLink,
         handleEntryScoreSoundPromptSave,
         handleForceContinuePastSpeech,
@@ -2227,6 +2268,8 @@ export default function MatchPageClient({
         micMonitor,
         modal,
         openModalWithFeedback,
+        overlayCopied,
+        overlayUrl,
         oversHistory,
         pendingStageCardCountdownLabel,
         pendingUmpireAnnouncementRef,
@@ -2239,6 +2282,7 @@ export default function MatchPageClient({
         setEntryScoreSoundEffectsEnabled,
         setInfoText,
         setModal,
+        handleOpenOverlayLink,
         setSoundEffectsOpen,
         setStageContinuePrompt,
         showCompactUmpireWalkie,

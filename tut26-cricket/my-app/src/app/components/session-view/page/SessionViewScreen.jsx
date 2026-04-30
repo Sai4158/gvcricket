@@ -17,11 +17,6 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
-import {
-  FaArrowLeft,
-  FaCheck,
-  FaShareAlt,
-} from "react-icons/fa";
 import useLocalMicMonitor from "../../live/useLocalMicMonitor";
 import useAnnouncementSettings from "../../live/useAnnouncementSettings";
 import useWalkieTalkie from "../../live/useWalkieTalkie";
@@ -2036,6 +2031,16 @@ export default function SessionViewClient({ sessionId, initialData }) {
               title="Live Match Stream"
               subtitle="Watch the YouTube live stream before following the score below."
               allowTheaterFullscreen
+              overlayAccess={
+                overlayUrl
+                  ? {
+                      overlayUrl,
+                      onCopy: handleCopyOverlayLink,
+                      onOpen: handleOpenOverlayLink,
+                      copied: overlayCopied,
+                    }
+                  : null
+              }
             />
           ) : null
         }
@@ -2097,81 +2102,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
         teamBName={teamB.name}
         gridRef={inningsGridRef}
       />
-
-      <section className="mt-8 w-full max-w-4xl">
-        <div className="overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(247,201,72,0.12),transparent_26%),linear-gradient(180deg,rgba(20,20,20,0.96),rgba(9,9,9,0.96))] shadow-[0_24px_60px_rgba(0,0,0,0.32)]">
-          <div className="h-[2px] w-full bg-[linear-gradient(90deg,#f7c948_0%,#ffffff_50%,#e11d2e_100%)]" />
-          <div className="px-5 py-5 md:px-6">
-            <div className="grid gap-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="max-w-2xl">
-                    <p className="text-[11px] font-black uppercase tracking-[0.24em] text-amber-300">
-                      YouTube Streaming Overlay
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-zinc-300">
-                      Open this clean live-score overlay for your YouTube stream.
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 gap-2">
-                    <button
-                      type="button"
-                      onClick={handleCopyOverlayLink}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/8 px-4 py-2 text-sm font-bold text-white transition hover:border-white/20 hover:bg-white/12"
-                    >
-                      {overlayCopied ? <FaCheck /> : <FaShareAlt />}
-                      {overlayCopied ? "Copied" : "Copy Link"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleOpenOverlayLink}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-amber-300/30 bg-amber-300/10 px-4 py-2 text-sm font-bold text-amber-100 transition hover:border-amber-200/40 hover:bg-amber-300/14"
-                    >
-                      Open
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
-                  <p className="break-all font-mono text-sm text-white">{overlayUrl}</p>
-                </div>
-              <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4">
-                <div className="overflow-hidden rounded-[22px] border border-white/10 bg-[#05070c] shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
-                  <div className="relative aspect-[16/9] bg-[radial-gradient(circle_at_top,rgba(225,29,46,0.18),transparent_46%),linear-gradient(180deg,#0b0d14,#05070c)]">
-                    <div className="absolute left-4 top-4 h-8 w-8 rounded-full bg-[linear-gradient(180deg,#7f1d1d,#2a0808)] shadow-[0_0_18px_rgba(225,29,46,0.28)]" />
-                    <div className="absolute bottom-0 left-0 right-0 h-[34%] bg-[linear-gradient(180deg,rgba(0,0,0,0),rgba(7,10,18,0.95)_48%)]" />
-                    <div className="absolute bottom-0 left-0 right-0 border-t border-white/10 bg-[linear-gradient(90deg,#12080a,#1f0b10,#12080a)] px-4 py-3">
-                      <div className="flex items-end justify-between gap-4">
-                        <div>
-                          <p className="text-[9px] font-black uppercase tracking-[0.24em] text-amber-300">
-                            Preview
-                          </p>
-                          <p className="mt-1 text-lg font-black uppercase text-white">
-                            Team A 84/2
-                          </p>
-                          <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/65">
-                            Overs 8.4
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {["1", "4", "Wd", "2"].map((ball) => (
-                            <span
-                              key={ball}
-                              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/12 bg-[linear-gradient(180deg,#7f1d1d,#2a0808)] text-xs font-black text-white"
-                            >
-                              {ball}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;

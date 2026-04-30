@@ -45,6 +45,7 @@ export default function MatchPageLayout({
   handleAnnouncedUndo,
   handleCommentaryReadScoreAction,
   handleCommentaryTestSequenceAction,
+  handleCopyOverlayLink,
   handleCopyShareLink,
   handleEntryScoreSoundPromptSave,
   handleForceContinuePastSpeech,
@@ -73,6 +74,8 @@ export default function MatchPageLayout({
   match,
   micMonitor,
   modal,
+  overlayCopied,
+  overlayUrl,
   oversHistory,
   openModalWithFeedback,
   pendingStageCardCountdownLabel,
@@ -84,6 +87,7 @@ export default function MatchPageLayout({
   setEntryScoreSoundEffectsEnabled,
   setInfoText,
   setModal,
+  handleOpenOverlayLink,
   scoreControlDisabledKeys,
   scoreTapIndicatorKey,
   setSoundEffectsOpen,
@@ -496,6 +500,16 @@ export default function MatchPageLayout({
           currentOverNumber={currentOverNumber}
           firstInningsOversPlayed={firstInningsOversPlayed}
           infoText={infoText}
+          overlayAccess={
+            overlayUrl
+              ? {
+                  overlayUrl,
+                  onCopy: handleCopyOverlayLink,
+                  onOpen: handleOpenOverlayLink,
+                  copied: overlayCopied,
+                }
+              : null
+          }
           onNext={handleProtectedNextInningsOrEnd}
           onUpdate={handleAnnouncedPatchUpdate}
           onImageUploaded={replaceMatch}

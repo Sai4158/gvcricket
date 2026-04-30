@@ -43,6 +43,7 @@ export default function MatchModalLayer({
   currentOverNumber,
   firstInningsOversPlayed,
   infoText,
+  overlayAccess,
   onNext,
   onUpdate,
   onImageUploaded,
@@ -236,6 +237,7 @@ export default function MatchModalLayer({
           onUpdate={onUpdate}
           onClose={onClose}
           isUpdating={isUpdating}
+          overlayAccess={overlayAccess}
         />
       )}
       {modalType === "out" && (

@@ -17,6 +17,7 @@ import {
   FaTrashAlt,
   FaYoutube,
 } from "react-icons/fa";
+import StreamingOverlayAccessCard from "./StreamingOverlayAccessCard";
 
 const HOLD_TO_REMOVE_DELAY_MS = 650;
 
@@ -152,6 +153,7 @@ export default function YouTubeLiveStreamCard({
   onHoldRemove,
   overlayMatch = null,
   allowTheaterFullscreen = false,
+  overlayAccess = null,
 }) {
   const holdTimerRef = useRef(null);
   const theaterFrameRef = useRef(null);
@@ -369,6 +371,16 @@ export default function YouTubeLiveStreamCard({
           <div className="mt-5 flex flex-wrap justify-end gap-3">
             {actionButtons}
           </div>
+        ) : null}
+
+        {overlayAccess?.overlayUrl ? (
+          <StreamingOverlayAccessCard
+            overlayUrl={overlayAccess.overlayUrl}
+            onCopy={overlayAccess.onCopy}
+            onOpen={overlayAccess.onOpen}
+            copied={overlayAccess.copied}
+            className="mt-5"
+          />
         ) : null}
       </div>
     </section>
