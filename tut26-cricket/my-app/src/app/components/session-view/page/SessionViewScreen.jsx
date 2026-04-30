@@ -9,13 +9,7 @@
  * Read next: ./README.md
  */
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import useLocalMicMonitor from "../../live/useLocalMicMonitor";
 import useAnnouncementSettings from "../../live/useAnnouncementSettings";
@@ -75,7 +69,8 @@ import {
 } from "./session-view-helpers";
 
 export default function SessionViewClient({ sessionId, initialData }) {
-  const initialWalkiePreferenceScope = initialData?.match?._id || sessionId || "";
+  const initialWalkiePreferenceScope =
+    initialData?.match?._id || sessionId || "";
   const [copied, setCopied] = useState(false);
   const [overlayCopied, setOverlayCopied] = useState(false);
   const [isLeavingToSessions, setIsLeavingToSessions] = useState(false);
@@ -271,7 +266,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
   useEffect(() => {
     const element = inningsGridRef.current;
-    if (!element || shouldLoadHistoryDetail || typeof IntersectionObserver === "undefined") {
+    if (
+      !element ||
+      shouldLoadHistoryDetail ||
+      typeof IntersectionObserver === "undefined"
+    ) {
       return undefined;
     }
 
@@ -299,13 +298,21 @@ export default function SessionViewClient({ sessionId, initialData }) {
       return;
     }
     const nextHistoryVersion = String(match.historyVersion || "");
-    if (!nextHistoryVersion || requestedHistoryVersionRef.current === nextHistoryVersion) {
+    if (
+      !nextHistoryVersion ||
+      requestedHistoryVersionRef.current === nextHistoryVersion
+    ) {
       return;
     }
 
     requestedHistoryVersionRef.current = nextHistoryVersion;
     void loadSessionHistory();
-  }, [loadSessionHistory, match?._id, match?.historyVersion, shouldLoadHistoryDetail]);
+  }, [
+    loadSessionHistory,
+    match?._id,
+    match?.historyVersion,
+    shouldLoadHistoryDetail,
+  ]);
 
   useEffect(() => {
     if (!match?._id) {
@@ -313,7 +320,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
 
     const nextMediaVersion = String(match.mediaVersion || "");
-    if (!nextMediaVersion || requestedMediaVersionRef.current === nextMediaVersion) {
+    if (
+      !nextMediaVersion ||
+      requestedMediaVersionRef.current === nextMediaVersion
+    ) {
       return;
     }
 
@@ -346,11 +356,13 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const currentAnnouncementEventId =
     match?.lastLiveEvent?.type === "sound_effect" ? "" : currentLiveEventId;
   const isLiveMatch = Boolean(
-    match?.isOngoing && !match?.result && !match?.pendingResult
+    match?.isOngoing && !match?.result && !match?.pendingResult,
   );
   const walkiePreferenceScope = match?._id || sessionId || "";
   const spectatorWalkieSignalActive = Boolean(
-    liveToolsReady && isLiveMatch && (spectatorWalkieEnabled || quickWalkieTalking),
+    liveToolsReady &&
+    isLiveMatch &&
+    (spectatorWalkieEnabled || quickWalkieTalking),
   );
   const walkie = useWalkieTalkie({
     matchId: match?._id || "",
@@ -449,32 +461,44 @@ export default function SessionViewClient({ sessionId, initialData }) {
 
   const pruneHandledDerivedScoreSoundActionIds = useCallback(() => {
     const now = Date.now();
-    for (const [actionId, recordedAt] of handledDerivedScoreSoundActionIdsRef.current) {
+    for (const [
+      actionId,
+      recordedAt,
+    ] of handledDerivedScoreSoundActionIdsRef.current) {
       if (now - Number(recordedAt || 0) > 30_000) {
         handledDerivedScoreSoundActionIdsRef.current.delete(actionId);
       }
     }
   }, []);
 
-  const markDerivedScoreSoundActionHandled = useCallback((actionId = "") => {
-    const safeActionId = String(actionId || "").trim();
-    if (!safeActionId) {
-      return;
-    }
+  const markDerivedScoreSoundActionHandled = useCallback(
+    (actionId = "") => {
+      const safeActionId = String(actionId || "").trim();
+      if (!safeActionId) {
+        return;
+      }
 
-    pruneHandledDerivedScoreSoundActionIds();
-    handledDerivedScoreSoundActionIdsRef.current.set(safeActionId, Date.now());
-  }, [pruneHandledDerivedScoreSoundActionIds]);
+      pruneHandledDerivedScoreSoundActionIds();
+      handledDerivedScoreSoundActionIdsRef.current.set(
+        safeActionId,
+        Date.now(),
+      );
+    },
+    [pruneHandledDerivedScoreSoundActionIds],
+  );
 
-  const hasHandledDerivedScoreSoundAction = useCallback((actionId = "") => {
-    const safeActionId = String(actionId || "").trim();
-    if (!safeActionId) {
-      return false;
-    }
+  const hasHandledDerivedScoreSoundAction = useCallback(
+    (actionId = "") => {
+      const safeActionId = String(actionId || "").trim();
+      if (!safeActionId) {
+        return false;
+      }
 
-    pruneHandledDerivedScoreSoundActionIds();
-    return handledDerivedScoreSoundActionIdsRef.current.has(safeActionId);
-  }, [pruneHandledDerivedScoreSoundActionIds]);
+      pruneHandledDerivedScoreSoundActionIds();
+      return handledDerivedScoreSoundActionIdsRef.current.has(safeActionId);
+    },
+    [pruneHandledDerivedScoreSoundActionIds],
+  );
 
   const clearPendingDerivedScoreSound = useCallback((actionId = "") => {
     const pending = pendingDerivedScoreSoundRef.current;
@@ -497,9 +521,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
     () =>
       Boolean(
         pendingSoundEffectTimerRef.current ||
-          soundEffectPlayingRef.current ||
-          activeBoundarySoundEffectRef.current ||
-          announcerStatus === "speaking",
+        soundEffectPlayingRef.current ||
+        activeBoundarySoundEffectRef.current ||
+        announcerStatus === "speaking",
       ),
     [announcerStatus],
   );
@@ -638,7 +662,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
   });
 
   useEffect(() => {
-    if (!match?._id || !isLiveMatch || settings.playScoreSoundEffects === false) {
+    if (
+      !match?._id ||
+      !isLiveMatch ||
+      settings.playScoreSoundEffects === false
+    ) {
       return undefined;
     }
 
@@ -756,7 +784,13 @@ export default function SessionViewClient({ sessionId, initialData }) {
     clearAnnouncementTimers();
     stop();
     stopLiveSoundEffect();
-  }, [clearAnnouncementTimers, clearPendingDerivedScoreSound, match?._id, stop, stopLiveSoundEffect]);
+  }, [
+    clearAnnouncementTimers,
+    clearPendingDerivedScoreSound,
+    match?._id,
+    stop,
+    stopLiveSoundEffect,
+  ]);
 
   useEffect(() => {
     const nextMatchId = match?._id || "";
@@ -1203,14 +1237,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
     const sourceActionId = String(liveEvent?.actionId || "").trim();
     const shouldHandleDerivedScoreSound = Boolean(
       liveEvent?.id &&
-        sourceActionId &&
-        (liveEvent.type === "score_update" ||
-          liveEvent.type === "target_chased" ||
-          liveEvent.type === "match_end") &&
-        liveEvent.ball &&
-        isLiveMatch &&
-        settings.playScoreSoundEffects !== false &&
-        match?.announcerBroadcastScoreSoundEffectsEnabled !== false,
+      sourceActionId &&
+      (liveEvent.type === "score_update" ||
+        liveEvent.type === "target_chased" ||
+        liveEvent.type === "match_end") &&
+      liveEvent.ball &&
+      isLiveMatch &&
+      settings.playScoreSoundEffects !== false &&
+      match?.announcerBroadcastScoreSoundEffectsEnabled !== false,
     );
 
     if (!shouldHandleDerivedScoreSound) {
@@ -1233,23 +1267,26 @@ export default function SessionViewClient({ sessionId, initialData }) {
         settings.enabled,
         settings.mode,
       ) + SCORE_EFFECT_FALLBACK_BUFFER_MS;
-    const timerId = window.setTimeout(() => {
-      pendingDerivedScoreSoundRef.current = null;
-      if (hasHandledDerivedScoreSoundAction(sourceActionId)) {
-        return;
-      }
+    const timerId = window.setTimeout(
+      () => {
+        pendingDerivedScoreSoundRef.current = null;
+        if (hasHandledDerivedScoreSoundAction(sourceActionId)) {
+          return;
+        }
 
-      void playLiveSoundEffect(derivedEffect, { userGesture: false }).then(
-        (played) => {
-          if (played) {
-            markDerivedScoreSoundActionHandled(sourceActionId);
-            return;
-          }
+        void playLiveSoundEffect(derivedEffect, { userGesture: false }).then(
+          (played) => {
+            if (played) {
+              markDerivedScoreSoundActionHandled(sourceActionId);
+              return;
+            }
 
-          resumeSpectatorAnnouncementsAfterSoundEffect();
-        },
-      );
-    }, Math.max(0, delayMs));
+            resumeSpectatorAnnouncementsAfterSoundEffect();
+          },
+        );
+      },
+      Math.max(0, delayMs),
+    );
 
     pendingDerivedScoreSoundRef.current = {
       actionId: sourceActionId,
@@ -1258,9 +1295,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
     };
 
     return () => {
-      if (
-        pendingDerivedScoreSoundRef.current?.timerId === timerId
-      ) {
+      if (pendingDerivedScoreSoundRef.current?.timerId === timerId) {
         window.clearTimeout(timerId);
         pendingDerivedScoreSoundRef.current = null;
       }
@@ -1454,7 +1489,9 @@ export default function SessionViewClient({ sessionId, initialData }) {
       return undefined;
     }
 
-    const autoFinalizeAtMs = Date.parse(String(match.resultAutoFinalizeAt || ""));
+    const autoFinalizeAtMs = Date.parse(
+      String(match.resultAutoFinalizeAt || ""),
+    );
     if (!Number.isFinite(autoFinalizeAtMs)) {
       return undefined;
     }
@@ -1948,8 +1985,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const walkieLoading = Boolean(
     walkie.recoveringAudio ||
     walkie.recoveringSignaling ||
-    (!walkie.talkPathPrimed &&
-      (walkie.preparingToTalk || walkie.claiming)),
+    (!walkie.talkPathPrimed && (walkie.preparingToTalk || walkie.claiming)),
   );
   const speakerCardTalking =
     quickSpeakerTalking || (micMonitor.isActive && !micMonitor.isPaused);
@@ -1980,11 +2016,11 @@ export default function SessionViewClient({ sessionId, initialData }) {
             ? "Waiting for umpire approval."
             : !walkie.snapshot?.enabled && walkieSwitchOn
               ? "Walkie is standing by for the umpire."
-            : walkie.snapshot?.enabled && walkieSwitchOn
-              ? "Tap and hold to talk."
-              : walkie.snapshot?.enabled
-                ? walkieUi.notice
-                : "Turn it on to request access.";
+              : walkie.snapshot?.enabled && walkieSwitchOn
+                ? "Tap and hold to talk."
+                : walkie.snapshot?.enabled
+                  ? walkieUi.notice
+                  : "Turn it on to request access.";
   const shouldSurfaceWalkieNotice = Boolean(
     walkie.snapshot?.enabled || walkieSwitchOn || walkieNeedsLocalEnableNotice,
   );
@@ -2086,7 +2122,10 @@ export default function SessionViewClient({ sessionId, initialData }) {
   });
 
   return (
-    <main id="top" className="min-h-screen bg-zinc-950 text-white font-sans p-4 pb-10 flex flex-col items-center">
+    <main
+      id="top"
+      className="min-h-screen bg-zinc-950 text-white font-sans p-4 pb-10 flex flex-col items-center"
+    >
       <SessionViewTopShell
         handleBackToSessions={handleBackToSessions}
         isLeavingToSessions={isLeavingToSessions}
@@ -2219,6 +2258,3 @@ export default function SessionViewClient({ sessionId, initialData }) {
     </main>
   );
 }
-
-
-

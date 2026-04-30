@@ -852,6 +852,34 @@ function getMomentPopupClasses(type) {
   return classes[type] || classes.over;
 }
 
+function getEventEffectDuration(effect) {
+  if (!effect) {
+    return 0;
+  }
+
+  if (
+    effect.tone === "four" ||
+    effect.tone === "six" ||
+    effect.tone === "wicket"
+  ) {
+    return 3000;
+  }
+
+  return 5000;
+}
+
+function getMomentPopupDuration(popup) {
+  if (!popup) {
+    return 0;
+  }
+
+  if (popup.type === "over") {
+    return 5000;
+  }
+
+  return 8000;
+}
+
 export default function SessionOverlayClient({ sessionId, initialData }) {
   const [data, setData] = useState(initialData || null);
   const [streamError, setStreamError] = useState("");
@@ -919,13 +947,13 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
       }
     };
 
-    const intervalId = window.setInterval(() => {
+    const timeoutId = window.setTimeout(() => {
       void refreshSnapshot();
-    }, 3000);
+    }, 1200);
 
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
+      window.clearTimeout(timeoutId);
     };
   }, [sessionId]);
 
@@ -989,6 +1017,8 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
       return undefined;
     }
 
+    const durationMs = getEventEffectDuration(eventEffect);
+
     const showTimer = window.setTimeout(() => {
       setActiveEventEffect(eventEffect);
     }, 0);
@@ -996,7 +1026,7 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
       setActiveEventEffect((current) => {
         return current?.key === eventEffect.key ? null : current;
       });
-    }, 5000);
+    }, durationMs);
 
     return () => {
       window.clearTimeout(showTimer);
@@ -1026,6 +1056,8 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
       return undefined;
     }
 
+    const durationMs = getMomentPopupDuration(popup);
+
     const showTimer = window.setTimeout(() => {
       setActiveMomentPopup(popup);
     }, 0);
@@ -1033,7 +1065,7 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
       setActiveMomentPopup((current) => {
         return current?.key === popup.key ? null : current;
       });
-    }, 8000);
+    }, durationMs);
 
     return () => {
       window.clearTimeout(showTimer);
