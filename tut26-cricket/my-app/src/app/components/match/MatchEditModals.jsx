@@ -597,18 +597,22 @@ export function EditLiveStreamModal({
     }
 
     setError("");
-    await onUpdate({
+    const updatedMatch = await onUpdate({
       liveStreamUrl: trimmedUrl,
     });
-    setShowSavedState(true);
+    if (updatedMatch) {
+      setShowSavedState(true);
+    }
   };
 
   const handleRemoveStream = async () => {
     setError("");
-    await onUpdate({
+    const updatedMatch = await onUpdate({
       liveStreamUrl: "",
     });
-    onClose();
+    if (updatedMatch) {
+      onClose();
+    }
   };
 
   const handleShareSpectatorPage = async () => {
