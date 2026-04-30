@@ -734,9 +734,9 @@ function getModeTheme(mode) {
       glow: "rgba(225,29,46,0.22)",
     },
     live: {
-      accent: "from-[#f7c948] via-[#ffffff] to-[#e11d2e]",
-      panel: "from-[#090909] via-[#111111] to-[#090909]",
-      glow: "rgba(247,201,72,0.18)",
+      accent: "from-[#7d0b13] via-[#e11d2e] to-[#f7c948]",
+      panel: "from-[#090909] via-[#18080c] to-[#090909]",
+      glow: "rgba(225,29,46,0.22)",
     },
   };
 
@@ -844,7 +844,7 @@ function getMomentPopupClasses(type) {
     intro: {
       shell:
         "border-[#f7c948]/20 bg-[linear-gradient(135deg,#151107,#090909_54%,#14090a)] shadow-[0_18px_42px_rgba(0,0,0,0.52)]",
-      accent: "from-[#f7c948] via-[#ffffff] to-[#e11d2e]",
+      accent: "from-[#7d0b13] via-[#e11d2e] to-[#f7c948]",
       title: "text-white",
     },
   };
