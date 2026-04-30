@@ -650,6 +650,7 @@ export function serializeSessionCard(sessionDocument) {
     winningTeamName: session.winningTeamName || "",
     winningScore: Number(session.winningScore || 0),
     winningWickets: Number(session.winningWickets || 0),
+    liveStream: getPublicLiveStream(session),
     createdAt: session.createdAt || null,
     updatedAt: session.updatedAt || null,
   };

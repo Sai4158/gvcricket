@@ -134,6 +134,11 @@ function SessionCard({
     0,
     Number(session.imageCount || matchImages.length || (cardImage ? 1 : 0))
   );
+  const hasLiveStream = Boolean(
+    session?.liveStream?.watchUrl ||
+      session?.liveStream?.embedUrl ||
+      session?.liveStream?.videoId
+  );
   const shouldRenderGallery = shouldLoadGallery || baseGalleryImages.length > 1;
   const resolvedGalleryImages = galleryImages.length
     ? galleryImages
@@ -574,6 +579,12 @@ function SessionCard({
               >
                 {statusMeta.summary}
               </p>
+              {hasLiveStream ? (
+                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-red-400/20 bg-red-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-red-200">
+                  <FaTowerBroadcast className="text-red-300" />
+                  <span>Live streaming now</span>
+                </div>
+              ) : null}
             </div>
           </div>
         )}

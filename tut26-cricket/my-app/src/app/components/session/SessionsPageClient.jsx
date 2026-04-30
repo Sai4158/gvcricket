@@ -614,13 +614,20 @@ export default function SessionsPageClient({
           session._id === sessionId
             ? {
                 ...session,
-                coverImageUrl: updatedMatch?.matchImageUrl || "",
-                matchImageUrl: updatedMatch?.matchImageUrl || "",
-                matchImages: Array.isArray(updatedMatch?.matchImages)
-                  ? updatedMatch.matchImages
-                  : [],
-              }
-            : session,
+              coverImageUrl: updatedMatch?.matchImageUrl || "",
+              matchImageUrl: updatedMatch?.matchImageUrl || "",
+              matchImages: Array.isArray(updatedMatch?.matchImages)
+                ? updatedMatch.matchImages
+                : [],
+              imageCount: Math.max(
+                Array.isArray(updatedMatch?.matchImages)
+                  ? updatedMatch.matchImages.length
+                  : 0,
+                updatedMatch?.matchImageUrl ? 1 : 0,
+              ),
+              liveStream: updatedMatch?.liveStream || null,
+            }
+          : session,
         ),
       );
     },

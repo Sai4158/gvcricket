@@ -160,6 +160,7 @@ function toSessionCard(session) {
     winningTeamName: session?.winningTeamName || "",
     winningScore: Number(session?.winningScore || 0),
     winningWickets: Number(session?.winningWickets || 0),
+    liveStream: session?.liveStream || null,
     createdAt: session?.createdAt || null,
     updatedAt: session?.updatedAt || null,
   });
@@ -275,6 +276,7 @@ export async function loadSessionsIndexPageData(options = {}) {
               winningTeamName: 1,
               winningScore: 1,
               winningWickets: 1,
+              liveStream: 1,
               matchImages: {
                 $slice: [{ $ifNull: ["$matchImages", []] }, 6],
               },
