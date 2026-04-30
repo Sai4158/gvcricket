@@ -73,7 +73,8 @@ export async function POST(req, { params }) {
       },
       { headers: { "Cache-Control": "no-store" } }
     );
-  } catch {
+  } catch (error) {
+    console.error("Walkie toggle failed:", error);
     return jsonError("Could not update walkie-talkie.", 500);
   }
 }

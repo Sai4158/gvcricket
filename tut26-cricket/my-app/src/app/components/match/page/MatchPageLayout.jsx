@@ -360,6 +360,10 @@ export default function MatchPageLayout({
               umpireRemoteSpeakerState.isRemoteTalking,
             )}
             walkieBusyLabel={umpireRemoteSpeakerState.roleLabel}
+            walkieAudienceCount={
+              Number(walkie.snapshot?.spectatorCount || 0) +
+              Number(walkie.snapshot?.directorCount || 0)
+            }
             isCommentaryActive={micMonitor.isActive || micMonitor.isPaused}
             isCommentaryTalking={Boolean(
               micMonitor.isActive && !micMonitor.isPaused,

@@ -1735,7 +1735,11 @@ export default function MatchPageClient({
       `/session/${match.sessionId}/view`,
       window.location.origin,
     );
-    const shareTitle = `${match.innings1.team} vs ${match.innings2.team}`;
+    const teamAName =
+      match.innings1?.team || match.teamAName || "Team A";
+    const teamBName =
+      match.innings2?.team || match.teamBName || "Team B";
+    const shareTitle = `${teamAName} vs ${teamBName}`;
     const shareText = `Follow the live score for ${shareTitle}. Current score: ${match.score}/${match.outs}.`;
 
     if (navigator.share) {

@@ -216,6 +216,8 @@ export default function useWalkieTalkie({
   const hasRemoteAudience = Boolean(
     connectedSpectatorCount + connectedDirectorCount > 0
   );
+  // Keep audio transport warm only when there's an audience to receive it.
+  // This avoids burning Agora minutes when the umpire is alone in the match.
   const keepReadyForTalk = Boolean(
     autoConnectAudio &&
       snapshot.enabled &&
@@ -223,13 +225,15 @@ export default function useWalkieTalkie({
       hasWalkieToken &&
       (role !== "umpire" || hasRemoteAudience)
   );
+  // Allow the umpire to press hold-to-talk even when no spectators have joined
+  // yet so they can self-test the walkie. The audio transport spins up
+  // on-demand for that talk session even though `keepReadyForTalk` is false.
   const canTalk = Boolean(
     enabled &&
       snapshot.enabled &&
       participantId &&
       hasWalkieToken &&
       !claiming &&
-      (role !== "umpire" || hasRemoteAudience) &&
       (!snapshot.busy || snapshot.activeSpeakerId === participantId)
   );
   const isBusy = Boolean(snapshot.busy);

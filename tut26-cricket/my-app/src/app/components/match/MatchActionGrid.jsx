@@ -502,6 +502,7 @@ const MatchActionGrid = memo(function MatchActionGrid({
   isWalkieLoading = false,
   isWalkieBusyByOther = false,
   walkieBusyLabel = "",
+  walkieAudienceCount = 0,
   isCommentaryActive = false,
   isCommentaryTalking = false,
   isAnnounceActive = false,
@@ -615,6 +616,8 @@ const MatchActionGrid = memo(function MatchActionGrid({
                   ? "Connecting"
                   : isWalkieFinishing
                   ? "Connected"
+                  : isWalkieActive && walkieAudienceCount === 0
+                  ? "No listeners"
                   : "Open panel"
               }
               statusClass={
@@ -626,6 +629,8 @@ const MatchActionGrid = memo(function MatchActionGrid({
                   ? "text-sky-100"
                   : isWalkieFinishing
                   ? "text-emerald-100"
+                  : isWalkieActive && walkieAudienceCount === 0
+                  ? "text-amber-200"
                   : "text-zinc-400"
               }
             />

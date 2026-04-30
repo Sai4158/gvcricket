@@ -88,14 +88,25 @@ export async function POST(req) {
     }
   }
 
-  return Response.json(
-    createAgoraRtcToken(parsedRequest.value),
-    {
-      headers: {
-        "Cache-Control": "no-store",
-      },
+  try {
+    return Response.json(
+      createAgoraRtcToken(parsedRequest.value),
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
+  } catch (error) {
+    console.error("Agora RTC token issue failed:", error);
+    if (String(error?.message || "").includes("Agora credentials")) {
+      return jsonError(
+        "Walkie-talkie audio is not configured on the server.",
+        503,
+      );
     }
-  );
+    return jsonError("Could not issue walkie audio token.", 500);
+  }
 }
 
 

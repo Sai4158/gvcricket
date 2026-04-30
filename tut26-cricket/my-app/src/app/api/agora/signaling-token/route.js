@@ -83,21 +83,32 @@ export async function POST(req) {
     }
   }
 
-  return Response.json(
-    {
-      ...createAgoraSignalingToken(parsedRequest.value),
-      participantToken: createWalkieParticipantToken(
-        parsedRequest.value.matchId,
-        parsedRequest.value.participantId,
-        parsedRequest.value.role
-      ),
-    },
-    {
-      headers: {
-        "Cache-Control": "no-store",
+  try {
+    return Response.json(
+      {
+        ...createAgoraSignalingToken(parsedRequest.value),
+        participantToken: createWalkieParticipantToken(
+          parsedRequest.value.matchId,
+          parsedRequest.value.participantId,
+          parsedRequest.value.role
+        ),
       },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
+  } catch (error) {
+    console.error("Agora signaling token issue failed:", error);
+    if (String(error?.message || "").includes("Agora credentials")) {
+      return jsonError(
+        "Walkie-talkie signaling is not configured on the server.",
+        503,
+      );
     }
-  );
+    return jsonError("Could not issue walkie signaling token.", 500);
+  }
 }
 
 
