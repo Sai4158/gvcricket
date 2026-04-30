@@ -152,6 +152,8 @@ export default function YouTubeLiveStreamCard({
   onHoldRemove,
   overlayMatch = null,
   allowTheaterFullscreen = false,
+  videoOnly = false,
+  headerOnly = false,
 }) {
   const holdTimerRef = useRef(null);
   const theaterFrameRef = useRef(null);
@@ -265,6 +267,31 @@ export default function YouTubeLiveStreamCard({
     return null;
   }
 
+  if (videoOnly) {
+    return (
+      <section className={className}>
+        <div
+          ref={theaterFrameRef}
+          className={`overflow-hidden rounded-[28px] border border-white/10 bg-black shadow-[0_20px_60px_rgba(0,0,0,0.34)] ${
+            isTheaterFullscreen ? "h-screen w-screen rounded-none border-0" : ""
+          }`}
+        >
+          <div className={`relative bg-black ${isTheaterFullscreen ? "h-full w-full" : "aspect-video"}`}>
+            {showOverlay ? <SpectatorVideoOverlay match={overlayMatch} /> : null}
+            <iframe
+              src={stream.embedUrl}
+              title={title}
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+              allowFullScreen
+              className="h-full w-full"
+            />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       className={`overflow-hidden rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(255,0,0,0.08),transparent_28%),linear-gradient(180deg,rgba(18,18,22,0.98),rgba(8,9,12,0.99))] shadow-[0_30px_90px_rgba(0,0,0,0.42)] ${className}`}
@@ -346,24 +373,26 @@ export default function YouTubeLiveStreamCard({
             ) : null}
           </div>
         ) : null}
-        <div
-          ref={theaterFrameRef}
-          className={`overflow-hidden rounded-[28px] border border-white/10 bg-black shadow-[0_20px_60px_rgba(0,0,0,0.34)] ${
-            isTheaterFullscreen ? "h-screen w-screen rounded-none border-0" : ""
-          }`}
-        >
-          <div className={`relative bg-black ${isTheaterFullscreen ? "h-full w-full" : "aspect-video"}`}>
-            {showOverlay ? <SpectatorVideoOverlay match={overlayMatch} /> : null}
-            <iframe
-              src={stream.embedUrl}
-              title={title}
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-              allowFullScreen
-              className="h-full w-full"
-            />
+        {!headerOnly ? (
+          <div
+            ref={theaterFrameRef}
+            className={`overflow-hidden rounded-[28px] border border-white/10 bg-black shadow-[0_20px_60px_rgba(0,0,0,0.34)] ${
+              isTheaterFullscreen ? "h-screen w-screen rounded-none border-0" : ""
+            }`}
+          >
+            <div className={`relative bg-black ${isTheaterFullscreen ? "h-full w-full" : "aspect-video"}`}>
+              {showOverlay ? <SpectatorVideoOverlay match={overlayMatch} /> : null}
+              <iframe
+                src={stream.embedUrl}
+                title={title}
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                allowFullScreen
+                className="h-full w-full"
+              />
+            </div>
           </div>
-        </div>
+        ) : null}
 
         {actionButtons.length ? (
           <div className="mt-5 flex flex-wrap justify-end gap-3">

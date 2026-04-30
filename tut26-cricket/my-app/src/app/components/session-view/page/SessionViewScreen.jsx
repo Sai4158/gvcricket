@@ -2025,13 +2025,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
         trackerHistory={trackerHistory}
         activeOverBalls={match?.activeOverBalls || []}
         activeOverNumber={match?.activeOverNumber || 1}
-        liveStreamCard={
+        liveStreamCard={null}
+        liveStreamVideo={
           match?.liveStream ? (
             <YouTubeLiveStreamCard
               stream={match.liveStream}
-              title="Live Match Stream"
-              subtitle="Watch the YouTube live stream before following the score below."
-              allowTheaterFullscreen
+              title="Live Match Stream Video"
+              videoOnly
+              className="w-full"
             />
           ) : null
         }
