@@ -43,6 +43,7 @@ import { duckPageMedia, restorePageMedia } from "../../../lib/page-audio";
 import { buildShareUrl } from "../../../lib/site-metadata";
 import OptionalFeatureBoundary from "../../shared/OptionalFeatureBoundary";
 import SiteFooter from "../../shared/SiteFooter";
+import StreamingOverlayAccessCard from "../../shared/StreamingOverlayAccessCard";
 import YouTubeLiveStreamCard from "../../shared/YouTubeLiveStreamCard";
 import { useRouteFeedback } from "../../shared/RouteFeedbackProvider";
 import { navigateToSessions } from "./result-navigation";
@@ -2031,16 +2032,6 @@ export default function SessionViewClient({ sessionId, initialData }) {
               title="Live Match Stream"
               subtitle="Watch the YouTube live stream before following the score below."
               allowTheaterFullscreen
-              overlayAccess={
-                overlayUrl
-                  ? {
-                      overlayUrl,
-                      onCopy: handleCopyOverlayLink,
-                      onOpen: handleOpenOverlayLink,
-                      copied: overlayCopied,
-                    }
-                  : null
-              }
             />
           ) : null
         }
@@ -2137,6 +2128,17 @@ export default function SessionViewClient({ sessionId, initialData }) {
         walkieNoticeText={walkieNoticeText}
         walkie={walkie}
       />
+      {overlayUrl ? (
+        <section className="mt-12 w-full max-w-4xl">
+          <StreamingOverlayAccessCard
+            overlayUrl={overlayUrl}
+            onCopy={handleCopyOverlayLink}
+            onOpen={handleOpenOverlayLink}
+            copied={overlayCopied}
+            description="Open this live-score overlay for streaming."
+          />
+        </section>
+      ) : null}
       <audio ref={soundEffectsAudioRef} hidden />
       <SiteFooter className="mt-16" />
     </main>

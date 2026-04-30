@@ -878,6 +878,52 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
     },
   });
 
+  useEffect(() => {
+    if (!sessionId || typeof window === "undefined") {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const refreshSnapshot = async () => {
+      try {
+        const response = await fetch(
+          `/api/live/sessions/${sessionId}?snapshot=1`,
+          {
+            cache: "no-store",
+          },
+        );
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = await response.json().catch(() => null);
+        if (!payload || cancelled) {
+          return;
+        }
+
+        applySessionStreamPayload({
+          payload,
+          lastSignatureRef,
+          setData,
+          setStreamError,
+          getSignature: buildOverlaySignature,
+        });
+      } catch {
+        // Leave SSE as the primary path and ignore fallback polling errors.
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void refreshSnapshot();
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [sessionId]);
+
   const session = data?.session || null;
   const match = data?.match || null;
   const teamA = useMemo(

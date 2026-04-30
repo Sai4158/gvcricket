@@ -162,6 +162,36 @@ function getLatestIsoTimestamp(...values) {
 
 export async function GET(request, { params }) {
   const { id } = await params;
+
+  if (request.nextUrl.searchParams.get("snapshot") === "1") {
+    try {
+      await connectDB();
+      const snapshot = await getCachedLiveSessionSnapshot(id, { force: true });
+      return Response.json(
+        {
+          ...snapshot.payload,
+          updatedAt: snapshot.updatedAt,
+        },
+        {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        },
+      );
+    } catch {
+      return new Response(
+        JSON.stringify({ message: "Live session snapshot unavailable." }),
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+          },
+        },
+      );
+    }
+  }
+
   const encoder = new TextEncoder();
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
