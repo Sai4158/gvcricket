@@ -133,6 +133,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const pendingDerivedScoreSoundRef = useRef(null);
   const handledDerivedScoreSoundActionIdsRef = useRef(new Map());
   const pendingResultNavigationRef = useRef("");
+  const bottomAnchorRef = useRef(null);
   const requestedHistoryVersionRef = useRef("");
   const inningsGridRef = useRef(null);
   const router = useRouter();
@@ -1498,10 +1499,15 @@ export default function SessionViewClient({ sessionId, initialData }) {
       return;
     }
 
-    window.scrollTo({
-      top: document.documentElement.scrollHeight,
-      behavior: "smooth",
-    });
+    const scrollToBottomAnchor = () => {
+      bottomAnchorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+      });
+    };
+
+    scrollToBottomAnchor();
+    window.requestAnimationFrame(scrollToBottomAnchor);
   }, []);
 
   const ensureSpectatorAnnouncerReady = useCallback(
@@ -2152,6 +2158,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
           />
         </section>
       ) : null}
+      <div ref={bottomAnchorRef} aria-hidden="true" className="h-px w-full" />
       <audio ref={soundEffectsAudioRef} hidden />
       <SiteFooter className="mt-16" />
     </main>

@@ -122,13 +122,6 @@ export default async function ResultPage({ params }) {
   if (!initialMatch) {
     notFound();
   }
-  if (initialMatch.pendingResult && !initialMatch.result) {
-    redirect(
-      initialMatch.sessionId
-        ? `/session/${initialMatch.sessionId}/view`
-        : `/match/${id}`,
-    );
-  }
 
   return <ResultPageClient matchId={id} initialMatch={initialMatch} />;
 }

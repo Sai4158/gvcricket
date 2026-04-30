@@ -48,6 +48,7 @@ export function normalizeResultMatch(match) {
 
   return {
     ...match,
+    result: String(match?.result || match?.pendingResult || "").trim(),
     innings1: normalizeInnings(match?.innings1),
     innings2: normalizeInnings(match?.innings2),
     matchImages: Array.isArray(match?.matchImages) ? match.matchImages : [],
