@@ -18,6 +18,10 @@ import { applySessionStreamPayload } from "../session-view/page/stream-hydration
 import { getBattingTeamBundle, getTeamBundle } from "../../lib/team-utils";
 import { isTiedMatchResult } from "../../lib/match-result-display";
 import { buildLiveScoreAnnouncementSequence } from "../../lib/live-announcements";
+import {
+  calculateInningsSummary,
+  calculateTrackedPlayerStats,
+} from "../../lib/match-stats";
 
 function formatOversFromBalls(legalBallCount) {
   const safeBalls = Math.max(0, Number(legalBallCount || 0));
@@ -34,11 +38,7 @@ function shortenTeamName(value = "") {
     return "TEAM";
   }
 
-  if (safeValue.length <= 14) {
-    return safeValue.toUpperCase();
-  }
-
-  return safeValue.slice(0, 12).trimEnd().toUpperCase();
+  return safeValue.toUpperCase();
 }
 
 function compactLabel(value = "", maxLength = 18) {
@@ -518,6 +518,82 @@ function buildMatchIntroPopup(match, teamA, teamB) {
   };
 }
 
+function getInningsPlayers(match, inningsKey, teamA, teamB) {
+  const inningsTeam = String(match?.[inningsKey]?.team || "").trim();
+  if (inningsTeam && inningsTeam === teamA?.name) {
+    return Array.isArray(teamA?.players) ? teamA.players : [];
+  }
+  if (inningsTeam && inningsTeam === teamB?.name) {
+    return Array.isArray(teamB?.players) ? teamB.players : [];
+  }
+
+  return inningsKey === "innings2"
+    ? Array.isArray(teamB?.players)
+      ? teamB.players
+      : []
+    : Array.isArray(teamA?.players)
+      ? teamA.players
+      : [];
+}
+
+function buildBattingCardPopup(match, teamA, teamB) {
+  const eventType = String(match?.lastLiveEvent?.type || "").trim();
+  const hasResult = Boolean(String(match?.result || "").trim());
+  const inningsKey =
+    eventType === "innings_change"
+      ? "innings1"
+      : hasResult || eventType === "match_end" || eventType === "target_chased"
+        ? Array.isArray(match?.innings2?.history) && match.innings2.history.length
+          ? "innings2"
+          : "innings1"
+        : "";
+
+  if (!inningsKey) {
+    return null;
+  }
+
+  const innings = match?.[inningsKey];
+  if (!innings) {
+    return null;
+  }
+
+  const players = getInningsPlayers(match, inningsKey, teamA, teamB);
+  const tracked = calculateTrackedPlayerStats(innings, players);
+  if (!Array.isArray(tracked?.battingStats) || !tracked.battingStats.length) {
+    return null;
+  }
+
+  const inningsSummary = calculateInningsSummary(innings);
+  const teamName = String(innings?.team || "Batting card").trim();
+  const displayedRows = tracked.battingStats.slice(0, 11);
+  const battingRuns = displayedRows.reduce(
+    (total, player) => total + Number(player?.runs || 0),
+    0,
+  );
+  const extras = Math.max(Number(innings?.score || 0) - battingRuns, 0);
+  const wickets =
+    displayedRows.filter((player) => String(player?.status || "").toLowerCase() === "out")
+      .length || Number(match?.outs || 0);
+  const scoreText = `${Number(innings?.score || 0)}-${wickets}`;
+  const footerText =
+    eventType === "innings_change"
+      ? `${String(match?.innings2?.team || teamB?.name || "Chasing team").trim()} need ${Number(innings?.score || 0) + 1}`
+      : String(match?.result || "Live batting card").trim();
+
+  return {
+    key: `batting-card-${match?.lastLiveEvent?.id || match?._id || inningsKey}`,
+    type: "batting-card",
+    teamName,
+    title: teamName,
+    subtitle: eventType === "innings_change" ? "Innings complete" : "Batting scorecard",
+    rows: displayedRows,
+    extras,
+    overs: inningsSummary.overs || formatOversFromBalls(innings?.legalBallCount || 0),
+    total: scoreText,
+    footer: footerText,
+  };
+}
+
 function resolveEventEffect(event) {
   if (!event || event.type !== "score_update") {
     return null;
@@ -891,6 +967,7 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
     const liveTeamA = getTeamBundle(match || {}, "teamA");
     const liveTeamB = getTeamBundle(match || {}, "teamB");
     const popup =
+      buildBattingCardPopup(match, liveTeamA, liveTeamB) ||
       buildResultPopup(match, getWinnerName(match)) ||
       buildInningsPopup(match) ||
       buildOverPopup(match, liveTargetRuns, liveChaseRunsLeft, liveBallsLeft);
@@ -1058,9 +1135,21 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
     targetRuns > 0
       ? `Runs ${chaseRunsLeft} | Balls ${inningsBallsLeft}`
       : `${totalOvers} overs match`;
-  const momentClasses = activeMomentPopup
-    ? getMomentPopupClasses(activeMomentPopup.type)
+  const visibleMomentPopup =
+    activeMomentPopup?.type === "over" &&
+    match?.lastLiveEvent?.type === "score_update" &&
+    !match?.lastLiveEvent?.overCompleted
+      ? null
+      : activeMomentPopup;
+  const momentClasses = visibleMomentPopup
+    ? getMomentPopupClasses(visibleMomentPopup.type)
     : getMomentPopupClasses("over");
+  const popupFrameClass =
+    visibleMomentPopup?.type === "batting-card"
+      ? "min-w-[1080px] max-w-[92vw] rounded-[20px] px-0 py-0"
+      : visibleMomentPopup?.type === "over"
+      ? "min-w-[760px] max-w-[88vw] rounded-[16px] px-10 py-6 md:min-w-[980px] md:px-14 md:py-7"
+      : "min-w-[520px] max-w-[78vw] rounded-[26px] px-8 py-5";
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-transparent text-white">
@@ -1178,12 +1267,7 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
             >
               <div className="absolute inset-y-0 left-0 w-10 bg-white/14 blur-xl" />
               <span className="overlay-event-shine" />
-              <p className="relative z-10 text-[10px] font-black uppercase tracking-[0.34em] text-white/72 md:text-[12px] xl:text-[14px]">
-                {activeEventEffect.tone === "wicket"
-                  ? "Big moment"
-                  : "Boundary"}
-              </p>
-              <p className="relative z-10 mt-1 text-3xl font-black uppercase tracking-[0.2em] text-white md:text-5xl xl:text-7xl">
+              <p className="relative z-10 text-3xl font-black uppercase tracking-[0.2em] text-white md:text-5xl xl:text-7xl">
                 {activeEventEffect.label}
               </p>
             </motion.div>
@@ -1192,9 +1276,9 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
       </AnimatePresence>
 
       <AnimatePresence mode="wait">
-        {activeMomentPopup ? (
+        {visibleMomentPopup ? (
           <motion.section
-            key={activeMomentPopup.key}
+            key={visibleMomentPopup.key}
             className="pointer-events-none absolute inset-x-0 top-[20%] z-40 flex justify-center px-6"
             initial={
               shouldReduceMotion ? false : { opacity: 0, y: 24, scale: 0.96 }
@@ -1212,41 +1296,124 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
             transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
           >
             <div
-              className={`relative min-w-[520px] max-w-[78vw] overflow-hidden rounded-[26px] border px-8 py-5 text-center ${momentClasses.shell}`}
+              className={`relative overflow-hidden border text-center ${popupFrameClass} ${momentClasses.shell}`}
             >
-              <div
-                className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${momentClasses.accent}`}
-              />
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,var(--mode-glow),transparent_58%)]" />
-              <span className="overlay-popup-scan" />
-              <div className="relative z-10">
-                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#f7c948]">
-                  {activeMomentPopup.eyebrow}
-                </p>
-                <p
-                  className={`mt-1 text-[3rem] font-black uppercase leading-none md:text-[3.8rem] ${momentClasses.title}`}
-                >
-                  {activeMomentPopup.title}
-                </p>
-                <p className="mt-2 text-[1.05rem] font-black uppercase text-white md:text-[1.18rem]">
-                  {activeMomentPopup.meta}
-                </p>
-                <div className="mt-3 flex items-center justify-center gap-4 text-[0.82rem] font-black uppercase tracking-[0.14em] text-white/76 md:text-[0.92rem]">
-                  {activeMomentPopup.summaryLeft ? (
-                    <span>{activeMomentPopup.summaryLeft}</span>
-                  ) : null}
-                  {activeMomentPopup.summaryLeft &&
-                  activeMomentPopup.summaryRight ? (
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#f7c948]" />
-                  ) : null}
-                  {activeMomentPopup.summaryRight ? (
-                    <span>{activeMomentPopup.summaryRight}</span>
-                  ) : null}
+              {visibleMomentPopup.type === "batting-card" ? (
+                <div className="relative z-10 overflow-hidden rounded-[20px] bg-[linear-gradient(180deg,#130708,#26090d)] text-left shadow-[0_28px_80px_rgba(0,0,0,0.55)]">
+                  <div className="bg-[linear-gradient(90deg,#570d12,#a5121e,#570d12)] px-8 py-5 md:px-10">
+                    <div className="flex items-center gap-5">
+                      <div className="relative h-16 w-16 shrink-0 rounded-full border border-white/20 bg-black/20 shadow-[0_0_22px_rgba(239,68,68,0.25)] md:h-20 md:w-20">
+                        <Image
+                          src="/gvLogo.png"
+                          alt="GV Cricket"
+                          fill
+                          sizes="80px"
+                          className="scale-[1.12] object-contain p-2"
+                          priority
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="rounded-[18px] border border-white/16 bg-black/30 px-5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                          <p className="truncate text-[2rem] font-black uppercase leading-none text-white md:text-[3rem]">
+                            {visibleMomentPopup.teamName}
+                          </p>
+                        </div>
+                        <p className="mt-3 text-[0.92rem] font-black uppercase tracking-[0.16em] text-white/78 md:text-[1.05rem]">
+                          {visibleMomentPopup.subtitle}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-[1.6fr_1fr_110px_110px] border-y border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))] px-8 py-2 text-[0.8rem] font-black uppercase tracking-[0.14em] text-white/84 md:px-10 md:text-[0.95rem]">
+                    <span>Batter</span>
+                    <span>Status</span>
+                    <span className="text-center">Runs</span>
+                    <span className="text-center">Balls</span>
+                  </div>
+                  <div className="bg-[linear-gradient(180deg,rgba(0,0,0,0.12),rgba(255,255,255,0.02))] px-8 py-2 md:px-10">
+                    {visibleMomentPopup.rows.map((player, index) => {
+                      const isNotOut = String(player?.status || "").toLowerCase() === "not out";
+                      return (
+                        <div
+                          key={`batting-card-row-${player.name}-${index}`}
+                          className={`grid grid-cols-[1.6fr_1fr_110px_110px] items-center border-b border-white/8 px-2 py-2.5 text-[0.95rem] md:text-[1.15rem] ${
+                            isNotOut
+                              ? "bg-[linear-gradient(90deg,rgba(185,28,28,0.55),rgba(127,29,29,0.38))]"
+                              : "bg-transparent"
+                          }`}
+                        >
+                          <span className="truncate font-black uppercase text-white">
+                            {player.name}
+                          </span>
+                          <span className="truncate uppercase text-white/80">
+                            {player.status}
+                          </span>
+                          <span className="text-center font-black text-white">
+                            {player.runs}
+                          </span>
+                          <span className="text-center text-white/86">
+                            {player.balls}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="grid grid-cols-[150px_1fr_190px_220px] items-center border-t border-white/12 bg-[linear-gradient(180deg,#e5e7eb,#a1a1aa)] px-8 py-3 text-black md:px-10">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[1rem] font-black uppercase">Extras</span>
+                      <span className="text-[1.1rem] font-black">{visibleMomentPopup.extras}</span>
+                    </div>
+                    <div className="text-center text-[1rem] font-black uppercase">
+                      Overs {visibleMomentPopup.overs}
+                    </div>
+                    <div className="text-center text-[1rem] font-black uppercase">
+                      Total
+                    </div>
+                    <div className="text-right text-[2rem] font-black uppercase">
+                      {visibleMomentPopup.total}
+                    </div>
+                  </div>
+                  <div className="border-t border-white/8 bg-black/28 px-8 py-3 text-center text-[0.9rem] font-black uppercase tracking-[0.12em] text-white/84 md:px-10">
+                    {visibleMomentPopup.footer}
+                  </div>
                 </div>
-                <p className="mt-2 text-[0.82rem] font-bold uppercase tracking-[0.14em] text-white/78 md:text-[0.92rem]">
-                  {activeMomentPopup.detail}
-                </p>
-              </div>
+              ) : (
+                <>
+                  <div
+                    className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${momentClasses.accent}`}
+                  />
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,var(--mode-glow),transparent_58%)]" />
+                  <span className="overlay-popup-scan" />
+                  <div className="relative z-10">
+                    <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#f7c948]">
+                      {visibleMomentPopup.eyebrow}
+                    </p>
+                    <p
+                      className={`mt-1 text-[3rem] font-black uppercase leading-none md:text-[3.8rem] ${momentClasses.title}`}
+                    >
+                      {visibleMomentPopup.title}
+                    </p>
+                    <p className="mt-2 text-[1.05rem] font-black uppercase text-white md:text-[1.18rem]">
+                      {visibleMomentPopup.meta}
+                    </p>
+                    <div className="mt-3 flex items-center justify-center gap-4 text-[0.82rem] font-black uppercase tracking-[0.14em] text-white/76 md:text-[0.92rem]">
+                      {visibleMomentPopup.summaryLeft ? (
+                        <span>{visibleMomentPopup.summaryLeft}</span>
+                      ) : null}
+                      {visibleMomentPopup.summaryLeft &&
+                      visibleMomentPopup.summaryRight ? (
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#f7c948]" />
+                      ) : null}
+                      {visibleMomentPopup.summaryRight ? (
+                        <span>{visibleMomentPopup.summaryRight}</span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 text-[0.82rem] font-bold uppercase tracking-[0.14em] text-white/78 md:text-[0.92rem]">
+                      {visibleMomentPopup.detail}
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           </motion.section>
         ) : null}
@@ -1279,69 +1446,57 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
 
             <div className="grid min-h-[68px] items-stretch gap-0 sm:grid-cols-[0.9fr_0.78fr_1.2fr] md:min-h-[78px] xl:min-h-[88px] xl:grid-cols-[0.94fr_0.96fr_1fr]">
               <div className="flex min-w-0 items-center border-r border-white/10 px-3 py-1.5 md:px-6 xl:px-12">
-                <div className="flex w-full items-center justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
-                      <p className="pb-0.5 text-[7px] font-black uppercase tracking-[0.2em] text-[#f7c948] md:text-[9px] xl:text-[10px]">
-                        Batting
-                      </p>
-                      <motion.p
-                        key={battingShort}
-                        className="truncate text-[1.25rem] font-black uppercase leading-none text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)] md:text-[1.75rem] xl:text-[2.2rem]"
-                        initial={
-                          shouldReduceMotion ? false : { opacity: 0, x: -10 }
-                        }
-                        animate={
-                          shouldReduceMotion
-                            ? { opacity: 1 }
-                            : { opacity: 1, x: 0 }
-                        }
-                        transition={{ duration: 0.22 }}
-                      >
-                        {battingShort}
-                      </motion.p>
-                    </div>
-                    <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-[0.62rem] font-black uppercase tracking-[0.06em] text-white/90 md:text-[0.76rem] xl:text-[0.92rem]">
-                      {strikerLabel ? (
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          <span className="text-[#f7c948]">Striker</span>
-                          <span className="truncate text-white">
-                            {strikerLabel}
-                          </span>
-                        </div>
-                      ) : null}
-                      {bowlerLabel ? (
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          <span className="text-[#f7c948]">Bowler</span>
-                          <span className="truncate text-white">
-                            {bowlerLabel}
-                          </span>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[0.55rem] font-black uppercase tracking-[0.08em] text-white/68 md:text-[0.65rem] xl:text-[0.74rem]">
-                    <span>
-                      {match?.innings === "second"
-                        ? "Chasing"
-                        : "Batting first"}
-                    </span>
-                    <span className="h-1 w-1 rounded-full bg-[#f7c948]" />
-                    <span>
-                      {targetRuns > 0
-                        ? `${chaseRunsLeft} to win`
-                        : `${totalOvers} overs total`}
-                    </span>
-                    {match?.tossWinner ? (
-                      <>
-                        <span className="h-1 w-1 rounded-full bg-[#f7c948]" />
+                <div className="flex w-full items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <p className="text-[7px] font-black uppercase tracking-[0.2em] text-[#f7c948] md:text-[9px] xl:text-[10px]">
+                      Batting
+                    </p>
+                    <motion.p
+                      key={battingShort}
+                      className="break-words text-[1.1rem] font-black uppercase leading-none text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)] md:text-[1.55rem] xl:text-[1.95rem]"
+                      initial={
+                        shouldReduceMotion ? false : { opacity: 0, x: -10 }
+                      }
+                      animate={
+                        shouldReduceMotion ? { opacity: 1 } : { opacity: 1, x: 0 }
+                      }
+                      transition={{ duration: 0.22 }}
+                    >
+                      {battingShort}
+                    </motion.p>
+                    {(strikerLabel || bowlerLabel) ? (
+                      <div className="flex min-w-0 flex-col gap-1 text-[0.58rem] font-black uppercase tracking-[0.06em] text-white/90 md:text-[0.72rem] xl:text-[0.84rem]">
+                        {strikerLabel ? (
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <span className="shrink-0 text-[#f7c948]">Striker</span>
+                            <span className="truncate text-white">{strikerLabel}</span>
+                          </div>
+                        ) : null}
+                        {bowlerLabel ? (
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <span className="shrink-0 text-[#f7c948]">Bowler</span>
+                            <span className="truncate text-white">{bowlerLabel}</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <div className="flex min-w-0 flex-col gap-1 text-[0.52rem] font-black uppercase tracking-[0.08em] text-white/68 md:text-[0.62rem] xl:text-[0.72rem]">
+                      <span>
+                        {match?.innings === "second" ? "Chasing" : "Batting first"}
+                      </span>
+                      <span>
+                        {targetRuns > 0
+                          ? `${chaseRunsLeft} to win`
+                          : `${totalOvers} overs total`}
+                      </span>
+                      {match?.tossWinner ? (
                         <span className="truncate">
                           {`${compactLabel(match.tossWinner, 12)} ${buildTossDecisionText(match?.tossDecision)}`}
                         </span>
-                      </>
-                    ) : null}
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="relative ml-2 h-14 w-14 shrink-0 drop-shadow-[0_0_24px_rgba(225,29,46,0.36)] md:h-[70px] md:w-[70px] xl:h-[86px] xl:w-[86px]">
+                  <div className="relative mt-1 h-14 w-14 shrink-0 drop-shadow-[0_0_24px_rgba(225,29,46,0.36)] md:h-[70px] md:w-[70px] xl:h-[86px] xl:w-[86px]">
                     <Image
                       src="/gvLogo.png"
                       alt="GV Cricket"
@@ -1391,7 +1546,7 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
 
               <div className="flex min-w-0 items-center px-3 py-1.5 md:px-5 xl:px-12">
                 <div className="w-full">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                     <div className="flex items-center gap-2">
                       <span className="text-[7px] font-black uppercase tracking-[0.18em] text-[#f7c948] md:text-[9px] xl:text-[10px]">
                         Over
@@ -1400,7 +1555,7 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
                         {currentOverLabel}
                       </span>
                     </div>
-                    <div className="flex min-w-0 items-center gap-1.5 text-[0.58rem] font-black uppercase text-white/90 md:text-[0.7rem] xl:gap-2 xl:text-[0.82rem]">
+                    <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 text-[0.58rem] font-black uppercase text-white/90 md:text-[0.7rem] xl:gap-2 xl:text-[0.82rem]">
                       <span>{currentOverTotals.runs} runs</span>
                       <span className="h-1 w-1 rounded-full bg-[#f7c948]" />
                       <span>{currentOverTotals.wickets} wkts</span>
@@ -1408,23 +1563,23 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
                       <span>{ballsLeftInOver} left</span>
                     </div>
                   </div>
-                  <div className="mt-1 flex min-w-0 items-center justify-between gap-3 text-[0.5rem] font-black uppercase tracking-[0.08em] text-white/68 md:text-[0.62rem] xl:text-[0.72rem]">
-                    <span className="truncate">{chaseLineText}</span>
-                    <span className="truncate text-right">
+                  <div className="mt-1 flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[0.5rem] font-black uppercase tracking-[0.08em] text-white/68 md:text-[0.62rem] xl:text-[0.72rem]">
+                    <span className="min-w-0 flex-1 truncate">{chaseLineText}</span>
+                    <span className="shrink-0 text-right">
                       {match?.innings === "second"
                         ? "Second innings"
                         : "First innings"}
                     </span>
                   </div>
-                  <div className="mt-1.5 flex items-start gap-3">
+                  <div className="mt-1.5 flex min-w-0 items-start gap-3">
                     <div className="min-w-0 flex-1 space-y-1">
                       {recentOversDisplay.length ? (
                         recentOversDisplay.map((over, overIndex) => (
                           <div
                             key={`recent-over-${over.overNumber}-${overIndex}`}
-                            className="flex items-center justify-between gap-3"
+                            className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5"
                           >
-                            <div className="flex items-center gap-2">
+                            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                               <span className="text-[0.52rem] font-black uppercase tracking-[0.18em] text-[#f7c948] md:text-[0.62rem] xl:text-[0.72rem]">
                                 Over {over.overNumber}
                               </span>
@@ -1437,7 +1592,7 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
                                 </span>
                               ) : null}
                             </div>
-                            <div className="flex min-h-[26px] items-start justify-end gap-1.5 md:min-h-[30px] md:gap-2">
+                            <div className="flex min-h-[26px] min-w-0 flex-wrap items-start justify-end gap-1.5 md:min-h-[30px] md:gap-2">
                               {over.values.map((value, valueIndex) => (
                                 <div
                                   key={`recent-over-ball-${over.overNumber}-${valueIndex}`}
@@ -1452,7 +1607,7 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
                           </div>
                         ))
                       ) : currentOverSummary.length ? (
-                        <div className="flex min-h-[38px] items-start justify-center gap-1.5 md:min-h-[46px] md:gap-2 xl:min-h-[54px] xl:gap-3">
+                        <div className="flex min-h-[38px] min-w-0 flex-wrap items-start justify-start gap-1.5 md:min-h-[46px] md:gap-2 xl:min-h-[54px] xl:gap-3">
                           {currentOverSummary.map((ball, index) => (
                             <motion.div
                               key={`${ball.top}-${ball.bottom}-${index}`}
