@@ -880,11 +880,159 @@ function getMomentPopupDuration(popup) {
   return 8000;
 }
 
+function buildLastBallHeadline(match) {
+  const event = match?.lastLiveEvent || null;
+  if (event?.type !== "score_update" || !event?.ball) {
+    return null;
+  }
+
+  const ball = event.ball;
+  const runs = Number(ball?.runs || 0);
+  const totalRuns =
+    runs +
+    (ball?.extraType === "wide" || ball?.extraType === "noball" ? 1 : 0);
+
+  if (ball?.isOut) {
+    return {
+      key: `event-${event.id}`,
+      label: totalRuns > 0 ? `${totalRuns} and out` : "Wicket",
+      detail: `${Number(match?.score || 0)}/${Number(match?.outs || 0)} after ${formatOversFromBalls(match?.legalBallCount)} overs`,
+    };
+  }
+
+  if (ball?.extraType === "wide") {
+    return {
+      key: `event-${event.id}`,
+      label: "Wide ball",
+      detail: `${totalRuns} run added. ${Number(match?.score || 0)}/${Number(match?.outs || 0)}`,
+    };
+  }
+
+  if (ball?.extraType === "noball") {
+    return {
+      key: `event-${event.id}`,
+      label: "No ball",
+      detail: `${totalRuns} run added. ${Number(match?.score || 0)}/${Number(match?.outs || 0)}`,
+    };
+  }
+
+  if (runs >= 6) {
+    return {
+      key: `event-${event.id}`,
+      label: "Six runs",
+      detail: `${Number(match?.score || 0)}/${Number(match?.outs || 0)} after ${formatOversFromBalls(match?.legalBallCount)} overs`,
+    };
+  }
+
+  if (runs === 4) {
+    return {
+      key: `event-${event.id}`,
+      label: "Four runs",
+      detail: `${Number(match?.score || 0)}/${Number(match?.outs || 0)} after ${formatOversFromBalls(match?.legalBallCount)} overs`,
+    };
+  }
+
+  return {
+    key: `event-${event.id}`,
+    label: `${totalRuns} run${totalRuns === 1 ? "" : "s"} scored`,
+    detail: `${Number(match?.score || 0)}/${Number(match?.outs || 0)} after ${formatOversFromBalls(match?.legalBallCount)} overs`,
+  };
+}
+
+function buildOverlayInsights({
+  match,
+  targetRuns,
+  chaseRunsLeft,
+  inningsBallsLeft,
+  currentOverTotals,
+  currentOverLabel,
+  recentOversDisplay,
+  strikerLabel,
+  bowlerLabel,
+}) {
+  if (!match) {
+    return [];
+  }
+
+  const insights = [];
+  const lastBallHeadline = buildLastBallHeadline(match);
+  if (lastBallHeadline) {
+    insights.push(lastBallHeadline);
+  }
+
+  if (targetRuns > 0 && match?.innings === "second") {
+    insights.push({
+      key: "target-pressure",
+      label: `${chaseRunsLeft} to win`,
+      detail: `${inningsBallsLeft} balls left in the chase`,
+    });
+
+    insights.push({
+      key: "required-rate",
+      label: `Req rate ${calculateRequiredRate(chaseRunsLeft, inningsBallsLeft)}`,
+      detail: `Target ${targetRuns} | Score ${Number(match?.score || 0)}/${Number(match?.outs || 0)}`,
+    });
+  } else {
+    insights.push({
+      key: "innings-build",
+      label: `${Number(match?.score || 0)} on the board`,
+      detail: `${inningsBallsLeft} balls left in the innings`,
+    });
+
+    insights.push({
+      key: "run-rate",
+      label: `Run rate ${calculateRunRateFromBalls(match?.score, match?.legalBallCount)}`,
+      detail: `${Number(match?.outs || 0)} wicket${Number(match?.outs || 0) === 1 ? "" : "s"} down after ${formatOversFromBalls(match?.legalBallCount)}`,
+    });
+  }
+
+  insights.push({
+    key: "current-over",
+    label: `Over ${currentOverLabel} moving`,
+    detail: `${currentOverTotals.runs} run${currentOverTotals.runs === 1 ? "" : "s"} and ${currentOverTotals.wickets} wicket${currentOverTotals.wickets === 1 ? "" : "s"} in this over`,
+  });
+
+  if (recentOversDisplay?.[0]) {
+    insights.push({
+      key: `recent-over-${recentOversDisplay[0].overNumber}`,
+      label: `Over ${recentOversDisplay[0].overNumber} recap`,
+      detail: `${recentOversDisplay[0].runs} run${recentOversDisplay[0].runs === 1 ? "" : "s"}${recentOversDisplay[0].wickets ? `, ${recentOversDisplay[0].wickets} wicket${recentOversDisplay[0].wickets === 1 ? "" : "s"}` : ""}`,
+    });
+  }
+
+  if (strikerLabel) {
+    insights.push({
+      key: `striker-${strikerLabel}`,
+      label: `${strikerLabel} on strike`,
+      detail:
+        targetRuns > 0 && match?.innings === "second"
+          ? `${chaseRunsLeft} still needed from ${inningsBallsLeft} balls`
+          : `${Number(match?.score || 0)}/${Number(match?.outs || 0)} after ${formatOversFromBalls(match?.legalBallCount)}`,
+    });
+  }
+
+  if (bowlerLabel) {
+    insights.push({
+      key: `bowler-${bowlerLabel}`,
+      label: `${bowlerLabel} bowling now`,
+      detail: `${ballsLeftInOver(match)} ball${ballsLeftInOver(match) === 1 ? "" : "s"} left in over ${currentOverLabel}`,
+    });
+  }
+
+  return insights.filter(
+    (insight, index, items) =>
+      insight?.label &&
+      insight?.detail &&
+      items.findIndex((item) => item.key === insight.key) === index,
+  );
+}
+
 export default function SessionOverlayClient({ sessionId, initialData }) {
   const [data, setData] = useState(initialData || null);
   const [streamError, setStreamError] = useState("");
   const [activeEventEffect, setActiveEventEffect] = useState(null);
   const [activeMomentPopup, setActiveMomentPopup] = useState(null);
+  const [overlayInsightIndex, setOverlayInsightIndex] = useState(0);
   const lastSignatureRef = useRef(buildOverlaySignature(initialData));
   const lastAnnouncedEventRef = useRef("");
   const lastIntroPopupRef = useRef("");
@@ -1218,6 +1366,40 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
     targetRuns > 0
       ? `Runs ${chaseRunsLeft} | Balls ${inningsBallsLeft}`
       : `${totalOvers} overs match`;
+  const overlayInsights = useMemo(
+    () =>
+      buildOverlayInsights({
+        match,
+        targetRuns,
+        chaseRunsLeft,
+        inningsBallsLeft,
+        currentOverTotals,
+        currentOverLabel,
+        recentOversDisplay,
+        strikerLabel,
+        bowlerLabel,
+      }),
+    [
+      match,
+      targetRuns,
+      chaseRunsLeft,
+      inningsBallsLeft,
+      currentOverTotals,
+      currentOverLabel,
+      recentOversDisplay,
+      strikerLabel,
+      bowlerLabel,
+    ],
+  );
+  const overlayInsightSignature = overlayInsights
+    .map((insight) => insight.key)
+    .join("|");
+  const activeOverlayInsight =
+    overlayInsights[
+      overlayInsights.length
+        ? overlayInsightIndex % overlayInsights.length
+        : 0
+    ] || null;
   const visibleMomentPopup =
     activeMomentPopup?.type === "over" &&
     match?.lastLiveEvent?.type === "score_update" &&
@@ -1233,6 +1415,26 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
       : visibleMomentPopup?.type === "over"
         ? "min-w-[760px] max-w-[88vw] rounded-[16px] px-10 py-6 md:min-w-[980px] md:px-14 md:py-7"
         : "min-w-[520px] max-w-[78vw] rounded-[26px] px-8 py-5";
+
+  useEffect(() => {
+    setOverlayInsightIndex(0);
+  }, [match?.lastLiveEvent?.id, match?.innings]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || overlayInsights.length <= 1) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setOverlayInsightIndex((current) => {
+        return (current + 1) % overlayInsights.length;
+      });
+    }, 3000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [overlayInsightSignature, overlayInsights.length]);
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-transparent text-white">
@@ -1580,16 +1782,48 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
                       </div>
                     ) : null}
                     <div className="flex min-w-0 flex-col gap-1 text-[0.52rem] font-black uppercase tracking-[0.08em] text-white/68 md:text-[0.62rem] xl:text-[0.72rem]">
-                      <span>
-                        {match?.innings === "second"
-                          ? "Chasing"
-                          : "Batting first"}
-                      </span>
-                      <span>
-                        {targetRuns > 0
-                          ? `${chaseRunsLeft} to win`
-                          : `${totalOvers} overs total`}
-                      </span>
+                      {activeOverlayInsight ? (
+                        <AnimatePresence mode="wait">
+                          <motion.div
+                            key={activeOverlayInsight.key}
+                            className="flex min-w-0 flex-col gap-1"
+                            initial={
+                              shouldReduceMotion
+                                ? false
+                                : { opacity: 0, y: 8 }
+                            }
+                            animate={
+                              shouldReduceMotion
+                                ? { opacity: 1 }
+                                : { opacity: 1, y: 0 }
+                            }
+                            exit={
+                              shouldReduceMotion
+                                ? { opacity: 0 }
+                                : { opacity: 0, y: -8 }
+                            }
+                            transition={{ duration: 0.22 }}
+                          >
+                            <span>{activeOverlayInsight.label}</span>
+                            <span className="truncate">
+                              {activeOverlayInsight.detail}
+                            </span>
+                          </motion.div>
+                        </AnimatePresence>
+                      ) : (
+                        <>
+                          <span>
+                            {match?.innings === "second"
+                              ? "Chasing"
+                              : "Batting first"}
+                          </span>
+                          <span>
+                            {targetRuns > 0
+                              ? `${chaseRunsLeft} to win`
+                              : `${totalOvers} overs total`}
+                          </span>
+                        </>
+                      )}
                       {match?.tossWinner ? (
                         <span className="truncate">
                           {`${compactLabel(match.tossWinner, 12)} ${buildTossDecisionText(match?.tossDecision)}`}
@@ -1666,7 +1900,9 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
                   </div>
                   <div className="mt-1 flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[0.5rem] font-black uppercase tracking-[0.08em] text-white/68 md:text-[0.62rem] xl:text-[0.72rem]">
                     <span className="min-w-0 flex-1 truncate">
-                      {chaseLineText}
+                      {activeOverlayInsight
+                        ? activeOverlayInsight.detail
+                        : chaseLineText}
                     </span>
                     <span className="shrink-0 text-right">
                       {match?.innings === "second"
