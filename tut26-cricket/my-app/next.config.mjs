@@ -66,6 +66,21 @@ const nextConfig = {
         hostname: "i.ibb.co",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "vercel.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "assets.vercel.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "vercel.live",
+        pathname: "/**",
+      },
     ],
   },
   outputFileTracingRoot: __dirname,

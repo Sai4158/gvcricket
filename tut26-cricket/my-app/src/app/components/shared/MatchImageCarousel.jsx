@@ -65,6 +65,8 @@ export default function MatchImageCarousel({
           (resolvedActiveIndex - 1 + normalizedImages.length) % normalizedImages.length
         ]
       : null;
+  const previousImageKey = previousImage?.id || previousImage?.url || "";
+  const nextImageKey = nextImage?.id || nextImage?.url || "";
 
   const setCarouselIndex = useCallback((nextIndex, direction = 1) => {
     setTransitionDirection(direction);
@@ -221,22 +223,16 @@ export default function MatchImageCarousel({
 
   const slideVariants = {
     enter: (direction) => ({
-      x: direction > 0 ? "5%" : "-5%",
-      opacity: 0.72,
-      scale: 0.992,
-      filter: "blur(3px)",
+      x: direction > 0 ? "7%" : "-7%",
+      opacity: 0.78,
     }),
     center: {
       x: 0,
       opacity: 1,
-      scale: 1,
-      filter: "blur(0px)",
     },
     exit: (direction) => ({
-      x: direction > 0 ? "-5%" : "5%",
-      opacity: 0.72,
-      scale: 0.992,
-      filter: "blur(3px)",
+      x: direction > 0 ? "-7%" : "7%",
+      opacity: 0.78,
     }),
   };
 
@@ -257,28 +253,28 @@ export default function MatchImageCarousel({
           <motion.div
             key={activeImage?.id || activeImage?.url || "fallback"}
             className="absolute inset-0"
-            style={{ willChange: "transform, opacity, filter" }}
+            style={{ willChange: "transform, opacity", backfaceVisibility: "hidden" }}
             custom={transitionDirection}
             initial={
               transitionStyle === "slide"
                 ? "enter"
-                : { opacity: 0.01, scale: 1.01, filter: "blur(2px)" }
+                : { opacity: 0.01 }
             }
             animate={
               transitionStyle === "slide"
                 ? "center"
-                : { opacity: 1, scale: 1, filter: "blur(0px)" }
+                : { opacity: 1 }
             }
             exit={
               transitionStyle === "slide"
                 ? "exit"
-                : { opacity: 0.01, scale: 0.995, filter: "blur(2px)" }
+                : { opacity: 0.01 }
             }
             variants={transitionStyle === "slide" ? slideVariants : undefined}
             transition={
               transitionStyle === "slide"
-                ? { duration: 0.42, ease: [0.22, 1, 0.36, 1] }
-                : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
+                ? { duration: 0.34, ease: [0.22, 1, 0.36, 1] }
+                : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
             }
           >
             <SafeMatchImage
@@ -290,6 +286,7 @@ export default function MatchImageCarousel({
               fallbackClassName={animatedFallbackClassName}
               draggable={false}
               loading={compact ? "lazy" : "eager"}
+              decoding="async"
               onLoad={() => {
                 if (!activeImageKey) {
                   return;
@@ -317,25 +314,67 @@ export default function MatchImageCarousel({
           ) : null}
         </motion.div>
         {!compact && (nextImage || previousImage) ? (
-          <div className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0">
+          <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-0">
+            {activeImage ? (
+              <SafeMatchImage
+                src={activeImage.url || ""}
+                alt=""
+                fill
+                sizes="(max-width: 768px) 100vw, 1200px"
+                className={animatedImageClassName}
+                fallbackClassName={animatedFallbackClassName}
+                loading="eager"
+                decoding="async"
+              />
+            ) : null}
             {nextImage ? (
               <SafeMatchImage
                 src={nextImage.url || ""}
                 alt=""
-                width={16}
-                height={9}
-                className="h-auto w-auto"
+                fill
+                sizes={compact ? "(max-width: 768px) 100vw, 33vw" : "(max-width: 768px) 100vw, 1200px"}
+                className={animatedImageClassName}
+                fallbackClassName={animatedFallbackClassName}
                 loading="eager"
+                decoding="async"
+                onLoad={() => {
+                  if (!nextImageKey) {
+                    return;
+                  }
+                  setLoadedImageKeys((current) => {
+                    if (current.has(nextImageKey)) {
+                      return current;
+                    }
+                    const next = new Set(current);
+                    next.add(nextImageKey);
+                    return next;
+                  });
+                }}
               />
             ) : null}
             {previousImage ? (
               <SafeMatchImage
                 src={previousImage.url || ""}
                 alt=""
-                width={16}
-                height={9}
-                className="h-auto w-auto"
+                fill
+                sizes={compact ? "(max-width: 768px) 100vw, 33vw" : "(max-width: 768px) 100vw, 1200px"}
+                className={animatedImageClassName}
+                fallbackClassName={animatedFallbackClassName}
                 loading="eager"
+                decoding="async"
+                onLoad={() => {
+                  if (!previousImageKey) {
+                    return;
+                  }
+                  setLoadedImageKeys((current) => {
+                    if (current.has(previousImageKey)) {
+                      return current;
+                    }
+                    const next = new Set(current);
+                    next.add(previousImageKey);
+                    return next;
+                  });
+                }}
               />
             ) : null}
           </div>
