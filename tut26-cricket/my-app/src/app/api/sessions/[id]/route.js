@@ -238,6 +238,7 @@ export async function PATCH(req, { params }) {
         },
         {
           new: true,
+          runValidators: true,
           ...(preserveEndedTimestamp ? { timestamps: false } : {}),
         },
       );

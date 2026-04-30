@@ -117,7 +117,8 @@ export const sessionCreateSchema = z
   })
   .strict();
 
-export const setupMatchSchema = z
+// Object form (extendable). Use `setupMatchSchema` below for validation.
+export const setupMatchObjectSchema = z
   .object({
     teamAName: requiredNameSchema,
     teamBName: requiredNameSchema,
@@ -127,6 +128,18 @@ export const setupMatchSchema = z
     draftToken: draftTokenSchema.optional(),
   })
   .strict();
+
+const distinctTeamNamesRefinement = (value) =>
+  value.teamAName !== value.teamBName;
+const distinctTeamNamesMessage = {
+  message: "Team names must be different.",
+  path: ["teamBName"],
+};
+
+export const setupMatchSchema = setupMatchObjectSchema.refine(
+  distinctTeamNamesRefinement,
+  distinctTeamNamesMessage,
+);
 
 export const createMatchSchema = z
   .object({

@@ -28,15 +28,28 @@ import { enforceRateLimit } from "../../../../lib/rate-limit";
 import { parseJsonRequest } from "../../../../lib/request-security";
 import { hasValidDraftToken } from "../../../../lib/session-draft";
 import { invalidateSessionsDataCache } from "../../../../lib/server-data";
-import { setupMatchSchema } from "../../../../lib/validators";
+import { setupMatchObjectSchema } from "../../../../lib/validators";
 import { z } from "zod";
 
-const startMatchSchema = setupMatchSchema
+const startMatchSchema = setupMatchObjectSchema
   .extend({
     tossWinner: z.string().trim().min(1).max(80),
     tossDecision: z.enum(["bat", "bowl"]),
   })
-  .strict();
+  .strict()
+  .refine((value) => value.teamAName !== value.teamBName, {
+    message: "Team names must be different.",
+    path: ["teamBName"],
+  })
+  .refine(
+    (value) =>
+      value.tossWinner === value.teamAName ||
+      value.tossWinner === value.teamBName,
+    {
+      message: "tossWinner must match teamAName or teamBName.",
+      path: ["tossWinner"],
+    },
+  );
 
 export async function POST(req, { params }) {
   const { id: sessionId } = await params;
@@ -144,19 +157,6 @@ export async function POST(req, { params }) {
         existingMatch.lastLiveEvent = null;
         existingMatch.lastEventType = "";
         existingMatch.lastEventText = "";
-        const existingMatchImages = rebaseStoredMatchImagesForMatch(
-          String(existingMatch._id),
-          sessionGalleryImages
-        );
-        applyStoredMatchImages(existingMatch, existingMatchImages, {
-          matchId: String(existingMatch._id),
-        });
-        existingMatch.mediaUpdatedAt =
-          session.mediaUpdatedAt ||
-          existingMatch.matchImageUploadedAt ||
-          existingMatch.mediaUpdatedAt ||
-          null;
-        await existingMatch.save({ session: transactionSession });
         await MatchUndoEntry.deleteMany({
           matchId: existingMatch._id,
         }).session(transactionSession);
@@ -200,6 +200,9 @@ export async function POST(req, { params }) {
       }
 
       if (finalMatch) {
+        // Apply stored gallery images and persist once per match. This single
+        // save covers both the new-match path (initial fields fresh from
+        // create) and the restart path (resets above are still in-memory).
         const nextMatchImages = rebaseStoredMatchImagesForMatch(
           String(finalMatch._id),
           sessionGalleryImages
