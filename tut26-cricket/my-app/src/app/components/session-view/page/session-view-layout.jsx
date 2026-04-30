@@ -7,7 +7,7 @@
  * Read next: ./README.md
  */
 
-import { FaArrowLeft, FaCheck, FaShareAlt } from "react-icons/fa";
+import { FaArrowLeft, FaCheck, FaEllipsisV, FaShareAlt } from "react-icons/fa";
 import MatchHeroBackdrop from "../../match/MatchHeroBackdrop";
 import { BallTracker } from "../../match/MatchBallHistory";
 import LoadingButton from "../../shared/LoadingButton";
@@ -20,6 +20,7 @@ export function SessionViewTopShell({
   isLeavingToSessions,
   handleShare,
   copied,
+  handleScrollToBottom,
   sessionName,
   match,
   trackerHistory,
@@ -61,7 +62,15 @@ export function SessionViewTopShell({
       </div>
 
       <MatchHeroBackdrop match={match} className="w-full max-w-4xl mt-5 mb-2">
-        <div className="px-5 py-7 sm:px-7">
+        <div className="relative px-5 py-7 sm:px-7">
+          <button
+            type="button"
+            onClick={handleScrollToBottom}
+            className="absolute right-5 top-5 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/4 text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white sm:right-7"
+            aria-label="Scroll to bottom"
+          >
+            <FaEllipsisV size={16} />
+          </button>
           <header className="w-full text-center">
             <div>
               <LiquidSportText

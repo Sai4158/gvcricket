@@ -1493,6 +1493,17 @@ export default function SessionViewClient({ sessionId, initialData }) {
     window.open(overlayUrl, "_blank", "noopener,noreferrer");
   }, [overlayUrl]);
 
+  const handleScrollToBottom = useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.scrollTo({
+      top: document.documentElement.scrollHeight,
+      behavior: "smooth",
+    });
+  }, []);
+
   const ensureSpectatorAnnouncerReady = useCallback(
     ({ userGesture = false, openPanel = false, forceEnable = false } = {}) => {
       if (forceEnable && !settings.enabled) {
@@ -2020,6 +2031,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
         isLeavingToSessions={isLeavingToSessions}
         handleShare={handleShare}
         copied={copied}
+        handleScrollToBottom={handleScrollToBottom}
         sessionName={sessionData.name}
         match={match}
         trackerHistory={trackerHistory}

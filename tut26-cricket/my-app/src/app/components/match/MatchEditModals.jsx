@@ -659,7 +659,7 @@ export function EditLiveStreamModal({
       title=""
       onExit={onClose}
       hideHeader
-      panelClassName="max-w-md max-h-[82vh] overflow-hidden"
+      panelClassName="max-w-md md:max-w-3xl xl:max-w-4xl max-h-[86vh] overflow-hidden"
     >
       <button
         type="button"
@@ -669,10 +669,13 @@ export function EditLiveStreamModal({
       >
         <FaTimes className="text-lg" />
       </button>
-      <div ref={modalScrollRef} className="max-h-[74vh] space-y-4 overflow-y-auto pr-1 pt-12">
+      <div
+        ref={modalScrollRef}
+        className="max-h-[78vh] space-y-4 overflow-y-auto pr-1 pt-12 md:space-y-5 md:pr-2"
+      >
         {showSavedState ? (
           <div className="space-y-4">
-            <div className="rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_32%),linear-gradient(180deg,rgba(26,26,30,0.985),rgba(12,12,16,0.99))] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+            <div className="rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_32%),linear-gradient(180deg,rgba(26,26,30,0.985),rgba(12,12,16,0.99))] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.28)] md:p-6">
               <div className="flex items-start gap-4">
                 <div className="flex min-w-0 items-center gap-3">
                   <span className="inline-flex h-8 w-11 shrink-0 items-center justify-center rounded-[10px] bg-[#FF0033] text-white shadow-[0_10px_24px_rgba(255,0,51,0.24)]">
@@ -702,7 +705,7 @@ export function EditLiveStreamModal({
               type="button"
               onClick={handleShareSpectatorPage}
               disabled={isSharingSpectatorPage || !spectatorUrl}
-              className="flex w-full items-center justify-center gap-2 rounded-[20px] border border-white/12 bg-white/[0.06] px-4 py-3 text-sm font-bold text-white transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-[20px] border border-white/12 bg-white/[0.06] px-4 py-3 text-sm font-bold text-white transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50 md:max-w-sm"
             >
               <FaShareAlt />
               {isSharingSpectatorPage ? "Sharing..." : "Share Spectator Page"}
@@ -710,7 +713,7 @@ export function EditLiveStreamModal({
           </div>
         ) : (
           <>
-        <div className="rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_32%),linear-gradient(180deg,rgba(26,26,30,0.985),rgba(12,12,16,0.99))] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+        <div className="rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_32%),linear-gradient(180deg,rgba(26,26,30,0.985),rgba(12,12,16,0.99))] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.28)] md:p-6">
           <div className="flex items-start gap-4">
             <div className="flex min-w-0 items-center gap-3">
               <span className="inline-flex h-8 w-11 shrink-0 items-center justify-center rounded-[10px] bg-[#FF0033] text-white shadow-[0_10px_24px_rgba(255,0,51,0.24)]">
@@ -744,7 +747,7 @@ export function EditLiveStreamModal({
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4">
+        <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 md:p-5">
           <div className="mb-3 flex items-center justify-between gap-3">
             <label
               htmlFor="match-live-stream-url"
@@ -779,11 +782,11 @@ export function EditLiveStreamModal({
 
         {previewStream?.watchUrl ? (
           <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,28,0.98),rgba(10,10,14,0.98))]">
-            <div className="flex items-center gap-3 border-b border-white/8 px-4 py-3">
+            <div className="flex items-center gap-3 border-b border-white/8 px-4 py-3 md:px-5 md:py-4">
               <FaYoutube className="text-lg text-red-500" />
               <p className="text-sm font-semibold text-white">Preview</p>
             </div>
-            <div className="aspect-video bg-black">
+            <div className="aspect-video bg-black md:aspect-[16/8.4]">
               <iframe
                 src={previewStream.embedUrl}
                 title="YouTube stream preview"
@@ -793,7 +796,7 @@ export function EditLiveStreamModal({
                 className="h-full w-full"
               />
             </div>
-            <div className="border-t border-white/8 px-4 py-3">
+            <div className="border-t border-white/8 px-4 py-3 md:px-5 md:py-4">
               <a
                 href={previewStream.watchUrl}
                 target="_blank"
@@ -805,7 +808,7 @@ export function EditLiveStreamModal({
             </div>
           </div>
         ) : existingStream?.watchUrl ? (
-          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4 md:p-5">
             <div className="flex items-center gap-2">
               <FaYoutube className="text-red-500" />
               <p className="text-sm font-semibold text-white">Current video</p>
@@ -822,7 +825,7 @@ export function EditLiveStreamModal({
         ) : null}
 
         {error ? (
-          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 md:px-5 md:py-4">
             {error}
           </div>
         ) : null}
@@ -855,6 +858,7 @@ export function EditLiveStreamModal({
             onCopy={overlayAccess.onCopy}
             onOpen={overlayAccess.onOpen}
             copied={overlayAccess.copied}
+            className="md:mx-auto md:max-w-2xl xl:max-w-[52rem]"
           />
         ) : null}
           </>
