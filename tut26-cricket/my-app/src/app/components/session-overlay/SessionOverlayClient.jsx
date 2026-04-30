@@ -13,11 +13,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import useEventSource from "../live/useEventSource";
+import useLiveSoundEffectsPlayer from "../live/useLiveSoundEffectsPlayer";
 import useSpeechAnnouncer from "../live/useSpeechAnnouncer";
 import { applySessionStreamPayload } from "../session-view/page/stream-hydration";
 import { getBattingTeamBundle, getTeamBundle } from "../../lib/team-utils";
 import { isTiedMatchResult } from "../../lib/match-result-display";
 import { buildLiveScoreAnnouncementSequence } from "../../lib/live-announcements";
+import { getScoreSoundEffectEventKey } from "../../lib/score-sound-effects";
+import { fetchCachedSoundEffectsLibrary } from "../../lib/sound-effects-client";
 import {
   calculateInningsSummary,
   calculateTrackedPlayerStats,
@@ -202,6 +205,74 @@ function calculateRunRateFromBalls(score, legalBallCount) {
   }
 
   return ((Number(score || 0) / safeBalls) * 6).toFixed(2);
+}
+
+function buildOverlayExtraCommentary(match, event) {
+  if (!match || !event || event.type !== "score_update") {
+    return "";
+  }
+
+  const ball = event.ball || {};
+  const runs = Number(ball?.runs || 0);
+  const extraType = String(ball?.extraType || "").trim().toLowerCase();
+  const isOut = Boolean(ball?.isOut);
+  const wickets = Number(match?.outs || 0);
+  const score = Number(match?.score || 0);
+  const legalBallCount = Number(match?.legalBallCount || 0);
+  const oversText = formatOversFromBalls(legalBallCount);
+  const targetRuns = Math.max(0, Number(match?.innings1?.score || 0) + 1);
+  const chaseRunsLeft =
+    match?.innings === "second" && targetRuns > 0
+      ? Math.max(0, targetRuns - score)
+      : 0;
+  const ballsRemaining = Math.max(
+    0,
+    Number(match?.overs || 0) * 6 - legalBallCount,
+  );
+  const currentRate = calculateRunRateFromBalls(score, legalBallCount);
+  const requiredRate =
+    match?.innings === "second" && ballsRemaining > 0
+      ? ((chaseRunsLeft * 6) / ballsRemaining).toFixed(2)
+      : "0.00";
+  const overSummary = getCurrentOverSummary(match);
+
+  if (isOut) {
+    if (match?.innings === "second" && chaseRunsLeft > 0) {
+      return `${wickets} down now. ${chaseRunsLeft} needed from ${ballsRemaining} balls. Required rate ${requiredRate}.`;
+    }
+
+    return `${wickets} down now. ${score} on the board after ${oversText} overs.`;
+  }
+
+  if (extraType === "wide") {
+    return `Extra run gifted. ${overSummary}.`;
+  }
+
+  if (extraType === "noball") {
+    return `No ball called. ${overSummary}.`;
+  }
+
+  if (runs >= 4) {
+    if (match?.innings === "second" && chaseRunsLeft > 0) {
+      return `${chaseRunsLeft} still needed from ${ballsRemaining} balls. Required rate ${requiredRate}.`;
+    }
+
+    return `${overSummary}. Current run rate ${currentRate}.`;
+  }
+
+  if (match?.innings === "second") {
+    if (chaseRunsLeft <= 0) {
+      return "That should finish the chase.";
+    }
+
+    return `${chaseRunsLeft} needed from ${ballsRemaining} balls. Required rate ${requiredRate}.`;
+  }
+
+  if (ball?.countsAsLegal !== false) {
+    return `${overSummary}. Current run rate ${currentRate}.`;
+  }
+
+  return `${score} for ${wickets} after ${oversText} overs.`;
 }
 
 function getCurrentOverBowler(match) {
@@ -1044,20 +1115,33 @@ function buildOverlayInsights({
 export default function SessionOverlayClient({ sessionId, initialData }) {
   const [data, setData] = useState(initialData || null);
   const [streamError, setStreamError] = useState("");
+  const [streamStatus, setStreamStatus] = useState("connecting");
+  const [scoreSoundEffectMap, setScoreSoundEffectMap] = useState({});
   const [activeEventEffect, setActiveEventEffect] = useState(null);
   const [activeMomentPopup, setActiveMomentPopup] = useState(null);
   const [overlayInsightIndex, setOverlayInsightIndex] = useState(0);
   const lastSignatureRef = useRef(buildOverlaySignature(initialData));
   const lastAnnouncedEventRef = useRef("");
+  const lastPlayedSoundEventRef = useRef("");
   const lastIntroPopupRef = useRef("");
   const shouldReduceMotion = useReducedMotion();
 
   useEventSource({
     url: sessionId ? `/api/live/sessions/${sessionId}` : null,
     event: "session",
+    heartbeatEvent: "ping",
     enabled: Boolean(sessionId),
     disconnectWhenHidden: false,
+    reconnectStaleAfterMs: 20000,
+    onOpen: () => {
+      setStreamStatus("live");
+      setStreamError("");
+    },
+    onHeartbeat: () => {
+      setStreamStatus("live");
+    },
     onMessage: (payload) => {
+      setStreamStatus("live");
       applySessionStreamPayload({
         payload,
         lastSignatureRef,
@@ -1067,6 +1151,7 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
       });
     },
     onError: () => {
+      setStreamStatus("reconnecting");
       if (!data) {
         setStreamError("Could not load the live overlay.");
       }
@@ -1155,6 +1240,7 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
     muted: false,
     mode: match?.announcerMode || "full",
   });
+  const soundEffects = useLiveSoundEffectsPlayer({ volume: 0.92 });
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1169,6 +1255,45 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
       window.clearTimeout(timer);
     };
   }, [speech]);
+
+  useEffect(() => {
+    if (!match?._id || match?.announcerScoreSoundEffectsEnabled === false) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const hydrateOverlayAudio = async () => {
+      try {
+        const [settingsResponse] = await Promise.all([
+          fetch(`/api/matches/${match._id}/announcer-settings`, {
+            cache: "no-store",
+            headers: { Accept: "application/json" },
+          }),
+          fetchCachedSoundEffectsLibrary({ force: false }).catch(() => []),
+        ]);
+
+        if (!settingsResponse.ok || cancelled) {
+          return;
+        }
+
+        const payload = await settingsResponse.json().catch(() => null);
+        if (!cancelled) {
+          setScoreSoundEffectMap(payload?.scoreSoundEffectMap || {});
+        }
+      } catch {
+        if (!cancelled) {
+          setScoreSoundEffectMap({});
+        }
+      }
+    };
+
+    void hydrateOverlayAudio();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [match?._id, match?.announcerScoreSoundEffectsEnabled]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1284,9 +1409,24 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
       match,
       match?.announcerMode || "full",
     );
+    const extraCommentary = buildOverlayExtraCommentary(
+      match,
+      match.lastLiveEvent,
+    );
+    const sequenceItems = Array.isArray(sequence?.items)
+      ? [...sequence.items]
+      : [];
 
-    if (sequence?.items?.length) {
-      speech.speakSequence(sequence.items, {
+    if (extraCommentary) {
+      sequenceItems.push({
+        text: extraCommentary,
+        pauseAfterMs: 0,
+        rate: 0.8,
+      });
+    }
+
+    if (sequenceItems.length) {
+      speech.speakSequence(sequenceItems, {
         key: `overlay-${match._id}-${match.lastLiveEvent.id}`,
         priority: Number(sequence.priority || 2),
         interrupt: true,
@@ -1300,6 +1440,69 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
     match?.lastLiveEvent,
     match?.lastLiveEvent?.id,
     speech,
+  ]);
+
+  useEffect(() => {
+    if (
+      !match?._id ||
+      !match?.lastLiveEvent?.id ||
+      match?.announcerScoreSoundEffectsEnabled === false ||
+      match?.announcerBroadcastScoreSoundEffectsEnabled === false ||
+      match?.lastLiveEvent?.type !== "score_update"
+    ) {
+      return;
+    }
+
+    if (lastPlayedSoundEventRef.current === match.lastLiveEvent.id) {
+      return;
+    }
+
+    const ball = match.lastLiveEvent.ball || {};
+    const eventKey = getScoreSoundEffectEventKey(
+      Number(ball?.runs || 0),
+      Boolean(ball?.isOut),
+      ball?.extraType || null,
+    );
+    const effectId = String(scoreSoundEffectMap?.[eventKey] || "").trim();
+    if (!eventKey || !effectId) {
+      return;
+    }
+
+    lastPlayedSoundEventRef.current = match.lastLiveEvent.id;
+
+    let cancelled = false;
+
+    const playScoreEffect = async () => {
+      try {
+        const files = await fetchCachedSoundEffectsLibrary({ force: false });
+        if (cancelled || !Array.isArray(files) || !files.length) {
+          return;
+        }
+
+        const effect = files.find((file) => file?.id === effectId) || null;
+        if (!effect?.src) {
+          return;
+        }
+
+        await soundEffects.playEffect(effect, { userGesture: false });
+      } catch {
+        // Keep overlay visuals and speech live even if audio playback is blocked.
+      }
+    };
+
+    void playScoreEffect();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    match?._id,
+    match?.announcerBroadcastScoreSoundEffectsEnabled,
+    match?.announcerScoreSoundEffectsEnabled,
+    match?.lastLiveEvent,
+    match?.lastLiveEvent?.id,
+    scoreSoundEffectMap,
+    soundEffects,
   ]);
 
   useEffect(() => {
@@ -1380,6 +1583,23 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
     targetRuns > 0
       ? `${chaseRunsLeft} needed | ${inningsBallsLeft} left`
       : `${totalOvers}-over match`;
+  const currentRunRateLabel = `CRR ${calculateRunRateFromBalls(score, match?.legalBallCount)}`;
+  const requiredRateLabel =
+    targetRuns > 0
+      ? `RRR ${calculateRequiredRate(chaseRunsLeft, inningsBallsLeft)}`
+      : `${inningsBallsLeft} balls`;
+  const streamStatusLabel =
+    streamStatus === "live"
+      ? ""
+      : streamStatus === "reconnecting"
+        ? "Reconnecting"
+        : "Connecting";
+  const streamStatusTone =
+    streamStatus === "live"
+      ? "border-emerald-300/30 bg-emerald-400/12 text-emerald-100"
+      : streamStatus === "reconnecting"
+        ? "border-amber-300/30 bg-amber-400/12 text-amber-100"
+        : "border-white/16 bg-white/8 text-white/80";
   const overlayInsights = useMemo(
     () =>
       buildOverlayInsights({
@@ -1452,10 +1672,22 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-transparent text-white">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(225,29,46,0.18),transparent_38%),radial-gradient(circle_at_50%_0%,rgba(247,201,72,0.08),transparent_32%)]" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:linear-gradient(to_right,rgba(255,255,255,0.5)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.35)_1px,transparent_1px)] [background-size:120px_120px]" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.05] [background-image:linear-gradient(180deg,transparent_0%,rgba(255,255,255,0.9)_50%,transparent_100%)] [background-size:100%_8px]" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(180deg,rgba(0,0,0,0),rgba(2,5,10,0.5)_46%,rgba(2,5,10,0.92)_100%)]" />
       <div
         className={`pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r ${modeTheme.accent}`}
       />
+      <audio ref={soundEffects.audioRef} hidden preload="metadata" playsInline />
+      {streamStatus !== "live" ? (
+        <section className="pointer-events-none absolute right-5 top-5 z-20 flex items-center gap-2">
+          <div className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[11px] font-black uppercase tracking-[0.2em] shadow-[0_10px_24px_rgba(12,18,32,0.12)] backdrop-blur-sm ${streamStatusTone}`}>
+            <span className={`h-2.5 w-2.5 rounded-full ${streamStatus === "reconnecting" ? "bg-amber-300 shadow-[0_0_12px_rgba(252,211,77,0.95)]" : "bg-white/70"}`} />
+            <span>{streamStatusLabel}</span>
+          </div>
+        </section>
+      ) : null}
       <section className="pointer-events-none absolute left-5 top-5 z-20">
         <div className="relative h-16 w-16 drop-shadow-[0_0_24px_rgba(225,29,46,0.36)] md:h-20 md:w-20 xl:h-24 xl:w-24">
           <Image
@@ -1736,6 +1968,8 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
             <div
               className={`h-[3px] w-full bg-gradient-to-r ${modeTheme.accent}`}
             />
+            <div className="pointer-events-none absolute left-0 top-0 h-10 w-10 border-l border-t border-white/16" />
+            <div className="pointer-events-none absolute right-0 top-0 h-10 w-10 border-r border-t border-white/16" />
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-40%,var(--mode-glow),transparent_46%),linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.12))]" />
             <motion.div
               key={glowKey}
@@ -1918,11 +2152,19 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
                         ? activeOverlayInsight.detail
                         : chaseLineText}
                     </span>
-                    <span className="shrink-0 text-right">
-                      {match?.innings === "second"
-                        ? "Chase"
-                        : "1st innings"}
-                    </span>
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 text-right">
+                      <span className="rounded-full border border-white/14 bg-white/[0.06] px-2.5 py-1 text-[0.5rem] font-black uppercase tracking-[0.1em] text-white/90 md:text-[0.6rem] xl:px-3 xl:text-[0.7rem]">
+                        {currentRunRateLabel}
+                      </span>
+                      <span className="rounded-full border border-white/14 bg-white/[0.06] px-2.5 py-1 text-[0.5rem] font-black uppercase tracking-[0.1em] text-white/90 md:text-[0.6rem] xl:px-3 xl:text-[0.7rem]">
+                        {requiredRateLabel}
+                      </span>
+                      <span className="text-white/78">
+                        {match?.innings === "second"
+                          ? "Chase"
+                          : "1st innings"}
+                      </span>
+                    </div>
                   </div>
                   <div className="mt-1.5 flex min-w-0 items-start gap-3">
                     <div className="min-w-0 flex-1 space-y-1">

@@ -22,13 +22,19 @@ function readPageVisibility() {
 export default function useEventSource({
   url,
   event,
+  heartbeatEvent = "ping",
   onMessage,
   onError,
+  onOpen,
+  onHeartbeat,
   enabled = true,
   disconnectWhenHidden = true,
+  reconnectStaleAfterMs = 0,
 }) {
   const onMessageRef = useRef(onMessage);
   const onErrorRef = useRef(onError);
+  const onOpenRef = useRef(onOpen);
+  const onHeartbeatRef = useRef(onHeartbeat);
   const [isPageVisible, setIsPageVisible] = useState(readPageVisibility);
   const [reconnectTick, setReconnectTick] = useState(0);
 
@@ -39,6 +45,14 @@ export default function useEventSource({
   useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
+
+  useEffect(() => {
+    onOpenRef.current = onOpen;
+  }, [onOpen]);
+
+  useEffect(() => {
+    onHeartbeatRef.current = onHeartbeat;
+  }, [onHeartbeat]);
 
   useEffect(() => {
     if (!disconnectWhenHidden || typeof document === "undefined") {
@@ -82,10 +96,14 @@ export default function useEventSource({
     };
 
     window.addEventListener("online", handleOnline);
+    window.addEventListener("focus", handleOnline);
+    window.addEventListener("pageshow", handleOnline);
     connection?.addEventListener?.("change", handleConnectionChange);
 
     return () => {
       window.removeEventListener("online", handleOnline);
+      window.removeEventListener("focus", handleOnline);
+      window.removeEventListener("pageshow", handleOnline);
       connection?.removeEventListener?.("change", handleConnectionChange);
     };
   }, []);
@@ -97,7 +115,31 @@ export default function useEventSource({
 
     const source = new EventSource(url);
     let closed = false;
+    let staleTimer = null;
+
+    const resetStaleTimer = () => {
+      if (!reconnectStaleAfterMs) {
+        return;
+      }
+
+      if (staleTimer) {
+        window.clearTimeout(staleTimer);
+      }
+
+      staleTimer = window.setTimeout(() => {
+        if (closed) {
+          return;
+        }
+        try {
+          source.close();
+        } catch {}
+        setReconnectTick((current) => current + 1);
+        onErrorRef.current?.(new Error("Live stream became stale and is reconnecting."));
+      }, reconnectStaleAfterMs);
+    };
+
     const handler = (message) => {
+      resetStaleTimer();
       try {
         const data = JSON.parse(message.data);
         try {
@@ -111,7 +153,24 @@ export default function useEventSource({
       }
     };
 
+    const heartbeatHandler = (message) => {
+      resetStaleTimer();
+      try {
+        const data = JSON.parse(message.data);
+        onHeartbeatRef.current?.(data);
+      } catch {
+        onHeartbeatRef.current?.(null);
+      }
+    };
+
     source.addEventListener(event, handler);
+    if (heartbeatEvent && heartbeatEvent !== event) {
+      source.addEventListener(heartbeatEvent, heartbeatHandler);
+    }
+    source.onopen = () => {
+      resetStaleTimer();
+      onOpenRef.current?.();
+    };
     const errorHandler = (error) => {
       if (closed || source.readyState === EventSource.CLOSED) {
         return;
@@ -123,11 +182,28 @@ export default function useEventSource({
 
     return () => {
       closed = true;
+      if (staleTimer) {
+        window.clearTimeout(staleTimer);
+        staleTimer = null;
+      }
       source.removeEventListener(event, handler);
+      if (heartbeatEvent && heartbeatEvent !== event) {
+        source.removeEventListener(heartbeatEvent, heartbeatHandler);
+      }
       source.removeEventListener("error", errorHandler);
+      source.onopen = null;
       source.close();
     };
-  }, [disconnectWhenHidden, enabled, event, isPageVisible, reconnectTick, url]);
+  }, [
+    disconnectWhenHidden,
+    enabled,
+    event,
+    heartbeatEvent,
+    isPageVisible,
+    reconnectStaleAfterMs,
+    reconnectTick,
+    url,
+  ]);
 }
 
 
