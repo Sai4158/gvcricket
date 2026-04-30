@@ -13,7 +13,7 @@ import dynamic from "next/dynamic";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft, FaCheck, FaShareAlt } from "react-icons/fa";
 import useEventSource from "../live/useEventSource";
 import LiquidSportText from "../home/LiquidSportText";
 import MatchHeroBackdrop from "../match/MatchHeroBackdrop";
@@ -75,6 +75,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
   const [zoomedImage, setZoomedImage] = useState(null);
   const [zoomedImageScale, setZoomedImageScale] = useState(1);
   const [isLiveStreamPinOpen, setIsLiveStreamPinOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const lastStreamUpdateRef = useRef(initialMatch?.updatedAt || "");
 
   const confettiPieces = useMemo(
@@ -203,6 +204,45 @@ export default function ResultPageClient({ matchId, initialMatch }) {
     router.push(`/session?refresh=${Date.now()}`);
   };
 
+  const handleShare = async () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const shareUrl = new URL(`/result/${matchId}`, window.location.origin).toString();
+    const shareTitle =
+      match?.innings1?.team && match?.innings2?.team
+        ? `${match.innings1.team} vs ${match.innings2.team}`
+        : "GV Cricket result";
+    const shareText = match?.result || "View the cricket match result.";
+
+    try {
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: shareTitle,
+            text: shareText,
+            url: shareUrl,
+          });
+          return;
+        } catch {
+          // Fall back to copy below if native share is dismissed or unavailable.
+        }
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 2000);
+        return;
+      }
+
+      window.prompt("Copy result link", shareUrl);
+    } catch (error) {
+      console.error("Result share failed:", error);
+    }
+  };
+
   const handleOpenImageManager = (preferredImageId = "") => {
     setActiveGalleryImageId(preferredImageId || matchImages[0]?.id || "");
     setIsImageManagerOpen(true);
@@ -285,7 +325,7 @@ export default function ResultPageClient({ matchId, initialMatch }) {
       className="min-h-screen bg-zinc-950 p-4 sm:p-8 text-zinc-300 font-sans"
     >
       <div className="mx-auto max-w-[88rem] space-y-12 py-10">
-        <div className="flex justify-start">
+        <div className="flex items-center justify-between gap-3">
           <LoadingButton
             onClick={handleOpenSessions}
             loading={isLeavingToSessions}
@@ -295,6 +335,14 @@ export default function ResultPageClient({ matchId, initialMatch }) {
             <FaArrowLeft />
             Back to Sessions
           </LoadingButton>
+          <button
+            type="button"
+            onClick={handleShare}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/35 text-zinc-100 backdrop-blur-sm transition-colors hover:bg-black/45"
+            aria-label="Share result link"
+          >
+            {copied ? <FaCheck className="text-green-400" /> : <FaShareAlt />}
+          </button>
         </div>
 
         <MatchHeroBackdrop match={match} className="mb-2">

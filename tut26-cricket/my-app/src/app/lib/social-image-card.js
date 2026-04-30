@@ -489,4 +489,212 @@ export function createResultSocialImage(match = null, options = {}) {
   );
 }
 
+function resolveSessionIndexShareImages(sessions = [], baseUrl = "") {
+  return (Array.isArray(sessions) ? sessions : [])
+    .filter((session) => Array.isArray(session?.matchImages) && session.matchImages.length >= 2)
+    .map((session) => {
+      const firstImage = session.matchImages.find((image) => image?.url);
+      if (!firstImage?.url) {
+        return null;
+      }
+
+      return {
+        id: session._id || firstImage.id || firstImage.url,
+        url: resolveSocialImageUrl(firstImage.url, baseUrl),
+        title: buildMatchupText(session),
+        scoreline: `${Number(session?.score || 0)}/${Number(session?.outs || 0)}`,
+        result: cleanText(session?.result || ""),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
+function buildSessionIndexHeadline(sessions = []) {
+  const count = Math.max(0, Number(sessions?.length || 0));
+  if (!count) {
+    return "Latest games and results.";
+  }
+  if (count === 1) {
+    return "Latest live game and result.";
+  }
+  return `Latest ${count} cricket sessions.`;
+}
+
+export function createSessionsIndexSocialImage(sessions = [], options = {}) {
+  const shareImages = resolveSessionIndexShareImages(sessions, options.baseUrl);
+  if (!shareImages.length) {
+    return createLogoOnlySocialImage();
+  }
+
+  const cards = shareImages.slice(0, 4);
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          position: "relative",
+          overflow: "hidden",
+          background:
+            "radial-gradient(circle at top left, rgba(56,189,248,0.18), transparent 24%), radial-gradient(circle at bottom right, rgba(245,158,11,0.14), transparent 26%), linear-gradient(180deg, #05070a 0%, #020304 100%)",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            inset: 28,
+            display: "flex",
+            borderRadius: 34,
+            border: "1px solid rgba(255,255,255,0.09)",
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))",
+            boxShadow:
+              "inset 0 1px 0 rgba(255,255,255,0.06), 0 24px 70px rgba(0,0,0,0.34)",
+          }}
+        />
+        <div
+          style={{
+            position: "relative",
+            zIndex: 2,
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            padding: "40px 42px",
+            color: "white",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 28,
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span
+                style={{
+                  fontSize: 18,
+                  letterSpacing: "0.28em",
+                  textTransform: "uppercase",
+                  color: "rgba(255,255,255,0.72)",
+                }}
+              >
+                GV Cricket
+              </span>
+              <span
+                style={{
+                  fontSize: 44,
+                  fontWeight: 900,
+                  lineHeight: 1.02,
+                }}
+              >
+                Sessions and Results
+              </span>
+              <span
+                style={{
+                  fontSize: 24,
+                  color: "rgba(255,255,255,0.84)",
+                }}
+              >
+                {buildSessionIndexHeadline(cards)}
+              </span>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: cards.length >= 3 ? "1fr 1fr" : `repeat(${cards.length}, 1fr)`,
+              gap: 18,
+              flex: 1,
+            }}
+          >
+            {cards.map((card) => (
+              <div
+                key={card.id}
+                style={{
+                  position: "relative",
+                  display: "flex",
+                  overflow: "hidden",
+                  borderRadius: 28,
+                  border: "1px solid rgba(255,255,255,0.09)",
+                  background: "rgba(10,12,18,0.28)",
+                  minHeight: cards.length <= 2 ? 320 : 210,
+                }}
+              >
+                <img
+                  src={card.url}
+                  alt=""
+                  width="540"
+                  height="320"
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background:
+                      "linear-gradient(180deg, rgba(6,8,12,0.1), rgba(6,8,12,0.34) 46%, rgba(6,8,12,0.88) 100%)",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "relative",
+                    zIndex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "flex-end",
+                    gap: 8,
+                    width: "100%",
+                    padding: "18px 20px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 24,
+                      fontWeight: 800,
+                      lineHeight: 1.08,
+                    }}
+                  >
+                    {card.title}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 28,
+                      fontWeight: 900,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {card.scoreline}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 16,
+                      color: "rgba(255,255,255,0.86)",
+                    }}
+                  >
+                    {card.result || "Live score available"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    ),
+    SOCIAL_IMAGE_SIZE
+  );
+}
+
 

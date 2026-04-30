@@ -12,52 +12,70 @@
  */
 
 import SessionsPageClient from "../components/session/SessionsPageClient";
-import { absoluteUrl, siteConfig } from "../lib/site-metadata";
+import {
+  absoluteUrl,
+  siteConfig,
+  versionedSocialImagePath,
+} from "../lib/site-metadata";
 
 // Refresh this page data every 15 seconds.
 export const revalidate = 15;
 
 // Page title and social-preview data for /session.
-export const metadata = {
-  title: "GV Cricket Latest Games, Live Cricket Scores, and Match Results",
-  description:
-    "Browse GV Cricket latest games, live cricket scores, completed match results, cricket scoreboards, and saved sessions for local matches, tournaments, and community cricket.",
-  keywords: [
-    "gv cricket latest games",
-    "live cricket scores",
-    "latest cricket games",
-    "recent cricket matches",
-    "cricket match results",
-    "cricket scoreboard",
-    "cricket live score sessions",
-    "free cricket score viewer",
-    "cricket scoring",
-    "live cricket scoring",
-  ],
-  alternates: {
-    canonical: absoluteUrl("/session"),
-  },
-  openGraph: {
-    title: "GV Cricket Latest Games, Live Scores, and Match Results",
+export async function generateMetadata() {
+  const shareImageUrl = absoluteUrl(
+    versionedSocialImagePath("/session/opengraph-image"),
+  );
+  const twitterImageUrl = absoluteUrl(
+    versionedSocialImagePath("/session/twitter-image"),
+  );
+
+  return {
+    title: "GV Cricket Latest Games, Live Cricket Scores, and Match Results",
     description:
-      "Open GV Cricket latest games, live cricket scoreboards, finished results, and saved sessions in one fast index.",
-    url: absoluteUrl("/session"),
-    images: [
-      {
-        url: absoluteUrl(siteConfig.ogImagePath),
-        width: 1200,
-        height: 630,
-        alt: "GV Cricket sessions and live score preview",
-      },
+      "Browse GV Cricket latest games, live cricket scores, completed match results, cricket scoreboards, and saved sessions for local matches, tournaments, and community cricket.",
+    keywords: [
+      "gv cricket latest games",
+      "live cricket scores",
+      "latest cricket games",
+      "recent cricket matches",
+      "cricket match results",
+      "cricket scoreboard",
+      "cricket live score sessions",
+      "free cricket score viewer",
+      "cricket scoring",
+      "live cricket scoring",
     ],
-  },
-  twitter: {
-    title: "GV Cricket Latest Games, Live Scores, and Match Results",
-    description:
-      "Open GV Cricket latest games, live cricket scoreboards, finished results, and saved sessions in one place.",
-    images: [absoluteUrl(siteConfig.twitterImagePath)],
-  },
-};
+    alternates: {
+      canonical: absoluteUrl("/session"),
+    },
+    openGraph: {
+      title: "GV Cricket Latest Games, Live Scores, and Match Results",
+      description:
+        "Open GV Cricket latest games, live cricket scoreboards, finished results, and saved sessions in one fast index.",
+      url: absoluteUrl("/session"),
+      images: [
+        {
+          url: shareImageUrl,
+          width: 1200,
+          height: 630,
+          alt: "GV Cricket sessions and live score preview",
+        },
+      ],
+    },
+    twitter: {
+      title: "GV Cricket Latest Games, Live Scores, and Match Results",
+      description:
+        "Open GV Cricket latest games, live cricket scoreboards, finished results, and saved sessions in one place.",
+      images: [
+        {
+          url: twitterImageUrl,
+          alt: "GV Cricket sessions and live score preview",
+        },
+      ],
+    },
+  };
+}
 
 const sessionsPageJsonLd = {
   "@context": "https://schema.org",
