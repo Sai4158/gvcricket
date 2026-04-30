@@ -543,7 +543,8 @@ function buildBattingCardPopup(match, teamA, teamB) {
     eventType === "innings_change"
       ? "innings1"
       : hasResult || eventType === "match_end" || eventType === "target_chased"
-        ? Array.isArray(match?.innings2?.history) && match.innings2.history.length
+        ? Array.isArray(match?.innings2?.history) &&
+          match.innings2.history.length
           ? "innings2"
           : "innings1"
         : "";
@@ -572,8 +573,9 @@ function buildBattingCardPopup(match, teamA, teamB) {
   );
   const extras = Math.max(Number(innings?.score || 0) - battingRuns, 0);
   const wickets =
-    displayedRows.filter((player) => String(player?.status || "").toLowerCase() === "out")
-      .length || Number(match?.outs || 0);
+    displayedRows.filter(
+      (player) => String(player?.status || "").toLowerCase() === "out",
+    ).length || Number(match?.outs || 0);
   const scoreText = `${Number(innings?.score || 0)}-${wickets}`;
   const footerText =
     eventType === "innings_change"
@@ -585,10 +587,13 @@ function buildBattingCardPopup(match, teamA, teamB) {
     type: "batting-card",
     teamName,
     title: teamName,
-    subtitle: eventType === "innings_change" ? "Innings complete" : "Batting scorecard",
+    subtitle:
+      eventType === "innings_change" ? "Innings complete" : "Batting scorecard",
     rows: displayedRows,
     extras,
-    overs: inningsSummary.overs || formatOversFromBalls(innings?.legalBallCount || 0),
+    overs:
+      inningsSummary.overs ||
+      formatOversFromBalls(innings?.legalBallCount || 0),
     total: scoreText,
     footer: footerText,
   };
@@ -1194,8 +1199,8 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
     visibleMomentPopup?.type === "batting-card"
       ? "min-w-[1080px] max-w-[92vw] rounded-[20px] px-0 py-0"
       : visibleMomentPopup?.type === "over"
-      ? "min-w-[760px] max-w-[88vw] rounded-[16px] px-10 py-6 md:min-w-[980px] md:px-14 md:py-7"
-      : "min-w-[520px] max-w-[78vw] rounded-[26px] px-8 py-5";
+        ? "min-w-[760px] max-w-[88vw] rounded-[16px] px-10 py-6 md:min-w-[980px] md:px-14 md:py-7"
+        : "min-w-[520px] max-w-[78vw] rounded-[26px] px-8 py-5";
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-transparent text-white">
@@ -1378,7 +1383,9 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
                   </div>
                   <div className="bg-[linear-gradient(180deg,rgba(0,0,0,0.12),rgba(255,255,255,0.02))] px-8 py-2 md:px-10">
                     {visibleMomentPopup.rows.map((player, index) => {
-                      const isNotOut = String(player?.status || "").toLowerCase() === "not out";
+                      const isNotOut =
+                        String(player?.status || "").toLowerCase() ===
+                        "not out";
                       return (
                         <div
                           key={`batting-card-row-${player.name}-${index}`}
@@ -1406,8 +1413,12 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
                   </div>
                   <div className="grid grid-cols-[150px_1fr_190px_220px] items-center border-t border-white/12 bg-[linear-gradient(180deg,#e5e7eb,#a1a1aa)] px-8 py-3 text-black md:px-10">
                     <div className="flex items-center gap-3">
-                      <span className="text-[1rem] font-black uppercase">Extras</span>
-                      <span className="text-[1.1rem] font-black">{visibleMomentPopup.extras}</span>
+                      <span className="text-[1rem] font-black uppercase">
+                        Extras
+                      </span>
+                      <span className="text-[1.1rem] font-black">
+                        {visibleMomentPopup.extras}
+                      </span>
                     </div>
                     <div className="text-center text-[1rem] font-black uppercase">
                       Overs {visibleMomentPopup.overs}
@@ -1504,31 +1515,43 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
                         shouldReduceMotion ? false : { opacity: 0, x: -10 }
                       }
                       animate={
-                        shouldReduceMotion ? { opacity: 1 } : { opacity: 1, x: 0 }
+                        shouldReduceMotion
+                          ? { opacity: 1 }
+                          : { opacity: 1, x: 0 }
                       }
                       transition={{ duration: 0.22 }}
                     >
                       {battingShort}
                     </motion.p>
-                    {(strikerLabel || bowlerLabel) ? (
+                    {strikerLabel || bowlerLabel ? (
                       <div className="flex min-w-0 flex-col gap-1 text-[0.58rem] font-black uppercase tracking-[0.06em] text-white/90 md:text-[0.72rem] xl:text-[0.84rem]">
                         {strikerLabel ? (
                           <div className="flex min-w-0 items-center gap-1.5">
-                            <span className="shrink-0 text-[#f7c948]">Striker</span>
-                            <span className="truncate text-white">{strikerLabel}</span>
+                            <span className="shrink-0 text-[#f7c948]">
+                              Striker
+                            </span>
+                            <span className="truncate text-white">
+                              {strikerLabel}
+                            </span>
                           </div>
                         ) : null}
                         {bowlerLabel ? (
                           <div className="flex min-w-0 items-center gap-1.5">
-                            <span className="shrink-0 text-[#f7c948]">Bowler</span>
-                            <span className="truncate text-white">{bowlerLabel}</span>
+                            <span className="shrink-0 text-[#f7c948]">
+                              Bowler
+                            </span>
+                            <span className="truncate text-white">
+                              {bowlerLabel}
+                            </span>
                           </div>
                         ) : null}
                       </div>
                     ) : null}
                     <div className="flex min-w-0 flex-col gap-1 text-[0.52rem] font-black uppercase tracking-[0.08em] text-white/68 md:text-[0.62rem] xl:text-[0.72rem]">
                       <span>
-                        {match?.innings === "second" ? "Chasing" : "Batting first"}
+                        {match?.innings === "second"
+                          ? "Chasing"
+                          : "Batting first"}
                       </span>
                       <span>
                         {targetRuns > 0
@@ -1610,7 +1633,9 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
                     </div>
                   </div>
                   <div className="mt-1 flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[0.5rem] font-black uppercase tracking-[0.08em] text-white/68 md:text-[0.62rem] xl:text-[0.72rem]">
-                    <span className="min-w-0 flex-1 truncate">{chaseLineText}</span>
+                    <span className="min-w-0 flex-1 truncate">
+                      {chaseLineText}
+                    </span>
                     <span className="shrink-0 text-right">
                       {match?.innings === "second"
                         ? "Second innings"

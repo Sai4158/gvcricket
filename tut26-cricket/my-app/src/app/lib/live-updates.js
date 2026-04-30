@@ -229,12 +229,6 @@ export function subscribeToMatch(matchId, callback) {
     Number(state.matchSubscribers.get(String(matchId)) || 0) + 1;
   state.matchSubscribers.set(String(matchId), nextCount);
   emitter.on(eventName, callback);
-  if (!state.matchWatcher || !state.sessionWatcher) {
-    void ensureLiveUpdates().catch((error) => {
-      console.error("Live updates ensure on subscribe failed:", error);
-      scheduleReconnect();
-    });
-  }
   return () => {
     emitter.off(eventName, callback);
     const currentCount = Number(state.matchSubscribers.get(String(matchId)) || 0);
@@ -255,12 +249,6 @@ export function subscribeToSession(sessionId, callback) {
     Number(state.sessionSubscribers.get(String(sessionId)) || 0) + 1;
   state.sessionSubscribers.set(String(sessionId), nextCount);
   emitter.on(eventName, callback);
-  if (!state.matchWatcher || !state.sessionWatcher) {
-    void ensureLiveUpdates().catch((error) => {
-      console.error("Live updates ensure on subscribe failed:", error);
-      scheduleReconnect();
-    });
-  }
   return () => {
     emitter.off(eventName, callback);
     const currentCount = Number(state.sessionSubscribers.get(String(sessionId)) || 0);

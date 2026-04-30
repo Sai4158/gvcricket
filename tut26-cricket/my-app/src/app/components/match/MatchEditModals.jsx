@@ -10,7 +10,7 @@
  */
 
 
-import { useEffect, useRef, useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { motion } from "framer-motion";
 import {
   FaMinus,
@@ -527,32 +527,16 @@ export function EditLiveStreamModal({
   const [isPasting, setIsPasting] = useState(false);
   const [showSavedState, setShowSavedState] = useState(false);
   const [isSharingSpectatorPage, setIsSharingSpectatorPage] = useState(false);
-  const normalizedPreview = normalizeYouTubeLiveStream(liveStreamUrl);
+  const deferredLiveStreamUrl = useDeferredValue(liveStreamUrl);
+  const normalizedPreview = normalizeYouTubeLiveStream(deferredLiveStreamUrl);
   const previewStream = normalizedPreview.ok
     ? normalizedPreview.value
     : existingStream;
   const hasTypedLink = String(liveStreamUrl || "").trim().length > 0;
-  const modalScrollRef = useRef(null);
-  const removeButtonRef = useRef(null);
   const spectatorUrl =
     match?.sessionId && typeof window !== "undefined"
       ? buildShareUrl(`/session/${match.sessionId}/view`, window.location.origin)
       : "";
-
-  useEffect(() => {
-    if (!hasTypedLink) {
-      return;
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      removeButtonRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [hasTypedLink, previewStream?.watchUrl]);
 
   const handleClearInput = () => {
     setLiveStreamUrl("");
@@ -661,18 +645,17 @@ export function EditLiveStreamModal({
       hideHeader
       panelClassName="max-w-md md:max-w-3xl xl:max-w-4xl max-h-[86vh] overflow-hidden"
     >
-      <button
-        type="button"
-        onClick={onClose}
-        className="absolute left-4 top-4 z-20 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/[0.12] text-white shadow-[0_12px_32px_rgba(255,255,255,0.12)] transition hover:bg-white/[0.18] hover:text-white"
-        aria-label="Close live stream popup"
-      >
-        <FaTimes className="text-lg" />
-      </button>
-      <div
-        ref={modalScrollRef}
-        className="max-h-[78vh] space-y-4 overflow-y-auto pr-1 pt-12 md:space-y-5 md:pr-2"
-      >
+      <div className="max-h-[78vh] space-y-4 overflow-y-auto pr-1 md:space-y-5 md:pr-2">
+        <div className="flex justify-start">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/[0.12] text-white shadow-[0_12px_32px_rgba(255,255,255,0.12)] transition hover:bg-white/[0.18] hover:text-white"
+            aria-label="Close live stream popup"
+          >
+            <FaTimes className="text-lg" />
+          </button>
+        </div>
         {showSavedState ? (
           <div className="space-y-4">
             <div className="rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_32%),linear-gradient(180deg,rgba(26,26,30,0.985),rgba(12,12,16,0.99))] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.28)] md:p-6">
@@ -842,7 +825,6 @@ export function EditLiveStreamModal({
             </LoadingButton>
           </div>
           <button
-            ref={removeButtonRef}
             type="button"
             onClick={handleRemoveStream}
             disabled={isUpdating || !existingStream?.watchUrl}
