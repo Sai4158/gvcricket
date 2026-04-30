@@ -81,6 +81,7 @@ import {
 export default function SessionViewClient({ sessionId, initialData }) {
   const initialWalkiePreferenceScope = initialData?.match?._id || sessionId || "";
   const [copied, setCopied] = useState(false);
+  const [overlayCopied, setOverlayCopied] = useState(false);
   const [isLeavingToSessions, setIsLeavingToSessions] = useState(false);
   const [data, setData] = useState(initialData || null);
   const [historyDetail, setHistoryDetail] = useState(null);
@@ -93,6 +94,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const [quickWalkieTalking, setQuickWalkieTalking] = useState(false);
   const [quickSpeakerTalking, setQuickSpeakerTalking] = useState(false);
   const [shouldLoadHistoryDetail, setShouldLoadHistoryDetail] = useState(false);
+  const [clientOrigin, setClientOrigin] = useState("");
   const lastAnnouncedEventRef = useRef("");
   const announcementDuckRef = useRef([]);
   const announcementRestoreTimerRef = useRef(null);
@@ -220,6 +222,14 @@ export default function SessionViewClient({ sessionId, initialData }) {
       window.cancelAnimationFrame(frameId);
     };
   }, [sessionId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    setClientOrigin(window.location.origin);
+  }, []);
 
   useEffect(() => {
     const element = inningsGridRef.current;
@@ -1459,6 +1469,34 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
   };
 
+  const overlayPath = `/session/${sessionId}/overlay`;
+  const overlayUrl = clientOrigin
+    ? new URL(overlayPath, clientOrigin).toString()
+    : overlayPath;
+
+  const handleCopyOverlayLink = useCallback(async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(overlayUrl);
+        setOverlayCopied(true);
+        window.setTimeout(() => setOverlayCopied(false), 2000);
+        return;
+      }
+
+      window.prompt("Copy overlay link", overlayUrl);
+    } catch (error) {
+      console.error("Overlay link copy failed:", error);
+    }
+  }, [overlayUrl]);
+
+  const handleOpenOverlayLink = useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.open(overlayUrl, "_blank", "noopener,noreferrer");
+  }, [overlayUrl]);
+
   const ensureSpectatorAnnouncerReady = useCallback(
     ({ userGesture = false, openPanel = false, forceEnable = false } = {}) => {
       if (forceEnable && !settings.enabled) {
@@ -1997,6 +2035,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
               stream={match.liveStream}
               title="Live Match Stream"
               subtitle="Watch the YouTube live stream before following the score below."
+              allowTheaterFullscreen
             />
           ) : null
         }
@@ -2058,6 +2097,70 @@ export default function SessionViewClient({ sessionId, initialData }) {
         teamBName={teamB.name}
         gridRef={inningsGridRef}
       />
+
+      <section className="mt-8 w-full max-w-4xl">
+        <div className="overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(247,201,72,0.12),transparent_26%),linear-gradient(180deg,rgba(20,20,20,0.96),rgba(9,9,9,0.96))] shadow-[0_24px_60px_rgba(0,0,0,0.32)]">
+          <div className="h-[2px] w-full bg-[linear-gradient(90deg,#f7c948_0%,#ffffff_50%,#e11d2e_100%)]" />
+          <div className="px-5 py-5 md:px-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-amber-300">
+                  Streaming Overlay
+                </p>
+                <p className="mt-1 text-xl font-black text-white">
+                  Use this browser-source link for live score overlay
+                </p>
+                <p className="mt-2 text-sm leading-6 text-zinc-300">
+                  Add this URL to OBS or Streamlabs as a Browser Source. It shows the live
+                  score overlay only, without the spectator page UI.
+                </p>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyOverlayLink}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/8 px-4 py-2 text-sm font-bold text-white transition hover:border-white/20 hover:bg-white/12"
+                >
+                  {overlayCopied ? <FaCheck /> : <FaShareAlt />}
+                  {overlayCopied ? "Copied" : "Copy Link"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenOverlayLink}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-amber-300/30 bg-amber-300/10 px-4 py-2 text-sm font-bold text-amber-100 transition hover:border-amber-200/40 hover:bg-amber-300/14"
+                >
+                  Open Overlay
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
+              <p className="break-all font-mono text-sm text-white">{overlayUrl}</p>
+            </div>
+
+            <div className="mt-4 grid gap-3 text-sm text-zinc-300 md:grid-cols-3">
+              <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
+                <p className="font-black uppercase tracking-[0.18em] text-amber-200">OBS</p>
+                <p className="mt-1 leading-6">
+                  In OBS: add a Browser Source under Sources, then paste the overlay link.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
+                <p className="font-black uppercase tracking-[0.18em] text-amber-200">Size</p>
+                <p className="mt-1 leading-6">
+                  Set width `1920` and height `1080` for a full HD stream overlay.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
+                <p className="font-black uppercase tracking-[0.18em] text-amber-200">Local Use</p>
+                <p className="mt-1 leading-6">
+                  If OBS runs on another device, replace `localhost` with your computer LAN IP.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {
