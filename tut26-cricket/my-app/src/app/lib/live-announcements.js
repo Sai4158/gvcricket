@@ -558,6 +558,15 @@ function buildChaseEquationLine(match) {
   return `${runsNeeded} needed from ${formatRemainingBalls(match)}.`;
 }
 
+function isFinalOversChaseWindow(match) {
+  if (match?.innings !== "second") {
+    return false;
+  }
+
+  const ballsRemaining = getBallsRemaining(match);
+  return ballsRemaining > 0 && ballsRemaining <= 12;
+}
+
 // Decides whether the chase equation is worth reading after an event.
 function shouldCallChaseEquation(event, match) {
   if (!event || !buildChaseEquationLine(match)) {
@@ -577,7 +586,15 @@ function shouldCallChaseEquation(event, match) {
     return true;
   }
 
-  if (!event.ball || !isLegalBall(event.ball)) {
+  if (!event.ball) {
+    return false;
+  }
+
+  if (isFinalOversChaseWindow(match)) {
+    return true;
+  }
+
+  if (!isLegalBall(event.ball)) {
     return false;
   }
 
