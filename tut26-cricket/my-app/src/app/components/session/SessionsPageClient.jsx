@@ -13,7 +13,7 @@
  * Read next: ./README.md
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -27,13 +27,16 @@ import {
   FaSlidersH,
   FaTrash,
   FaTimes,
+  FaYoutube,
 } from "react-icons/fa";
+import { LuClipboardPaste } from "react-icons/lu";
 import DarkSelect from "../shared/DarkSelect";
 import LoadingButton from "../shared/LoadingButton";
 import PendingLink from "../shared/PendingLink";
 import SessionCard from "./SessionCard";
 import { verifyImageActionPin } from "../../lib/image-pin-client";
 import { buildPinRequestError } from "../../lib/pin-attempt-client";
+import { normalizeYouTubeLiveStream } from "../../lib/youtube-live-stream";
 import { useRouteFeedback } from "../shared/RouteFeedbackProvider";
 
 const InfoModal = dynamic(() => import("./InfoModal"), { ssr: false });
@@ -86,6 +89,7 @@ const EMPTY_MANAGE_FORM = {
   name: "",
   teamAName: "",
   teamBName: "",
+  liveStreamUrl: "",
 };
 
 // Small helpers for search and sorting.
@@ -420,6 +424,18 @@ export default function SessionsPageClient({
         : null,
     [manageSessionContext?.sessionId, sessions],
   );
+  const deferredManageLiveStreamUrl = useDeferredValue(manageForm.liveStreamUrl);
+  const normalizedManageLiveStreamPreview = useMemo(() => {
+    const trimmedUrl = String(deferredManageLiveStreamUrl || "").trim();
+    if (!trimmedUrl) {
+      return { ok: false, message: "", value: null };
+    }
+
+    const normalized = normalizeYouTubeLiveStream(trimmedUrl);
+    return normalized.ok
+      ? normalized
+      : { ok: false, message: normalized.message, value: null };
+  }, [deferredManageLiveStreamUrl]);
 
   const buildSessionsQuery = useCallback(
     ({
@@ -552,19 +568,27 @@ export default function SessionsPageClient({
       name: String(manageForm.name || "").trim(),
       teamAName: String(manageForm.teamAName || "").trim(),
       teamBName: String(manageForm.teamBName || "").trim(),
+      liveStreamUrl: String(manageForm.liveStreamUrl || "").trim(),
     }),
-    [manageForm.name, manageForm.teamAName, manageForm.teamBName],
+    [
+      manageForm.name,
+      manageForm.teamAName,
+      manageForm.teamBName,
+      manageForm.liveStreamUrl,
+    ],
   );
   const normalizedManageInitialForm = useMemo(
     () => ({
       name: String(manageInitialForm.name || "").trim(),
       teamAName: String(manageInitialForm.teamAName || "").trim(),
       teamBName: String(manageInitialForm.teamBName || "").trim(),
+      liveStreamUrl: String(manageInitialForm.liveStreamUrl || "").trim(),
     }),
     [
       manageInitialForm.name,
       manageInitialForm.teamAName,
       manageInitialForm.teamBName,
+      manageInitialForm.liveStreamUrl,
     ],
   );
   const isManageFormDirty = useMemo(
@@ -572,7 +596,9 @@ export default function SessionsPageClient({
       normalizedManageForm.name !== normalizedManageInitialForm.name ||
       normalizedManageForm.teamAName !==
         normalizedManageInitialForm.teamAName ||
-      normalizedManageForm.teamBName !== normalizedManageInitialForm.teamBName,
+      normalizedManageForm.teamBName !== normalizedManageInitialForm.teamBName ||
+      normalizedManageForm.liveStreamUrl !==
+        normalizedManageInitialForm.liveStreamUrl,
     [
       normalizedManageForm.name,
       normalizedManageForm.teamAName,
@@ -963,6 +989,8 @@ export default function SessionsPageClient({
       name: session.name || "",
       teamAName: session.teamAName || "",
       teamBName: session.teamBName || "",
+      liveStreamUrl:
+        session?.liveStream?.inputUrl || session?.liveStream?.watchUrl || "",
     };
     setManageForm(nextForm);
     setManageInitialForm(nextForm);
@@ -1061,6 +1089,31 @@ export default function SessionsPageClient({
     }));
   }, []);
 
+  const handlePasteManageLiveStreamLink = useCallback(async () => {
+    if (!navigator?.clipboard?.readText) {
+      setManageError("Paste is not supported in this browser.");
+      return;
+    }
+
+    try {
+      const pastedText = await navigator.clipboard.readText();
+      if (!String(pastedText || "").trim()) {
+        setManageError("Clipboard is empty.");
+        return;
+      }
+
+      handleManageFieldChange("liveStreamUrl", String(pastedText || "").trim());
+      setManageError("");
+    } catch {
+      setManageError("Could not paste the YouTube link. Try pasting it manually.");
+    }
+  }, [handleManageFieldChange]);
+
+  const handleClearManageLiveStreamLink = useCallback(() => {
+    handleManageFieldChange("liveStreamUrl", "");
+    setManageError("");
+  }, [handleManageFieldChange]);
+
   const handleManageSessionSave = useCallback(async () => {
     if (!manageSessionContext?.sessionId || manageSubmitting) {
       return;
@@ -1074,6 +1127,7 @@ export default function SessionsPageClient({
         sessions.find(
           (session) => session._id === manageSessionContext.sessionId,
         ) || null;
+      const trimmedLiveStreamUrl = String(manageForm.liveStreamUrl || "").trim();
       const response = await fetch(
         `/api/sessions/${manageSessionContext.sessionId}`,
         {
@@ -1095,6 +1149,67 @@ export default function SessionsPageClient({
         throw new Error(payload.message || "Could not update session.");
       }
 
+      if (previousSession?.match) {
+        if (trimmedLiveStreamUrl) {
+          const normalizedStream =
+            normalizeYouTubeLiveStream(trimmedLiveStreamUrl);
+          if (!normalizedStream.ok) {
+            throw new Error(normalizedStream.message);
+          }
+
+          const liveStreamResponse = await fetch(
+            `/api/matches/${previousSession.match}/live-stream`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                pin: manageSessionContext.pin,
+                liveStreamUrl: trimmedLiveStreamUrl,
+              }),
+            },
+          );
+          const liveStreamPayload = await liveStreamResponse
+            .json()
+            .catch(() => ({ message: "Could not update live stream." }));
+
+          if (!liveStreamResponse.ok) {
+            throw new Error(
+              liveStreamPayload.message || "Could not update live stream.",
+            );
+          }
+
+          mergeMatchImageUpdateIntoSession(
+            manageSessionContext.sessionId,
+            liveStreamPayload,
+          );
+        } else if (previousSession?.liveStream?.watchUrl) {
+          const liveStreamResponse = await fetch(
+            `/api/matches/${previousSession.match}/live-stream`,
+            {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                pin: manageSessionContext.pin,
+              }),
+            },
+          );
+          const liveStreamPayload = await liveStreamResponse
+            .json()
+            .catch(() => ({ message: "Could not remove live stream." }));
+
+          if (!liveStreamResponse.ok) {
+            throw new Error(
+              liveStreamPayload.message || "Could not remove live stream.",
+            );
+          }
+
+          mergeMatchImageUpdateIntoSession(
+            manageSessionContext.sessionId,
+            liveStreamPayload,
+          );
+        }
+      }
+
       const changedItems = [
         describeSessionFieldChange(
           "Game name",
@@ -1110,6 +1225,13 @@ export default function SessionsPageClient({
           "Team B",
           previousSession?.teamBName || "",
           payload.teamBName || manageForm.teamBName.trim(),
+        ),
+        describeSessionFieldChange(
+          "YouTube link",
+          previousSession?.liveStream?.watchUrl ||
+            previousSession?.liveStream?.inputUrl ||
+            "",
+          trimmedLiveStreamUrl,
         ),
       ].filter(Boolean);
 
@@ -1139,8 +1261,10 @@ export default function SessionsPageClient({
     manageForm.name,
     manageForm.teamAName,
     manageForm.teamBName,
+    manageForm.liveStreamUrl,
     manageSessionContext,
     manageSubmitting,
+    mergeMatchImageUpdateIntoSession,
     mergeSessionUpdateIntoList,
     reloadSessionsFromServer,
     sessions,
@@ -1834,6 +1958,67 @@ export default function SessionsPageClient({
                   className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-white outline-none transition focus:border-emerald-300/28 focus:bg-white/[0.06]"
                 />
               </label>
+              {managedSession?.match ? (
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <span className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                      YouTube Link
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={
+                          String(manageForm.liveStreamUrl || "").trim()
+                            ? handleClearManageLiveStreamLink
+                            : handlePasteManageLiveStreamLink
+                        }
+                        className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-200 transition hover:bg-white/[0.08]"
+                      >
+                        {String(manageForm.liveStreamUrl || "").trim() ? (
+                          <FaTimes className="text-sm" />
+                        ) : (
+                          <LuClipboardPaste className="text-sm" />
+                        )}
+                        {String(manageForm.liveStreamUrl || "").trim()
+                          ? "Clear"
+                          : "Paste"}
+                      </button>
+                    </div>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={manageForm.liveStreamUrl}
+                    onChange={(event) =>
+                      handleManageFieldChange("liveStreamUrl", event.target.value)
+                    }
+                    placeholder="Paste watch, live, share, shorts, embed, or youtu.be link"
+                    className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-zinc-500 focus:border-emerald-300/28 focus:bg-white/[0.06]"
+                  />
+                  {normalizedManageLiveStreamPreview.ok &&
+                  normalizedManageLiveStreamPreview.value?.watchUrl ? (
+                    <div className="mt-3 flex items-center gap-2 rounded-2xl border border-red-400/18 bg-red-500/8 px-3 py-2 text-sm text-red-100">
+                      <FaYoutube className="text-red-300" />
+                      <span className="truncate">
+                        {normalizedManageLiveStreamPreview.value.watchUrl}
+                      </span>
+                    </div>
+                  ) : managedSession?.liveStream?.watchUrl &&
+                    !String(manageForm.liveStreamUrl || "").trim() ? (
+                    <div className="mt-3 flex items-center gap-2 rounded-2xl border border-red-400/18 bg-red-500/8 px-3 py-2 text-sm text-red-100">
+                      <FaYoutube className="text-red-300" />
+                      <span className="truncate">
+                        {managedSession.liveStream.watchUrl}
+                      </span>
+                    </div>
+                  ) : null}
+                  {String(manageForm.liveStreamUrl || "").trim() &&
+                  !normalizedManageLiveStreamPreview.ok ? (
+                    <p className="mt-3 text-sm text-amber-200">
+                      {normalizedManageLiveStreamPreview.message}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               {manageError ? (
                 <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
                   {manageError}
@@ -1846,7 +2031,9 @@ export default function SessionsPageClient({
                   disabled={
                     !manageForm.name.trim() ||
                     !manageForm.teamAName.trim() ||
-                    !manageForm.teamBName.trim()
+                    !manageForm.teamBName.trim() ||
+                    (String(manageForm.liveStreamUrl || "").trim().length > 0 &&
+                      !normalizedManageLiveStreamPreview.ok)
                   }
                   loading={manageSubmitting}
                   pendingLabel="Saving..."
