@@ -140,11 +140,13 @@ export async function PUT(req, { params }) {
       return jsonError("Match not found.", 404);
     }
     const finalizedMatch = await finalizePendingResultIfExpired(match);
+    const mediaUpdatedAt = new Date();
 
     finalizedMatch.liveStream = {
       ...normalizedStream.value,
-      updatedAt: new Date().toISOString(),
+      updatedAt: mediaUpdatedAt.toISOString(),
     };
+    finalizedMatch.mediaUpdatedAt = mediaUpdatedAt;
     finalizedMatch.lastEventType = "live_stream_update";
     finalizedMatch.lastEventText = "Live stream updated.";
     finalizedMatch.lastLiveEvent = {
@@ -254,8 +256,10 @@ export async function DELETE(req, { params }) {
       return jsonError("Match not found.", 404);
     }
     const finalizedMatch = await finalizePendingResultIfExpired(match);
+    const mediaUpdatedAt = new Date();
 
     finalizedMatch.liveStream = null;
+    finalizedMatch.mediaUpdatedAt = mediaUpdatedAt;
     finalizedMatch.lastEventType = "live_stream_update";
     finalizedMatch.lastEventText = "Live stream removed.";
     finalizedMatch.lastLiveEvent = {

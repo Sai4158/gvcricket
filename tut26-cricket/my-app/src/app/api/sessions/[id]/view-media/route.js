@@ -19,11 +19,16 @@ export async function GET(_req, { params }) {
       return jsonError("Session not found.", 404);
     }
 
-    return Response.json(payload.media, {
-      headers: {
-        "Cache-Control": "no-store",
+    return Response.json(
+      {
+        media: payload.media,
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      },
+    );
   } catch {
     return jsonError("Failed to load session media.", 500);
   }

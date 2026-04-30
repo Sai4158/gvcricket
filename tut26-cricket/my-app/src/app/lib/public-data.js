@@ -768,6 +768,7 @@ export function serializeSessionViewMedia(matchDocument, fallbackState = null) {
   return {
     matchImageUrl: publicImages[0]?.url || getPublicMatchImagePath(match),
     matchImages: publicImages,
+    liveStream: getPublicLiveStream(match, fallbackState),
     mediaVersion: getMediaVersion(match),
     updatedAt: match.updatedAt || null,
   };
