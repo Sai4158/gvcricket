@@ -22,6 +22,7 @@ import {
   getPersistentWalkieSnapshot,
   setPersistentWalkieEnabled,
 } from "../../../../lib/walkie-store";
+import { publishMatchUpdate } from "../../../../lib/live-updates";
 import Match from "../../../../../models/Match";
 
 async function hasMatchAccess(matchId, accessVersion) {
@@ -57,6 +58,26 @@ export async function POST(req, { params }) {
 
     const { enabled } = parsedRequest.value;
     const snapshot = await setPersistentWalkieEnabled(id, enabled);
+
+    // Mirror the shared on/off flag onto the Match doc so the umpire client
+    // (which derives `signalingActive` from `match.walkieTalkieEnabled` via
+    // SSE) auto-resumes RTM signaling on reload — without this mirror, the
+    // umpire would have to toggle again after every page refresh.
+    if (Boolean(match.walkieTalkieEnabled) !== Boolean(enabled)) {
+      await Match.updateOne(
+        { _id: match._id },
+        {
+          $set: {
+            walkieTalkieEnabled: Boolean(enabled),
+            walkieTalkieUpdatedAt: new Date(),
+          },
+        },
+        { timestamps: false },
+      ).catch((error) => {
+        console.error("Could not mirror walkie state to match:", error);
+      });
+      publishMatchUpdate(match._id);
+    }
 
     await writeAuditLog({
       action: enabled ? "walkie_enabled" : "walkie_disabled",

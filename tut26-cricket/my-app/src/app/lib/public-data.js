@@ -570,6 +570,7 @@ export function serializePublicMatch(
     announcerBroadcastScoreSoundEffectsEnabled:
       match.announcerBroadcastScoreSoundEffectsEnabled !== false,
     announcerScoreSoundEffectMap,
+    walkieTalkieEnabled: Boolean(match.walkieTalkieEnabled),
     recentActionIds: getPublicRecentActionIds(match),
     lastLiveEvent: match.lastLiveEvent || null,
     lastEventType: match.lastEventType || "",

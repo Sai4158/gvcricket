@@ -16,6 +16,7 @@ import {
 import { parseJsonRequest } from "../../../../../lib/request-security";
 import { walkieRespondSchema } from "../../../../../lib/validators";
 import { respondToPersistentWalkieRequest } from "../../../../../lib/walkie-store";
+import { publishMatchUpdate } from "../../../../../lib/live-updates";
 import Match from "../../../../../../models/Match";
 
 async function hasMatchAccess(matchId, accessVersion) {
@@ -54,6 +55,29 @@ export async function POST(req, { params }) {
   const result = await respondToPersistentWalkieRequest(id, parsedRequest.value);
   if (!result.ok) {
     return jsonError(result.message, result.status);
+  }
+
+  // Accepting a request flips the shared walkie state to enabled. Mirror that
+  // onto the Match doc so the umpire client's SSE-driven `signalingActive`
+  // gate (which reads match.walkieTalkieEnabled) catches up immediately.
+  if (
+    parsedRequest.value.action === "accept" &&
+    Boolean(result.snapshot?.enabled) &&
+    !match.walkieTalkieEnabled
+  ) {
+    await Match.updateOne(
+      { _id: match._id },
+      {
+        $set: {
+          walkieTalkieEnabled: true,
+          walkieTalkieUpdatedAt: new Date(),
+        },
+      },
+      { timestamps: false },
+    ).catch((error) => {
+      console.error("Could not mirror walkie accept to match:", error);
+    });
+    publishMatchUpdate(match._id);
   }
 
   return Response.json(
