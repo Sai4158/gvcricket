@@ -1091,7 +1091,11 @@ export function buildSessionMirrorUpdate(matchDocument) {
     outs: Number(match?.outs || 0),
     innings: match?.innings || "",
     result: resultText,
-    pendingResult: normalizeMatchResultText(match, match?.pendingResult || ""),
+    pendingResult:
+      resultText &&
+      resultText === normalizeMatchResultText(match, match?.pendingResult || "")
+        ? ""
+        : normalizeMatchResultText(match, match?.pendingResult || ""),
     winningTeamName:
       isTied
         ? ""

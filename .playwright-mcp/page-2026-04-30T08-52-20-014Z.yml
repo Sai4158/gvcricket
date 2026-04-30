@@ -1,0 +1,165 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - button "Back to Sessions" [ref=e4]:
+        - img [ref=e5]
+        - text: Back
+      - generic [ref=e10]: Live Spectator View
+      - button "Share Link" [ref=e11]:
+        - img [ref=e12]
+    - generic [ref=e14]:
+      - img "Match cover" [ref=e16]
+      - generic [ref=e21]:
+        - button "Scroll to bottom" [ref=e22]:
+          - img [ref=e23]
+        - heading "Umpire Flow 1777539038911" [level=1] [ref=e27]:
+          - generic [ref=e28]:
+            - generic [ref=e29]: Umpire Flow 1777539038911
+            - generic: Umpire Flow 1777539038911
+        - generic [ref=e32]:
+          - paragraph [ref=e33]: Blue Blazers
+          - paragraph [ref=e34]: 16/1
+          - generic [ref=e35]:
+            - generic [ref=e37]:
+              - paragraph [ref=e38]: Players
+              - paragraph [ref=e39]: "3"
+            - generic [ref=e41]:
+              - paragraph [ref=e42]: Overs
+              - paragraph [ref=e43]: "1.0"
+            - generic [ref=e45]:
+              - paragraph [ref=e46]: Target
+              - paragraph [ref=e47]: "16"
+        - generic [ref=e50]:
+          - generic [ref=e51]:
+            - generic [ref=e52]: RATE 16.00
+            - heading "OVER 1" [level=3] [ref=e53]
+            - generic [ref=e54]: OVER DONE
+          - generic [ref=e56]:
+            - generic [ref=e58]:
+              - generic [ref=e59]: "6"
+              - generic [ref=e60]: "1"
+            - generic [ref=e62]:
+              - generic [ref=e63]: "3"
+              - generic [ref=e64]: "2"
+            - generic [ref=e66]:
+              - generic [ref=e67]: W
+              - generic [ref=e68]: "3"
+            - generic [ref=e70]:
+              - generic [ref=e71]: "2"
+              - generic [ref=e72]: "4"
+            - generic [ref=e74]:
+              - generic [ref=e75]: Wd+1
+              - generic [ref=e76]: .
+            - generic [ref=e78]:
+              - generic [ref=e79]: NB+1
+              - generic [ref=e80]: .
+            - generic [ref=e82]:
+              - generic [ref=e83]: "1"
+              - generic [ref=e84]: "5"
+            - generic [ref=e86]:
+              - generic [ref=e87]: "2"
+              - generic [ref=e88]: "6"
+    - generic [ref=e90]:
+      - button "Open loudspeaker" [ref=e91]:
+        - generic [ref=e92]:
+          - generic [ref=e93]:
+            - img [ref=e96]
+            - switch "Toggle loudspeaker" [ref=e99]
+          - generic [ref=e102]:
+            - generic [ref=e103]: Loudspeaker
+            - generic [ref=e104]: Use phone as a mic.
+      - button "Open score announcer" [ref=e105]:
+        - generic [ref=e106]:
+          - generic [ref=e107]:
+            - button "Announce current score" [ref=e108]:
+              - img [ref=e109]
+            - switch "Toggle score announcer" [checked] [ref=e112]
+          - generic [ref=e115]:
+            - generic [ref=e116]: Score Announcer
+            - generic [ref=e117]: Reads each update.
+          - img [ref=e120]
+    - generic [ref=e122]:
+      - generic [ref=e123]:
+        - generic [ref=e125]:
+          - generic [ref=e127]:
+            - heading "Blue Blazers" [level=2] [ref=e128]
+            - generic [ref=e129]: Innings completed
+          - generic [ref=e130]:
+            - generic [ref=e131]: "16"
+            - generic [ref=e132]: Runs
+          - paragraph [ref=e133]: Target 16
+        - generic [ref=e134]: "Run Rate: 16.00"
+        - generic [ref=e215]:
+          - paragraph [ref=e216]: Over 1
+          - generic [ref=e217]:
+            - generic [ref=e218]: "6"
+            - generic [ref=e219]: "3"
+            - generic [ref=e220]: W
+            - generic [ref=e221]: "2"
+            - generic [ref=e222]: Wd+1
+            - generic [ref=e223]: NB+1
+            - generic [ref=e224]: "1"
+            - generic [ref=e225]: "2"
+      - generic [ref=e137]:
+        - generic [ref=e139]:
+          - generic [ref=e141]:
+            - heading "Red Rockets" [level=2] [ref=e142]
+            - generic [ref=e143]: Innings completed
+          - generic [ref=e144]:
+            - generic [ref=e145]: "15"
+            - generic [ref=e146]: Runs
+          - paragraph [ref=e147]: "Target set: 16"
+        - generic [ref=e148]: "Run Rate: 15.00"
+        - generic [ref=e226]:
+          - paragraph [ref=e227]: Over 1
+          - generic [ref=e228]:
+            - generic [ref=e229]: .
+            - generic [ref=e230]: "1"
+            - generic [ref=e231]: "2"
+            - generic [ref=e232]: Wd+1
+            - generic [ref=e233]: NB+1
+            - generic [ref=e234]: W
+            - generic [ref=e235]: "4"
+            - generic [ref=e236]: "6"
+    - generic [ref=e154]:
+      - generic [ref=e155]:
+        - generic [ref=e156]:
+          - paragraph [ref=e157]: YouTube Streaming Overlay
+          - paragraph [ref=e158]: Open this live-score overlay for streaming.
+        - generic [ref=e159]:
+          - button "Copy Link" [ref=e160]:
+            - img [ref=e161]
+            - text: Copy Link
+          - button "Open" [ref=e163]
+      - paragraph [ref=e165]: http://127.0.0.1:3000/session/69f317df27d4d7dff29a54bb/overlay
+      - generic [ref=e172]:
+        - generic [ref=e173]:
+          - paragraph [ref=e174]: Preview
+          - paragraph [ref=e175]: Team A 84/2
+          - paragraph [ref=e176]: Overs 8.4
+        - generic [ref=e177]:
+          - generic [ref=e178]: "1"
+          - generic [ref=e179]: "4"
+          - generic [ref=e180]: Wd
+          - generic [ref=e181]: "2"
+    - generic [ref=e183]:
+      - button "Back to top" [ref=e185]:
+        - img [ref=e186]
+      - generic [ref=e189]: Footer divider
+      - img "GV Cricket logo" [ref=e191]
+      - navigation "Popular pages" [ref=e193]:
+        - paragraph [ref=e194]: Popular Pages
+        - generic [ref=e195]:
+          - link "Start Match" [ref=e196] [cursor=pointer]:
+            - /url: /session/new
+          - link "View All Games" [ref=e197] [cursor=pointer]:
+            - /url: /session
+          - link "Updates" [ref=e198] [cursor=pointer]:
+            - /url: /update
+      - paragraph [ref=e200]: © 2026 GV Cricket. All rights reserved.
+      - paragraph [ref=e202]: GV Cricket brings live score, umpire mode, spectator view, director controls, walkie-talkie, and results into one fast mobile flow.
+      - link "gvcricket.com" [ref=e204] [cursor=pointer]:
+        - /url: https://gvcricket.com
+  - button "Open Next.js Dev Tools" [ref=e210] [cursor=pointer]:
+    - img [ref=e211]
+  - alert [ref=e214]

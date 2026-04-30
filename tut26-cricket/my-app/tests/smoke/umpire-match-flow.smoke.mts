@@ -368,6 +368,11 @@ async function main() {
     "Blue Blazers won by 2 wickets.",
     "winner should finalize correctly"
   );
+  assert.equal(
+    finalizeSecondInnings.body.match.pendingResult,
+    "",
+    "pending result should clear after final confirmation"
+  );
 
   const sessionIndexResult = await json("/api/sessions", {}, anonymous);
   assert.equal(sessionIndexResult.response.status, 200, "sessions index should load");

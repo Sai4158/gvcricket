@@ -14,6 +14,7 @@ export function buildContentSecurityPolicy() {
     "'unsafe-eval'",
     "'wasm-unsafe-eval'",
     "https://vercel.live",
+    "https://va.vercel-scripts.com",
     "https://www.youtube.com",
     "https://www.youtube-nocookie.com",
     "https://s.ytimg.com",

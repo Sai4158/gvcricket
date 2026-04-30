@@ -729,7 +729,7 @@ export function buildSpectatorScoreAnnouncement(event, match) {
   const parts = [];
   parts.push(buildScoreSentence(event.score, event.outs));
 
-  const reminder = buildSmartScoreReminder(event, match);
+  const reminder = buildProgressReminder(event, match);
   if (reminder) {
     parts.push(reminder);
   }

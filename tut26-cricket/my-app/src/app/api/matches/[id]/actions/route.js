@@ -452,6 +452,15 @@ export async function POST(req, { params }) {
       }
     }
 
+    if (
+      String(nextState?.result || "").trim() &&
+      !String(nextState?.pendingResult || "").trim()
+    ) {
+      updatePayload.pendingResult = "";
+      updatePayload.pendingResultAt = null;
+      updatePayload.resultAutoFinalizeAt = null;
+    }
+
     const updatedMatch = await Match.findByIdAndUpdate(
       id,
       { $set: updatePayload },

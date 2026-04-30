@@ -363,6 +363,34 @@ function getPublicLiveStream(match, fallbackState = null) {
   return normalizeStoredLiveStream(match?.liveStream || fallbackState?.liveStream || null);
 }
 
+function getEffectivePendingResult(match) {
+  const resultText = normalizeMatchResultText(match, match?.result || "");
+  const pendingResultText = normalizeMatchResultText(
+    match,
+    match?.pendingResult || "",
+  );
+
+  if (!pendingResultText) {
+    return "";
+  }
+
+  if (resultText && resultText === pendingResultText) {
+    return "";
+  }
+
+  return pendingResultText;
+}
+
+function getEffectivePendingResultAt(match) {
+  return getEffectivePendingResult(match) ? match?.pendingResultAt || null : null;
+}
+
+function getEffectiveResultAutoFinalizeAt(match) {
+  return getEffectivePendingResult(match)
+    ? match?.resultAutoFinalizeAt || null
+    : null;
+}
+
 export function serializeLiveMatchPatch(matchDocument) {
   if (!matchDocument) {
     return null;
@@ -384,9 +412,9 @@ export function serializeLiveMatchPatch(matchDocument) {
     tossDecision: match?.tossDecision || "",
     tossReady: hasCompleteTossState(match),
     result: normalizeMatchResultText(match, match?.result || ""),
-    pendingResult: normalizeMatchResultText(match, match?.pendingResult || ""),
-    pendingResultAt: match?.pendingResultAt || null,
-    resultAutoFinalizeAt: match?.resultAutoFinalizeAt || null,
+    pendingResult: getEffectivePendingResult(match),
+    pendingResultAt: getEffectivePendingResultAt(match),
+    resultAutoFinalizeAt: getEffectiveResultAutoFinalizeAt(match),
     isOngoing: Boolean(match?.isOngoing),
     undoCount: getPublicUndoCount(match),
     recentActionIds: getPublicRecentActionIds(match),
@@ -478,9 +506,9 @@ export function serializeUmpireBootstrap(matchDocument, fallbackState = null) {
     isOngoing: Boolean(match.isOngoing),
     innings: match.innings || "first",
     result: normalizeMatchResultText(match, match.result || ""),
-    pendingResult: normalizeMatchResultText(match, match.pendingResult || ""),
-    pendingResultAt: match.pendingResultAt || null,
-    resultAutoFinalizeAt: match.resultAutoFinalizeAt || null,
+    pendingResult: getEffectivePendingResult(match),
+    pendingResultAt: getEffectivePendingResultAt(match),
+    resultAutoFinalizeAt: getEffectiveResultAutoFinalizeAt(match),
     innings1: buildUmpireInnings(match, "innings1", activeInningsKey === "innings1"),
     innings2: buildUmpireInnings(match, "innings2", activeInningsKey === "innings2"),
     balls: Array.isArray(match.balls) ? match.balls : [],
@@ -548,9 +576,9 @@ export function serializePublicMatch(
     isOngoing: Boolean(match.isOngoing),
     innings: match.innings || "first",
     result: normalizeMatchResultText(match, match.result || ""),
-    pendingResult: normalizeMatchResultText(match, match.pendingResult || ""),
-    pendingResultAt: match.pendingResultAt || null,
-    resultAutoFinalizeAt: match.resultAutoFinalizeAt || null,
+    pendingResult: getEffectivePendingResult(match),
+    pendingResultAt: getEffectivePendingResultAt(match),
+    resultAutoFinalizeAt: getEffectiveResultAutoFinalizeAt(match),
     innings1: match.innings1 || { team: "", score: 0, history: [] },
     innings2: match.innings2 || { team: "", score: 0, history: [] },
     tossReady: hasCompleteTossState(match, fallbackState),
@@ -677,9 +705,9 @@ export function serializeSessionViewBootstrap(
     isOngoing: Boolean(match.isOngoing),
     innings: match.innings || "first",
     result: normalizeMatchResultText(match, match.result || ""),
-    pendingResult: normalizeMatchResultText(match, match.pendingResult || ""),
-    pendingResultAt: match.pendingResultAt || null,
-    resultAutoFinalizeAt: match.resultAutoFinalizeAt || null,
+    pendingResult: getEffectivePendingResult(match),
+    pendingResultAt: getEffectivePendingResultAt(match),
+    resultAutoFinalizeAt: getEffectiveResultAutoFinalizeAt(match),
     innings1: buildCompactInnings(match, "innings1"),
     innings2: buildCompactInnings(match, "innings2"),
     matchImageUrl: getPublicMatchImageUrl(match, fallbackState),
