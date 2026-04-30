@@ -54,13 +54,27 @@ function compactLabel(value = "", maxLength = 18) {
   return `${safeValue.slice(0, maxLength - 1).trimEnd()}...`;
 }
 
+function formatWonByText(resultText = "") {
+  const safeResult = String(resultText || "").trim();
+  if (!safeResult) {
+    return "";
+  }
+
+  const wonByMatch = safeResult.match(/won\s+by\s+(.+)$/i);
+  if (wonByMatch?.[1]) {
+    return `Won by ${wonByMatch[1].trim()}`;
+  }
+
+  return safeResult;
+}
+
 function buildStatusText(match) {
   if (!match) {
     return "";
   }
 
   if (match.result) {
-    return String(match.result).trim();
+    return formatWonByText(match.result);
   }
 
   if (match.pendingResult) {
@@ -99,7 +113,7 @@ function buildTopRightText(match, targetRuns, chaseRunsLeft, chaseWicketsLeft) {
   }
 
   if (match.result) {
-    return String(match.result).trim();
+    return formatWonByText(match.result);
   }
 
   if (match.pendingResult) {
@@ -163,11 +177,11 @@ function getScenarioMessage(
   }
 
   if (eventType === "target_chased") {
-    return resultText || `${innings2Team} chased the target successfully.`;
+    return formatWonByText(resultText) || `${innings2Team} chased the target successfully.`;
   }
 
   if (eventType === "match_end" || resultText) {
-    return resultText || "Match complete.";
+    return formatWonByText(resultText) || "Match complete.";
   }
 
   if (targetRuns > 0) {
@@ -450,9 +464,9 @@ function buildResultPopup(match, winnerName) {
   return {
     key: `result-${match?._id || "match"}-${resultText || match?.lastLiveEvent?.id}`,
     eyebrow: "Match complete",
-    title: winnerName ? `Congrats ${winnerName}` : "Result confirmed",
-    meta: resultText || "Target chased",
-    detail: "Final result",
+    title: winnerName || "Result",
+    meta: formatWonByText(resultText) || "Target chased",
+    detail: "Full time",
     type: "result",
   };
 }
@@ -964,19 +978,19 @@ function buildOverlayInsights({
     insights.push({
       key: "target-pressure",
       label: `${chaseRunsLeft} to win`,
-      detail: `${inningsBallsLeft} balls left in the chase`,
+      detail: `${inningsBallsLeft} balls remaining`,
     });
 
     insights.push({
       key: "required-rate",
       label: `Req rate ${calculateRequiredRate(chaseRunsLeft, inningsBallsLeft)}`,
-      detail: `Target ${targetRuns} | Score ${Number(match?.score || 0)}/${Number(match?.outs || 0)}`,
+      detail: `Target ${targetRuns} | ${Number(match?.score || 0)}/${Number(match?.outs || 0)}`,
     });
   } else {
     insights.push({
       key: "innings-build",
       label: `${Number(match?.score || 0)} on the board`,
-      detail: `${inningsBallsLeft} balls left in the innings`,
+      detail: `${inningsBallsLeft} balls remaining`,
     });
 
     insights.push({
@@ -986,10 +1000,10 @@ function buildOverlayInsights({
     });
   }
 
-  insights.push({
-    key: "current-over",
-    label: `Over ${currentOverLabel} moving`,
-    detail: `${currentOverTotals.runs} run${currentOverTotals.runs === 1 ? "" : "s"} and ${currentOverTotals.wickets} wicket${currentOverTotals.wickets === 1 ? "" : "s"} in this over`,
+    insights.push({
+      key: "current-over",
+    label: `Over ${currentOverLabel} live`,
+    detail: `${currentOverTotals.runs} run${currentOverTotals.runs === 1 ? "" : "s"}, ${currentOverTotals.wickets} wicket${currentOverTotals.wickets === 1 ? "" : "s"} this over`,
   });
 
   if (recentOversDisplay?.[0]) {
@@ -1360,12 +1374,12 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
     Array.isArray(teamB?.players) ? teamB.players.length : 0,
   );
   const targetLabelText =
-    targetRuns > 0 ? `Target ${targetRuns}` : `${totalOvers} overs total`;
+    targetRuns > 0 ? `Target ${targetRuns}` : `${totalOvers} overs`;
   const centerMetaText = `${totalPlayers} players`;
   const chaseLineText =
     targetRuns > 0
-      ? `Runs ${chaseRunsLeft} | Balls ${inningsBallsLeft}`
-      : `${totalOvers} overs match`;
+      ? `${chaseRunsLeft} needed | ${inningsBallsLeft} left`
+      : `${totalOvers}-over match`;
   const overlayInsights = useMemo(
     () =>
       buildOverlayInsights({
@@ -1740,7 +1754,7 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
                 <div className="flex w-full items-start justify-between gap-3">
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <p className="text-[7px] font-black uppercase tracking-[0.2em] text-[#f7c948] md:text-[9px] xl:text-[10px]">
-                      Batting
+                      Live
                     </p>
                     <motion.p
                       key={battingShort}
@@ -1815,7 +1829,7 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
                           <span>
                             {match?.innings === "second"
                               ? "Chasing"
-                              : "Batting first"}
+                              : "Setting the total"}
                           </span>
                           <span>
                             {targetRuns > 0
@@ -1906,8 +1920,8 @@ export default function SessionOverlayClient({ sessionId, initialData }) {
                     </span>
                     <span className="shrink-0 text-right">
                       {match?.innings === "second"
-                        ? "Second innings"
-                        : "First innings"}
+                        ? "Chase"
+                        : "1st innings"}
                     </span>
                   </div>
                   <div className="mt-1.5 flex min-w-0 items-start gap-3">
