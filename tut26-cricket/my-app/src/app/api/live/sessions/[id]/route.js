@@ -31,7 +31,7 @@ const STREAM_BOOTSTRAP_PAD = "0".repeat(64);
 const LIVE_SESSION_FIELDS =
   "_id name match teamAName teamBName updatedAt";
 const LIVE_MATCH_FIELDS =
-  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1.team innings1.score innings2.team innings2.score balls activeOverBalls activeOverNumber legalBallCount firstInningsLegalBallCount secondInningsLegalBallCount matchImageUrl liveStream announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled walkieTalkieEnabled mediaUpdatedAt lastLiveEvent lastEventText lastEventType updatedAt";
+  "_id teamA teamB teamAName teamBName overs sessionId tossWinner tossDecision score outs isOngoing innings result pendingResult pendingResultAt resultAutoFinalizeAt innings1.team innings1.score innings2.team innings2.score balls activeOverBalls activeOverNumber legalBallCount firstInningsLegalBallCount secondInningsLegalBallCount matchImageUrl matchImagePublicId matchImageStorageUrlEnc matchImageStorageUrlHash matchImageUploadedAt matchImageUploadedBy liveStream announcerEnabled announcerMode announcerScoreSoundEffectsEnabled announcerBroadcastScoreSoundEffectsEnabled walkieTalkieEnabled mediaUpdatedAt lastLiveEvent lastEventText lastEventType updatedAt";
 const globalSessionSnapshotCache =
   globalThis.__gvLiveSessionSnapshotCache || new Map();
 

@@ -135,6 +135,7 @@ export default function SessionViewClient({ sessionId, initialData }) {
   const pendingResultNavigationRef = useRef("");
   const bottomAnchorRef = useRef(null);
   const requestedHistoryVersionRef = useRef("");
+  const requestedMediaVersionRef = useRef("");
   const inningsGridRef = useRef(null);
   const router = useRouter();
   const { startNavigation } = useRouteFeedback();
@@ -205,11 +206,51 @@ export default function SessionViewClient({ sessionId, initialData }) {
     }
   }, [isHistoryLoading, sessionId]);
 
+  const loadSessionMedia = useCallback(async () => {
+    if (!sessionId) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/view-media`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Could not load session media.");
+      }
+
+      const payload = await response.json().catch(() => null);
+      if (!payload?.media) {
+        throw new Error("Could not load session media.");
+      }
+
+      setData((current) => {
+        if (!current?.match) {
+          return current;
+        }
+
+        return {
+          ...current,
+          match: {
+            ...current.match,
+            ...payload.media,
+          },
+        };
+      });
+    } catch {
+      // Keep the current spectator shell visible even if deferred media fails.
+    }
+  }, [sessionId]);
+
   useEffect(() => {
     setHistoryDetail(null);
     setLiveToolsReady(false);
     setShouldLoadHistoryDetail(false);
     requestedHistoryVersionRef.current = "";
+    requestedMediaVersionRef.current = "";
 
     const frameId = window.requestAnimationFrame(() => {
       setLiveToolsReady(true);
@@ -265,6 +306,20 @@ export default function SessionViewClient({ sessionId, initialData }) {
     requestedHistoryVersionRef.current = nextHistoryVersion;
     void loadSessionHistory();
   }, [loadSessionHistory, match?._id, match?.historyVersion, shouldLoadHistoryDetail]);
+
+  useEffect(() => {
+    if (!match?._id) {
+      return;
+    }
+
+    const nextMediaVersion = String(match.mediaVersion || "");
+    if (!nextMediaVersion || requestedMediaVersionRef.current === nextMediaVersion) {
+      return;
+    }
+
+    requestedMediaVersionRef.current = nextMediaVersion;
+    void loadSessionMedia();
+  }, [loadSessionMedia, match?._id, match?.mediaVersion]);
 
   useEventSource({
     url: sessionId ? `/api/live/sessions/${sessionId}` : null,
