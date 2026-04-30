@@ -303,7 +303,7 @@ test("[security] spectator commentary gives progress reminders and clean undo li
   );
   assert.equal(
     buildSpectatorAnnouncement(undoEvent, match, "full"),
-    "Umpire has removed the score for that ball. Umpire will redo this ball."
+    "Umpire has removed the score for this ball and will redo it."
   );
   assert.equal(buildSpectatorScoreAnnouncement(undoEvent, match), "Score is 4 for 0.");
 });
@@ -499,7 +499,7 @@ test("[security] umpire commentary speaks score buttons and undo with clean word
   );
   assert.equal(
     buildUmpireAnnouncement(undoEvent, "simple"),
-    "Umpire has removed the score for that ball. Umpire will redo this ball."
+    "Umpire has removed the score for this ball and will redo it."
   );
 });
 

@@ -257,14 +257,17 @@ function getCompletedOvers(match) {
   return Math.floor(countLegalBalls(getActiveHistory(match)) / 6);
 }
 
-// Counts completed legal balls in the active innings.
+// Counts completed legal balls in the active innings. Prefers the larger of
+// the compact count and the history count so a stale `legalBallCount` from a
+// partial patch does not silently undercount the over.
 function getCompletedLegalBalls(match) {
   const compactLegalBallCount = Number(match?.legalBallCount);
+  const historyLegalBallCount = countLegalBalls(getActiveHistory(match));
   if (Number.isFinite(compactLegalBallCount) && compactLegalBallCount >= 0) {
-    return compactLegalBallCount;
+    return Math.max(compactLegalBallCount, historyLegalBallCount);
   }
 
-  return countLegalBalls(getActiveHistory(match));
+  return historyLegalBallCount;
 }
 
 // Calculates how many full overs remain in the innings.
