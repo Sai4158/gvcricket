@@ -161,11 +161,26 @@ function getCompactOverStateFromBalls(match) {
     ? reconstructedMatch[activeInningsKey].history
     : [];
   const activeOver = activeHistory.at(-1) || null;
+  const activeLegalBallCount = countLegalBalls(activeHistory);
+  const storedFirst = Number(match?.firstInningsLegalBallCount);
+  const storedSecond = Number(match?.secondInningsLegalBallCount);
 
   return {
     activeOverBalls: Array.isArray(activeOver?.balls) ? activeOver.balls : [],
     activeOverNumber: Number(activeOver?.overNumber || 1),
-    legalBallCount: countLegalBalls(activeHistory),
+    legalBallCount: activeLegalBallCount,
+    firstInningsLegalBallCount:
+      innings === "first"
+        ? activeLegalBallCount
+        : Number.isFinite(storedFirst) && storedFirst >= 0
+          ? storedFirst
+          : countLegalBalls(match?.innings1?.history || []),
+    secondInningsLegalBallCount:
+      innings === "second"
+        ? activeLegalBallCount
+        : Number.isFinite(storedSecond) && storedSecond >= 0
+          ? storedSecond
+          : countLegalBalls(match?.innings2?.history || []),
   };
 }
 
@@ -365,6 +380,9 @@ export function serializeLiveMatchPatch(matchDocument) {
     innings: match?.innings || "first",
     innings1: buildUmpireInnings(match, "innings1", false),
     innings2: buildUmpireInnings(match, "innings2", false),
+    tossWinner: match?.tossWinner || "",
+    tossDecision: match?.tossDecision || "",
+    tossReady: hasCompleteTossState(match),
     result: normalizeMatchResultText(match, match?.result || ""),
     pendingResult: normalizeMatchResultText(match, match?.pendingResult || ""),
     pendingResultAt: match?.pendingResultAt || null,
@@ -668,6 +686,8 @@ export function serializeSessionViewBootstrap(
     legalBallCount: compactOverState.legalBallCount,
     activeOverNumber: compactOverState.activeOverNumber,
     activeOverBalls: compactOverState.activeOverBalls,
+    firstInningsLegalBallCount: compactOverState.firstInningsLegalBallCount,
+    secondInningsLegalBallCount: compactOverState.secondInningsLegalBallCount,
     historyVersion: getHistoryVersion(match),
     mediaVersion: getMediaVersion(match),
     lastLiveEvent: match.lastLiveEvent || null,

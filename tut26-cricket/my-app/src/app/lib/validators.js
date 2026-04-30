@@ -89,7 +89,7 @@ const secretPinSchema = z
   .regex(/^\d{6}$/, "PIN must be 6 digits.");
 const ballSchema = z
   .object({
-    runs: z.number().int().min(0).max(7),
+    runs: z.number().int().min(0).max(6),
     isOut: z.boolean().default(false),
     extraType: z.enum(["wide", "noball", "byes", "legbyes"]).nullable().optional(),
     batsmanOnStrike: optionalStringSchema.optional(),
@@ -289,27 +289,10 @@ const actionBaseSchema = z.object({
 
 export const matchScoreSchema = actionBaseSchema
   .extend({
-    runs: z.number().int().min(0).max(7),
+    runs: z.number().int().min(0).max(6),
     isOut: z.boolean().default(false),
     extraType: z.enum(["wide", "noball"]).nullable().default(null),
   })
-  .refine(
-    (value) => {
-      if (value.extraType === "wide") {
-        return value.runs >= 0;
-      }
-
-      if (value.extraType === "noball") {
-        return value.runs >= 0;
-      }
-
-      return value.runs <= 6;
-    },
-    {
-      message: "runs is invalid.",
-      path: ["runs"],
-    }
-  )
   .strict();
 
 export const matchActionSchema = z.discriminatedUnion("type", [

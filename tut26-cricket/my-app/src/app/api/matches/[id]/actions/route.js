@@ -165,7 +165,7 @@ export async function POST(req, { params }) {
     if (!match) {
       return jsonError("Match not found.", 404);
     }
-    const finalizedMatch = await finalizePendingResultIfExpired(match);
+    let finalizedMatch = await finalizePendingResultIfExpired(match);
 
     const hasAccess = await hasMatchAccess(
       id,
@@ -402,6 +402,16 @@ export async function POST(req, { params }) {
             },
           },
         );
+      }
+    }
+
+    // The fast undo path may have loaded `finalizedMatch` as a raw object via
+    // Match.collection.findOne. Anything that needs a Mongoose document below
+    // (e.g. `.save()`) must re-fetch first to avoid TypeErrors.
+    if (shouldUseFastUndoPath && typeof finalizedMatch.save !== "function") {
+      finalizedMatch = await Match.findById(id);
+      if (!finalizedMatch) {
+        return jsonError("Match not found.", 404);
       }
     }
 

@@ -144,8 +144,10 @@ function normalizeOptimisticMatch(nextMatch) {
     : activeHistory.length
       ? countLegalBalls(activeHistory)
       : countLegalBallsInBalls(activeOverBalls);
+  // Trust the explicit count when it's present so undo / engine corrections
+  // don't get clamped to a stale optimistic value.
   const legalBallCount = Number.isFinite(Number(nextMatch?.legalBallCount))
-    ? Math.max(derivedLegalBallCount, Number(nextMatch.legalBallCount || 0))
+    ? Number(nextMatch.legalBallCount || 0)
     : derivedLegalBallCount;
   const firstInningsLegalBallCount = Number.isFinite(
     Number(nextMatch?.firstInningsLegalBallCount),

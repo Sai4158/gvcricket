@@ -17,6 +17,8 @@ const emitter = globalThis.__gvLiveEmitter || new EventEmitter();
 globalThis.__gvLiveEmitter = emitter;
 emitter.setMaxListeners(500);
 const WATCHER_IDLE_SHUTDOWN_MS = 60_000;
+const WATCHER_RECONNECT_DELAY_MS = 1_500;
+const WATCHER_RECONNECT_MAX_DELAY_MS = 15_000;
 
 const state = globalThis.__gvLiveState || {
   initialized: false,
@@ -26,6 +28,8 @@ const state = globalThis.__gvLiveState || {
   matchSubscribers: new Map(),
   sessionSubscribers: new Map(),
   idleShutdownTimer: null,
+  reconnectTimer: null,
+  reconnectDelay: WATCHER_RECONNECT_DELAY_MS,
 };
 globalThis.__gvLiveState = state;
 
@@ -109,6 +113,36 @@ function scheduleIdleShutdown() {
   }, WATCHER_IDLE_SHUTDOWN_MS);
 }
 
+function clearReconnectTimer() {
+  if (state.reconnectTimer) {
+    clearTimeout(state.reconnectTimer);
+    state.reconnectTimer = null;
+  }
+}
+
+function scheduleReconnect() {
+  if (state.reconnectTimer) {
+    return;
+  }
+  if (getTotalSubscriberCount() === 0) {
+    return;
+  }
+
+  const delay = state.reconnectDelay;
+  state.reconnectDelay = Math.min(
+    Math.max(WATCHER_RECONNECT_DELAY_MS, delay * 2),
+    WATCHER_RECONNECT_MAX_DELAY_MS,
+  );
+
+  state.reconnectTimer = setTimeout(() => {
+    state.reconnectTimer = null;
+    void ensureLiveUpdates().catch((error) => {
+      console.error("Live updates reconnect failed:", error);
+      scheduleReconnect();
+    });
+  }, delay);
+}
+
 async function startWatchers() {
   await connectDB();
 
@@ -131,6 +165,12 @@ async function startWatchers() {
       console.error("Match change stream error:", error);
       state.matchWatcher = null;
       state.initialized = false;
+      scheduleReconnect();
+    });
+    state.matchWatcher.on("close", () => {
+      state.matchWatcher = null;
+      state.initialized = false;
+      scheduleReconnect();
     });
   }
 
@@ -145,14 +185,23 @@ async function startWatchers() {
       console.error("Session change stream error:", error);
       state.sessionWatcher = null;
       state.initialized = false;
+      scheduleReconnect();
+    });
+    state.sessionWatcher.on("close", () => {
+      state.sessionWatcher = null;
+      state.initialized = false;
+      scheduleReconnect();
     });
   }
+
+  state.reconnectDelay = WATCHER_RECONNECT_DELAY_MS;
 }
 
 export async function ensureLiveUpdates() {
   clearIdleShutdownTimer();
+  clearReconnectTimer();
 
-  if (state.initialized) return;
+  if (state.initialized && state.matchWatcher && state.sessionWatcher) return;
   if (state.initializing) {
     await state.initializing;
     return;
@@ -161,6 +210,10 @@ export async function ensureLiveUpdates() {
   state.initializing = startWatchers()
     .then(() => {
       state.initialized = true;
+    })
+    .catch((error) => {
+      state.initialized = false;
+      throw error;
     })
     .finally(() => {
       state.initializing = null;
@@ -176,6 +229,12 @@ export function subscribeToMatch(matchId, callback) {
     Number(state.matchSubscribers.get(String(matchId)) || 0) + 1;
   state.matchSubscribers.set(String(matchId), nextCount);
   emitter.on(eventName, callback);
+  if (!state.matchWatcher || !state.sessionWatcher) {
+    void ensureLiveUpdates().catch((error) => {
+      console.error("Live updates ensure on subscribe failed:", error);
+      scheduleReconnect();
+    });
+  }
   return () => {
     emitter.off(eventName, callback);
     const currentCount = Number(state.matchSubscribers.get(String(matchId)) || 0);
@@ -196,6 +255,12 @@ export function subscribeToSession(sessionId, callback) {
     Number(state.sessionSubscribers.get(String(sessionId)) || 0) + 1;
   state.sessionSubscribers.set(String(sessionId), nextCount);
   emitter.on(eventName, callback);
+  if (!state.matchWatcher || !state.sessionWatcher) {
+    void ensureLiveUpdates().catch((error) => {
+      console.error("Live updates ensure on subscribe failed:", error);
+      scheduleReconnect();
+    });
+  }
   return () => {
     emitter.off(eventName, callback);
     const currentCount = Number(state.sessionSubscribers.get(String(sessionId)) || 0);

@@ -229,13 +229,16 @@ function buildScoreWriteOperation(nextState, currentMatch, actionId) {
 }
 
 function buildScoreWriteFilter(match) {
+  // Use field-level optimistic concurrency instead of `updatedAt` so unrelated
+  // writers (image uploads, session mirror) don't force the score retry loop.
   const filter = {
     _id: match?._id,
+    score: Number(match?.score || 0),
+    outs: Number(match?.outs || 0),
+    innings: match?.innings || "first",
+    legalBallCount: Number(match?.legalBallCount || 0),
+    undoSequence: Number(match?.undoSequence || 0),
   };
-
-  if (match?.updatedAt) {
-    filter.updatedAt = match.updatedAt;
-  }
 
   return filter;
 }
@@ -331,9 +334,22 @@ export async function POST(req, { params }) {
         parsedRequest.value.actionId,
       );
 
-      let createdUndoEntryId = null;
+      // Try the Match update first under field-level optimistic concurrency.
+      // If another writer raced us, retry with a fresh read instead of leaving
+      // an orphan undo snapshot behind.
+      const scoreUpdateResult = await Match.collection.updateOne(
+        buildScoreWriteFilter(finalizedMatch),
+        writeOperation,
+      );
+      if (!scoreUpdateResult?.matchedCount) {
+        continue;
+      }
+
+      // Persist the undo snapshot AFTER the Match commit. Failure here only
+      // costs the user the ability to undo this one ball, never corrupts the
+      // live match state.
       try {
-        const createdUndoEntry = await MatchUndoEntry.collection.insertOne({
+        await MatchUndoEntry.collection.insertOne({
           matchId: finalizedMatch._id,
           sequence: updatedMatch.undoSequence,
           actionId: parsedRequest.value.actionId,
@@ -342,26 +358,10 @@ export async function POST(req, { params }) {
           createdAt: new Date(),
           updatedAt: new Date(),
         });
-        createdUndoEntryId = createdUndoEntry?.insertedId || null;
       } catch (error) {
-        if (isDuplicateKeyError(error)) {
-          continue;
+        if (!isDuplicateKeyError(error)) {
+          console.error("Could not create score undo snapshot:", error);
         }
-        console.error("Could not create score undo snapshot:", error);
-        return jsonError("Could not update the match.", 500);
-      }
-
-      const scoreUpdateResult = await Match.collection.updateOne(
-        buildScoreWriteFilter(finalizedMatch),
-        writeOperation,
-      );
-      if (!scoreUpdateResult?.matchedCount) {
-        if (createdUndoEntryId) {
-          await MatchUndoEntry.collection
-            .deleteOne({ _id: createdUndoEntryId })
-            .catch(() => {});
-        }
-        continue;
       }
 
       invalidateSessionsDataCache();
