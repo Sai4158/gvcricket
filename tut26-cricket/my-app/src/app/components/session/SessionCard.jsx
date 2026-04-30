@@ -272,11 +272,12 @@ function SessionCard({
         return response.json().catch(() => null);
       })
       .then((payload) => {
-        if (!payload || !Array.isArray(payload.matchImages) || !payload.matchImages.length) {
+        const media = payload?.media || null;
+        if (!media || !Array.isArray(media.matchImages) || !media.matchImages.length) {
           return;
         }
 
-        setGalleryImages(payload.matchImages);
+        setGalleryImages(media.matchImages);
       })
       .catch(() => {});
 
@@ -438,6 +439,12 @@ function SessionCard({
       <div className="relative flex h-full flex-col">
         <div className="flex flex-col gap-3">
           <div className="relative min-w-0 pt-12">
+            {hasLiveStream ? (
+              <span className="absolute left-0 top-0 inline-flex items-center gap-2 rounded-full border border-red-400/22 bg-[linear-gradient(135deg,rgba(239,68,68,0.18),rgba(127,29,29,0.26))] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-red-100 shadow-[0_10px_24px_rgba(239,68,68,0.12)]">
+                <FaYoutube className="text-[11px] text-red-300" />
+                <span>YouTube</span>
+              </span>
+            ) : null}
             <span
               className={`absolute right-0 top-0 inline-flex w-fit max-w-full whitespace-nowrap items-center gap-2 self-start rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
                 statusMeta.tone === "live"
